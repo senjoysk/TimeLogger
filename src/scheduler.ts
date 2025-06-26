@@ -90,6 +90,25 @@ export class Scheduler {
     console.log(`  ✅ 日次サマリースケジュール (UTC: ${cronPattern}) を開始しました`);
   }
 
+  private startApiCostReportSchedule(): void {
+    // 毎日09:05 UTC (18:05 JST) に実行するcron式
+    const cronPattern = '5 9 * * *';
+
+    const job = cron.schedule(cronPattern, async () => {
+      try {
+        console.log('💰 APIコストレポートスケジュールが実行されました (UTC)');
+        await this.bot.sendApiCostReport();
+      } catch (error) {
+        console.error('❌ APIコストレポートスケジュール実行エラー:', error);
+      }
+    }, {
+      scheduled: true,
+    });
+
+    this.jobs.set('apiCostReport', job);
+    console.log(`  ✅ APIコストレポートスケジュール (UTC: ${cronPattern}) を開始しました`);
+  }
+
   /**
    * スケジュール情報をログ出力
    */

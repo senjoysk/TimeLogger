@@ -292,6 +292,88 @@ export class Database {
     });
   }
 
+  public async saveApiUsageLog(
+    log: { operation: string; inputTokens: number; outputTokens: number; cost: number; }
+  ): Promise<void> {
+    if (!this.db) {
+      throw new Error('データベースが初期化されていません');
+    }
+
+    const sql = `
+      INSERT INTO api_usage_logs (id, operation, input_tokens, output_tokens, cost, created_at)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `;
+
+    const params = [
+      require('uuid').v4(),
+      log.operation,
+      log.inputTokens,
+      log.outputTokens,
+      log.cost,
+      formatDateTime(new Date()),
+    ];
+
+    return new Promise((resolve, reject) => {
+      this.db!.run(sql, params, function(error) {
+        if (error) {
+          reject(error);
+        } else {
+          resolve();
+        }
+      });
+    });
+  }
+
+  public async getApiUsageStats(date: string): Promise<{ 
+    totalCalls: number; 
+    totalInputTokens: number; 
+    totalOutputTokens: number; 
+    totalCost: number; 
+    callsByOperation: { [operation: string]: number; };
+  }> {
+    if (!this.db) {
+      throw new Error('データベースが初期化されていません');
+    }
+
+    const sql = `
+      SELECT 
+        operation,
+        COUNT(*) as call_count,
+        SUM(input_tokens) as total_input,
+        SUM(output_tokens) as total_output,
+        SUM(cost) as total_cost
+      FROM api_usage_logs
+      WHERE DATE(created_at) = ?
+      GROUP BY operation
+    `;
+
+    return new Promise((resolve, reject) => {
+      this.db!.all(sql, [date], (error, rows: any[]) => {
+        if (error) {
+          reject(error);
+        } else {
+          const stats = {
+            totalCalls: 0,
+            totalInputTokens: 0,
+            totalOutputTokens: 0,
+            totalCost: 0,
+            callsByOperation: {} as { [operation: string]: number; },
+          };
+
+          rows.forEach(row => {
+            stats.totalCalls += row.call_count;
+            stats.totalInputTokens += row.total_input;
+            stats.totalOutputTokens += row.total_output;
+            stats.totalCost += row.total_cost;
+            stats.callsByOperation[row.operation] = row.call_count;
+          });
+
+          resolve(stats);
+        }
+      });
+    });
+  }
+
   /**
    * データベースの行を ActivityRecord に変換
    */

@@ -41,7 +41,7 @@ export class TaskLoggerBot {
 
     // サービスの初期化
     this.database = new Database();
-    this.geminiService = new GeminiService();
+    this.geminiService = new GeminiService(this.database);
     this.activityService = new ActivityService(this.database, this.geminiService);
     this.summaryService = new SummaryService(this.database, this.geminiService);
 
@@ -173,11 +173,21 @@ export class TaskLoggerBot {
     console.log(`✅ 処理対象メッセージ: "${content}"`);
     
     try {
-      // メッセージの種類に応じて処理を分岐
-      if (this.isSummaryRequest(content)) {
-        console.log('  ↳ [DEBUG] サマリー要求として処理');
-        await this.handleSummaryRequest(message);
+      // コマンドとして処理を試みる
+      if (content.startsWith(config.discord.commandPrefix)) {
+        const command = content.slice(config.discord.commandPrefix.length).trim().toLowerCase();
+        if (command === 'summary') {
+          console.log('  ↳ [DEBUG] コマンド: サマリー要求として処理');
+          await this.handleSummaryRequest(message);
+        } else if (command === 'cost') {
+          console.log('  ↳ [DEBUG] コマンド: API費用レポート要求として処理');
+          await this.handleCostReportRequest(message);
+        } else {
+          await message.reply(`不明なコマンドです: ${config.discord.commandPrefix}${command}
+利用可能なコマンド: ${config.discord.commandPrefix}summary, ${config.discord.commandPrefix}cost`);
+        }
       } else {
+        // コマンドではない場合、活動記録として処理
         console.log('  ↳ [DEBUG] 活動記録として処理');
         await this.handleActivityLog(message, content);
       }
@@ -188,25 +198,8 @@ export class TaskLoggerBot {
   }
 
   /**
-   * サマリー要求かどうかを判定
-   * @param content メッセージ内容
-   * @returns サマリー要求の場合true
-   */
-  private isSummaryRequest(content: string): boolean {
-    const summaryKeywords = [
-      'サマリー', 'まとめ', '要約', '集計', 
-      '今日', '一日', '振り返り', 'summary'
-    ];
-    
-    return summaryKeywords.some(keyword => 
-      content.toLowerCase().includes(keyword.toLowerCase())
-    );
-  }
-
-  /**
-   * 活動記録を処理
+   * サマリー要求を処理
    * @param message メッセージオブジェクト
-   * @param content メッセージ内容
    */
   private async handleActivityLog(message: Message, content: string): Promise<void> {
     console.log(`📝 [DEBUG] 活動記録処理開始: ${message.author.tag} - "${content}"`);
@@ -289,6 +282,39 @@ export class TaskLoggerBot {
     }
 
     this.status.lastSummaryTime = new Date();
+  }
+
+  /**
+   * API費用レポート要求を処理
+   * @param message メッセージオブジェクト
+   */
+  private async handleCostReportRequest(message: Message): Promise<void> {
+    console.log(`💰 [DEBUG] API費用レポート要求処理開始: ${message.author.tag}`);
+    
+    try {
+      // API費用レポートを生成
+      console.log('  ↳ [DEBUG] GeminiServiceでAPI費用レポート取得中...');
+      const costReport = await this.geminiService.getDailyCostReport();
+      
+      // コスト警告もチェック
+      const alert = await this.geminiService.checkCostAlerts();
+      
+      let responseMessage = costReport;
+      if (alert) {
+        responseMessage = `${alert.message}\n\n${costReport}`;
+      }
+      
+      console.log('  ↳ [DEBUG] API費用レポート送信中...');
+      await message.reply(responseMessage);
+      console.log('  ↳ [DEBUG] API費用レポート送信完了');
+
+    } catch (error) {
+      console.error('❌ [DEBUG] API費用レポート生成エラー:', error);
+      await message.reply(
+        '申し訳ありません。API費用レポートの生成中にエラーが発生しました。\n' +
+        'しばらく時間をおいて再度お試しください。'
+      );
+    }
   }
 
   /**
@@ -379,6 +405,39 @@ export class TaskLoggerBot {
       } catch (fallbackError) {
         console.error('❌ フォールバックメッセージ送信もエラー:', fallbackError);
       }
+    }
+  }
+
+  public async sendApiCostReport(): Promise<void> {
+    try {
+      const user = await this.client.users.fetch(config.discord.targetUserId);
+      if (!user) {
+        console.error('❌ 対象ユーザーが見つかりません');
+        return;
+      }
+      const dmChannel = await user.createDM();
+
+      const report = await this.geminiService.getDailyCostReport();
+      await dmChannel.send(report);
+      console.log('✅ APIコストレポートを送信しました');
+    } catch (error) {
+      console.error('❌ APIコストレポート送信エラー:', error);
+    }
+  }
+
+  public async sendCostAlert(message: string): Promise<void> {
+    try {
+      const user = await this.client.users.fetch(config.discord.targetUserId);
+      if (!user) {
+        console.error('❌ 対象ユーザーが見つかりません');
+        return;
+      }
+      const dmChannel = await user.createDM();
+
+      await dmChannel.send(`🚨 **コスト警告** 🚨\n${message}`);
+      console.log('✅ コスト警告を送信しました');
+    } catch (error) {
+      console.error('❌ コスト警告送信エラー:', error);
     }
   }
 

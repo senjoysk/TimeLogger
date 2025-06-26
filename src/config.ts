@@ -12,7 +12,8 @@ export const config = {
   discord: {
     token: process.env.DISCORD_TOKEN || '',
     clientId: process.env.DISCORD_CLIENT_ID || '',
-    targetUserId: process.env.TARGET_USER_ID || '', // タスク記録対象のユーザーID
+    targetUserId: process.env.TARGET_USER_ID || '',
+    commandPrefix: process.env.COMMAND_PREFIX || '!',
   },
   
   // Google Gemini API設定

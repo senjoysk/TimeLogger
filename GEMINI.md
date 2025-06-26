@@ -103,3 +103,23 @@ This application is a Discord bot that tracks user activities and generates summ
 - **Follow TDD**: When asked to add a feature, start by creating a test file in `src/__tests__/`.
 - **Stay Consistent**: Mimic the style, structure, and architectural patterns of the existing codebase.
 - **Verify Changes**: After making changes, run `npm test` to ensure that all tests still pass.
+
+## 9. API Cost Monitoring
+
+This project includes a built-in mechanism to monitor Google Gemini API usage and estimate associated costs. This is crucial for maintaining operational transparency and preventing unexpected expenses.
+
+- **Monitored API**: Google Gemini API (specifically, calls made via `GeminiService`).
+- **Monitored Metrics**:
+  - API call count per operation (`analyzeActivity`, `generateDailySummary`).
+  - Total input tokens consumed.
+  - Total output tokens generated.
+  - Estimated cost based on current Gemini 1.5 Flash pricing.
+- **Cost Calculation Basis**: Costs are estimated using the latest known pricing for Gemini 1.5 Flash (as of June 2024). These are estimates and may not reflect exact billing.
+- **Data Persistence**: All API usage logs (operation, tokens, cost, timestamp) are persisted in the SQLite database (`api_usage_logs` table).
+- **Daily Report**: A daily API usage report is automatically generated and sent to the configured `targetUserId` via Discord DM at **18:05 JST (09:05 UTC)**. You can also request an on-demand report by sending the command `!cost` (or `/cost` depending on `COMMAND_PREFIX` in `.env`) to the bot in a direct message.
+- **Cost Alerts**: Automated alerts are triggered and sent to the `targetUserId` via Discord DM under the following conditions:
+  - Estimated monthly cost exceeds $20 (warning level).
+  - Estimated monthly cost exceeds $50 (critical level).
+  - Daily API call count exceeds 50 (warning level).
+
+Developers should regularly review these reports and alerts to manage API consumption effectively.

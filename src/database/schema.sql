@@ -23,16 +23,20 @@ CREATE TABLE IF NOT EXISTS activity_records (
 -- 日次サマリーテーブル
 CREATE TABLE IF NOT EXISTS daily_summaries (
     id TEXT PRIMARY KEY,
-    user_id TEXT NOT NULL,
-    business_date TEXT NOT NULL, -- 'YYYY-MM-DD' 形式の業務日
-    
-    -- サマリー内容（JSON形式で保存）
-    category_totals TEXT NOT NULL, -- CategoryTotal[] のJSON
-    total_minutes INTEGER NOT NULL DEFAULT 0,
-    insights TEXT, -- Geminiが生成した感想
-    motivation TEXT, -- 明日に向けた前向きな一言
-    
-    generated_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
+    userId TEXT NOT NULL,
+    date TEXT NOT NULL,
+    summaryData TEXT NOT NULL,
+    createdAt TEXT NOT NULL,
+    UNIQUE(userId, date)
+);
+
+CREATE TABLE IF NOT EXISTS api_usage_logs (
+    id TEXT PRIMARY KEY,
+    operation TEXT NOT NULL,
+    input_tokens INTEGER NOT NULL,
+    output_tokens INTEGER NOT NULL,
+    cost REAL NOT NULL,
+    created_at TEXT NOT NULL
 );
 
 -- インデックスの作成

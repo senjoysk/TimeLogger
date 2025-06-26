@@ -1,6 +1,8 @@
 import { GoogleGenerativeAI, GenerativeModel } from '@google/generative-ai';
 import { config } from '../config';
 import { ActivityAnalysis, ActivityRecord, DailySummary, CategoryTotal } from '../types';
+import { ApiCostMonitor } from './apiCostMonitor';
+import { Database } from '../database/database';
 
 /**
  * Google Gemini API サービスクラス
@@ -9,8 +11,9 @@ import { ActivityAnalysis, ActivityRecord, DailySummary, CategoryTotal } from '.
 export class GeminiService {
   private genAI: GoogleGenerativeAI;
   private model: GenerativeModel;
+  private costMonitor: ApiCostMonitor;
 
-  constructor() {
+  constructor(database: Database) {
     // Gemini API の初期化
     this.genAI = new GoogleGenerativeAI(config.gemini.apiKey);
     
@@ -23,6 +26,9 @@ export class GeminiService {
         maxOutputTokens: 1000, // 十分な出力長
       },
     });
+    
+    // API使用量監視の初期化
+    this.costMonitor = new ApiCostMonitor(database);
   }
 
   /**
@@ -46,6 +52,17 @@ export class GeminiService {
       // Gemini API 呼び出し
       const result = await this.model.generateContent(prompt);
       const response = result.response;
+
+      // トークン使用量を記録
+      if (response.usageMetadata) {
+        const { promptTokenCount, candidatesTokenCount } = response.usageMetadata;
+        await this.costMonitor.recordApiCall('analyzeActivity', promptTokenCount, candidatesTokenCount);
+        const alert = await this.costMonitor.checkCostAlerts();
+        if (alert) {
+          console.warn(`🚨 コスト警告: ${alert.message}`);
+        }
+      }
+
       const responseText = response.text();
 
       // JSON レスポンスをパース
@@ -85,6 +102,17 @@ export class GeminiService {
       // Gemini API 呼び出し
       const result = await this.model.generateContent(prompt);
       const response = result.response;
+
+      // トークン使用量を記録
+      if (response.usageMetadata) {
+        const { promptTokenCount, candidatesTokenCount } = response.usageMetadata;
+        await this.costMonitor.recordApiCall('generateDailySummary', promptTokenCount, candidatesTokenCount);
+        const alert = await this.costMonitor.checkCostAlerts();
+        if (alert) {
+          console.warn(`🚨 コスト警告: ${alert.message}`);
+        }
+      }
+
       const responseText = response.text();
 
       // JSON レスポンスをパース
@@ -285,4 +313,27 @@ ${categoryList}
       generatedAt: new Date().toISOString(),
     };
   }
+
+  /**
+   * API使用量の統計を取得
+   */
+  public getCostStats() {
+    return this.costMonitor.getTodayStats();
+  }
+
+  /**
+   * API使用量の日次レポートを取得
+   */
+  public async getDailyCostReport(): Promise<string> {
+    return await this.costMonitor.generateDailyReport();
+  }
+
+  /**
+   * コスト警告をチェック
+   */
+  public async checkCostAlerts() {
+    return await this.costMonitor.checkCostAlerts();
+  }
+
+  
 }
