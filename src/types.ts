@@ -61,6 +61,22 @@ export interface CategoryTotal {
   recordCount: number;
   /** 平均生産性レベル */
   averageProductivity: number;
+  /** サブカテゴリ別の詳細（オプション） */
+  subCategories?: SubCategoryTotal[];
+}
+
+/**
+ * サブカテゴリ別の活動集計
+ */
+export interface SubCategoryTotal {
+  /** サブカテゴリ名 */
+  subCategory: string;
+  /** 合計活動時間（分） */
+  totalMinutes: number;
+  /** そのサブカテゴリの活動記録数 */
+  recordCount: number;
+  /** 平均生産性レベル */
+  averageProductivity: number;
 }
 
 /**

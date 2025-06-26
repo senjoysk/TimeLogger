@@ -1,4 +1,4 @@
-import { DailySummary, ActivityRecord, CategoryTotal } from '../types';
+import { DailySummary, ActivityRecord, CategoryTotal, SubCategoryTotal } from '../types';
 import { Database } from '../database/database';
 import { GeminiService } from './geminiService';
 import { getCurrentBusinessDate } from '../utils/timeUtils';
@@ -147,28 +147,50 @@ export class SummaryService {
       ? `${totalHours}時間${totalMinutesRemainder}分` 
       : `${totalMinutesRemainder}分`;
 
-    // 上位3カテゴリのみ表示
-    const topCategories = summary.categoryTotals
-      .sort((a, b) => b.totalMinutes - a.totalMinutes)
-      .slice(0, 3)
-      .map(cat => {
-        const hours = Math.floor(cat.totalMinutes / 60);
-        const minutes = cat.totalMinutes % 60;
-        const timeStr = hours > 0 ? `${hours}h${minutes}m` : `${minutes}m`;
-        return `${cat.category}(${timeStr})`;
-      })
-      .join(', ');
+    // カテゴリを詳細表示（2段階の粒度）
+    const categoryBreakdown = this.buildDetailedCategoryBreakdown(summary.categoryTotals);
 
     return [
-      '🌅 **今日一日お疲れさまでした！**',
+      '📊 **今日の活動サマリー**',
       '',
       `⏱️ 総活動時間: **${totalTimeStr}**`,
-      `📊 主な活動: ${topCategories}`,
       '',
-      `💭 ${summary.insights}`,
-      '',
-      `🌟 ${summary.motivation}`,
+      '📋 **活動内訳**',
+      categoryBreakdown,
     ].join('\n');
+  }
+
+  /**
+   * 詳細なカテゴリ内訳を構築（2段階の粒度）
+   * @param categoryTotals カテゴリ別集計
+   * @returns フォーマットされた内訳文字列
+   */
+  private buildDetailedCategoryBreakdown(categoryTotals: CategoryTotal[]): string {
+    // カテゴリを時間順でソート
+    const sortedCategories = categoryTotals.sort((a, b) => b.totalMinutes - a.totalMinutes);
+    
+    return sortedCategories.map(cat => {
+      const hours = Math.floor(cat.totalMinutes / 60);
+      const minutes = cat.totalMinutes % 60;
+      const timeStr = hours > 0 ? `${hours}h${minutes}m` : `${minutes}m`;
+      
+      let result = `• **${cat.category}**: ${timeStr}`;
+      
+      // サブカテゴリがある場合は詳細表示
+      if (cat.subCategories && cat.subCategories.length > 0) {
+        const subCategoryDetails = cat.subCategories.map(sub => {
+          const subHours = Math.floor(sub.totalMinutes / 60);
+          const subMinutes = sub.totalMinutes % 60;
+          const subTimeStr = subHours > 0 ? `${subHours}h${subMinutes}m` : `${subMinutes}m`;
+          
+          return `  - ${sub.subCategory}: ${subTimeStr}`;
+        }).join('\n');
+        
+        result += '\n' + subCategoryDetails;
+      }
+      
+      return result;
+    }).join('\n');
   }
 
   /**

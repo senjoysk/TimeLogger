@@ -1,6 +1,6 @@
 import { GoogleGenerativeAI, GenerativeModel } from '@google/generative-ai';
 import { config } from '../config';
-import { ActivityAnalysis, ActivityRecord, DailySummary, CategoryTotal } from '../types';
+import { ActivityAnalysis, ActivityRecord, DailySummary, CategoryTotal, SubCategoryTotal } from '../types';
 import { ApiCostMonitor } from './apiCostMonitor';
 import { Database } from '../database/database';
 
@@ -257,37 +257,117 @@ ${categoryList}
   }
 
   /**
-   * カテゴリ別集計を計算
+   * カテゴリ別集計を計算（重複排除版）
+   * 同一時間枠では最も詳細な記録を使用し、実際の活動時間を正確に計算
    */
   private calculateCategoryTotals(activities: ActivityRecord[]): CategoryTotal[] {
+    // 時間枠ごとにグループ化して重複を排除
+    const timeSlotMap = new Map<string, ActivityRecord[]>();
+    
+    activities.forEach(activity => {
+      const timeSlot = activity.timeSlot;
+      if (!timeSlotMap.has(timeSlot)) {
+        timeSlotMap.set(timeSlot, []);
+      }
+      timeSlotMap.get(timeSlot)!.push(activity);
+    });
+
+    // 各時間枠で重複を解決し、実際の時間を計算
+    const resolvedActivities: { category: string; subCategory?: string; minutes: number; productivityLevel: number }[] = [];
+    
+    timeSlotMap.forEach((slotActivities, timeSlot) => {
+      if (slotActivities.length === 1) {
+        // 単一の記録の場合はそのまま使用
+        const activity = slotActivities[0];
+        resolvedActivities.push({
+          category: activity.analysis.category,
+          subCategory: activity.analysis.subCategory,
+          minutes: Math.min(activity.analysis.estimatedMinutes, 30), // 30分枠を超えないよう制限
+          productivityLevel: activity.analysis.productivityLevel
+        });
+      } else {
+        // 複数記録がある場合の処理
+        const categoryMinutesMap = new Map<string, number>();
+        let totalProductivity = 0;
+        let totalRecords = 0;
+
+        slotActivities.forEach(activity => {
+          const category = activity.analysis.category;
+          const currentMinutes = categoryMinutesMap.get(category) || 0;
+          categoryMinutesMap.set(category, currentMinutes + activity.analysis.estimatedMinutes);
+          totalProductivity += activity.analysis.productivityLevel;
+          totalRecords++;
+        });
+
+        // 30分枠内で各カテゴリの時間を正規化
+        const totalCategoryMinutes = Array.from(categoryMinutesMap.values()).reduce((sum, minutes) => sum + minutes, 0);
+        const normalizedRatio = Math.min(30, totalCategoryMinutes) / totalCategoryMinutes;
+
+        categoryMinutesMap.forEach((minutes, category) => {
+          const normalizedMinutes = Math.round(minutes * normalizedRatio);
+          if (normalizedMinutes > 0) {
+            resolvedActivities.push({
+              category,
+              minutes: normalizedMinutes,
+              productivityLevel: Math.round(totalProductivity / totalRecords * 10) / 10
+            });
+          }
+        });
+      }
+    });
+
+    // カテゴリ別に集計（サブカテゴリ詳細も含む）
     const categoryMap = new Map<string, {
       totalMinutes: number;
       recordCount: number;
       productivitySum: number;
+      subCategoryMap: Map<string, { totalMinutes: number; recordCount: number; productivitySum: number }>;
     }>();
 
-    // 各活動をカテゴリ別に集計
-    activities.forEach(activity => {
-      const category = activity.analysis.category;
+    resolvedActivities.forEach(resolved => {
+      const category = resolved.category;
+      const subCategory = resolved.subCategory || 'その他';
+      
       const existing = categoryMap.get(category) || {
         totalMinutes: 0,
         recordCount: 0,
         productivitySum: 0,
+        subCategoryMap: new Map()
       };
 
-      existing.totalMinutes += activity.analysis.estimatedMinutes;
+      existing.totalMinutes += resolved.minutes;
       existing.recordCount += 1;
-      existing.productivitySum += activity.analysis.productivityLevel;
+      existing.productivitySum += resolved.productivityLevel;
+
+      // サブカテゴリも集計
+      const subCategoryData = existing.subCategoryMap.get(subCategory) || {
+        totalMinutes: 0,
+        recordCount: 0,
+        productivitySum: 0
+      };
       
+      subCategoryData.totalMinutes += resolved.minutes;
+      subCategoryData.recordCount += 1;
+      subCategoryData.productivitySum += resolved.productivityLevel;
+      
+      existing.subCategoryMap.set(subCategory, subCategoryData);
       categoryMap.set(category, existing);
     });
 
-    // CategoryTotal[] 形式に変換
+    // CategoryTotal[] 形式に変換（サブカテゴリ詳細付き）
     return Array.from(categoryMap.entries()).map(([category, data]) => ({
       category,
       totalMinutes: data.totalMinutes,
       recordCount: data.recordCount,
       averageProductivity: Math.round(data.productivitySum / data.recordCount * 10) / 10,
+      subCategories: Array.from(data.subCategoryMap.entries())
+        .map(([subCategory, subData]) => ({
+          subCategory,
+          totalMinutes: subData.totalMinutes,
+          recordCount: subData.recordCount,
+          averageProductivity: Math.round(subData.productivitySum / subData.recordCount * 10) / 10,
+        }))
+        .sort((a, b) => b.totalMinutes - a.totalMinutes) // サブカテゴリも時間順でソート
     }));
   }
 

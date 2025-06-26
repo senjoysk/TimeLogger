@@ -112,7 +112,7 @@ describe('SummaryService', () => {
       );
 
       // 検証：データベースに保存されたか
-      expect(mockDatabase.saveDailySummary).toHaveBeenCalledWith(mockGeminiSummary);
+      expect(mockDatabase.saveDailySummary).toHaveBeenCalledWith(mockGeminiSummary, 'Asia/Tokyo');
     });
 
     it('活動記録がない場合は空のサマリーを生成する', async () => {
@@ -281,14 +281,11 @@ describe('SummaryService', () => {
       const result = summaryService.formatBriefSummary(summary);
 
       // 検証：必要な情報が含まれているか
-      expect(result).toContain('今日一日お疲れさまでした！');
+      expect(result).toContain('📊 **今日の活動サマリー**');
       expect(result).toContain('総活動時間: **4時間50分**');
-      expect(result).toContain('仕事(3h0m)');
-      expect(result).toContain('会議(1h0m)');
-      expect(result).toContain('休憩(30m)');
-      expect(result).not.toContain('勉強'); // 4番目なので含まれない
-      expect(result).toContain('充実した一日でした。');
-      expect(result).toContain('素晴らしい進捗です！');
+      expect(result).toContain('• **仕事**: 3h0m');
+      expect(result).toContain('• **会議**: 1h0m');
+      expect(result).toContain('• **休憩**: 30m');
     });
   });
 
