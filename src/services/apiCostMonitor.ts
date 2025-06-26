@@ -7,6 +7,7 @@ import { getCurrentBusinessDate } from '../utils/timeUtils';
  */
 export class ApiCostMonitor {
   private database: Database;
+  private config = config;
   
   // Gemini 1.5 Flash の料金（2024年6月時点の推定）
   private readonly PRICE_PER_INPUT_TOKEN = 0.00000075; // $0.075/1M tokens
@@ -43,7 +44,7 @@ export class ApiCostMonitor {
   /**
    * 本日の統計を取得
    */
-  public async getTodayStats(): Promise<{
+  public async getTodayStats(timezone: string = 'Asia/Tokyo'): Promise<{
     totalCalls: number;
     analyzeActivityCalls: number;
     generateSummaryCalls: number;
@@ -51,8 +52,9 @@ export class ApiCostMonitor {
     totalOutputTokens: number;
     estimatedCost: number;
   }> {
-    const today = getCurrentBusinessDate();
-    const stats = await this.database.getApiUsageStats(today);
+    const today = getCurrentBusinessDate(timezone);
+    // 現在の実装ではシングルユーザーのため、コンフィグのユーザーIDを使用
+    const stats = await this.database.getApiUsageStats(config.discord.targetUserId, timezone);
     
     return {
       totalCalls: stats.totalCalls,
@@ -67,11 +69,11 @@ export class ApiCostMonitor {
   /**
    * 月間推定コストを計算
    */
-  public async getMonthlyEstimate(workingDaysPerMonth: number = 20): Promise<{
+  public async getMonthlyEstimate(timezone: string = 'Asia/Tokyo', workingDaysPerMonth: number = 20): Promise<{
     estimatedMonthlyCost: number;
     estimatedMonthlyCalls: number;
   }> {
-    const todayStats = await this.getTodayStats();
+    const todayStats = await this.getTodayStats(timezone);
     
     return {
       estimatedMonthlyCalls: todayStats.totalCalls * workingDaysPerMonth,
@@ -82,14 +84,14 @@ export class ApiCostMonitor {
   /**
    * 日次レポートを生成
    */
-  public async generateDailyReport(): Promise<string> {
-    const stats = await this.getTodayStats();
-    const monthly = await this.getMonthlyEstimate();
+  public async generateDailyReport(timezone: string = 'Asia/Tokyo'): Promise<string> {
+    const stats = await this.getTodayStats(timezone);
+    const monthly = await this.getMonthlyEstimate(timezone);
     
     return [
       '💰 **Gemini API 使用量レポート**',
       '',
-      `📅 **本日 (${getCurrentBusinessDate()})**`,
+      `📅 **本日 (${getCurrentBusinessDate(timezone)})**`,
       `• 総API呼び出し数: ${stats.totalCalls}回`,
       `• 活動解析: ${stats.analyzeActivityCalls}回`,
       `• サマリー生成: ${stats.generateSummaryCalls}回`,
@@ -108,9 +110,9 @@ export class ApiCostMonitor {
   /**
    * 警告レベルのチェック
    */
-  public async checkCostAlerts(): Promise<{ level: 'info' | 'warning' | 'critical', message: string } | null> {
-    const stats = await this.getTodayStats();
-    const monthly = await this.getMonthlyEstimate();
+  public async checkCostAlerts(timezone: string = 'Asia/Tokyo'): Promise<{ level: 'info' | 'warning' | 'critical', message: string } | null> {
+    const stats = await this.getTodayStats(timezone);
+    const monthly = await this.getMonthlyEstimate(timezone);
     
     if (monthly.estimatedMonthlyCost > 50) {
       return {

@@ -92,4 +92,13 @@ export interface BotStatus {
   lastPromptTime?: Date;
   lastSummaryTime?: Date;
   scheduledJobs: string[];
+  timezone?: string; // Botのデフォルトタイムゾーン、またはユーザーのタイムゾーン
+}
+
+/**
+ * ユーザー情報
+ */
+export interface User {
+  userId: string;
+  timezone: string;
 }

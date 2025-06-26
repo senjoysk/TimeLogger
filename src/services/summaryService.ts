@@ -24,13 +24,14 @@ export class SummaryService {
    */
   public async generateDailySummary(
     userId: string,
-    businessDate: string = getCurrentBusinessDate()
+    timezone: string,
+    businessDate: string = getCurrentBusinessDate(timezone)
   ): Promise<DailySummary> {
     try {
       console.log(`📊 日次サマリーを生成中: ${businessDate}`);
 
       // 指定日の活動記録を取得
-      const activities = await this.database.getActivityRecords(userId, businessDate);
+      const activities = await this.database.getActivityRecords(userId, timezone, businessDate);
       
       if (activities.length === 0) {
         console.log('活動記録がないため、空のサマリーを生成します');
@@ -41,7 +42,7 @@ export class SummaryService {
       const summary = await this.geminiService.generateDailySummary(activities, businessDate);
 
       // データベースに保存
-      await this.database.saveDailySummary(summary);
+      await this.database.saveDailySummary(summary, timezone);
 
       console.log(`✅ 日次サマリーを生成・保存しました: ${businessDate}`);
       return summary;
@@ -60,11 +61,12 @@ export class SummaryService {
    */
   public async getDailySummary(
     userId: string,
-    businessDate: string = getCurrentBusinessDate()
+    timezone: string,
+    businessDate: string = getCurrentBusinessDate(timezone)
   ): Promise<DailySummary> {
     try {
       // 既存のサマリーを確認
-      const existingSummary = await this.database.getDailySummary(userId, businessDate);
+      const existingSummary = await this.database.getDailySummary(userId, timezone, businessDate);
       
       if (existingSummary) {
         console.log(`📊 既存の日次サマリーを取得: ${businessDate}`);
@@ -73,7 +75,7 @@ export class SummaryService {
 
       // 存在しない場合は新規生成
       console.log(`📊 日次サマリーが存在しないため新規生成: ${businessDate}`);
-      return await this.generateDailySummary(userId, businessDate);
+      return await this.generateDailySummary(userId, timezone, businessDate);
 
     } catch (error) {
       console.error('❌ 日次サマリー取得エラー:', error);
@@ -86,12 +88,13 @@ export class SummaryService {
    * @param summary 日次サマリー
    * @returns フォーマットされた文字列
    */
-  public formatDailySummary(summary: DailySummary): string {
+  public formatDailySummary(summary: DailySummary, timezone: string): string {
     const date = new Date(summary.date).toLocaleDateString('ja-JP', {
       year: 'numeric',
       month: 'long',
       day: 'numeric',
-      weekday: 'long'
+      weekday: 'long',
+      timeZone: timezone
     });
 
     // カテゴリ別集計の表示
@@ -128,7 +131,7 @@ export class SummaryService {
       '🌟 **明日への一言**',
       summary.motivation,
       '',
-      `📝 *${new Date(summary.generatedAt).toLocaleString('ja-JP')} に生成*`,
+      `📝 *${new Date(summary.generatedAt).toLocaleString('ja-JP', { timeZone: timezone })} に生成*`,
     ].join('\n');
   }
 
@@ -176,7 +179,8 @@ export class SummaryService {
    */
   public async getCategoryStats(
     userId: string,
-    businessDate: string = getCurrentBusinessDate()
+    timezone: string,
+    businessDate: string = getCurrentBusinessDate(timezone)
   ): Promise<{
     categories: CategoryTotal[];
     mostProductiveCategory: string;
@@ -184,7 +188,7 @@ export class SummaryService {
     averageActivityDuration: number;
   }> {
     try {
-      const activities = await this.database.getActivityRecords(userId, businessDate);
+      const activities = await this.database.getActivityRecords(userId, timezone, businessDate);
       
       if (activities.length === 0) {
         return {

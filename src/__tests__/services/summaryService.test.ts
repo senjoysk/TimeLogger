@@ -8,7 +8,7 @@ import { DailySummary, ActivityRecord, CategoryTotal } from '../../types';
 jest.mock('../../database/database');
 jest.mock('../../services/geminiService');
 jest.mock('../../utils/timeUtils', () => ({
-  getCurrentBusinessDate: () => '2024-01-15',
+  getCurrentBusinessDate: (timezone: string) => '2024-01-15',
 }));
 
 describe('SummaryService', () => {
@@ -23,7 +23,7 @@ describe('SummaryService', () => {
     jest.clearAllMocks();
     
     mockDatabase = new Database() as jest.Mocked<Database>;
-    mockGeminiService = new GeminiService() as jest.Mocked<GeminiService>;
+    mockGeminiService = new GeminiService(mockDatabase) as jest.Mocked<GeminiService>;
     
     summaryService = new SummaryService(mockDatabase, mockGeminiService);
   });
@@ -91,6 +91,7 @@ describe('SummaryService', () => {
     it('活動記録から日次サマリーを生成する', async () => {
       const result = await summaryService.generateDailySummary(
         mockUserId,
+        'Asia/Tokyo',
         mockBusinessDate
       );
 
@@ -100,6 +101,7 @@ describe('SummaryService', () => {
       // 検証：データベースから活動記録を取得したか
       expect(mockDatabase.getActivityRecords).toHaveBeenCalledWith(
         mockUserId,
+        'Asia/Tokyo',
         mockBusinessDate
       );
 
@@ -118,6 +120,7 @@ describe('SummaryService', () => {
 
       const result = await summaryService.generateDailySummary(
         mockUserId,
+        'Asia/Tokyo',
         mockBusinessDate
       );
 
@@ -154,12 +157,14 @@ describe('SummaryService', () => {
 
       const result = await summaryService.getDailySummary(
         mockUserId,
+        'Asia/Tokyo',
         mockBusinessDate
       );
 
       expect(result).toEqual(existingSummary);
       expect(mockDatabase.getDailySummary).toHaveBeenCalledWith(
         mockUserId,
+        'Asia/Tokyo',
         mockBusinessDate
       );
       // 新規生成されないことを確認
@@ -184,11 +189,12 @@ describe('SummaryService', () => {
 
       const result = await summaryService.getDailySummary(
         mockUserId,
+        'Asia/Tokyo',
         mockBusinessDate
       );
 
       expect(result).toEqual(newSummary);
-      expect(generateSpy).toHaveBeenCalledWith(mockUserId, mockBusinessDate);
+      expect(generateSpy).toHaveBeenCalledWith(mockUserId, 'Asia/Tokyo', mockBusinessDate);
     });
   });
 
@@ -222,7 +228,7 @@ describe('SummaryService', () => {
     };
 
     it('日次サマリーをDiscord形式でフォーマットする', () => {
-      const result = summaryService.formatDailySummary(summary);
+      const result = summaryService.formatDailySummary(summary, 'Asia/Tokyo');
 
       // 検証：必要な情報が含まれているか
       expect(result).toContain('2024年1月15日');

@@ -41,7 +41,8 @@ export class GeminiService {
   public async analyzeActivity(
     userInput: string,
     timeSlot: string,
-    previousActivities: ActivityRecord[] = []
+    previousActivities: ActivityRecord[] = [],
+    timezone: string
   ): Promise<ActivityAnalysis> {
     try {
       console.log(`🧠 Gemini で活動を解析中: "${userInput}"`);
@@ -324,15 +325,15 @@ ${categoryList}
   /**
    * API使用量の日次レポートを取得
    */
-  public async getDailyCostReport(): Promise<string> {
-    return await this.costMonitor.generateDailyReport();
+  public async getDailyCostReport(userId: string, timezone: string): Promise<string> {
+    return await this.costMonitor.generateDailyReport(timezone);
   }
 
   /**
    * コスト警告をチェック
    */
-  public async checkCostAlerts() {
-    return await this.costMonitor.checkCostAlerts();
+  public async checkCostAlerts(userId: string, timezone: string) {
+    return await this.costMonitor.checkCostAlerts(timezone);
   }
 
   

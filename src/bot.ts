@@ -6,6 +6,7 @@ import { Database } from './database/database';
 import { GeminiService } from './services/geminiService';
 import { ActivityService } from './services/activityService';
 import { SummaryService } from './services/summaryService';
+import timezones from 'timezones.json';
 
 /**
  * Discord Bot のメインクラス
@@ -173,23 +174,30 @@ export class TaskLoggerBot {
     console.log(`✅ 処理対象メッセージ: "${content}"`);
     
     try {
+      const userId = message.author.id;
+      const userTimezone = await this.database.getUserTimezone(userId);
+
       // コマンドとして処理を試みる
       if (content.startsWith(config.discord.commandPrefix)) {
-        const command = content.slice(config.discord.commandPrefix.length).trim().toLowerCase();
+        const args = content.slice(config.discord.commandPrefix.length).trim().split(/\s+/);
+        const command = args.shift()?.toLowerCase();
+
         if (command === 'summary') {
           console.log('  ↳ [DEBUG] コマンド: サマリー要求として処理');
-          await this.handleSummaryRequest(message);
+          await this.handleSummaryRequest(message, userTimezone);
         } else if (command === 'cost') {
           console.log('  ↳ [DEBUG] コマンド: API費用レポート要求として処理');
-          await this.handleCostReportRequest(message);
+          await this.handleCostReportRequest(message, userTimezone);
+        } else if (command === 'timezone') {
+          console.log('  ↳ [DEBUG] コマンド: タイムゾーン設定要求として処理');
+          await this.handleTimezoneCommand(message, args);
         } else {
-          await message.reply(`不明なコマンドです: ${config.discord.commandPrefix}${command}
-利用可能なコマンド: ${config.discord.commandPrefix}summary, ${config.discord.commandPrefix}cost`);
+          await message.reply(`不明なコマンドです: ${config.discord.commandPrefix}${command}\n利用可能なコマンド: ${config.discord.commandPrefix}summary, ${config.discord.commandPrefix}cost, ${config.discord.commandPrefix}timezone`);
         }
       } else {
         // コマンドではない場合、活動記録として処理
         console.log('  ↳ [DEBUG] 活動記録として処理');
-        await this.handleActivityLog(message, content);
+        await this.handleActivityLog(message, content, userTimezone);
       }
     } catch (error) {
       console.error('❌ メッセージ処理エラー:', error);
@@ -201,7 +209,7 @@ export class TaskLoggerBot {
    * サマリー要求を処理
    * @param message メッセージオブジェクト
    */
-  private async handleActivityLog(message: Message, content: string): Promise<void> {
+  private async handleActivityLog(message: Message, content: string, userTimezone: string): Promise<void> {
     console.log(`📝 [DEBUG] 活動記録処理開始: ${message.author.tag} - "${content}"`);
     
     try {
@@ -209,7 +217,8 @@ export class TaskLoggerBot {
       console.log('  ↳ [DEBUG] ActivityServiceで処理中...');
       const activityRecords = await this.activityService.processActivityRecord(
         message.author.id,
-        content
+        content,
+        userTimezone
       );
       console.log(`  ↳ [DEBUG] 活動記録処理完了: ${activityRecords.length}件の記録を作成`);
 
@@ -222,8 +231,8 @@ export class TaskLoggerBot {
       const lastRecord = activityRecords[activityRecords.length - 1];
 
       // 確認メッセージを送信
-      const startTime = formatTime(new Date(firstRecord.analysis.startTime!));
-      const endTime = formatTime(new Date(lastRecord.analysis.endTime!));
+      const startTime = formatTime(new Date(firstRecord.analysis.startTime!), userTimezone);
+      const endTime = formatTime(new Date(lastRecord.analysis.endTime!), userTimezone);
       const totalMinutes = activityRecords.reduce((sum, r) => sum + r.analysis.estimatedMinutes, 0);
 
       const confirmation = [
@@ -253,13 +262,13 @@ export class TaskLoggerBot {
    * サマリー要求を処理
    * @param message メッセージオブジェクト
    */
-  private async handleSummaryRequest(message: Message): Promise<void> {
+  private async handleSummaryRequest(message: Message, userTimezone: string): Promise<void> {
     console.log(`📊 [DEBUG] サマリー要求処理開始: ${message.author.tag}`);
     
     try {
       // 日次サマリーを取得・生成
       console.log('  ↳ [DEBUG] SummaryServiceでサマリー取得中...');
-      const summary = await this.summaryService.getDailySummary(message.author.id);
+      const summary = await this.summaryService.getDailySummary(message.author.id, userTimezone);
       console.log('  ↳ [DEBUG] サマリー取得完了:', {
         date: summary.date,
         totalMinutes: summary.totalMinutes,
@@ -268,7 +277,7 @@ export class TaskLoggerBot {
       
       // フォーマットして送信
       console.log('  ↳ [DEBUG] サマリーフォーマット中...');
-      const formattedSummary = this.summaryService.formatDailySummary(summary);
+      const formattedSummary = this.summaryService.formatDailySummary(summary, userTimezone);
       console.log('  ↳ [DEBUG] サマリー送信中...');
       await message.reply(formattedSummary);
       console.log('  ↳ [DEBUG] サマリー送信完了');
@@ -288,16 +297,16 @@ export class TaskLoggerBot {
    * API費用レポート要求を処理
    * @param message メッセージオブジェクト
    */
-  private async handleCostReportRequest(message: Message): Promise<void> {
+  private async handleCostReportRequest(message: Message, userTimezone: string): Promise<void> {
     console.log(`💰 [DEBUG] API費用レポート要求処理開始: ${message.author.tag}`);
     
     try {
       // API費用レポートを生成
       console.log('  ↳ [DEBUG] GeminiServiceでAPI費用レポート取得中...');
-      const costReport = await this.geminiService.getDailyCostReport();
+      const costReport = await this.geminiService.getDailyCostReport(message.author.id, userTimezone);
       
       // コスト警告もチェック
-      const alert = await this.geminiService.checkCostAlerts();
+      const alert = await this.geminiService.checkCostAlerts(message.author.id, userTimezone);
       
       let responseMessage = costReport;
       if (alert) {
@@ -323,12 +332,6 @@ export class TaskLoggerBot {
   public async sendActivityPrompt(): Promise<void> {
     console.log('🕐 [DEBUG] 30分間隔問いかけ実行開始');
     
-    // 働く時間帯でない場合はスキップ
-    if (!isWorkingHours()) {
-      console.log('  ↳ [DEBUG] 働く時間帯ではないため、問いかけをスキップしました');
-      return;
-    }
-
     try {
       // 対象ユーザーを取得
       console.log(`  ↳ [DEBUG] 対象ユーザー取得中: ${config.discord.targetUserId}`);
@@ -339,12 +342,21 @@ export class TaskLoggerBot {
       }
       console.log(`  ↳ [DEBUG] ユーザー取得成功: ${user.tag}`);
 
+      // ユーザーのタイムゾーンを取得
+      const userTimezone = await this.database.getUserTimezone(user.id);
+
+      // 働く時間帯でない場合はスキップ
+      if (!isWorkingHours(userTimezone)) {
+        console.log('  ↳ [DEBUG] 働く時間帯ではないため、問いかけをスキップしました');
+        return;
+      }
+
       // DMチャンネルを作成/取得
       console.log('  ↳ [DEBUG] DMチャンネル作成中...');
       const dmChannel = await user.createDM();
       
       // 現在の時間枠を取得
-      const timeSlot = getCurrentTimeSlot();
+      const timeSlot = getCurrentTimeSlot(userTimezone);
       console.log(`  ↳ [DEBUG] 時間枠: ${timeSlot.label}`);
       
       // 問いかけメッセージを送信
@@ -379,8 +391,10 @@ export class TaskLoggerBot {
       // DMチャンネルを作成/取得
       const dmChannel = await user.createDM();
       
+      const userTimezone = await this.database.getUserTimezone(config.discord.targetUserId);
+      
       // 日次サマリーを生成
-      const summary = await this.summaryService.getDailySummary(config.discord.targetUserId);
+      const summary = await this.summaryService.getDailySummary(config.discord.targetUserId, userTimezone);
       
       // 簡潔なサマリーとして送信
       const briefSummary = this.summaryService.formatBriefSummary(summary);
@@ -417,7 +431,8 @@ export class TaskLoggerBot {
       }
       const dmChannel = await user.createDM();
 
-      const report = await this.geminiService.getDailyCostReport();
+      const userTimezone = await this.database.getUserTimezone(user.id);
+      const report = await this.geminiService.getDailyCostReport(user.id, userTimezone);
       await dmChannel.send(report);
       console.log('✅ APIコストレポートを送信しました');
     } catch (error) {
@@ -447,5 +462,53 @@ export class TaskLoggerBot {
    */
   public getStatus(): BotStatus {
     return { ...this.status };
+  }
+
+  /**
+   * タイムゾーン設定コマンドを処理
+   * @param message メッセージオブジェクト
+   * @param args コマンド引数
+   */
+  private async handleTimezoneCommand(message: Message, args: string[]): Promise<void> {
+    const userId = message.author.id;
+    const subcommand = args[0];
+    const value = args.slice(1).join(' ');
+
+    if (subcommand === 'set') {
+      if (!value) {
+        await message.reply('タイムゾーンを設定するには、`!timezone set <タイムゾーン名>` の形式で指定してください。例: `!timezone set Asia/Tokyo`');
+        return;
+      }
+      // タイムゾーンの検証
+      const isValidTimezone = timezones.some((tz: any) => tz.tzName === value);
+      if (!isValidTimezone) {
+        await message.reply(`無効なタイムゾーンです: \`${value}\`。IANAタイムゾーンデータベースの形式で指定してください。例: \`Asia/Tokyo\`。または \`!timezone search <都市名>\` で検索してください。`);
+        return;
+      }
+
+      await this.database.setUserTimezone(userId, value);
+      await message.reply(`タイムゾーンを \`${value}\` に設定しました。`);
+    } else if (subcommand === 'search') {
+      if (!value) {
+        await message.reply('検索する都市名を指定してください。例: `!timezone search Tokyo`');
+        return;
+      }
+      const results = timezones.filter((tz: any) => 
+        tz.cities.some((city: string) => city.toLowerCase().includes(value.toLowerCase()))
+      );
+
+      if (results.length > 0) {
+        const response = results.slice(0, 5).map((tz: any) => 
+          `• ${tz.tzName} (主要都市: ${tz.cities.join(', ')})`
+        ).join('\n');
+        await message.reply(`見つかったタイムゾーン:\n${response}\n\n設定するには \`!timezone set <タイムゾーン名>\` を使用してください。`);
+      } else {
+        await message.reply(`\`${value}\` に一致するタイムゾーンは見つかりませんでした。`);
+      }
+    } else {
+      // 現在のタイムゾーンを表示
+      const currentTimezone = await this.database.getUserTimezone(userId);
+      await message.reply(`現在のタイムゾーンは \`${currentTimezone}\` です。変更するには \`!timezone set <タイムゾーン名>\` を使用してください。`);
+    }
   }
 }

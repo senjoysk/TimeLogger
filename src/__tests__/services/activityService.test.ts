@@ -22,7 +22,7 @@ describe('ActivityService', () => {
     
     // モックインスタンスの作成
     mockDatabase = new Database() as jest.Mocked<Database>;
-    mockGeminiService = new GeminiService() as jest.Mocked<GeminiService>;
+    mockGeminiService = new GeminiService(mockDatabase) as jest.Mocked<GeminiService>;
     
     // ActivityServiceのインスタンス作成
     activityService = new ActivityService(mockDatabase, mockGeminiService);
@@ -52,7 +52,8 @@ describe('ActivityService', () => {
       // テスト実行
       const result = await activityService.processActivityRecord(
         mockUserId,
-        mockUserInput
+        mockUserInput,
+        'Asia/Tokyo'
       );
 
       // 検証：返り値の確認 (配列の最初の要素をチェック)
@@ -71,8 +72,9 @@ describe('ActivityService', () => {
       // 検証：Gemini APIが呼ばれたか
       expect(mockGeminiService.analyzeActivity).toHaveBeenCalledWith(
         mockUserInput,
-        expect.any(String),
-        []
+        '',
+        [],
+        'Asia/Tokyo'
       );
 
       // 検証：データベースに保存されたか
@@ -84,7 +86,8 @@ describe('ActivityService', () => {
           analysis: expect.objectContaining({
             category: mockAnalysis.category,
           })
-        })
+        }),
+        'Asia/Tokyo'
       );
     });
 
@@ -108,13 +111,14 @@ describe('ActivityService', () => {
       mockDatabase.getActivityRecordsByTimeSlot.mockResolvedValue(existingRecords);
 
       // テスト実行
-      await activityService.processActivityRecord(mockUserId, mockUserInput);
+      await activityService.processActivityRecord(mockUserId, mockUserInput, 'Asia/Tokyo');
 
       // 検証：Geminiの呼び出しをチェック（新しいシグネチャに合わせて修正）
       expect(mockGeminiService.analyzeActivity).toHaveBeenCalledWith(
         mockUserInput,
         '',
-        []
+        [],
+        'Asia/Tokyo'
       );
     });
 
@@ -125,7 +129,7 @@ describe('ActivityService', () => {
 
       // テスト実行と検証
       await expect(
-        activityService.processActivityRecord(mockUserId, mockUserInput)
+        activityService.processActivityRecord(mockUserId, mockUserInput, 'Asia/Tokyo')
       ).rejects.toThrow('データベースエラー');
     });
   });
@@ -152,7 +156,7 @@ describe('ActivityService', () => {
       };
       mockGeminiService.analyzeActivity.mockResolvedValue(analysisResult);
 
-      await activityService.processActivityRecord(mockUserId, userInput, new Date('2025-06-26T14:35:00.000Z'));
+      await activityService.processActivityRecord(mockUserId, userInput, 'Asia/Tokyo', new Date('2025-06-26T14:35:00.000Z'));
 
       expect(mockDatabase.saveActivityRecord).toHaveBeenCalledTimes(1);
       expect(mockDatabase.saveActivityRecord).toHaveBeenCalledWith(expect.objectContaining({
@@ -178,7 +182,7 @@ describe('ActivityService', () => {
       };
       mockGeminiService.analyzeActivity.mockResolvedValue(analysisResult);
 
-      await activityService.processActivityRecord(mockUserId, userInput, new Date('2025-06-26T15:05:00.000Z'));
+      await activityService.processActivityRecord(mockUserId, userInput, 'Asia/Tokyo', new Date('2025-06-26T15:05:00.000Z'));
 
       expect(mockDatabase.saveActivityRecord).toHaveBeenCalledTimes(2);
       expect(mockDatabase.saveActivityRecord).toHaveBeenCalledWith(expect.objectContaining({
@@ -204,7 +208,7 @@ describe('ActivityService', () => {
       mockGeminiService.analyzeActivity.mockResolvedValue(analysisResult);
 
       // The processActivityRecord will use its own internal current time, so we pass a date that falls into the 16:00 slot
-      await activityService.processActivityRecord(mockUserId, userInput, new Date('2025-06-26T16:15:00.000Z'));
+      await activityService.processActivityRecord(mockUserId, userInput, 'Asia/Tokyo', new Date('2025-06-26T16:15:00.000Z'));
 
       expect(mockDatabase.saveActivityRecord).toHaveBeenCalledTimes(1);
       expect(mockDatabase.saveActivityRecord).toHaveBeenCalledWith(expect.objectContaining({
@@ -234,10 +238,10 @@ describe('ActivityService', () => {
 
       mockDatabase.getActivityRecords.mockResolvedValue(mockActivities);
 
-      const result = await activityService.getTodayActivities('test-user');
+      const result = await activityService.getTodayActivities('test-user', 'Asia/Tokyo');
 
       expect(result).toEqual(mockActivities);
-      expect(mockDatabase.getActivityRecords).toHaveBeenCalledWith('test-user');
+      expect(mockDatabase.getActivityRecords).toHaveBeenCalledWith('test-user', 'Asia/Tokyo');
     });
   });
 
@@ -271,8 +275,8 @@ describe('ActivityService', () => {
     });
   });
 
-  describe('getActivityStats', () => {
-    it('活動記録の統計情報を計算する', async () => {
+  describe('formatTodayActivities', () => {
+    it('今日の活動記録一覧をDiscord形式でフォーマットする', async () => {
       const mockActivities: ActivityRecord[] = [
         {
           id: 'test-1',
@@ -302,45 +306,23 @@ describe('ActivityService', () => {
           createdAt: '2024-01-15 09:35:00',
           updatedAt: '2024-01-15 09:35:00',
         },
-        {
-          id: 'test-3',
-          userId: 'test-user',
-          timeSlot: '2024-01-15 10:00:00',
-          originalText: 'プログラミング続き',
-          analysis: {
-            category: '仕事',
-            structuredContent: 'コーディング',
-            estimatedMinutes: 30,
-            productivityLevel: 5,
-          },
-          createdAt: '2024-01-15 10:05:00',
-          updatedAt: '2024-01-15 10:05:00',
-        },
       ];
 
       mockDatabase.getActivityRecords.mockResolvedValue(mockActivities);
 
-      const stats = await activityService.getActivityStats('test-user');
+      const result = await activityService.formatTodayActivities('test-user', 'Asia/Tokyo');
 
-      // 検証
-      expect(stats.totalRecords).toBe(3);
-      expect(stats.totalMinutes).toBe(90);
-      expect(stats.categoryCounts).toEqual({
-        '仕事': 2,
-        '会議': 1,
-      });
-      expect(stats.averageProductivity).toBe(4); // (4+3+5)/3 = 4
+      expect(result).toContain('📋 **今日の活動記録**');
+      expect(result).toContain('総記録数: 2件 | 総活動時間: 60分 | 平均生産性: 3.5/5');
+      expect(result).toContain('**09:00:00** [仕事]');
+      expect(result).toContain('**09:30:00** [会議]');
     });
 
-    it('活動記録がない場合の統計情報', async () => {
+    it('活動記録がない場合のフォーマット', async () => {
       mockDatabase.getActivityRecords.mockResolvedValue([]);
 
-      const stats = await activityService.getActivityStats('test-user');
+      const result = await activityService.formatTodayActivities('test-user', 'Asia/Tokyo');
 
-      expect(stats.totalRecords).toBe(0);
-      expect(stats.totalMinutes).toBe(0);
-      expect(stats.categoryCounts).toEqual({});
-      expect(stats.averageProductivity).toBe(0);
+      expect(result).toBe('今日の活動記録はまだありません。');
     });
   });
-});

@@ -4,6 +4,8 @@ import { join, dirname } from 'path';
 import { config } from '../config';
 import { ActivityRecord, DailySummary, CategoryTotal } from '../types';
 import { getCurrentBusinessDate, formatDateTime } from '../utils/timeUtils';
+import { toZonedTime, fromZonedTime } from 'date-fns-tz';
+import { addDays } from 'date-fns';
 
 /**
  * データベース管理クラス
@@ -32,6 +34,9 @@ export class Database {
       
       // スキーマの作成
       await this.createSchema();
+      
+      // ユーザーテーブルの初期化（必要であれば）
+      await this.initializeUserTable();
       
       console.log('✅ データベースの初期化が完了しました');
       
@@ -112,10 +117,71 @@ export class Database {
   }
 
   /**
+   * ユーザーテーブルを初期化（必要であれば）
+   */
+  private async initializeUserTable(): Promise<void> {
+    return new Promise((resolve, reject) => {
+      this.db!.run(`
+        INSERT OR IGNORE INTO users (user_id, timezone) VALUES (?, ?)
+      `, [config.discord.targetUserId, 'Asia/Tokyo'], function(error) {
+        if (error) {
+          reject(error);
+        } else {
+          console.log('ユーザーテーブルを初期化しました（既存ユーザーはスキップ）');
+          resolve();
+        }
+      });
+    });
+  }
+
+  /**
+   * ユーザーのタイムゾーンを取得
+   * @param userId ユーザーID
+   * @returns タイムゾーン文字列 (例: 'Asia/Tokyo')
+   */
+  public async getUserTimezone(userId: string): Promise<string> {
+    if (!this.db) {
+      throw new Error('データベースが初期化されていません');
+    }
+    return new Promise((resolve, reject) => {
+      this.db!.get(`SELECT timezone FROM users WHERE user_id = ?`, [userId], (error, row: any) => {
+        if (error) {
+          reject(error);
+        } else {
+          resolve(row ? row.timezone : 'Asia/Tokyo'); // デフォルトはJST
+        }
+      });
+    });
+  }
+
+  /**
+   * ユーザーのタイムゾーンを設定
+   * @param userId ユーザーID
+   * @param timezone 設定するタイムゾーン文字列
+   */
+  public async setUserTimezone(userId: string, timezone: string): Promise<void> {
+    if (!this.db) {
+      throw new Error('データベースが初期化されていません');
+    }
+    return new Promise((resolve, reject) => {
+      this.db!.run(`
+        INSERT OR REPLACE INTO users (user_id, timezone) VALUES (?, ?)
+      `, [userId, timezone], function(error) {
+        if (error) {
+          reject(error);
+        } else {
+          console.log(`ユーザー ${userId} のタイムゾーンを ${timezone} に設定しました`);
+          resolve();
+        }
+      });
+    });
+  }
+
+  /**
    * 活動記録を保存
    * @param record 保存する活動記録
    */
-  public async saveActivityRecord(record: ActivityRecord): Promise<void> {
+  public async saveActivityRecord(record: ActivityRecord, timezone: string): Promise<void> {
     if (!this.db) {
       throw new Error('データベースが初期化されていません');
     }
@@ -132,7 +198,7 @@ export class Database {
       record.id,
       record.userId,
       record.timeSlot,
-      getCurrentBusinessDate(),
+      getCurrentBusinessDate(timezone),
       record.originalText,
       record.analysis.category,
       record.analysis.subCategory || null,
@@ -163,7 +229,8 @@ export class Database {
    */
   public async getActivityRecords(
     userId: string, 
-    businessDate: string = getCurrentBusinessDate()
+    timezone: string,
+    businessDate: string = getCurrentBusinessDate(timezone)
   ): Promise<ActivityRecord[]> {
     if (!this.db) {
       throw new Error('データベースが初期化されていません');
@@ -223,7 +290,7 @@ export class Database {
    * 日次サマリーを保存
    * @param summary 保存するサマリー
    */
-  public async saveDailySummary(summary: DailySummary): Promise<void> {
+  public async saveDailySummary(summary: DailySummary, timezone: string): Promise<void> {
     if (!this.db) {
       throw new Error('データベースが初期化されていません');
     }
@@ -244,7 +311,7 @@ export class Database {
       summary.totalMinutes,
       summary.insights,
       summary.motivation,
-      summary.generatedAt,
+      formatDateTime(new Date(), 'UTC'),
     ];
 
     return new Promise((resolve, reject) => {
@@ -267,7 +334,8 @@ export class Database {
    */
   public async getDailySummary(
     userId: string, 
-    businessDate: string = getCurrentBusinessDate()
+    timezone: string,
+    businessDate: string = getCurrentBusinessDate(timezone)
   ): Promise<DailySummary | null> {
     if (!this.db) {
       throw new Error('データベースが初期化されていません');
@@ -310,7 +378,7 @@ export class Database {
       log.inputTokens,
       log.outputTokens,
       log.cost,
-      formatDateTime(new Date()),
+      formatDateTime(new Date(), 'UTC'),
     ];
 
     return new Promise((resolve, reject) => {
@@ -324,7 +392,7 @@ export class Database {
     });
   }
 
-  public async getApiUsageStats(date: string): Promise<{ 
+  public async getApiUsageStats(userId: string, timezone: string): Promise<{ 
     totalCalls: number; 
     totalInputTokens: number; 
     totalOutputTokens: number; 
@@ -335,6 +403,13 @@ export class Database {
       throw new Error('データベースが初期化されていません');
     }
 
+    const businessDate = getCurrentBusinessDate(timezone);
+    // タイムゾーンでの日付をUTCに変換
+    const startOfDayLocal = new Date(`${businessDate}T00:00:00`);
+    const endOfDayLocal = new Date(`${businessDate}T23:59:59`);
+    const startOfDayUTC = fromZonedTime(startOfDayLocal, timezone).toISOString();
+    const endOfDayUTC = fromZonedTime(endOfDayLocal, timezone).toISOString();
+
     const sql = `
       SELECT 
         operation,
@@ -343,12 +418,12 @@ export class Database {
         SUM(output_tokens) as total_output,
         SUM(cost) as total_cost
       FROM api_usage_logs
-      WHERE DATE(created_at) = ?
+      WHERE created_at BETWEEN ? AND ?
       GROUP BY operation
     `;
 
     return new Promise((resolve, reject) => {
-      this.db!.all(sql, [date], (error, rows: any[]) => {
+      this.db!.all(sql, [startOfDayUTC, endOfDayUTC], (error, rows: any[]) => {
         if (error) {
           reject(error);
         } else {
@@ -418,7 +493,7 @@ export class Database {
       throw new Error('データベースが初期化されていません');
     }
 
-    const today = getCurrentBusinessDate();
+    const today = getCurrentBusinessDate('UTC');
     
     const sqlActivity = `DELETE FROM activity_records WHERE business_date != ?`;
     const sqlSummary = `DELETE FROM daily_summaries WHERE business_date != ?`;

@@ -1,45 +1,47 @@
 import { TimeSlot } from '../types';
 import { config } from '../config';
+import { toZonedTime, format, fromZonedTime } from 'date-fns-tz';
+import { addMinutes, setMinutes, setHours, getHours, getMinutes, getDay, subMinutes, subDays } from 'date-fns';
 
-const JST_OFFSET = 9 * 60 * 60 * 1000; // 9 hours in milliseconds
+/**
+ * 指定されたタイムゾーンで現在時刻のタイムスロットを取得
+ * @param timezone タイムゾーン文字列 (例: 'Asia/Tokyo')
+ * @returns 現在のタイムスロット
+ */
+export function getCurrentTimeSlot(timezone: string): TimeSlot {
+  const now = new Date();
+  const zonedNow = toZonedTime(now, timezone);
 
-function getJSTDate(date: Date): Date {
-  return new Date(date.getTime() + JST_OFFSET);
-}
+  // ユーザー体験としては「前の枠」に記録したいので、30分前の時刻を計算
+  const targetTime = subMinutes(zonedNow, 30);
 
-export function getTimeSlotForDate(date: Date): TimeSlot {
-  const utcDate = new Date(date);
-  const minutes = utcDate.getUTCMinutes();
+  const minutes = getMinutes(targetTime);
   const slotMinutes = minutes < 30 ? 0 : 30;
 
-  const start = new Date(utcDate);
-  start.setUTCMinutes(slotMinutes, 0, 0);
+  let start = setMinutes(targetTime, slotMinutes);
+  start = setMinutes(start, slotMinutes);
 
-  const end = new Date(start.getTime() + 30 * 60 * 1000);
+  const end = addMinutes(start, 30);
 
-  const label = `${formatTime(start)}-${formatTime(end)}`;
+  const label = `${format(start, 'HH:mm', { timeZone: timezone })}-${format(end, 'HH:mm', { timeZone: timezone })}`;
 
-  return { start, end, label };
+  // UTCに戻して返す
+  return {
+    start: fromZonedTime(start, timezone),
+    end: fromZonedTime(end, timezone),
+    label
+  };
 }
 
-export function getCurrentTimeSlot(): TimeSlot {
-    // 現在時刻をUTCで取得し、そこからタイムスロットを計算する
-    // ただし、ユーザー体験としてはJSTの「前の枠」に記録したい
-    const now = new Date();
-    const jstNow = getJSTDate(now);
-    
-    // JSTでの現在時刻の30分前の時刻を計算
-    const targetTime = new Date(jstNow.getTime() - 30 * 60 * 1000);
-    
-    // 30分前の時刻が属するスロットを計算
-    return getTimeSlotForDate(targetTime);
-}
-
-
-export function isWorkingHours(): boolean {
-  const jstNow = getJSTDate(new Date());
-  const hour = jstNow.getUTCHours();
-  const day = jstNow.getUTCDay(); // 0: Sunday, 1: Monday, ..., 6: Saturday
+/**
+ * 指定されたタイムゾーンで現在が勤務時間内か判定
+ * @param timezone タイムゾーン文字列
+ * @returns 勤務時間内であればtrue
+ */
+export function isWorkingHours(timezone: string): boolean {
+  const zonedNow = toZonedTime(new Date(), timezone);
+  const hour = getHours(zonedNow);
+  const day = getDay(zonedNow); // 0: Sunday, 1: Monday, ..., 6: Saturday
 
   if (day === 0 || day === 6) {
     return false;
@@ -48,55 +50,95 @@ export function isWorkingHours(): boolean {
   return hour >= config.app.workingHours.start && hour < config.app.workingHours.end;
 }
 
-export function getCurrentBusinessDate(): string {
-  return getBusinessDateForDate(new Date());
+/**
+ * 指定されたタイムゾーンで現在の業務日を取得
+ * @param timezone タイムゾーン文字列
+ * @returns 業務日 (YYYY-MM-DD)
+ */
+export function getCurrentBusinessDate(timezone: string): string {
+  return getBusinessDateForDate(new Date(), timezone);
 }
 
-export function getBusinessDateForDate(date: Date): string {
-  const jstDate = getJSTDate(date);
+/**
+ * 指定されたタイムゾーンで特定の日付の業務日を取得
+ * @param date 日付オブジェクト
+ * @param timezone タイムゾーン文字列
+ * @returns 業務日 (YYYY-MM-DD)
+ */
+export function getBusinessDateForDate(date: Date, timezone: string): string {
+  let zonedDate = toZonedTime(date, timezone);
 
-  if (jstDate.getUTCHours() < config.app.dayBoundary.start) {
-    jstDate.setUTCDate(jstDate.getUTCDate() - 1);
+  if (getHours(zonedDate) < config.app.dayBoundary.start) {
+    zonedDate = subDays(zonedDate, 1);
   }
 
-  return formatDate(jstDate);
+  return format(zonedDate, 'yyyy-MM-dd', { timeZone: timezone });
 }
 
-export function formatDate(date: Date): string {
-  return getJSTDate(date).toISOString().split('T')[0];
+/**
+ * 指定されたタイムゾーンで日付をフォーマット
+ * @param date 日付オブジェクト
+ * @param timezone タイムゾーン文字列
+ * @returns フォーマットされた日付 (YYYY-MM-DD)
+ */
+export function formatDate(date: Date, timezone: string): string {
+  return format(toZonedTime(date, timezone), 'yyyy-MM-dd', { timeZone: timezone });
 }
 
-export function formatTime(date: Date): string {
-  return getJSTDate(date).toISOString().substr(11, 5);
+/**
+ * 指定されたタイムゾーンで時刻をフォーマット
+ * @param date 日付オブジェクト
+ * @param timezone タイムゾーン文字列
+ * @returns フォーマットされた時刻 (HH:mm)
+ */
+export function formatTime(date: Date, timezone: string): string {
+  return format(toZonedTime(date, timezone), 'HH:mm', { timeZone: timezone });
 }
 
-export function formatDateTime(date: Date): string {
-  return date.toISOString().slice(0, 19).replace('T', ' ');
+/**
+ * 指定されたタイムゾーンで日時をフォーマット
+ * @param date 日付オブジェクト
+ * @param timezone タイムゾーン文字列
+ * @returns フォーマットされた日時 (YYYY-MM-DD HH:mm:ss)
+ */
+export function formatDateTime(date: Date, timezone: string): string {
+  return format(toZonedTime(date, timezone), 'yyyy-MM-dd HH:mm:ss', { timeZone: timezone });
 }
 
-export function getNextPromptTime(): Date {
+/**
+ * 次の問いかけ時刻を計算
+ * @param timezone タイムゾーン文字列
+ * @returns 次の問いかけ時刻 (UTC)
+ */
+export function getNextPromptTime(timezone: string): Date {
   const now = new Date();
-  const jstNow = getJSTDate(now);
-  const next = new Date(jstNow);
+  let zonedNow = toZonedTime(now, timezone);
+  let next = new Date(zonedNow);
 
-  const currentMinutes = jstNow.getUTCMinutes();
+  const currentMinutes = getMinutes(zonedNow);
   if (currentMinutes < 30) {
-    next.setUTCMinutes(30, 0, 0);
+    next = setMinutes(zonedNow, 30);
   } else {
-    next.setUTCHours(jstNow.getUTCHours() + 1, 0, 0, 0);
+    next = setHours(zonedNow, getHours(zonedNow) + 1);
+    next = setMinutes(next, 0);
   }
 
-  // Convert back to UTC for the timer
-  return new Date(next.getTime() - JST_OFFSET);
+  // UTCに戻して返す
+  return fromZonedTime(next, timezone);
 }
 
-export function getTodaySummaryTime(): Date {
+/**
+ * 今日のサマリー生成時刻を計算
+ * @param timezone タイムゾーン文字列
+ * @returns サマリー生成時刻 (UTC)
+ */
+export function getTodaySummaryTime(timezone: string): Date {
   const now = new Date();
-  const jstDate = getJSTDate(now);
+  let zonedNow = toZonedTime(now, timezone);
   
-  const summaryTime = new Date(jstDate);
-  summaryTime.setUTCHours(config.app.summaryTime.hour, config.app.summaryTime.minute, 0, 0);
+  let summaryTime = setHours(zonedNow, config.app.summaryTime.hour);
+  summaryTime = setMinutes(summaryTime, config.app.summaryTime.minute);
 
-  // Convert back to UTC for the timer
-  return new Date(summaryTime.getTime() - JST_OFFSET);
+  // UTCに戻して返す
+  return fromZonedTime(summaryTime, timezone);
 }

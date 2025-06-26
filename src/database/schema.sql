@@ -1,6 +1,12 @@
 -- Discord Task Logger データベーススキーマ
 -- SQLite を使用して活動記録を管理
 
+-- ユーザー設定テーブル
+CREATE TABLE IF NOT EXISTS users (
+    user_id TEXT PRIMARY KEY,
+    timezone TEXT DEFAULT 'Asia/Tokyo' -- デフォルトはJST
+);
+
 -- 活動記録テーブル
 CREATE TABLE IF NOT EXISTS activity_records (
     id TEXT PRIMARY KEY,
@@ -16,8 +22,8 @@ CREATE TABLE IF NOT EXISTS activity_records (
     estimated_minutes INTEGER DEFAULT 30,
     productivity_level INTEGER DEFAULT 3,
     
-    created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
-    updated_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
+    created_at TEXT NOT NULL DEFAULT (datetime('now', 'utc')),
+    updated_at TEXT NOT NULL DEFAULT (datetime('now', 'utc'))
 );
 
 -- 日次サマリーテーブル

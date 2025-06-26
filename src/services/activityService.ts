@@ -2,7 +2,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { ActivityRecord, ActivityAnalysis } from '../types';
 import { Database } from '../database/database';
 import { GeminiService } from './geminiService';
-import { getCurrentTimeSlot, getTimeSlotForDate, formatDateTime } from '../utils/timeUtils';
+import { getCurrentTimeSlot, formatDateTime } from '../utils/timeUtils';
 
 /**
  * 活動記録管理サービス
@@ -27,26 +27,27 @@ export class ActivityService {
   public async processActivityRecord(
     userId: string,
     userInput: string,
+    timezone: string,
     inputTime: Date = new Date()
   ): Promise<ActivityRecord[]> {
     try {
       console.log(`📝 活動記録を処理開始: ${userInput}`);
 
       // Gemini で活動内容を解析 (時間情報も含む)
-      const analysis = await this.geminiService.analyzeActivity(userInput, '', []);
+      const analysis = await this.geminiService.analyzeActivity(userInput, '', [], timezone);
 
       const startTime = analysis.startTime ? new Date(analysis.startTime) : inputTime;
       const endTime = analysis.endTime ? new Date(analysis.endTime) : new Date(startTime.getTime() + 30 * 60000);
 
       // 活動がまたがるタイムスロットを計算
-      const timeSlots = this.calculateTimeSlots(startTime, endTime);
+      const timeSlots = this.calculateTimeSlots(startTime, endTime, timezone);
       const totalSlots = timeSlots.length;
 
       const createdRecords: ActivityRecord[] = [];
 
       for (let i = 0; i < totalSlots; i++) {
         const slot = timeSlots[i];
-        const timeSlotString = formatDateTime(slot.start);
+        const timeSlotString = formatDateTime(slot.start, timezone);
 
         // 各スロットの活動時間を計算
         const slotEndTime = new Date(slot.start.getTime() + 30 * 60000);
@@ -65,11 +66,11 @@ export class ActivityService {
           timeSlot: timeSlotString,
           originalText: userInput.trim(),
           analysis: recordAnalysis,
-          createdAt: formatDateTime(new Date()),
-          updatedAt: formatDateTime(new Date()),
+          createdAt: formatDateTime(new Date(), 'UTC'),
+          updatedAt: formatDateTime(new Date(), 'UTC'),
         };
 
-        await this.database.saveActivityRecord(activityRecord);
+        await this.database.saveActivityRecord(activityRecord, timezone);
         createdRecords.push(activityRecord);
         console.log(`✅ 活動記録を保存しました: ${activityRecord.id} for time slot ${timeSlotString}`);
       }
@@ -87,9 +88,9 @@ export class ActivityService {
    * @param userId ユーザーID
    * @returns 今日の活動記録リスト
    */
-  public async getTodayActivities(userId: string): Promise<ActivityRecord[]> {
+  public async getTodayActivities(userId: string, timezone: string): Promise<ActivityRecord[]> {
     try {
-      const activities = await this.database.getActivityRecords(userId);
+      const activities = await this.database.getActivityRecords(userId, timezone);
       console.log(`📋 今日の活動記録を取得: ${activities.length}件`);
       return activities;
     } catch (error) {
@@ -122,12 +123,12 @@ export class ActivityService {
    * 投稿が時間枠内（例：14:00-14:29）であれば現在の枠
    * 投稿が時間枠外（例：14:30以降）であれば前の枠に記録
    */
-  private calculateTimeSlots(startTime: Date, endTime: Date): { start: Date; label: string }[] {
+  private calculateTimeSlots(startTime: Date, endTime: Date, timezone: string): { start: Date; label: string }[] {
     const slots = [];
-    let current = getTimeSlotForDate(startTime).start;
+    let current = getCurrentTimeSlot(timezone).start;
 
     while (current < endTime) {
-      slots.push(getTimeSlotForDate(current));
+      slots.push(getCurrentTimeSlot(timezone));
       current = new Date(current.getTime() + 30 * 60000);
     }
 
@@ -139,14 +140,14 @@ export class ActivityService {
    * @param userId ユーザーID
    * @returns 統計情報
    */
-  public async getActivityStats(userId: string): Promise<{
+  public async getActivityStats(userId: string, timezone: string): Promise<{
     totalRecords: number;
     totalMinutes: number;
     categoryCounts: { [category: string]: number };
     averageProductivity: number;
   }> {
     try {
-      const activities = await this.getTodayActivities(userId);
+      const activities = await this.getTodayActivities(userId, timezone);
       
       const stats = {
         totalRecords: activities.length,
@@ -199,15 +200,15 @@ export class ActivityService {
    * @param userId ユーザーID
    * @returns フォーマットされた活動記録一覧
    */
-  public async formatTodayActivities(userId: string): Promise<string> {
+  public async formatTodayActivities(userId: string, timezone: string): Promise<string> {
     try {
-      const activities = await this.getTodayActivities(userId);
+      const activities = await this.getTodayActivities(userId, timezone);
       
       if (activities.length === 0) {
         return '今日の活動記録はまだありません。';
       }
 
-      const stats = await this.getActivityStats(userId);
+      const stats = await this.getActivityStats(userId, timezone);
       
       const header = [
         '📋 **今日の活動記録**',

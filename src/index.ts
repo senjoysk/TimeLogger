@@ -31,7 +31,7 @@ class Application {
       console.log('');
       
       // スケジューラーの開始
-      this.scheduler.start();
+      await this.scheduler.start();
       console.log('');
       
       console.log('🎉 Discord Task Logger が正常に起動しました！');
