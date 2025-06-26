@@ -400,4 +400,170 @@ describe('ActivityService', () => {
       expect(totalMinutes).toBe(1); // 0.5分は1分に四捨五入
     });
   });
+
+  describe('日本語時制の解釈テスト (Gemini連携)', () => {
+    const mockUserId = 'test-user-123';
+    const mockTimezone = 'Asia/Tokyo';
+    const currentTime = new Date('2025-06-26T16:44:00.000Z'); // 現在時刻（JST 1:44AM）
+
+    beforeEach(() => {
+      // 最近の活動記録のモック（空配列）
+      mockDatabase.getActivityRecords.mockResolvedValue([]);
+      // データベース保存のモック
+      mockDatabase.saveActivityRecord.mockResolvedValue(undefined);
+    });
+
+    it('過去形「〜してた」は現在時刻を終了時刻とする', async () => {
+      const userInput = '追加のバグを修正してた';
+      
+      // Geminiが過去形を正しく解釈することを想定
+      const mockAnalysis: ActivityAnalysis = {
+        category: '仕事',
+        subCategory: 'バグ修正',
+        structuredContent: '追加のバグ修正作業',
+        estimatedMinutes: 30,
+        productivityLevel: 4,
+        startTime: '2025-06-26T16:14:00.000Z', // 現在時刻-30分
+        endTime: '2025-06-26T16:44:00.000Z',   // 現在時刻
+      };
+      
+      mockGeminiService.analyzeActivity.mockResolvedValue(mockAnalysis);
+
+      const result = await activityService.processActivityRecord(
+        mockUserId, 
+        userInput, 
+        mockTimezone, 
+        currentTime
+      );
+
+      expect(result).toHaveLength(1);
+      expect(result[0].analysis.startTime).toBe('2025-06-26T16:14:00.000Z');
+      expect(result[0].analysis.endTime).toBe('2025-06-26T16:44:00.000Z');
+      expect(mockGeminiService.analyzeActivity).toHaveBeenCalledWith(
+        userInput,
+        '',
+        [], // 最近の活動記録（空配列）
+        mockTimezone
+      );
+    });
+
+    it('現在進行形「〜している」は現在時刻を開始時刻とする', async () => {
+      const userInput = '資料を作成している';
+      
+      // Geminiが現在進行形を正しく解釈することを想定
+      const mockAnalysis: ActivityAnalysis = {
+        category: '仕事',
+        subCategory: '資料作成',
+        structuredContent: '資料作成作業',
+        estimatedMinutes: 30,
+        productivityLevel: 3,
+        startTime: '2025-06-26T16:44:00.000Z', // 現在時刻
+        endTime: '2025-06-26T17:14:00.000Z',   // 現在時刻+30分
+      };
+      
+      mockGeminiService.analyzeActivity.mockResolvedValue(mockAnalysis);
+
+      const result = await activityService.processActivityRecord(
+        mockUserId, 
+        userInput, 
+        mockTimezone, 
+        currentTime
+      );
+
+      expect(result).toHaveLength(1);
+      expect(result[0].analysis.startTime).toBe('2025-06-26T16:44:00.000Z');
+      expect(result[0].analysis.endTime).toBe('2025-06-26T17:14:00.000Z');
+    });
+
+    it('過去形で15分作業の場合、適切な開始時刻を計算', async () => {
+      const userInput = 'コードレビューした';
+      
+      // Geminiが15分の作業と判定することを想定
+      const mockAnalysis: ActivityAnalysis = {
+        category: '仕事',
+        subCategory: 'コードレビュー',
+        structuredContent: 'コードレビュー作業',
+        estimatedMinutes: 15,
+        productivityLevel: 4,
+        startTime: '2025-06-26T16:29:00.000Z', // 現在時刻-15分
+        endTime: '2025-06-26T16:44:00.000Z',   // 現在時刻
+      };
+      
+      mockGeminiService.analyzeActivity.mockResolvedValue(mockAnalysis);
+
+      const result = await activityService.processActivityRecord(
+        mockUserId, 
+        userInput, 
+        mockTimezone, 
+        currentTime
+      );
+
+      expect(result).toHaveLength(1);
+      // 実際の計算時間を確認
+      const startTime = new Date(result[0].analysis.startTime!);
+      const endTime = new Date(result[0].analysis.endTime!);
+      const actualMinutes = Math.round((endTime.getTime() - startTime.getTime()) / (1000 * 60));
+      
+      expect(actualMinutes).toBe(15);
+      expect(result[0].originalText).toBe('コードレビューした');
+    });
+
+    it('最近の活動記録をコンテキストとして渡す', async () => {
+      const userInput = '引き続きバグ修正してた';
+      
+      // 最近の活動記録をモック
+      const recentActivities: ActivityRecord[] = [
+        {
+          id: 'recent-1',
+          userId: mockUserId,
+          timeSlot: '2025-06-26 16:00:00',
+          originalText: '前回のバグ修正作業',
+          analysis: {
+            category: '仕事',
+            subCategory: 'バグ修正',
+            structuredContent: '前回のバグ修正',
+            estimatedMinutes: 30,
+            productivityLevel: 4,
+            startTime: '2025-06-26T16:00:00.000Z',
+            endTime: '2025-06-26T16:30:00.000Z',
+          },
+          createdAt: '2025-06-26T16:05:00.000Z',
+          updatedAt: '2025-06-26T16:05:00.000Z',
+        }
+      ];
+      
+      mockDatabase.getActivityRecords.mockResolvedValue(recentActivities);
+      
+      const mockAnalysis: ActivityAnalysis = {
+        category: '仕事',
+        subCategory: 'バグ修正',
+        structuredContent: '継続的なバグ修正作業',
+        estimatedMinutes: 14, // 16:30-16:44の継続作業
+        productivityLevel: 4,
+        startTime: '2025-06-26T16:30:00.000Z', // 前回の終了時刻から継続
+        endTime: '2025-06-26T16:44:00.000Z',
+      };
+      
+      mockGeminiService.analyzeActivity.mockResolvedValue(mockAnalysis);
+
+      await activityService.processActivityRecord(
+        mockUserId, 
+        userInput, 
+        mockTimezone, 
+        currentTime
+      );
+
+      // 最近の活動記録がコンテキストとして渡されることを確認
+      expect(mockGeminiService.analyzeActivity).toHaveBeenCalledWith(
+        userInput,
+        '',
+        expect.arrayContaining([
+          expect.objectContaining({
+            originalText: '前回のバグ修正作業'
+          })
+        ]),
+        mockTimezone
+      );
+    });
+  });
 });

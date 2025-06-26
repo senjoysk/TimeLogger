@@ -33,8 +33,11 @@ export class ActivityService {
     try {
       console.log(`📝 活動記録を処理開始: ${userInput}`);
 
+      // コンテキストとして最近の活動記録を取得（直近3件）
+      const recentActivities = await this.getRecentActivities(userId, timezone, 3);
+
       // Gemini で活動内容を解析 (時間情報も含む)
-      const analysis = await this.geminiService.analyzeActivity(userInput, '', [], timezone);
+      const analysis = await this.geminiService.analyzeActivity(userInput, '', recentActivities, timezone);
 
       const startTime = analysis.startTime ? new Date(analysis.startTime) : inputTime;
       const endTime = analysis.endTime ? new Date(analysis.endTime) : new Date(startTime.getTime() + 30 * 60000);
@@ -120,15 +123,41 @@ export class ActivityService {
 
   /**
    * 投稿時刻に基づいて適切な30分枠を決定
-   * 投稿が時間枠内（例：14:00-14:29）であれば現在の枠
-   * 投稿が時間枠外（例：14:30以降）であれば前の枠に記録
+   * 30分以内の活動は1つのスロットに記録
    */
   private calculateTimeSlots(startTime: Date, endTime: Date, timezone: string): { start: Date; label: string }[] {
+    // 活動時間が30分以内の場合は1つのスロットにまとめる
+    const durationMinutes = Math.round((endTime.getTime() - startTime.getTime()) / (1000 * 60));
+    
+    if (durationMinutes <= 30) {
+      // 開始時刻の30分境界に揃える
+      const aligned = new Date(startTime);
+      const minutes = aligned.getMinutes();
+      const alignedMinutes = minutes < 30 ? 0 : 30;
+      aligned.setMinutes(alignedMinutes, 0, 0);
+      
+      const slotLabel = formatDateTime(aligned, timezone);
+      return [{
+        start: aligned,
+        label: slotLabel
+      }];
+    }
+
+    // 30分を超える場合は複数のスロットに分割
     const slots = [];
-    let current = getCurrentTimeSlot(timezone).start;
+    let current = new Date(startTime);
+    
+    // 現在時刻を30分単位の境界に揃える
+    const minutes = current.getMinutes();
+    const alignedMinutes = minutes < 30 ? 0 : 30;
+    current.setMinutes(alignedMinutes, 0, 0);
 
     while (current < endTime) {
-      slots.push(getCurrentTimeSlot(timezone));
+      const slotLabel = formatDateTime(current, timezone);
+      slots.push({
+        start: new Date(current),
+        label: slotLabel
+      });
       current = new Date(current.getTime() + 30 * 60000);
     }
 
@@ -193,6 +222,31 @@ export class ActivityService {
       `⏱️ ${record.analysis.estimatedMinutes}分 ${productivity} (${record.analysis.productivityLevel}/5)`,
       `💡 ${record.analysis.structuredContent}`,
     ].join('\n');
+  }
+
+  /**
+   * 最近の活動記録を取得（コンテキスト用）
+   * @param userId ユーザーID
+   * @param timezone タイムゾーン
+   * @param limit 取得件数
+   * @returns 最近の活動記録リスト
+   */
+  public async getRecentActivities(userId: string, timezone: string, limit: number = 3): Promise<ActivityRecord[]> {
+    try {
+      // 今日の活動記録を取得
+      const activities = await this.database.getActivityRecords(userId, timezone);
+      
+      // 作成日時でソートして最新のものから取得
+      const sortedActivities = activities
+        .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+        .slice(0, limit);
+
+      console.log(`📋 最近の活動記録を取得: ${sortedActivities.length}件 (上限: ${limit}件)`);
+      return sortedActivities;
+    } catch (error) {
+      console.error('❌ 最近の活動記録取得エラー:', error);
+      return [];
+    }
   }
 
   /**
