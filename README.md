@@ -167,6 +167,15 @@ src/
 # 型チェック
 npm run build
 
+# 単体テスト
+npm test
+
+# テストをwatchモードで実行（TDD開発時に便利）
+npm run test:watch
+
+# カバレッジレポート付きテスト
+npm run test:coverage
+
 # 手動テスト用
 npm run dev
 ```

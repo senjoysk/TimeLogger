@@ -52,6 +52,9 @@ src/
 - `npm run build`: TypeScriptをビルド
 - `npm start`: 本番モードで実行
 - `npm run watch`: ファイル変更を監視して自動再起動
+- `npm test`: テストを実行
+- `npm run test:watch`: テストをwatchモードで実行
+- `npm run test:coverage`: カバレッジレポート付きでテスト実行
 
 
 ## アーキテクチャ概要
