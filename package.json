@@ -15,7 +15,9 @@
     "bot:stop": "./scripts/bot-manager.sh stop",
     "bot:restart": "./scripts/bot-manager.sh restart",
     "bot:status": "./scripts/bot-manager.sh status",
-    "bot:logs": "./scripts/bot-manager.sh logs"
+    "bot:logs": "./scripts/bot-manager.sh logs",
+    "summary:delete": "node scripts/delete-today-summary.js",
+    "summary:delete-date": "node scripts/delete-today-summary.js"
   },
   "keywords": [
     "discord",
