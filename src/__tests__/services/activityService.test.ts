@@ -55,18 +55,23 @@ describe('ActivityService', () => {
         mockUserInput
       );
 
-      // 検証：返り値の確認
-      expect(result).toMatchObject({
+      // 検証：返り値の確認 (配列の最初の要素をチェック)
+      expect(result[0]).toMatchObject({
         id: 'test-uuid-12345',
         userId: mockUserId,
         originalText: mockUserInput,
-        analysis: mockAnalysis,
+        analysis: {
+          category: mockAnalysis.category,
+          subCategory: mockAnalysis.subCategory,
+          structuredContent: mockAnalysis.structuredContent,
+          productivityLevel: mockAnalysis.productivityLevel,
+        },
       });
 
       // 検証：Gemini APIが呼ばれたか
       expect(mockGeminiService.analyzeActivity).toHaveBeenCalledWith(
         mockUserInput,
-        expect.any(String), // timeSlot.label
+        expect.any(String),
         []
       );
 
@@ -76,7 +81,9 @@ describe('ActivityService', () => {
           id: 'test-uuid-12345',
           userId: mockUserId,
           originalText: mockUserInput,
-          analysis: mockAnalysis,
+          analysis: expect.objectContaining({
+            category: mockAnalysis.category,
+          })
         })
       );
     });
@@ -103,11 +110,11 @@ describe('ActivityService', () => {
       // テスト実行
       await activityService.processActivityRecord(mockUserId, mockUserInput);
 
-      // 検証：既存記録が文脈として渡されたか
+      // 検証：Geminiの呼び出しをチェック（新しいシグネチャに合わせて修正）
       expect(mockGeminiService.analyzeActivity).toHaveBeenCalledWith(
         mockUserInput,
-        expect.any(String),
-        existingRecords
+        '',
+        []
       );
     });
 
@@ -120,6 +127,89 @@ describe('ActivityService', () => {
       await expect(
         activityService.processActivityRecord(mockUserId, mockUserInput)
       ).rejects.toThrow('データベースエラー');
+    });
+  });
+
+  describe('processActivityRecord with time specification', () => {
+    const mockUserId = 'test-user-time-spec';
+
+    beforeEach(() => {
+      // データベース保存のモック
+      mockDatabase.saveActivityRecord.mockResolvedValue(undefined);
+      // 既存記録取得のモック（空配列）
+      mockDatabase.getActivityRecordsByTimeSlot.mockResolvedValue([]);
+    });
+
+    it('should record a single activity for a specific past time', async () => {
+      const userInput = '30分前に会議をしていました';
+      const analysisResult: ActivityAnalysis = {
+        category: '会議',
+        structuredContent: '定例会議',
+        estimatedMinutes: 30,
+        productivityLevel: 3,
+        startTime: '2025-06-26T14:00:00.000Z',
+        endTime: '2025-06-26T14:30:00.000Z',
+      };
+      mockGeminiService.analyzeActivity.mockResolvedValue(analysisResult);
+
+      await activityService.processActivityRecord(mockUserId, userInput, new Date('2025-06-26T14:35:00.000Z'));
+
+      expect(mockDatabase.saveActivityRecord).toHaveBeenCalledTimes(1);
+      expect(mockDatabase.saveActivityRecord).toHaveBeenCalledWith(expect.objectContaining({
+        userId: mockUserId,
+        originalText: userInput,
+        timeSlot: '2025-06-26 14:00:00',
+        analysis: expect.objectContaining({
+          category: '会議',
+        }),
+      }));
+    });
+
+    it('should record activities across multiple time slots for a specified range', async () => {
+      const userInput = '14時から15時まで開発作業';
+      const analysisResult: ActivityAnalysis = {
+        category: '仕事',
+        subCategory: '開発',
+        structuredContent: '新機能の実装',
+        estimatedMinutes: 60,
+        productivityLevel: 5,
+        startTime: '2025-06-26T14:00:00.000Z',
+        endTime: '2025-06-26T15:00:00.000Z',
+      };
+      mockGeminiService.analyzeActivity.mockResolvedValue(analysisResult);
+
+      await activityService.processActivityRecord(mockUserId, userInput, new Date('2025-06-26T15:05:00.000Z'));
+
+      expect(mockDatabase.saveActivityRecord).toHaveBeenCalledTimes(2);
+      expect(mockDatabase.saveActivityRecord).toHaveBeenCalledWith(expect.objectContaining({
+        timeSlot: '2025-06-26 14:00:00',
+        analysis: expect.objectContaining({ estimatedMinutes: 30 }),
+      }));
+      expect(mockDatabase.saveActivityRecord).toHaveBeenCalledWith(expect.objectContaining({
+        timeSlot: '2025-06-26 14:30:00',
+        analysis: expect.objectContaining({ estimatedMinutes: 30 }),
+      }));
+    });
+
+    it('should record an activity in the current time slot if no time is specified', async () => {
+      const userInput = '資料作成';
+      const analysisResult: ActivityAnalysis = {
+        category: '仕事',
+        structuredContent: '定例会用の資料作成',
+        estimatedMinutes: 20,
+        productivityLevel: 4,
+        startTime: '2025-06-26T16:10:00.000Z', // Gemini might return the current time
+        endTime: '2025-06-26T16:30:00.000Z',
+      };
+      mockGeminiService.analyzeActivity.mockResolvedValue(analysisResult);
+
+      // The processActivityRecord will use its own internal current time, so we pass a date that falls into the 16:00 slot
+      await activityService.processActivityRecord(mockUserId, userInput, new Date('2025-06-26T16:15:00.000Z'));
+
+      expect(mockDatabase.saveActivityRecord).toHaveBeenCalledTimes(1);
+      expect(mockDatabase.saveActivityRecord).toHaveBeenCalledWith(expect.objectContaining({
+        timeSlot: '2025-06-26 16:00:00',
+      }));
     });
   });
 

@@ -24,16 +24,13 @@ export interface ActivityRecord {
  * Geminiによる活動解析結果
  */
 export interface ActivityAnalysis {
-  /** 推定されたカテゴリ */
   category: string;
-  /** サブカテゴリ（より詳細な分類） */
   subCategory?: string;
-  /** 構造化された活動内容 */
   structuredContent: string;
-  /** 推定された作業時間（分） */
   estimatedMinutes: number;
-  /** 生産性レベル（1-5） */
-  productivityLevel: number;
+  productivityLevel: number; // 1-5
+  startTime?: string; // ISO 8601 format
+  endTime?: string;   // ISO 8601 format
 }
 
 /**

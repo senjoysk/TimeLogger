@@ -48,65 +48,46 @@ export class Scheduler {
    * 毎時0分と30分に実行
    */
   private startActivityPromptSchedule(): void {
-    // 毎時0分と30分に実行するcron式
-    const cronPattern = '0,30 * * * *';
+    // JSTの平日9:00-17:59はUTCの0:00-8:59
+    // 毎時0分と30分に実行
+    const cronPattern = '0,30 0-8 * * 1-5'; // UTCで月-金の0:00-8:59
     
     const job = cron.schedule(cronPattern, async () => {
       try {
-        console.log('⏰ 30分間隔の問いかけスケジュールが実行されました');
-        
-        // 働く時間帯かチェック
-        if (!isWorkingHours()) {
-          console.log('   ⏸️  働く時間帯ではないため、問いかけをスキップします');
-          return;
-        }
-        
-        // Bot経由で問いかけを送信
+        console.log('⏰ 30分間隔の問いかけスケジュールが実行されました (UTC)');
         await this.bot.sendActivityPrompt();
-        
       } catch (error) {
         console.error('❌ 問いかけスケジュール実行エラー:', error);
       }
     }, {
-      scheduled: false, // 手動で開始
-      timezone: 'Asia/Tokyo', // 日本時間で実行
+      scheduled: true,
     });
 
-    // スケジュールを開始
-    job.start();
     this.jobs.set('activityPrompt', job);
-    
-    console.log('  ✅ 30分間隔問いかけスケジュール (毎時0分・30分) を開始しました');
+    console.log(`  ✅ 30分間隔問いかけスケジュール (UTC: ${cronPattern}) を開始しました`);
   }
 
   /**
    * 日次サマリースケジュールを開始
-   * 毎日18:00に実行
+   * 毎日18:00 JST (09:00 UTC) に実行
    */
   private startDailySummarySchedule(): void {
-    // 毎日18:00に実行するcron式
-    const cronPattern = `0 ${config.app.summaryTime.hour} * * *`;
+    // 毎日09:00 UTC (18:00 JST) に実行するcron式
+    const cronPattern = '0 9 * * *';
     
     const job = cron.schedule(cronPattern, async () => {
       try {
-        console.log('📊 日次サマリースケジュールが実行されました');
-        
-        // Bot経由でサマリーを送信
+        console.log('📊 日次サマリースケジュールが実行されました (UTC)');
         await this.bot.sendDailySummary();
-        
       } catch (error) {
         console.error('❌ 日次サマリースケジュール実行エラー:', error);
       }
     }, {
-      scheduled: false, // 手動で開始
-      timezone: 'Asia/Tokyo', // 日本時間で実行
+      scheduled: true,
     });
 
-    // スケジュールを開始
-    job.start();
     this.jobs.set('dailySummary', job);
-    
-    console.log(`  ✅ 日次サマリースケジュール (毎日${config.app.summaryTime.hour}:00) を開始しました`);
+    console.log(`  ✅ 日次サマリースケジュール (UTC: ${cronPattern}) を開始しました`);
   }
 
   /**

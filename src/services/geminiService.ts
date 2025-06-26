@@ -124,38 +124,9 @@ export class GeminiService {
       contextInfo = `\n\n【同じ時間枠の過去の記録】\n${prevTexts}\n\n`;
     }
 
-    return `
-あなたは時間管理とタスク解析の専門家です。
-ユーザーの活動記録を以下の形式で構造化して解析してください。
+    const now = new Date().toISOString();
 
-【分析対象】
-時間枠: ${timeSlot}
-ユーザー入力: "${userInput}"${contextInfo}
-
-【出力形式】（必ずJSON形式で回答してください）
-{
-  "category": "メインカテゴリ名",
-  "subCategory": "サブカテゴリ名（任意）",
-  "structuredContent": "活動内容の構造化された説明",
-  "estimatedMinutes": 推定時間（分、1-30の範囲）,
-  "productivityLevel": 生産性レベル（1-5、5が最高）
-}
-
-【カテゴリの例】
-- 仕事（会議、プログラミング、調査、企画、レビューなど）
-- 勉強（学習、読書、研修など）
-- 休憩（昼食、コーヒーブレイク、散歩など）
-- コミュニケーション（メール、チャット、電話など）
-- 管理業務（スケジュール調整、資料整理など）
-
-【判断基準】
-- estimatedMinutes: 実際の作業時間を30分以内で推定
-- productivityLevel: 目標達成への貢献度（1:低い 3:普通 5:高い）
-- 曖昧な入力でも、文脈から最も適切なカテゴリを推測してください
-- 複数の活動が含まれる場合は、最も主要な活動をベースに判断してください
-
-必ずJSON形式のみで回答してください。説明文は不要です。
-`;
+    return `\nあなたは時間管理とタスク解析の専門家です。\nユーザーの活動記録を以下の形式で構造化して解析してください。\n\n【現在時刻】\n${now}\n\n【分析対象】\nユーザー入力: "${userInput}"${contextInfo}\n\n【出力形式】（必ずJSON形式で回答してください）\n{\n  "category": "メインカテゴリ名",\n  "subCategory": "サブカテゴリ名（任意）",\n  "structuredContent": "活動内容の構造化された説明",\n  "estimatedMinutes": 推定合計時間（分）、\n  "productivityLevel": 生産性レベル（1-5、5が最高）,\n  "startTime": "活動開始時刻のISO 8601形式の文字列（例: 2025-06-26T14:00:00.000Z)",\n  "endTime": "活動終了時刻のISO 8601形式の文字列（例: 2025-06-26T15:30:00.000Z)"\n}\n\n【カテゴリの例】\n- 仕事（会議、プログラミング、調査、企画、レビューなど）\n- 勉強（学習、読書、研修など）\n- 休憩（昼食、コーヒーブレイク、散歩など）\n- コミュニケーション（メール、チャット、電話など）\n- 管理業務（スケジュール調整、資料整理など）\n\n【判断基準】\n- **時間解釈**: ユーザー入力から活動の開始・終了時刻を特定してください。\n  - 「さっき」「30分前」のような相対的な表現は、【現在時刻】を基準に絶対時刻へ変換してください。\n  - 「14時から15時まで」のような範囲指定も解釈してください。\n  - 時間に関する言及がない場合は、活動時間は30分と仮定し、開始時刻と終了時刻を【現在時刻】を基準に設定してください。\n- estimatedMinutes: startTimeとendTimeから算出した合計時間（分）を記入してください。\n- productivityLevel: 目標達成への貢献度（1:低い 3:普通 5:高い）\n- 曖昧な入力でも、文脈から最も適切なカテゴリを推測してください\n- 複数の活動が含まれる場合は、最も主要な活動をベースに判断してください\n\n必ずJSON形式のみで回答してください。説明文は不要です。\n`;
   }
 
   /**
@@ -219,8 +190,10 @@ ${categoryList}
         category: parsed.category || '未分類',
         subCategory: parsed.subCategory || undefined,
         structuredContent: parsed.structuredContent || '活動記録',
-        estimatedMinutes: Math.min(Math.max(parsed.estimatedMinutes || 30, 1), 30),
+        estimatedMinutes: parsed.estimatedMinutes || 30,
         productivityLevel: Math.min(Math.max(parsed.productivityLevel || 3, 1), 5),
+        startTime: parsed.startTime,
+        endTime: parsed.endTime,
       };
     } catch (error) {
       console.error('解析レスポンスのパースエラー:', error);

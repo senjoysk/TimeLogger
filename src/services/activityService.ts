@@ -1,5 +1,5 @@
 import { v4 as uuidv4 } from 'uuid';
-import { ActivityRecord } from '../types';
+import { ActivityRecord, ActivityAnalysis } from '../types';
 import { Database } from '../database/database';
 import { GeminiService } from './geminiService';
 import { getCurrentTimeSlot, getTimeSlotForDate, formatDateTime } from '../utils/timeUtils';
@@ -28,43 +28,53 @@ export class ActivityService {
     userId: string,
     userInput: string,
     inputTime: Date = new Date()
-  ): Promise<ActivityRecord> {
+  ): Promise<ActivityRecord[]> {
     try {
       console.log(`📝 活動記録を処理開始: ${userInput}`);
 
-      // 投稿時刻に基づいて適切な時間枠を決定
-      const timeSlot = this.determineTimeSlot(inputTime);
-      const timeSlotString = formatDateTime(timeSlot.start);
+      // Gemini で活動内容を解析 (時間情報も含む)
+      const analysis = await this.geminiService.analyzeActivity(userInput, '', []);
 
-      // 同じ時間枠の既存記録を取得（追加投稿の場合の文脈情報として使用）
-      const existingRecords = await this.database.getActivityRecordsByTimeSlot(
-        userId,
-        timeSlotString
-      );
+      const startTime = analysis.startTime ? new Date(analysis.startTime) : inputTime;
+      const endTime = analysis.endTime ? new Date(analysis.endTime) : new Date(startTime.getTime() + 30 * 60000);
 
-      // Gemini で活動内容を解析
-      const analysis = await this.geminiService.analyzeActivity(
-        userInput,
-        timeSlot.label,
-        existingRecords
-      );
+      // 活動がまたがるタイムスロットを計算
+      const timeSlots = this.calculateTimeSlots(startTime, endTime);
+      const totalSlots = timeSlots.length;
 
-      // 活動記録オブジェクトを作成
-      const activityRecord: ActivityRecord = {
-        id: uuidv4(),
-        userId,
-        timeSlot: timeSlotString,
-        originalText: userInput.trim(),
-        analysis,
-        createdAt: formatDateTime(new Date()),
-        updatedAt: formatDateTime(new Date()),
-      };
+      const createdRecords: ActivityRecord[] = [];
 
-      // データベースに保存
-      await this.database.saveActivityRecord(activityRecord);
+      for (let i = 0; i < totalSlots; i++) {
+        const slot = timeSlots[i];
+        const timeSlotString = formatDateTime(slot.start);
 
-      console.log(`✅ 活動記録を保存しました: ${activityRecord.id}`);
-      return activityRecord;
+        // 各スロットの活動時間を計算
+        const slotEndTime = new Date(slot.start.getTime() + 30 * 60000);
+        const effectiveStartTime = i === 0 ? startTime : slot.start;
+        const effectiveEndTime = i === totalSlots - 1 ? endTime : slotEndTime;
+        const estimatedMinutes = Math.round((effectiveEndTime.getTime() - effectiveStartTime.getTime()) / 60000);
+
+        const recordAnalysis: ActivityAnalysis = {
+          ...analysis,
+          estimatedMinutes: Math.max(1, estimatedMinutes), // 少なくとも1分とする
+        };
+
+        const activityRecord: ActivityRecord = {
+          id: uuidv4(),
+          userId,
+          timeSlot: timeSlotString,
+          originalText: userInput.trim(),
+          analysis: recordAnalysis,
+          createdAt: formatDateTime(new Date()),
+          updatedAt: formatDateTime(new Date()),
+        };
+
+        await this.database.saveActivityRecord(activityRecord);
+        createdRecords.push(activityRecord);
+        console.log(`✅ 活動記録を保存しました: ${activityRecord.id} for time slot ${timeSlotString}`);
+      }
+
+      return createdRecords;
 
     } catch (error) {
       console.error('❌ 活動記録処理エラー:', error);
@@ -112,21 +122,16 @@ export class ActivityService {
    * 投稿が時間枠内（例：14:00-14:29）であれば現在の枠
    * 投稿が時間枠外（例：14:30以降）であれば前の枠に記録
    */
-  private determineTimeSlot(inputTime: Date) {
-    const currentSlot = getCurrentTimeSlot();
-    const inputSlot = getTimeSlotForDate(inputTime);
+  private calculateTimeSlots(startTime: Date, endTime: Date): { start: Date; label: string }[] {
+    const slots = [];
+    let current = getTimeSlotForDate(startTime).start;
 
-    // 投稿時刻が現在の30分枠の開始時刻以降の場合
-    if (inputTime >= currentSlot.start) {
-      // 前の30分枠に記録（要件: 追加投稿は前の30分枠として扱う）
-      const previousSlot = new Date(inputSlot.start);
-      previousSlot.setMinutes(previousSlot.getMinutes() - 30);
-      
-      return getTimeSlotForDate(previousSlot);
-    } else {
-      // 投稿時刻の30分枠に記録
-      return inputSlot;
+    while (current < endTime) {
+      slots.push(getTimeSlotForDate(current));
+      current = new Date(current.getTime() + 30 * 60000);
     }
+
+    return slots;
   }
 
   /**

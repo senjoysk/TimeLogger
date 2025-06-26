@@ -1,6 +1,6 @@
 import { Client, GatewayIntentBits, Message, Partials } from 'discord.js';
 import { config } from './config';
-import { getCurrentTimeSlot, isWorkingHours } from './utils/timeUtils';
+import { getCurrentTimeSlot, isWorkingHours, formatTime } from './utils/timeUtils';
 import { BotStatus } from './types';
 import { Database } from './database/database';
 import { GeminiService } from './services/geminiService';
@@ -214,28 +214,33 @@ export class TaskLoggerBot {
     try {
       // 活動記録を処理・保存
       console.log('  ↳ [DEBUG] ActivityServiceで処理中...');
-      const activityRecord = await this.activityService.processActivityRecord(
+      const activityRecords = await this.activityService.processActivityRecord(
         message.author.id,
         content
       );
-      console.log('  ↳ [DEBUG] 活動記録処理完了:', {
-        id: activityRecord.id,
-        category: activityRecord.analysis.category,
-        subCategory: activityRecord.analysis.subCategory,
-        productivityLevel: activityRecord.analysis.productivityLevel
-      });
+      console.log(`  ↳ [DEBUG] 活動記録処理完了: ${activityRecords.length}件の記録を作成`);
+
+      if (activityRecords.length === 0) {
+        await message.reply('活動を記録できませんでした。時間や内容を明確にしてもう一度お試しください。');
+        return;
+      }
+
+      const firstRecord = activityRecords[0];
+      const lastRecord = activityRecords[activityRecords.length - 1];
 
       // 確認メッセージを送信
-      const timeSlot = getCurrentTimeSlot();
+      const startTime = formatTime(new Date(firstRecord.analysis.startTime!));
+      const endTime = formatTime(new Date(lastRecord.analysis.endTime!));
+      const totalMinutes = activityRecords.reduce((sum, r) => sum + r.analysis.estimatedMinutes, 0);
+
       const confirmation = [
         '✅ **活動記録を保存しました！**',
         '',
-        `⏰ 時間枠: ${timeSlot.label}`,
-        `📂 カテゴリ: ${activityRecord.analysis.category}`,
-        `⏱️ 推定時間: ${activityRecord.analysis.estimatedMinutes}分`,
-        `⭐ 生産性: ${'★'.repeat(activityRecord.analysis.productivityLevel)} (${activityRecord.analysis.productivityLevel}/5)`,
+        `⏰ 時間: ${startTime} - ${endTime} (${totalMinutes}分)`,
+        `📂 カテゴリ: ${firstRecord.analysis.category}`,
+        `⭐ 生産性: ${'★'.repeat(firstRecord.analysis.productivityLevel)} (${firstRecord.analysis.productivityLevel}/5)`,
         '',
-        `💡 ${activityRecord.analysis.structuredContent}`,
+        `💡 ${firstRecord.analysis.structuredContent}`,
       ].join('\n');
 
       console.log('  ↳ [DEBUG] 確認メッセージ送信中...');
@@ -245,12 +250,10 @@ export class TaskLoggerBot {
     } catch (error) {
       console.error('❌ [DEBUG] 活動記録処理エラー:', error);
       await message.reply(
-        '申し訳ありません。活動記録の処理中にエラーが発生しました。\n' +
+        '申し訳ありません。活動記録の処理中にエラーが発生しました.\n' +
         'しばらく時間をおいて再度お試しください。'
       );
     }
-
-    this.status.lastPromptTime = new Date();
   }
 
   /**
