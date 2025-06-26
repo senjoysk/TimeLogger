@@ -14,9 +14,9 @@ export class Scheduler {
   private jobs: Map<string, cron.ScheduledTask> = new Map();
   private userTimezones: Map<string, string> = new Map();
 
-  constructor(bot: TaskLoggerBot) {
+  constructor(bot: TaskLoggerBot, database: Database) {
     this.bot = bot;
-    this.db = new Database();
+    this.db = database;
   }
 
   /**
@@ -182,6 +182,11 @@ export class Scheduler {
    */
   private async loadUserTimezones(): Promise<void> {
     try {
+      // データベースが初期化されているか確認
+      if (!this.db) {
+        throw new Error('データベースが初期化されていません');
+      }
+      
       // 現在はシングルユーザー対応のため、設定ファイルのユーザーIDのみ取得
       const userId = config.discord.targetUserId;
       const timezone = await this.db.getUserTimezone(userId);

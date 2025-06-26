@@ -326,3 +326,4 @@ describe('ActivityService', () => {
       expect(result).toBe('今日の活動記録はまだありません。');
     });
   });
+});

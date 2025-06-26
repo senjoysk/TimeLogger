@@ -177,3 +177,42 @@ Tests: 10 passed, 10 total
 ✅ **動作確認**: 各機能の基本動作確認済み  
 
 実装完了日: 2025-06-26
+
+## 追加修正（タイムゾーン検索エラー対応）
+
+### 問題
+`!timezone search Kolkata`でエラーが発生していた
+
+### 原因
+1. **timezones.jsonの構造違い**: bot.tsでは`cities`プロパティを期待していたが、実際は`text`と`utc`プロパティ
+2. **初期化順序の問題**: SchedulerがDatabaseの初期化前にタイムゾーン読み込みを試行
+3. **テストファイルの構文エラー**: 閉じ括弧不足
+
+### 解決策
+1. **タイムゾーン検索ロジック修正**:
+   - `tz.cities`の代わりに`tz.text`と`tz.utc`配列で検索
+   - 検索結果表示を実際のデータ構造に合わせて変更
+   - タイムゾーン検証を`tz.utc.includes()`で実行
+
+2. **初期化順序修正**:
+   - SchedulerコンストラクタでDatabaseインスタンスを受け取るよう変更
+   - index.tsでBot初期化後にSchedulerを初期化
+   - bot.tsに`getDatabase()`メソッド追加
+
+3. **テストファイル修正**:
+   - activityService.test.tsの閉じ括弧追加
+   - timezoneService.test.tsのSchedulerコンストラクタ修正
+
+### 動作確認
+- `npm test`での全テスト成功
+- Bot正常起動確認
+- タイムゾーン検索テストスクリプトで動作確認
+
+### 修正ファイル
+- `src/bot.ts`: タイムゾーン検索ロジック修正、getDatabase()追加
+- `src/scheduler.ts`: コンストラクタ修正、データベース初期化チェック追加
+- `src/index.ts`: 初期化順序変更
+- `src/__tests__/services/activityService.test.ts`: 構文エラー修正
+- `src/__tests__/services/timezoneService.test.ts`: コンストラクタ修正
+
+修正完了日: 2025-06-26

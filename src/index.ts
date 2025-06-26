@@ -12,7 +12,8 @@ class Application {
 
   constructor() {
     this.bot = new TaskLoggerBot();
-    this.scheduler = new Scheduler(this.bot);
+    // スケジューラーの初期化はBotの初期化後に行う
+    this.scheduler = null as any;
   }
 
   /**
@@ -29,6 +30,9 @@ class Application {
       // Discord Bot の起動
       await this.bot.start();
       console.log('');
+      
+      // スケジューラーの初期化（Botのデータベース初期化後）
+      this.scheduler = new Scheduler(this.bot, this.bot.getDatabase());
       
       // スケジューラーの開始
       await this.scheduler.start();

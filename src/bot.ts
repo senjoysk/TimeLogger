@@ -465,6 +465,14 @@ export class TaskLoggerBot {
   }
 
   /**
+   * データベースインスタンスを取得
+   * @returns データベースインスタンス
+   */
+  public getDatabase(): Database {
+    return this.database;
+  }
+
+  /**
    * タイムゾーン設定コマンドを処理
    * @param message メッセージオブジェクト
    * @param args コマンド引数
@@ -479,8 +487,10 @@ export class TaskLoggerBot {
         await message.reply('タイムゾーンを設定するには、`!timezone set <タイムゾーン名>` の形式で指定してください。例: `!timezone set Asia/Tokyo`');
         return;
       }
-      // タイムゾーンの検証
-      const isValidTimezone = timezones.some((tz: any) => tz.tzName === value);
+      // タイムゾーンの検証（IANAタイムゾーン名で検証）
+      const isValidTimezone = timezones.some((tz: any) => 
+        tz.utc && tz.utc.includes(value)
+      );
       if (!isValidTimezone) {
         await message.reply(`無効なタイムゾーンです: \`${value}\`。IANAタイムゾーンデータベースの形式で指定してください。例: \`Asia/Tokyo\`。または \`!timezone search <都市名>\` で検索してください。`);
         return;
@@ -493,14 +503,25 @@ export class TaskLoggerBot {
         await message.reply('検索する都市名を指定してください。例: `!timezone search Tokyo`');
         return;
       }
-      const results = timezones.filter((tz: any) => 
-        tz.cities.some((city: string) => city.toLowerCase().includes(value.toLowerCase()))
-      );
+      // timezones.jsonの実際の構造に合わせて検索
+      const results = timezones.filter((tz: any) => {
+        // textフィールドから都市名を検索
+        const searchInText = tz.text && tz.text.toLowerCase().includes(value.toLowerCase());
+        // utcフィールドからタイムゾーン名を検索
+        const searchInUtc = tz.utc && tz.utc.some((utcZone: string) => 
+          utcZone.toLowerCase().includes(value.toLowerCase())
+        );
+        return searchInText || searchInUtc;
+      });
 
       if (results.length > 0) {
-        const response = results.slice(0, 5).map((tz: any) => 
-          `• ${tz.tzName} (主要都市: ${tz.cities.join(', ')})`
-        ).join('\n');
+        const response = results.slice(0, 5).map((tz: any) => {
+          // 主要なIANAタイムゾーンを取得（最初のものを使用）
+          const mainTimezone = tz.utc && tz.utc.length > 0 ? tz.utc[0] : '不明';
+          // textフィールドから都市名を抽出
+          const cityPart = tz.text ? tz.text.split(') ')[1] || tz.text : '不明';
+          return `• ${mainTimezone} (${cityPart})`;
+        }).join('\n');
         await message.reply(`見つかったタイムゾーン:\n${response}\n\n設定するには \`!timezone set <タイムゾーン名>\` を使用してください。`);
       } else {
         await message.reply(`\`${value}\` に一致するタイムゾーンは見つかりませんでした。`);

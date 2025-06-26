@@ -16,7 +16,7 @@ describe('Timezone Service Tests', () => {
   beforeEach(() => {
     db = new Database();
     bot = new TaskLoggerBot();
-    scheduler = new Scheduler(bot);
+    scheduler = new Scheduler(bot, db);
     jest.clearAllMocks();
   });
 
