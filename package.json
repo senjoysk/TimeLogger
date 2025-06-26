@@ -10,7 +10,12 @@
     "watch": "ts-node --watch src/index.ts",
     "test": "jest",
     "test:watch": "jest --watch",
-    "test:coverage": "jest --coverage"
+    "test:coverage": "jest --coverage",
+    "bot:start": "./scripts/bot-manager.sh start",
+    "bot:stop": "./scripts/bot-manager.sh stop",
+    "bot:restart": "./scripts/bot-manager.sh restart",
+    "bot:status": "./scripts/bot-manager.sh status",
+    "bot:logs": "./scripts/bot-manager.sh logs"
   },
   "keywords": [
     "discord",
