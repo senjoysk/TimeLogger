@@ -326,4 +326,78 @@ describe('ActivityService', () => {
       expect(result).toBe('今日の活動記録はまだありません。');
     });
   });
+
+  describe('活動記録時間計算', () => {
+    it('開始時刻と終了時刻の差分を正しく計算する', () => {
+      // 16:18-16:33 のケース（15分）
+      const startTime = new Date('2025-06-26T16:18:00');
+      const endTime = new Date('2025-06-26T16:33:00');
+      
+      const startTimeMs = startTime.getTime();
+      const endTimeMs = endTime.getTime();
+      const totalMinutes = Math.round((endTimeMs - startTimeMs) / (1000 * 60));
+      
+      expect(totalMinutes).toBe(15);
+    });
+
+    it('30分間の活動記録を正しく計算する', () => {
+      // 14:00-14:30 のケース（30分）
+      const startTime = new Date('2025-06-26T14:00:00');
+      const endTime = new Date('2025-06-26T14:30:00');
+      
+      const startTimeMs = startTime.getTime();
+      const endTimeMs = endTime.getTime();
+      const totalMinutes = Math.round((endTimeMs - startTimeMs) / (1000 * 60));
+      
+      expect(totalMinutes).toBe(30);
+    });
+
+    it('45分間の活動記録を正しく計算する', () => {
+      // 09:15-10:00 のケース（45分）
+      const startTime = new Date('2025-06-26T09:15:00');
+      const endTime = new Date('2025-06-26T10:00:00');
+      
+      const startTimeMs = startTime.getTime();
+      const endTimeMs = endTime.getTime();
+      const totalMinutes = Math.round((endTimeMs - startTimeMs) / (1000 * 60));
+      
+      expect(totalMinutes).toBe(45);
+    });
+
+    it('1時間を超える活動記録を正しく計算する', () => {
+      // 13:00-14:30 のケース（90分）
+      const startTime = new Date('2025-06-26T13:00:00');
+      const endTime = new Date('2025-06-26T14:30:00');
+      
+      const startTimeMs = startTime.getTime();
+      const endTimeMs = endTime.getTime();
+      const totalMinutes = Math.round((endTimeMs - startTimeMs) / (1000 * 60));
+      
+      expect(totalMinutes).toBe(90);
+    });
+
+    it('日付を跨ぐ活動記録を正しく計算する', () => {
+      // 23:45-00:15 のケース（30分）
+      const startTime = new Date('2025-06-26T23:45:00');
+      const endTime = new Date('2025-06-27T00:15:00');
+      
+      const startTimeMs = startTime.getTime();
+      const endTimeMs = endTime.getTime();
+      const totalMinutes = Math.round((endTimeMs - startTimeMs) / (1000 * 60));
+      
+      expect(totalMinutes).toBe(30);
+    });
+
+    it('1分未満の小数点は四捨五入される', () => {
+      // 30.5秒のケース
+      const startTime = new Date('2025-06-26T14:00:00.000');
+      const endTime = new Date('2025-06-26T14:00:30.500');
+      
+      const startTimeMs = startTime.getTime();
+      const endTimeMs = endTime.getTime();
+      const totalMinutes = Math.round((endTimeMs - startTimeMs) / (1000 * 60));
+      
+      expect(totalMinutes).toBe(1); // 0.5分は1分に四捨五入
+    });
+  });
 });

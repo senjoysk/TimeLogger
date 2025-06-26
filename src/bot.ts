@@ -233,7 +233,10 @@ export class TaskLoggerBot {
       // 確認メッセージを送信
       const startTime = formatTime(new Date(firstRecord.analysis.startTime!), userTimezone);
       const endTime = formatTime(new Date(lastRecord.analysis.endTime!), userTimezone);
-      const totalMinutes = activityRecords.reduce((sum, r) => sum + r.analysis.estimatedMinutes, 0);
+      // 実際の開始時刻と終了時刻の差分で時間を計算
+      const startTimeMs = new Date(firstRecord.analysis.startTime!).getTime();
+      const endTimeMs = new Date(lastRecord.analysis.endTime!).getTime();
+      const totalMinutes = Math.round((endTimeMs - startTimeMs) / (1000 * 60));
 
       const confirmation = [
         '✅ **活動記録を保存しました！**',
