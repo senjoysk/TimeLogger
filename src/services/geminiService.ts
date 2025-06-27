@@ -1,19 +1,20 @@
 import { GoogleGenerativeAI, GenerativeModel } from '@google/generative-ai';
 import { config } from '../config';
 import { ActivityAnalysis, ActivityRecord, DailySummary, CategoryTotal, SubCategoryTotal } from '../types';
+import { IAnalysisService, IApiCostRepository } from '../repositories/interfaces';
 import { ApiCostMonitor } from './apiCostMonitor';
-import { Database } from '../database/database';
 
 /**
  * Google Gemini API サービスクラス
  * 活動記録の解析とサマリー生成を行う
+ * IAnalysisServiceインターフェースを実装
  */
-export class GeminiService {
+export class GeminiService implements IAnalysisService {
   private genAI: GoogleGenerativeAI;
   private model: GenerativeModel;
   private costMonitor: ApiCostMonitor;
 
-  constructor(database: Database) {
+  constructor(costRepository: IApiCostRepository) {
     // Gemini API の初期化
     this.genAI = new GoogleGenerativeAI(config.gemini.apiKey);
     
@@ -27,8 +28,8 @@ export class GeminiService {
       },
     });
     
-    // API使用量監視の初期化
-    this.costMonitor = new ApiCostMonitor(database);
+    // API使用量監視の初期化（インターフェースベース）
+    this.costMonitor = new ApiCostMonitor(costRepository);
   }
 
   /**

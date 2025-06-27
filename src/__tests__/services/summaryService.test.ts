@@ -1,21 +1,35 @@
 import { SummaryService } from '../../services/summaryService';
-import { Database } from '../../database/database';
-import { GeminiService } from '../../services/geminiService';
 import { ActivityRecord, DailySummary, CategoryTotal } from '../../types';
-
-// モッククラスの作成
-jest.mock('../../database/database');
-jest.mock('../../services/geminiService');
+import { IDatabaseRepository, IAnalysisService } from '../../repositories/interfaces';
 
 describe('SummaryService', () => {
   let summaryService: SummaryService;
-  let mockDatabase: jest.Mocked<Database>;
-  let mockGeminiService: jest.Mocked<GeminiService>;
+  let mockRepository: jest.Mocked<IDatabaseRepository>;
+  let mockAnalysisService: jest.Mocked<IAnalysisService>;
 
   beforeEach(() => {
-    mockDatabase = new Database() as jest.Mocked<Database>;
-    mockGeminiService = new GeminiService(mockDatabase) as jest.Mocked<GeminiService>;
-    summaryService = new SummaryService(mockDatabase, mockGeminiService);
+    // インターフェースベースのモック作成
+    mockRepository = {
+      initialize: jest.fn(),
+      close: jest.fn(),
+      getUserTimezone: jest.fn(),
+      setUserTimezone: jest.fn(),
+      saveActivityRecord: jest.fn(),
+      getActivityRecords: jest.fn(),
+      getActivityRecordsByTimeSlot: jest.fn(),
+      saveDailySummary: jest.fn(),
+      getDailySummary: jest.fn(),
+    };
+
+    mockAnalysisService = {
+      analyzeActivity: jest.fn(),
+      generateDailySummary: jest.fn(),
+      getCostStats: jest.fn(),
+      getDailyCostReport: jest.fn(),
+      checkCostAlerts: jest.fn(),
+    };
+
+    summaryService = new SummaryService(mockRepository, mockAnalysisService);
   });
 
   afterEach(() => {
@@ -37,12 +51,12 @@ describe('SummaryService', () => {
         generatedAt: '2025-06-27T10:00:00.000Z'
       };
 
-      mockDatabase.getDailySummary.mockResolvedValue(existingSummary);
+      mockRepository.getDailySummary.mockResolvedValue(existingSummary);
 
       const result = await summaryService.getDailySummary(userId, timezone, businessDate);
 
       expect(result).toEqual(existingSummary);
-      expect(mockDatabase.getDailySummary).toHaveBeenCalledWith(userId, timezone, businessDate);
+      expect(mockRepository.getDailySummary).toHaveBeenCalledWith(userId, timezone, businessDate);
     });
 
     it('既存のサマリーがない場合は新規生成する', async () => {
@@ -90,17 +104,17 @@ describe('SummaryService', () => {
         generatedAt: '2025-06-27T10:00:00.000Z'
       };
 
-      mockDatabase.getDailySummary.mockResolvedValue(null);
-      mockDatabase.getActivityRecords.mockResolvedValue(mockActivities);
-      mockGeminiService.generateDailySummary.mockResolvedValue(generatedSummary);
-      mockDatabase.saveDailySummary.mockResolvedValue(undefined);
+      mockRepository.getDailySummary.mockResolvedValue(null);
+      mockRepository.getActivityRecords.mockResolvedValue(mockActivities);
+      mockAnalysisService.generateDailySummary.mockResolvedValue(generatedSummary);
+      mockRepository.saveDailySummary.mockResolvedValue(undefined);
 
       const result = await summaryService.getDailySummary(userId, timezone, businessDate);
 
       expect(result).toEqual(generatedSummary);
-      expect(mockDatabase.getActivityRecords).toHaveBeenCalledWith(userId, timezone, businessDate);
-      expect(mockGeminiService.generateDailySummary).toHaveBeenCalledWith(mockActivities, businessDate);
-      expect(mockDatabase.saveDailySummary).toHaveBeenCalledWith(generatedSummary, timezone);
+      expect(mockRepository.getActivityRecords).toHaveBeenCalledWith(userId, timezone, businessDate);
+      expect(mockAnalysisService.generateDailySummary).toHaveBeenCalledWith(mockActivities, businessDate);
+      expect(mockRepository.saveDailySummary).toHaveBeenCalledWith(generatedSummary, timezone);
     });
 
     it('活動記録がない場合は空のサマリーを返す', async () => {
@@ -108,8 +122,8 @@ describe('SummaryService', () => {
       const timezone = 'Asia/Tokyo';
       const businessDate = '2025-06-27';
 
-      mockDatabase.getDailySummary.mockResolvedValue(null);
-      mockDatabase.getActivityRecords.mockResolvedValue([]);
+      mockRepository.getDailySummary.mockResolvedValue(null);
+      mockRepository.getActivityRecords.mockResolvedValue([]);
 
       const result = await summaryService.getDailySummary(userId, timezone, businessDate);
 

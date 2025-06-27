@@ -32,7 +32,7 @@ class Application {
       console.log('');
       
       // スケジューラーの初期化（Botのデータベース初期化後）
-      this.scheduler = new Scheduler(this.bot, this.bot.getDatabase());
+      this.scheduler = new Scheduler(this.bot, this.bot.getRepository());
       
       // スケジューラーの開始
       await this.scheduler.start();

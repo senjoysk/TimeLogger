@@ -1,7 +1,7 @@
 import * as cron from 'node-cron';
 import { TaskLoggerBot } from './bot';
 import { config } from './config';
-import { Database } from './database/database';
+import { SqliteRepository } from './repositories/sqliteRepository';
 import { toZonedTime } from 'date-fns-tz';
 
 /**
@@ -10,13 +10,13 @@ import { toZonedTime } from 'date-fns-tz';
  */
 export class Scheduler {
   private bot: TaskLoggerBot;
-  private db: Database;
+  private repository: SqliteRepository;
   private jobs: Map<string, cron.ScheduledTask> = new Map();
   private userTimezones: Map<string, string> = new Map();
 
-  constructor(bot: TaskLoggerBot, database: Database) {
+  constructor(bot: TaskLoggerBot, repository: SqliteRepository) {
     this.bot = bot;
-    this.db = database;
+    this.repository = repository;
   }
 
   /**
@@ -182,14 +182,14 @@ export class Scheduler {
    */
   private async loadUserTimezones(): Promise<void> {
     try {
-      // データベースが初期化されているか確認
-      if (!this.db) {
-        throw new Error('データベースが初期化されていません');
+      // リポジトリが初期化されているか確認
+      if (!this.repository) {
+        throw new Error('リポジトリが初期化されていません');
       }
       
       // 現在はシングルユーザー対応のため、設定ファイルのユーザーIDのみ取得
       const userId = config.discord.targetUserId;
-      const timezone = await this.db.getUserTimezone(userId);
+      const timezone = await this.repository.getUserTimezone(userId);
       this.userTimezones.set(userId, timezone);
       console.log(`  → ユーザー ${userId} のタイムゾーン: ${timezone}`);
     } catch (error) {

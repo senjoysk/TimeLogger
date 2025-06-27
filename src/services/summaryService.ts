@@ -1,19 +1,18 @@
 import { DailySummary, ActivityRecord, CategoryTotal, SubCategoryTotal } from '../types';
-import { Database } from '../database/database';
-import { GeminiService } from './geminiService';
+import { IDatabaseRepository, IAnalysisService } from '../repositories/interfaces';
 import { getCurrentBusinessDate } from '../utils/timeUtils';
 
 /**
  * 日次サマリー管理サービス
- * 一日の活動記録を集計し、Gemini で感想と励ましメッセージを生成
+ * 一日の活動記録を集計し、AI で感想と励ましメッセージを生成
  */
 export class SummaryService {
-  private database: Database;
-  private geminiService: GeminiService;
+  private repository: IDatabaseRepository;
+  private analysisService: IAnalysisService;
 
-  constructor(database: Database, geminiService: GeminiService) {
-    this.database = database;
-    this.geminiService = geminiService;
+  constructor(repository: IDatabaseRepository, analysisService: IAnalysisService) {
+    this.repository = repository;
+    this.analysisService = analysisService;
   }
 
   /**
@@ -31,18 +30,18 @@ export class SummaryService {
       console.log(`📊 日次サマリーを生成中: ${businessDate}`);
 
       // 指定日の活動記録を取得
-      const activities = await this.database.getActivityRecords(userId, timezone, businessDate);
+      const activities = await this.repository.getActivityRecords(userId, timezone, businessDate);
       
       if (activities.length === 0) {
         console.log('活動記録がないため、空のサマリーを生成します');
         return this.createEmptySummary(businessDate);
       }
 
-      // Gemini でサマリーを生成
-      const summary = await this.geminiService.generateDailySummary(activities, businessDate);
+      // AI でサマリーを生成
+      const summary = await this.analysisService.generateDailySummary(activities, businessDate);
 
       // データベースに保存
-      await this.database.saveDailySummary(summary, timezone);
+      await this.repository.saveDailySummary(summary, timezone);
 
       console.log(`✅ 日次サマリーを生成・保存しました: ${businessDate}`);
       return summary;
@@ -66,7 +65,7 @@ export class SummaryService {
   ): Promise<DailySummary> {
     try {
       // 既存のサマリーを確認
-      const existingSummary = await this.database.getDailySummary(userId, timezone, businessDate);
+      const existingSummary = await this.repository.getDailySummary(userId, timezone, businessDate);
       
       if (existingSummary) {
         console.log(`📊 既存の日次サマリーを取得: ${businessDate}`);
@@ -211,7 +210,7 @@ export class SummaryService {
     averageActivityDuration: number;
   }> {
     try {
-      const activities = await this.database.getActivityRecords(userId, timezone, businessDate);
+      const activities = await this.repository.getActivityRecords(userId, timezone, businessDate);
       
       if (activities.length === 0) {
         return {

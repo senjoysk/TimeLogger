@@ -1,7 +1,6 @@
 import { v4 as uuidv4 } from 'uuid';
 import { ActivityRecord, ActivityAnalysis } from '../types';
-import { IDatabaseRepository } from '../repositories/interfaces';
-import { GeminiService } from './geminiService';
+import { IDatabaseRepository, IAnalysisService } from '../repositories/interfaces';
 import { getCurrentTimeSlot, formatDateTime } from '../utils/timeUtils';
 
 /**
@@ -10,11 +9,11 @@ import { getCurrentTimeSlot, formatDateTime } from '../utils/timeUtils';
  */
 export class ActivityService {
   private repository: IDatabaseRepository;
-  private geminiService: GeminiService;
+  private analysisService: IAnalysisService;
 
-  constructor(repository: IDatabaseRepository, geminiService: GeminiService) {
+  constructor(repository: IDatabaseRepository, analysisService: IAnalysisService) {
     this.repository = repository;
-    this.geminiService = geminiService;
+    this.analysisService = analysisService;
   }
 
   /**
@@ -36,8 +35,8 @@ export class ActivityService {
       // コンテキストとして最近の活動記録を取得（直近3件）
       const recentActivities = await this.getRecentActivities(userId, timezone, 3);
 
-      // Gemini で活動内容を解析 (時間情報も含む)
-      const analysis = await this.geminiService.analyzeActivity(userInput, '', recentActivities, timezone);
+      // AI で活動内容を解析 (時間情報も含む)
+      const analysis = await this.analysisService.analyzeActivity(userInput, '', recentActivities, timezone);
 
       const startTime = analysis.startTime ? new Date(analysis.startTime) : inputTime;
       const endTime = analysis.endTime ? new Date(analysis.endTime) : new Date(startTime.getTime() + 30 * 60000);

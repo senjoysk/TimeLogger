@@ -2,7 +2,7 @@ import { Client, GatewayIntentBits, Message, Partials } from 'discord.js';
 import { config } from './config';
 import { getCurrentTimeSlot, isWorkingHours, formatTime } from './utils/timeUtils';
 import { BotStatus } from './types';
-import { Database } from './database/database';
+import { SqliteRepository } from './repositories/sqliteRepository';
 import { GeminiService } from './services/geminiService';
 import { ActivityService } from './services/activityService';
 import { SummaryService } from './services/summaryService';
@@ -15,7 +15,7 @@ import timezones from 'timezones.json';
 export class TaskLoggerBot {
   private client: Client;
   private status: BotStatus;
-  private database: Database;
+  private repository: SqliteRepository;
   private geminiService: GeminiService;
   private activityService: ActivityService;
   private summaryService: SummaryService;
@@ -40,11 +40,11 @@ export class TaskLoggerBot {
       scheduledJobs: [],
     };
 
-    // サービスの初期化
-    this.database = new Database();
-    this.geminiService = new GeminiService(this.database);
-    this.activityService = new ActivityService(this.database, this.geminiService);
-    this.summaryService = new SummaryService(this.database, this.geminiService);
+    // サービスの初期化（依存関係注入）
+    this.repository = new SqliteRepository(config.database.path);
+    this.geminiService = new GeminiService(this.repository);
+    this.activityService = new ActivityService(this.repository, this.geminiService);
+    this.summaryService = new SummaryService(this.repository, this.geminiService);
 
     this.setupEventHandlers();
   }
@@ -57,7 +57,7 @@ export class TaskLoggerBot {
       console.log('🤖 Discord Bot を起動中...');
       
       // データベースの初期化
-      await this.database.initialize();
+      await this.repository.initialize();
       
       await this.client.login(config.discord.token);
       this.status.isRunning = true;
@@ -79,7 +79,7 @@ export class TaskLoggerBot {
     this.client.destroy();
     
     // データベース接続を閉じる
-    await this.database.close();
+    await this.repository.close();
     
     console.log('✅ Discord Bot が停止しました');
   }
@@ -175,7 +175,7 @@ export class TaskLoggerBot {
     
     try {
       const userId = message.author.id;
-      const userTimezone = await this.database.getUserTimezone(userId);
+      const userTimezone = await this.repository.getUserTimezone(userId);
 
       // コマンドとして処理を試みる
       if (content.startsWith(config.discord.commandPrefix)) {
@@ -375,7 +375,7 @@ export class TaskLoggerBot {
       console.log(`  ↳ [DEBUG] ユーザー取得成功: ${user.tag}`);
 
       // ユーザーのタイムゾーンを取得
-      const userTimezone = await this.database.getUserTimezone(user.id);
+      const userTimezone = await this.repository.getUserTimezone(user.id);
 
       // 働く時間帯でない場合はスキップ
       if (!isWorkingHours(userTimezone)) {
@@ -423,7 +423,7 @@ export class TaskLoggerBot {
       // DMチャンネルを作成/取得
       const dmChannel = await user.createDM();
       
-      const userTimezone = await this.database.getUserTimezone(config.discord.targetUserId);
+      const userTimezone = await this.repository.getUserTimezone(config.discord.targetUserId);
       
       // 日次サマリーを生成
       const summary = await this.summaryService.getDailySummary(config.discord.targetUserId, userTimezone);
@@ -463,7 +463,7 @@ export class TaskLoggerBot {
       }
       const dmChannel = await user.createDM();
 
-      const userTimezone = await this.database.getUserTimezone(user.id);
+      const userTimezone = await this.repository.getUserTimezone(user.id);
       const report = await this.geminiService.getDailyCostReport(user.id, userTimezone);
       await dmChannel.send(report);
       console.log('✅ APIコストレポートを送信しました');
@@ -500,8 +500,8 @@ export class TaskLoggerBot {
    * データベースインスタンスを取得
    * @returns データベースインスタンス
    */
-  public getDatabase(): Database {
-    return this.database;
+  public getRepository(): SqliteRepository {
+    return this.repository;
   }
 
   /**
@@ -528,7 +528,7 @@ export class TaskLoggerBot {
         return;
       }
 
-      await this.database.setUserTimezone(userId, value);
+      await this.repository.setUserTimezone(userId, value);
       await message.reply(`タイムゾーンを \`${value}\` に設定しました。`);
     } else if (subcommand === 'search') {
       if (!value) {
@@ -560,7 +560,7 @@ export class TaskLoggerBot {
       }
     } else {
       // 現在のタイムゾーンを表示
-      const currentTimezone = await this.database.getUserTimezone(userId);
+      const currentTimezone = await this.repository.getUserTimezone(userId);
       await message.reply(`現在のタイムゾーンは \`${currentTimezone}\` です。変更するには \`!timezone set <タイムゾーン名>\` を使用してください。`);
     }
   }

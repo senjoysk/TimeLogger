@@ -1,24 +1,38 @@
 import { ActivityService } from '../../services/activityService';
-import { Database } from '../../database/database';
-import { GeminiService } from '../../services/geminiService';
 import { ActivityRecord, ActivityAnalysis } from '../../types';
-
-// モッククラスの作成
-jest.mock('../../database/database');
-jest.mock('../../services/geminiService');
+import { IDatabaseRepository, IAnalysisService } from '../../repositories/interfaces';
 
 describe('ActivityService', () => {
   let activityService: ActivityService;
-  let mockDatabase: jest.Mocked<Database>;
-  let mockGeminiService: jest.Mocked<GeminiService>;
+  let mockRepository: jest.Mocked<IDatabaseRepository>;
+  let mockAnalysisService: jest.Mocked<IAnalysisService>;
 
   beforeEach(() => {
-    mockDatabase = new Database() as jest.Mocked<Database>;
-    mockGeminiService = new GeminiService(mockDatabase) as jest.Mocked<GeminiService>;
-    activityService = new ActivityService(mockDatabase, mockGeminiService);
+    // インターフェースベースのモック作成
+    mockRepository = {
+      initialize: jest.fn(),
+      close: jest.fn(),
+      getUserTimezone: jest.fn(),
+      setUserTimezone: jest.fn(),
+      saveActivityRecord: jest.fn(),
+      getActivityRecords: jest.fn(),
+      getActivityRecordsByTimeSlot: jest.fn(),
+      saveDailySummary: jest.fn(),
+      getDailySummary: jest.fn(),
+    };
+
+    mockAnalysisService = {
+      analyzeActivity: jest.fn(),
+      generateDailySummary: jest.fn(),
+      getCostStats: jest.fn(),
+      getDailyCostReport: jest.fn(),
+      checkCostAlerts: jest.fn(),
+    };
+
+    activityService = new ActivityService(mockRepository, mockAnalysisService);
 
     // デフォルトのモック設定
-    mockGeminiService.analyzeActivity.mockResolvedValue({
+    mockAnalysisService.analyzeActivity.mockResolvedValue({
       category: 'テスト',
       subCategory: 'ユニットテスト',
       structuredContent: 'テスト活動の記録',
@@ -28,7 +42,8 @@ describe('ActivityService', () => {
       endTime: '2025-06-27T03:30:00.000Z'
     });
 
-    mockDatabase.saveActivityRecord.mockResolvedValue(undefined);
+    mockRepository.saveActivityRecord.mockResolvedValue(undefined);
+    mockRepository.getActivityRecords.mockResolvedValue([]);
   });
 
   afterEach(() => {
@@ -41,7 +56,7 @@ describe('ActivityService', () => {
       const userInput = 'テストコードを書いていた';
       const timezone = 'Asia/Tokyo';
 
-      mockGeminiService.analyzeActivity.mockResolvedValue({
+      mockAnalysisService.analyzeActivity.mockResolvedValue({
         category: '仕事',
         subCategory: 'プログラミング',
         structuredContent: 'テストコードの作成',
@@ -66,7 +81,7 @@ describe('ActivityService', () => {
         structuredContent: 'テストコードの作成',
         productivityLevel: 5
       });
-      expect(mockDatabase.saveActivityRecord).toHaveBeenCalledTimes(2);
+      expect(mockRepository.saveActivityRecord).toHaveBeenCalledTimes(2);
     });
 
     it('30分以内の活動は1つのスロットに記録される', async () => {
@@ -74,7 +89,7 @@ describe('ActivityService', () => {
       const userInput = '短時間のミーティング';
       const timezone = 'Asia/Tokyo';
 
-      mockGeminiService.analyzeActivity.mockResolvedValue({
+      mockAnalysisService.analyzeActivity.mockResolvedValue({
         category: '仕事',
         subCategory: '会議',
         structuredContent: '短時間のミーティング参加',
@@ -88,7 +103,7 @@ describe('ActivityService', () => {
 
       expect(result).toHaveLength(1);
       expect(result[0].analysis.estimatedMinutes).toBe(15);
-      expect(mockDatabase.saveActivityRecord).toHaveBeenCalledTimes(1);
+      expect(mockRepository.saveActivityRecord).toHaveBeenCalledTimes(1);
     });
 
     it('エラーが発生した場合は適切にハンドリングする', async () => {
@@ -96,7 +111,7 @@ describe('ActivityService', () => {
       const userInput = 'テスト入力';
       const timezone = 'Asia/Tokyo';
 
-      mockGeminiService.analyzeActivity.mockRejectedValue(new Error('API エラー'));
+      mockAnalysisService.analyzeActivity.mockRejectedValue(new Error('API エラー'));
 
       await expect(
         activityService.processActivityRecord(userId, userInput, timezone)
@@ -109,7 +124,7 @@ describe('ActivityService', () => {
       const timezone = 'Asia/Tokyo';
       const inputTime = new Date('2025-06-27T03:30:00.000Z');
 
-      mockGeminiService.analyzeActivity.mockResolvedValue({
+      mockAnalysisService.analyzeActivity.mockResolvedValue({
         category: '仕事',
         subCategory: undefined,
         structuredContent: '作業',
@@ -152,12 +167,12 @@ describe('ActivityService', () => {
         }
       ];
 
-      mockDatabase.getActivityRecords.mockResolvedValue(mockActivities);
+      mockRepository.getActivityRecords.mockResolvedValue(mockActivities);
 
       const result = await activityService.getRecentActivities(userId, timezone, limit);
 
       expect(result).toEqual(mockActivities);
-      expect(mockDatabase.getActivityRecords).toHaveBeenCalledWith(userId, timezone);
+      expect(mockRepository.getActivityRecords).toHaveBeenCalledWith(userId, timezone);
     });
   });
 
