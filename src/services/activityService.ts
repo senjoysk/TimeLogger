@@ -69,6 +69,8 @@ export class ActivityService {
           timeSlot: timeSlotString,
           originalText: userInput.trim(),
           analysis: recordAnalysis,
+          category: recordAnalysis.category, // データベース保存用
+          subCategory: recordAnalysis.subCategory, // データベース保存用
           createdAt: formatDateTime(new Date(), 'UTC'),
           updatedAt: formatDateTime(new Date(), 'UTC'),
         };

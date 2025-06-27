@@ -184,7 +184,9 @@ export class TaskLoggerBot {
 
         if (command === 'summary') {
           console.log('  ↳ [DEBUG] コマンド: サマリー要求として処理');
-          await this.handleSummaryRequest(message, userTimezone);
+          // 日付引数を取得（例: !summary 2025-06-26）
+          const dateArg = args[0];
+          await this.handleSummaryRequest(message, userTimezone, dateArg);
         } else if (command === 'cost') {
           console.log('  ↳ [DEBUG] コマンド: API費用レポート要求として処理');
           await this.handleCostReportRequest(message, userTimezone);
@@ -264,14 +266,41 @@ export class TaskLoggerBot {
   /**
    * サマリー要求を処理
    * @param message メッセージオブジェクト
+   * @param dateString オプション：指定日付（YYYY-MM-DD形式）
    */
-  private async handleSummaryRequest(message: Message, userTimezone: string): Promise<void> {
+  private async handleSummaryRequest(message: Message, userTimezone: string, dateString?: string): Promise<void> {
     console.log(`📊 [DEBUG] サマリー要求処理開始: ${message.author.tag}`);
     
     try {
+      let targetDate: string | undefined;
+      
+      // 日付引数が指定されている場合
+      if (dateString) {
+        // 日付形式のバリデーション（YYYY-MM-DD）
+        const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+        if (!dateRegex.test(dateString)) {
+          await message.reply(
+            '❌ 日付形式が正しくありません。\n' +
+            '`!summary YYYY-MM-DD` の形式で指定してください。\n' +
+            '例: `!summary 2025-06-26`'
+          );
+          return;
+        }
+        
+        // 日付の妥当性チェック
+        const date = new Date(dateString + 'T00:00:00');
+        if (isNaN(date.getTime())) {
+          await message.reply('❌ 無効な日付です。正しい日付を指定してください。');
+          return;
+        }
+        
+        targetDate = dateString;
+        console.log(`  ↳ [DEBUG] 指定日付: ${targetDate}`);
+      }
+      
       // 日次サマリーを取得・生成
       console.log('  ↳ [DEBUG] SummaryServiceでサマリー取得中...');
-      const summary = await this.summaryService.getDailySummary(message.author.id, userTimezone);
+      const summary = await this.summaryService.getDailySummary(message.author.id, userTimezone, targetDate);
       console.log('  ↳ [DEBUG] サマリー取得完了:', {
         date: summary.date,
         totalMinutes: summary.totalMinutes,
@@ -280,7 +309,7 @@ export class TaskLoggerBot {
       
       // フォーマットして送信
       console.log('  ↳ [DEBUG] サマリーフォーマット中...');
-      const formattedSummary = this.summaryService.formatDailySummary(summary, userTimezone);
+      const formattedSummary = this.summaryService.formatBriefSummary(summary);
       console.log('  ↳ [DEBUG] サマリー送信中...');
       await message.reply(formattedSummary);
       console.log('  ↳ [DEBUG] サマリー送信完了');

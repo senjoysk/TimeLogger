@@ -465,6 +465,9 @@ export class Database {
         estimatedMinutes: row.estimated_minutes,
         productivityLevel: row.productivity_level,
       },
+      // データベースから直接取得したカテゴリ（スクリプトで修正済み）
+      category: row.category,
+      subCategory: row.sub_category,
       createdAt: row.created_at,
       updatedAt: row.updated_at,
     };

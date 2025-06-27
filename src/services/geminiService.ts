@@ -160,7 +160,7 @@ export class GeminiService {
 
     const now = new Date().toISOString();
 
-    return `\nあなたは時間管理とタスク解析の専門家です。\nユーザーの活動記録を以下の形式で構造化して解析してください。\n\n【現在時刻】\n${now}\n\n【分析対象】\nユーザー入力: "${userInput}"${contextInfo}\n\n【出力形式】（必ずJSON形式で回答してください）\n{\n  "category": "メインカテゴリ名",\n  "subCategory": "サブカテゴリ名（任意）",\n  "structuredContent": "活動内容の構造化された説明",\n  "estimatedMinutes": 推定合計時間（分）、\n  "productivityLevel": 生産性レベル（1-5、5が最高）,\n  "startTime": "活動開始時刻のISO 8601形式の文字列（例: 2025-06-26T14:00:00.000Z)",\n  "endTime": "活動終了時刻のISO 8601形式の文字列（例: 2025-06-26T15:30:00.000Z)"\n}\n\n【カテゴリの例】\n- 仕事（会議、プログラミング、調査、企画、レビューなど）\n- 勉強（学習、読書、研修など）\n- 休憩（昼食、コーヒーブレイク、散歩など）\n- コミュニケーション（メール、チャット、電話など）\n- 管理業務（スケジュール調整、資料整理など）\n\n【重要：日本語の時制解釈】\n- **過去形（〜した、〜していた、〜してた）**: 活動は既に完了している\n  - endTimeは【現在時刻】に設定\n  - startTimeはendTimeから推定活動時間を差し引いた時刻\n  - 例：「バグを修正してた」→ 現在時刻までに修正作業が完了\n- **現在形・現在進行形（〜している、〜中）**: 活動が継続中\n  - startTimeは【現在時刻】に設定\n  - endTimeはstartTimeに推定活動時間を加算した時刻\n- **未来形（〜する予定、〜します）**: 活動が予定されている\n  - startTimeは【現在時刻】またはユーザー指定時刻\n  - endTimeは推定活動時間を加算した時刻\n\n【判断基準】\n- **時間解釈**: ユーザー入力から活動の開始・終了時刻を特定してください。\n  - まず日本語の時制（過去・現在・未来）を正確に判定してください\n  - 「さっき」「30分前」のような相対的な表現は、【現在時刻】を基準に絶対時刻へ変換してください\n  - 「14時から15時まで」のような範囲指定も解釈してください\n  - 時間に関する言及がない場合は、時制に基づいてstartTime/endTimeを設定してください\n    - 過去形：endTime=現在時刻、startTime=現在時刻-推定活動時間\n    - 現在形：startTime=現在時刻、endTime=現在時刻+推定活動時間\n    - 未来形：startTime=現在時刻、endTime=現在時刻+推定活動時間\n  - **コンテキスト活用**: 【最近の活動記録】を参考にして、活動の継続性や関連性を判断してください\n- estimatedMinutes: startTimeとendTimeから算出した合計時間（分）を記入してください\n- productivityLevel: 目標達成への貢献度（1:低い 3:普通 5:高い）\n- 曖昧な入力でも、文脈から最も適切なカテゴリを推測してください\n- 複数の活動が含まれる場合は、最も主要な活動をベースに判断してください\n\n必ずJSON形式のみで回答してください。説明文は不要です。\n`;
+    return `\nあなたは時間管理とタスク解析の専門家です。\nユーザーの活動記録を以下の形式で構造化して解析してください。\n\n【現在時刻】\n${now}\n\n【分析対象】\nユーザー入力: "${userInput}"${contextInfo}\n\n【出力形式】（必ずJSON形式で回答してください）\n{\n  "category": "メインカテゴリ名",\n  "subCategory": "サブカテゴリ名（任意）",\n  "structuredContent": "活動内容の構造化された説明",\n  "estimatedMinutes": 推定合計時間（分）、\n  "productivityLevel": 生産性レベル（1-5、5が最高）,\n  "startTime": "活動開始時刻のISO 8601形式の文字列（例: 2025-06-26T14:00:00.000Z)",\n  "endTime": "活動終了時刻のISO 8601形式の文字列（例: 2025-06-26T15:30:00.000Z)"\n}\n\n【重要：カテゴリとサブカテゴリの詳細分類】\n**仕事カテゴリの詳細サブカテゴリ**:\n- プログラミング: コーディング、実装、開発作業\n- バグ修正: 不具合対応、修正作業、デバッグ、テスト\n- 経理業務: 予算計算、請求書処理、コスト管理、経費精算、拠点予算\n- 調査業務: 技術調査、市場調査、情報収集、API調査\n- 管理業務: 書類整理、スケジュール調整、資料作成、文書作成\n- 監査業務: 監査対応、書類作成、署名作業、監査準備\n- 会議: 打合せ、会議参加、ディスカッション、チーム会議\n\n**休憩カテゴリの詳細サブカテゴリ**:\n- コーヒーブレイク: 短時間休憩、飲み物タイム\n- 家事: 掃除、整理整頓、生活関連作業\n- その他: その他の休憩活動\n\n**混在作業の処理**: 複数の作業が含まれる場合は、最も時間を費やした主要な活動をベースに分類してください\n\n【重要：日本語の時制解釈】\n- **過去形（〜した、〜していた、〜してた）**: 活動は既に完了している\n  - endTimeは【現在時刻】に設定\n  - startTimeはendTimeから推定活動時間を差し引いた時刻\n  - 例：「バグを修正してた」→ 現在時刻までに修正作業が完了\n- **現在形・現在進行形（〜している、〜中）**: 活動が継続中\n  - startTimeは【現在時刻】に設定\n  - endTimeはstartTimeに推定活動時間を加算した時刻\n- **未来形（〜する予定、〜します）**: 活動が予定されている\n  - startTimeは【現在時刻】またはユーザー指定時刻\n  - endTimeは推定活動時間を加算した時刻\n\n【判断基準】\n- **時間解釈**: ユーザー入力から活動の開始・終了時刻を特定してください。\n  - まず日本語の時制（過去・現在・未来）を正確に判定してください\n  - 「さっき」「30分前」のような相対的な表現は、【現在時刻】を基準に絶対時刻へ変換してください\n  - 「14時から15時まで」のような範囲指定も解釈してください\n  - 時間に関する言及がない場合は、時制に基づいてstartTime/endTimeを設定してください\n    - 過去形：endTime=現在時刻、startTime=現在時刻-推定活動時間\n    - 現在形：startTime=現在時刻、endTime=現在時刻+推定活動時間\n    - 未来形：startTime=現在時刻、endTime=現在時刻+推定活動時間\n  - **コンテキスト活用**: 【最近の活動記録】を参考にして、活動の継続性や関連性を判断してください\n- estimatedMinutes: startTimeとendTimeから算出した合計時間（分）を記入してください\n- productivityLevel: 目標達成への貢献度（1:低い 3:普通 5:高い）\n- 曖昧な入力でも、文脈から最も適切なカテゴリを推測してください\n- 複数の活動が含まれる場合は、最も主要な活動をベースに判断してください\n\n必ずJSON形式のみで回答してください。説明文は不要です。\n`;
   }
 
   /**
@@ -277,11 +277,11 @@ ${categoryList}
     
     timeSlotMap.forEach((slotActivities, timeSlot) => {
       if (slotActivities.length === 1) {
-        // 単一の記録の場合はそのまま使用
+        // 単一の記録の場合はそのまま使用（データベースの値を優先）
         const activity = slotActivities[0];
         resolvedActivities.push({
-          category: activity.analysis.category,
-          subCategory: activity.analysis.subCategory,
+          category: activity.category, // データベースから直接取得
+          subCategory: activity.subCategory, // データベースから直接取得
           minutes: Math.min(activity.analysis.estimatedMinutes, 30), // 30分枠を超えないよう制限
           productivityLevel: activity.analysis.productivityLevel
         });
@@ -292,7 +292,7 @@ ${categoryList}
         let totalRecords = 0;
 
         slotActivities.forEach(activity => {
-          const category = activity.analysis.category;
+          const category = activity.category; // データベースから直接取得
           const currentMinutes = categoryMinutesMap.get(category) || 0;
           categoryMinutesMap.set(category, currentMinutes + activity.analysis.estimatedMinutes);
           totalProductivity += activity.analysis.productivityLevel;

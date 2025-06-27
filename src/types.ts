@@ -14,6 +14,10 @@ export interface ActivityRecord {
   originalText: string;
   /** Geminiによる解析結果 */
   analysis: ActivityAnalysis;
+  /** データベース保存済みのカテゴリ（スクリプトで修正可能） */
+  category: string;
+  /** データベース保存済みのサブカテゴリ（スクリプトで修正可能） */
+  subCategory?: string;
   /** 記録日時 */
   createdAt: string;
   /** 更新日時 */
