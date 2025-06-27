@@ -8,6 +8,8 @@ import { ActivityService } from './services/activityService';
 import { SummaryService } from './services/summaryService';
 import { CommandManager } from './handlers/commandManager';
 import { TimezoneCommandHandler } from './handlers/timezoneCommandHandler';
+import { SummaryCommandHandler } from './handlers/summaryCommandHandler';
+import { CostCommandHandler } from './handlers/costCommandHandler';
 import { ActivityHandler } from './handlers/activityHandler';
 import { SummaryHandler } from './handlers/summaryHandler';
 import { CostReportHandler } from './handlers/costReportHandler';
@@ -76,7 +78,12 @@ export class TaskLoggerBot {
 
     // コマンドハンドラーの登録
     const timezoneHandler = new TimezoneCommandHandler(this.repository);
+    const summaryCommandHandler = new SummaryCommandHandler(this.summaryService);
+    const costCommandHandler = new CostCommandHandler(this.geminiService);
+    
     this.commandManager.registerCommandHandler('timezone', timezoneHandler);
+    this.commandManager.registerCommandHandler('summary', summaryCommandHandler);
+    this.commandManager.registerCommandHandler('cost', costCommandHandler);
   }
 
   /**
