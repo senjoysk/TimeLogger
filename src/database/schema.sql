@@ -29,11 +29,14 @@ CREATE TABLE IF NOT EXISTS activity_records (
 -- 日次サマリーテーブル
 CREATE TABLE IF NOT EXISTS daily_summaries (
     id TEXT PRIMARY KEY,
-    userId TEXT NOT NULL,
-    date TEXT NOT NULL,
-    summaryData TEXT NOT NULL,
-    createdAt TEXT NOT NULL,
-    UNIQUE(userId, date)
+    user_id TEXT NOT NULL,
+    business_date TEXT NOT NULL,
+    category_totals TEXT NOT NULL,
+    total_minutes INTEGER NOT NULL,
+    insights TEXT NOT NULL,
+    motivation TEXT NOT NULL,
+    generated_at TEXT NOT NULL,
+    UNIQUE(user_id, business_date)
 );
 
 CREATE TABLE IF NOT EXISTS api_usage_logs (

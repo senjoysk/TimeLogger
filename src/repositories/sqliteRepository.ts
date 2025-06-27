@@ -226,7 +226,7 @@ export class SqliteRepository implements IDatabaseRepository, IApiCostRepository
 
     const sql = `
       INSERT OR REPLACE INTO daily_summaries (
-        id, userId, business_date, category_totals, total_minutes, insights, motivation, generated_at
+        id, user_id, business_date, category_totals, total_minutes, insights, motivation, generated_at
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     `;
 

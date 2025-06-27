@@ -36,3 +36,7 @@ Thumbs.db
 
 # TypeScriptキャッシュ
 *.tsbuildinfo
+
+# テストカバレッジレポート
+coverage/
+*.lcov

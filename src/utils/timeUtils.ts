@@ -1,7 +1,7 @@
 import { TimeSlot } from '../types';
 import { config } from '../config';
-import { toZonedTime, format, fromZonedTime } from 'date-fns-tz';
-import { addMinutes, setMinutes, setHours, getHours, getMinutes, getDay, subMinutes, subDays } from 'date-fns';
+import { toZonedTime, fromZonedTime } from 'date-fns-tz';
+import { addMinutes, setMinutes, setHours, setSeconds, getHours, getMinutes, getDay, subMinutes, subDays, format } from 'date-fns';
 
 /**
  * 指定されたタイムゾーンで現在時刻のタイムスロットを取得
@@ -19,11 +19,11 @@ export function getCurrentTimeSlot(timezone: string): TimeSlot {
   const slotMinutes = minutes < 30 ? 0 : 30;
 
   let start = setMinutes(targetTime, slotMinutes);
-  start = setMinutes(start, slotMinutes);
+  start = setSeconds(start, 0);
 
   const end = addMinutes(start, 30);
 
-  const label = `${format(start, 'HH:mm', { timeZone: timezone })}-${format(end, 'HH:mm', { timeZone: timezone })}`;
+  const label = `${format(start, 'HH:mm')}-${format(end, 'HH:mm')}`;
 
   // UTCに戻して返す
   return {
@@ -72,7 +72,7 @@ export function getBusinessDateForDate(date: Date, timezone: string): string {
     zonedDate = subDays(zonedDate, 1);
   }
 
-  return format(zonedDate, 'yyyy-MM-dd', { timeZone: timezone });
+  return format(zonedDate, 'yyyy-MM-dd');
 }
 
 /**
@@ -82,7 +82,7 @@ export function getBusinessDateForDate(date: Date, timezone: string): string {
  * @returns フォーマットされた日付 (YYYY-MM-DD)
  */
 export function formatDate(date: Date, timezone: string): string {
-  return format(toZonedTime(date, timezone), 'yyyy-MM-dd', { timeZone: timezone });
+  return format(toZonedTime(date, timezone), 'yyyy-MM-dd');
 }
 
 /**
@@ -92,7 +92,7 @@ export function formatDate(date: Date, timezone: string): string {
  * @returns フォーマットされた時刻 (HH:mm)
  */
 export function formatTime(date: Date, timezone: string): string {
-  return format(toZonedTime(date, timezone), 'HH:mm', { timeZone: timezone });
+  return format(toZonedTime(date, timezone), 'HH:mm');
 }
 
 /**
@@ -102,7 +102,7 @@ export function formatTime(date: Date, timezone: string): string {
  * @returns フォーマットされた日時 (YYYY-MM-DD HH:mm:ss)
  */
 export function formatDateTime(date: Date, timezone: string): string {
-  return format(toZonedTime(date, timezone), 'yyyy-MM-dd HH:mm:ss', { timeZone: timezone });
+  return format(toZonedTime(date, timezone), 'yyyy-MM-dd HH:mm:ss');
 }
 
 /**

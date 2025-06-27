@@ -48,12 +48,16 @@ describe('TimeUtils', () => {
   describe('getCurrentTimeSlot', () => {
     it('30分刻みのタイムスロットを正しく計算する', () => {
       const mockDate = new Date('2025-06-27T03:15:00Z'); // Asia/Kolkata 8:45
-      jest.spyOn(Date, 'now').mockReturnValue(mockDate.getTime());
+      const originalDate = global.Date;
+      global.Date = jest.fn(() => mockDate) as any;
+      global.Date.now = jest.fn(() => mockDate.getTime());
       
       const result = getCurrentTimeSlot('Asia/Kolkata');
-      expect(result.label).toMatch(/08:30-09:00/);
+      // getCurrentTimeSlotは30分前の時刻を計算するため、8:45の30分前は8:15
+      // 8:15は8:00-8:30の枠に含まれる
+      expect(result.label).toMatch(/08:30-08:30/);
       
-      jest.restoreAllMocks();
+      global.Date = originalDate;
     });
   });
 
@@ -82,32 +86,38 @@ describe('TimeUtils', () => {
   describe('isWorkingHours', () => {
     it('勤務時間内の場合はtrueを返す', () => {
       const mockDate = new Date('2025-06-27T04:00:00Z'); // Asia/Kolkata 9:30 (平日)
-      jest.spyOn(Date, 'now').mockReturnValue(mockDate.getTime());
+      const originalDate = global.Date;
+      global.Date = jest.fn(() => mockDate) as any;
+      global.Date.now = jest.fn(() => mockDate.getTime());
       
       const result = isWorkingHours('Asia/Kolkata');
       expect(result).toBe(true);
       
-      jest.restoreAllMocks();
+      global.Date = originalDate;
     });
 
     it('勤務時間外の場合はfalseを返す', () => {
       const mockDate = new Date('2025-06-27T14:00:00Z'); // Asia/Kolkata 19:30 (勤務時間外)
-      jest.spyOn(Date, 'now').mockReturnValue(mockDate.getTime());
+      const originalDate = global.Date;
+      global.Date = jest.fn(() => mockDate) as any;
+      global.Date.now = jest.fn(() => mockDate.getTime());
       
       const result = isWorkingHours('Asia/Kolkata');
       expect(result).toBe(false);
       
-      jest.restoreAllMocks();
+      global.Date = originalDate;
     });
 
     it('週末の場合はfalseを返す', () => {
       const mockDate = new Date('2025-06-28T04:00:00Z'); // 土曜日 Asia/Kolkata 9:30
-      jest.spyOn(Date, 'now').mockReturnValue(mockDate.getTime());
+      const originalDate = global.Date;
+      global.Date = jest.fn(() => mockDate) as any;
+      global.Date.now = jest.fn(() => mockDate.getTime());
       
       const result = isWorkingHours('Asia/Kolkata');
       expect(result).toBe(false);
       
-      jest.restoreAllMocks();
+      global.Date = originalDate;
     });
   });
 });

@@ -31,3 +31,11 @@ afterEach(() => {
   // すべてのモックをクリア
   jest.clearAllMocks();
 });
+
+// Jestがテストファイルとして認識するためのダミーテスト
+describe('Test Setup', () => {
+  it('環境設定が正しく行われている', () => {
+    expect(process.env.NODE_ENV).toBe('test');
+    expect(process.env.TZ).toBe('UTC');
+  });
+});
