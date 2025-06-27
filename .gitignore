@@ -40,3 +40,7 @@ Thumbs.db
 # テストカバレッジレポート
 coverage/
 *.lcov
+
+# プロセス管理ファイル
+.bot.pid
+*.pid
