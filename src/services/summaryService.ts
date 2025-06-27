@@ -169,28 +169,29 @@ export class SummaryService {
     // カテゴリを時間順でソート
     const sortedCategories = categoryTotals.sort((a, b) => b.totalMinutes - a.totalMinutes);
     
-    return sortedCategories.map(cat => {
+    const categoryLines: string[] = [];
+    
+    sortedCategories.forEach(cat => {
       const hours = Math.floor(cat.totalMinutes / 60);
       const minutes = cat.totalMinutes % 60;
       const timeStr = hours > 0 ? `${hours}h${minutes}m` : `${minutes}m`;
       
-      let result = `• **${cat.category}**: ${timeStr}`;
+      // メインカテゴリ行を追加
+      categoryLines.push(`• **${cat.category}**: ${timeStr}`);
       
       // サブカテゴリがある場合は詳細表示
       if (cat.subCategories && cat.subCategories.length > 0) {
-        const subCategoryDetails = cat.subCategories.map(sub => {
+        cat.subCategories.forEach(sub => {
           const subHours = Math.floor(sub.totalMinutes / 60);
           const subMinutes = sub.totalMinutes % 60;
           const subTimeStr = subHours > 0 ? `${subHours}h${subMinutes}m` : `${subMinutes}m`;
           
-          return `  - ${sub.subCategory}: ${subTimeStr}`;
-        }).join('\n');
-        
-        result += '\n' + subCategoryDetails;
+          categoryLines.push(`  - ${sub.subCategory}: ${subTimeStr}`);
+        });
       }
-      
-      return result;
-    }).join('\n');
+    });
+    
+    return categoryLines.join('\n');
   }
 
   /**
