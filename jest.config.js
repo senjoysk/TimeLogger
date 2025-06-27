@@ -11,11 +11,22 @@ module.exports = {
     '**/?(*.)+(spec|test).+(ts|tsx|js)'
   ],
   
+  // Transform設定（新しい方法）
+  transform: {
+    '^.+\\.ts$': ['ts-jest', {
+      tsconfig: {
+        esModuleInterop: true,
+        allowSyntheticDefaultImports: true,
+      }
+    }]
+  },
+  
   // カバレッジ設定
   collectCoverageFrom: [
     'src/**/*.{ts,tsx}',
     '!src/**/*.d.ts',
     '!src/index.ts', // エントリーポイントは除外
+    '!src/__tests__/**/*', // テストファイルは除外
   ],
   
   // モジュールパスのエイリアス
@@ -25,17 +36,6 @@ module.exports = {
   
   // タイムアウト設定
   testTimeout: 10000,
-  
-  // グローバル設定
-  globals: {
-    'ts-jest': {
-      tsconfig: {
-        // テスト用のTypeScript設定
-        esModuleInterop: true,
-        allowSyntheticDefaultImports: true,
-      }
-    }
-  },
   
   // セットアップファイル
   setupFilesAfterEnv: ['<rootDir>/src/__tests__/setup.ts'],

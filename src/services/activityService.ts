@@ -1,6 +1,6 @@
 import { v4 as uuidv4 } from 'uuid';
 import { ActivityRecord, ActivityAnalysis } from '../types';
-import { Database } from '../database/database';
+import { IDatabaseRepository } from '../repositories/interfaces';
 import { GeminiService } from './geminiService';
 import { getCurrentTimeSlot, formatDateTime } from '../utils/timeUtils';
 
@@ -9,11 +9,11 @@ import { getCurrentTimeSlot, formatDateTime } from '../utils/timeUtils';
  * ユーザーの活動記録の処理、解析、保存を統括
  */
 export class ActivityService {
-  private database: Database;
+  private repository: IDatabaseRepository;
   private geminiService: GeminiService;
 
-  constructor(database: Database, geminiService: GeminiService) {
-    this.database = database;
+  constructor(repository: IDatabaseRepository, geminiService: GeminiService) {
+    this.repository = repository;
     this.geminiService = geminiService;
   }
 
@@ -75,7 +75,7 @@ export class ActivityService {
           updatedAt: formatDateTime(new Date(), 'UTC'),
         };
 
-        await this.database.saveActivityRecord(activityRecord, timezone);
+        await this.repository.saveActivityRecord(activityRecord, timezone);
         createdRecords.push(activityRecord);
         console.log(`✅ 活動記録を保存しました: ${activityRecord.id} for time slot ${timeSlotString}`);
       }
@@ -95,7 +95,7 @@ export class ActivityService {
    */
   public async getTodayActivities(userId: string, timezone: string): Promise<ActivityRecord[]> {
     try {
-      const activities = await this.database.getActivityRecords(userId, timezone);
+      const activities = await this.repository.getActivityRecords(userId, timezone);
       console.log(`📋 今日の活動記録を取得: ${activities.length}件`);
       return activities;
     } catch (error) {
@@ -115,7 +115,7 @@ export class ActivityService {
     timeSlot: string
   ): Promise<ActivityRecord[]> {
     try {
-      const activities = await this.database.getActivityRecordsByTimeSlot(userId, timeSlot);
+      const activities = await this.repository.getActivityRecordsByTimeSlot(userId, timeSlot);
       return activities;
     } catch (error) {
       console.error('❌ 時間枠別活動記録取得エラー:', error);
@@ -236,7 +236,7 @@ export class ActivityService {
   public async getRecentActivities(userId: string, timezone: string, limit: number = 3): Promise<ActivityRecord[]> {
     try {
       // 今日の活動記録を取得
-      const activities = await this.database.getActivityRecords(userId, timezone);
+      const activities = await this.repository.getActivityRecords(userId, timezone);
       
       // 作成日時でソートして最新のものから取得
       const sortedActivities = activities

@@ -10,6 +10,9 @@ import { addDays } from 'date-fns';
 /**
  * データベース管理クラス
  * SQLite を使用して活動記録とサマリーを管理
+ * 
+ * @deprecated このクラスは非推奨です。代わりにSqliteRepositoryを使用してください。
+ * リファクタリング後に削除予定。
  */
 export class Database {
   private db: sqlite3.Database | null = null;
