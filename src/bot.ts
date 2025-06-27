@@ -1,12 +1,16 @@
 import { Client, GatewayIntentBits, Message, Partials } from 'discord.js';
 import { config } from './config';
-import { getCurrentTimeSlot, isWorkingHours, formatTime } from './utils/timeUtils';
+import { isWorkingHours } from './utils/timeUtils';
 import { BotStatus } from './types';
 import { SqliteRepository } from './repositories/sqliteRepository';
 import { GeminiService } from './services/geminiService';
 import { ActivityService } from './services/activityService';
 import { SummaryService } from './services/summaryService';
-import timezones from 'timezones.json';
+import { CommandManager } from './handlers/commandManager';
+import { TimezoneCommandHandler } from './handlers/timezoneCommandHandler';
+import { ActivityHandler } from './handlers/activityHandler';
+import { SummaryHandler } from './handlers/summaryHandler';
+import { CostReportHandler } from './handlers/costReportHandler';
 
 /**
  * Discord Bot のメインクラス
@@ -19,6 +23,7 @@ export class TaskLoggerBot {
   private geminiService: GeminiService;
   private activityService: ActivityService;
   private summaryService: SummaryService;
+  private commandManager!: CommandManager;
 
   constructor() {
     // Discord クライアントの初期化
@@ -46,7 +51,31 @@ export class TaskLoggerBot {
     this.activityService = new ActivityService(this.repository, this.geminiService);
     this.summaryService = new SummaryService(this.repository, this.geminiService);
 
+    // ハンドラーの初期化
+    this.initializeCommandManager();
+
     this.setupEventHandlers();
+  }
+
+  /**
+   * コマンドマネージャーを初期化
+   */
+  private initializeCommandManager(): void {
+    // ハンドラーの作成
+    const activityHandler = new ActivityHandler(this.activityService);
+    const summaryHandler = new SummaryHandler(this.summaryService);
+    const costReportHandler = new CostReportHandler(this.geminiService);
+
+    // コマンドマネージャーの初期化
+    this.commandManager = new CommandManager(
+      activityHandler,
+      summaryHandler,
+      costReportHandler
+    );
+
+    // コマンドハンドラーの登録
+    const timezoneHandler = new TimezoneCommandHandler(this.repository);
+    this.commandManager.registerCommandHandler('timezone', timezoneHandler);
   }
 
   /**
@@ -177,186 +206,14 @@ export class TaskLoggerBot {
       const userId = message.author.id;
       const userTimezone = await this.repository.getUserTimezone(userId);
 
-      // コマンドとして処理を試みる
-      if (content.startsWith(config.discord.commandPrefix)) {
-        const args = content.slice(config.discord.commandPrefix.length).trim().split(/\s+/);
-        const command = args.shift()?.toLowerCase();
-
-        if (command === 'summary') {
-          console.log('  ↳ [DEBUG] コマンド: サマリー要求として処理');
-          // 日付引数を取得（例: !summary 2025-06-26）
-          const dateArg = args[0];
-          await this.handleSummaryRequest(message, userTimezone, dateArg);
-        } else if (command === 'cost') {
-          console.log('  ↳ [DEBUG] コマンド: API費用レポート要求として処理');
-          await this.handleCostReportRequest(message, userTimezone);
-        } else if (command === 'timezone') {
-          console.log('  ↳ [DEBUG] コマンド: タイムゾーン設定要求として処理');
-          await this.handleTimezoneCommand(message, args);
-        } else {
-          await message.reply(`不明なコマンドです: ${config.discord.commandPrefix}${command}\n利用可能なコマンド: ${config.discord.commandPrefix}summary, ${config.discord.commandPrefix}cost, ${config.discord.commandPrefix}timezone`);
-        }
-      } else {
-        // コマンドではない場合、活動記録として処理
-        console.log('  ↳ [DEBUG] 活動記録として処理');
-        await this.handleActivityLog(message, content, userTimezone);
-      }
+      // CommandManagerに処理を委譲
+      await this.commandManager.handleMessage(message, userTimezone);
     } catch (error) {
       console.error('❌ メッセージ処理エラー:', error);
       await message.reply('申し訳ありません。処理中にエラーが発生しました。');
     }
   }
 
-  /**
-   * サマリー要求を処理
-   * @param message メッセージオブジェクト
-   */
-  private async handleActivityLog(message: Message, content: string, userTimezone: string): Promise<void> {
-    console.log(`📝 [DEBUG] 活動記録処理開始: ${message.author.tag} - "${content}"`);
-    
-    try {
-      // 活動記録を処理・保存
-      console.log('  ↳ [DEBUG] ActivityServiceで処理中...');
-      const activityRecords = await this.activityService.processActivityRecord(
-        message.author.id,
-        content,
-        userTimezone
-      );
-      console.log(`  ↳ [DEBUG] 活動記録処理完了: ${activityRecords.length}件の記録を作成`);
-
-      if (activityRecords.length === 0) {
-        await message.reply('活動を記録できませんでした。時間や内容を明確にしてもう一度お試しください。');
-        return;
-      }
-
-      const firstRecord = activityRecords[0];
-      const lastRecord = activityRecords[activityRecords.length - 1];
-
-      // 確認メッセージを送信
-      const startTime = formatTime(new Date(firstRecord.analysis.startTime!), userTimezone);
-      const endTime = formatTime(new Date(lastRecord.analysis.endTime!), userTimezone);
-      // 実際の開始時刻と終了時刻の差分で時間を計算
-      const startTimeMs = new Date(firstRecord.analysis.startTime!).getTime();
-      const endTimeMs = new Date(lastRecord.analysis.endTime!).getTime();
-      const totalMinutes = Math.round((endTimeMs - startTimeMs) / (1000 * 60));
-
-      const confirmation = [
-        '✅ **活動記録を保存しました！**',
-        '',
-        `⏰ 時間: ${startTime} - ${endTime} (${totalMinutes}分)`,
-        `📂 カテゴリ: ${firstRecord.analysis.category}`,
-        `⭐ 生産性: ${'★'.repeat(firstRecord.analysis.productivityLevel)} (${firstRecord.analysis.productivityLevel}/5)`,
-        '',
-        `💡 ${firstRecord.analysis.structuredContent}`,
-      ].join('\n');
-
-      console.log('  ↳ [DEBUG] 確認メッセージ送信中...');
-      await message.reply(confirmation);
-      console.log('  ↳ [DEBUG] 確認メッセージ送信完了');
-
-    } catch (error) {
-      console.error('❌ [DEBUG] 活動記録処理エラー:', error);
-      await message.reply(
-        '申し訳ありません。活動記録の処理中にエラーが発生しました.\n' +
-        'しばらく時間をおいて再度お試しください。'
-      );
-    }
-  }
-
-  /**
-   * サマリー要求を処理
-   * @param message メッセージオブジェクト
-   * @param dateString オプション：指定日付（YYYY-MM-DD形式）
-   */
-  private async handleSummaryRequest(message: Message, userTimezone: string, dateString?: string): Promise<void> {
-    console.log(`📊 [DEBUG] サマリー要求処理開始: ${message.author.tag}`);
-    
-    try {
-      let targetDate: string | undefined;
-      
-      // 日付引数が指定されている場合
-      if (dateString) {
-        // 日付形式のバリデーション（YYYY-MM-DD）
-        const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
-        if (!dateRegex.test(dateString)) {
-          await message.reply(
-            '❌ 日付形式が正しくありません。\n' +
-            '`!summary YYYY-MM-DD` の形式で指定してください。\n' +
-            '例: `!summary 2025-06-26`'
-          );
-          return;
-        }
-        
-        // 日付の妥当性チェック
-        const date = new Date(dateString + 'T00:00:00');
-        if (isNaN(date.getTime())) {
-          await message.reply('❌ 無効な日付です。正しい日付を指定してください。');
-          return;
-        }
-        
-        targetDate = dateString;
-        console.log(`  ↳ [DEBUG] 指定日付: ${targetDate}`);
-      }
-      
-      // 日次サマリーを取得・生成
-      console.log('  ↳ [DEBUG] SummaryServiceでサマリー取得中...');
-      const summary = await this.summaryService.getDailySummary(message.author.id, userTimezone, targetDate);
-      console.log('  ↳ [DEBUG] サマリー取得完了:', {
-        date: summary.date,
-        totalMinutes: summary.totalMinutes,
-        categoryCount: summary.categoryTotals.length
-      });
-      
-      // フォーマットして送信
-      console.log('  ↳ [DEBUG] サマリーフォーマット中...');
-      const formattedSummary = this.summaryService.formatBriefSummary(summary);
-      console.log('  ↳ [DEBUG] サマリー送信中...');
-      await message.reply(formattedSummary);
-      console.log('  ↳ [DEBUG] サマリー送信完了');
-
-    } catch (error) {
-      console.error('❌ [DEBUG] サマリー生成エラー:', error);
-      await message.reply(
-        '申し訳ありません。サマリーの生成中にエラーが発生しました。\n' +
-        'しばらく時間をおいて再度お試しください。'
-      );
-    }
-
-    this.status.lastSummaryTime = new Date();
-  }
-
-  /**
-   * API費用レポート要求を処理
-   * @param message メッセージオブジェクト
-   */
-  private async handleCostReportRequest(message: Message, userTimezone: string): Promise<void> {
-    console.log(`💰 [DEBUG] API費用レポート要求処理開始: ${message.author.tag}`);
-    
-    try {
-      // API費用レポートを生成
-      console.log('  ↳ [DEBUG] GeminiServiceでAPI費用レポート取得中...');
-      const costReport = await this.geminiService.getDailyCostReport(message.author.id, userTimezone);
-      
-      // コスト警告もチェック
-      const alert = await this.geminiService.checkCostAlerts(message.author.id, userTimezone);
-      
-      let responseMessage = costReport;
-      if (alert) {
-        responseMessage = `${alert.message}\n\n${costReport}`;
-      }
-      
-      console.log('  ↳ [DEBUG] API費用レポート送信中...');
-      await message.reply(responseMessage);
-      console.log('  ↳ [DEBUG] API費用レポート送信完了');
-
-    } catch (error) {
-      console.error('❌ [DEBUG] API費用レポート生成エラー:', error);
-      await message.reply(
-        '申し訳ありません。API費用レポートの生成中にエラーが発生しました。\n' +
-        'しばらく時間をおいて再度お試しください。'
-      );
-    }
-  }
 
   /**
    * 30分間の活動について問いかけ
@@ -388,7 +245,7 @@ export class TaskLoggerBot {
       const dmChannel = await user.createDM();
       
       // 現在の時間枠を取得
-      const timeSlot = getCurrentTimeSlot(userTimezone);
+      const timeSlot = require('./utils/timeUtils').getCurrentTimeSlot(userTimezone);
       console.log(`  ↳ [DEBUG] 時間枠: ${timeSlot.label}`);
       
       // 問いかけメッセージを送信
@@ -504,64 +361,4 @@ export class TaskLoggerBot {
     return this.repository;
   }
 
-  /**
-   * タイムゾーン設定コマンドを処理
-   * @param message メッセージオブジェクト
-   * @param args コマンド引数
-   */
-  private async handleTimezoneCommand(message: Message, args: string[]): Promise<void> {
-    const userId = message.author.id;
-    const subcommand = args[0];
-    const value = args.slice(1).join(' ');
-
-    if (subcommand === 'set') {
-      if (!value) {
-        await message.reply('タイムゾーンを設定するには、`!timezone set <タイムゾーン名>` の形式で指定してください。例: `!timezone set Asia/Tokyo`');
-        return;
-      }
-      // タイムゾーンの検証（IANAタイムゾーン名で検証）
-      const isValidTimezone = timezones.some((tz: any) => 
-        tz.utc && tz.utc.includes(value)
-      );
-      if (!isValidTimezone) {
-        await message.reply(`無効なタイムゾーンです: \`${value}\`。IANAタイムゾーンデータベースの形式で指定してください。例: \`Asia/Tokyo\`。または \`!timezone search <都市名>\` で検索してください。`);
-        return;
-      }
-
-      await this.repository.setUserTimezone(userId, value);
-      await message.reply(`タイムゾーンを \`${value}\` に設定しました。`);
-    } else if (subcommand === 'search') {
-      if (!value) {
-        await message.reply('検索する都市名を指定してください。例: `!timezone search Tokyo`');
-        return;
-      }
-      // timezones.jsonの実際の構造に合わせて検索
-      const results = timezones.filter((tz: any) => {
-        // textフィールドから都市名を検索
-        const searchInText = tz.text && tz.text.toLowerCase().includes(value.toLowerCase());
-        // utcフィールドからタイムゾーン名を検索
-        const searchInUtc = tz.utc && tz.utc.some((utcZone: string) => 
-          utcZone.toLowerCase().includes(value.toLowerCase())
-        );
-        return searchInText || searchInUtc;
-      });
-
-      if (results.length > 0) {
-        const response = results.slice(0, 5).map((tz: any) => {
-          // 主要なIANAタイムゾーンを取得（最初のものを使用）
-          const mainTimezone = tz.utc && tz.utc.length > 0 ? tz.utc[0] : '不明';
-          // textフィールドから都市名を抽出
-          const cityPart = tz.text ? tz.text.split(') ')[1] || tz.text : '不明';
-          return `• ${mainTimezone} (${cityPart})`;
-        }).join('\n');
-        await message.reply(`見つかったタイムゾーン:\n${response}\n\n設定するには \`!timezone set <タイムゾーン名>\` を使用してください。`);
-      } else {
-        await message.reply(`\`${value}\` に一致するタイムゾーンは見つかりませんでした。`);
-      }
-    } else {
-      // 現在のタイムゾーンを表示
-      const currentTimezone = await this.repository.getUserTimezone(userId);
-      await message.reply(`現在のタイムゾーンは \`${currentTimezone}\` です。変更するには \`!timezone set <タイムゾーン名>\` を使用してください。`);
-    }
-  }
 }
