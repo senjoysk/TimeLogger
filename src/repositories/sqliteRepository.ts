@@ -4,6 +4,7 @@ import { join } from 'path';
 import { ActivityRecord, DailySummary } from '../types';
 import { IDatabaseRepository, IApiCostRepository } from './interfaces';
 import { getCurrentBusinessDate } from '../utils/timeUtils';
+import { AppError, ErrorType } from '../utils/errorHandler';
 
 /**
  * SQLiteを使用したデータベースリポジトリの実装
@@ -327,6 +328,83 @@ export class SqliteRepository implements IDatabaseRepository, IApiCostRepository
 
     await this.setUserTimezone(defaultUserId, defaultTimezone);
     console.log('デフォルトユーザーを初期化しました');
+  }
+
+  /**
+   * 活動記録の時刻を更新
+   */
+  public async updateActivityTime(
+    activityId: string,
+    startTime: string,
+    endTime: string,
+    estimatedMinutes: number
+  ): Promise<void> {
+    if (!this.db) {
+      throw new AppError('データベースが初期化されていません', ErrorType.DATABASE);
+    }
+
+    const analysis = await this.getActivityAnalysis(activityId);
+    if (!analysis) {
+      throw new AppError('活動記録が見つかりません', ErrorType.DATABASE);
+    }
+
+    // analysisオブジェクトを更新
+    const updatedAnalysis = {
+      ...analysis,
+      startTime,
+      endTime,
+      estimatedMinutes
+    };
+
+    const query = `
+      UPDATE activity_records 
+      SET 
+        analysis = ?,
+        estimated_minutes = ?,
+        updated_at = datetime('now')
+      WHERE id = ?
+    `;
+
+    return new Promise((resolve, reject) => {
+      this.db!.run(
+        query,
+        [JSON.stringify(updatedAnalysis), estimatedMinutes, activityId],
+        (err) => {
+          if (err) {
+            reject(new AppError('活動記録の更新に失敗しました', ErrorType.DATABASE, { activityId }, err));
+          } else {
+            resolve();
+          }
+        }
+      );
+    });
+  }
+
+  /**
+   * 活動記録のanalysisデータを取得
+   */
+  private async getActivityAnalysis(activityId: string): Promise<any> {
+    if (!this.db) {
+      throw new AppError('データベースが初期化されていません', ErrorType.DATABASE);
+    }
+
+    const query = 'SELECT analysis FROM activity_records WHERE id = ?';
+
+    return new Promise((resolve, reject) => {
+      this.db!.get(query, [activityId], (err, row: any) => {
+        if (err) {
+          reject(new AppError('活動記録の取得に失敗しました', ErrorType.DATABASE, { activityId }, err));
+        } else if (!row) {
+          resolve(null);
+        } else {
+          try {
+            resolve(JSON.parse(row.analysis));
+          } catch (e) {
+            reject(new AppError('活動記録の解析に失敗しました', ErrorType.DATABASE, { activityId }));
+          }
+        }
+      });
+    });
   }
 
   /**

@@ -28,7 +28,8 @@ export interface ValidationReport {
 export const CRITICAL_COMMANDS = [
   { command: 'timezone', description: 'タイムゾーン設定・表示' },
   { command: 'summary', description: 'サマリー表示' },
-  { command: 'cost', description: 'API費用レポート表示' }
+  { command: 'cost', description: 'API費用レポート表示' },
+  { command: 'edit', description: '活動記録の時刻修正' }
 ] as const;
 
 /**

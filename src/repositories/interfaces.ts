@@ -17,6 +17,7 @@ export interface IDatabaseRepository {
   saveActivityRecord(record: ActivityRecord, timezone: string): Promise<void>;
   getActivityRecords(userId: string, timezone: string, businessDate?: string): Promise<ActivityRecord[]>;
   getActivityRecordsByTimeSlot(userId: string, timeSlot: string): Promise<ActivityRecord[]>;
+  updateActivityTime(activityId: string, startTime: string, endTime: string, estimatedMinutes: number): Promise<void>;
 
   // 日次サマリー関連操作
   saveDailySummary(summary: DailySummary, timezone: string): Promise<void>;

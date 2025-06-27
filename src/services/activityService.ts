@@ -128,8 +128,27 @@ export class ActivityService {
    * 30分以内の活動は1つのスロットに記録
    */
   private calculateTimeSlots(startTime: Date, endTime: Date, timezone: string): { start: Date; label: string }[] {
+    // デバッグログ追加
+    console.log(`🔧 calculateTimeSlots:`, {
+      startTime: startTime.toISOString(),
+      endTime: endTime.toISOString(),
+      timezone,
+      durationHours: (endTime.getTime() - startTime.getTime()) / (1000 * 60 * 60)
+    });
+
     // 活動時間が30分以内の場合は1つのスロットにまとめる
     const durationMinutes = Math.round((endTime.getTime() - startTime.getTime()) / (1000 * 60));
+    
+    // 異常な時間範囲をチェック
+    if (durationMinutes <= 0) {
+      console.error('❌ 無効な時間範囲:', { startTime, endTime, durationMinutes });
+      throw new Error('開始時刻が終了時刻より後になっています');
+    }
+
+    if (durationMinutes > 24 * 60) {
+      console.error('❌ 24時間を超える活動:', { startTime, endTime, durationMinutes });
+      throw new Error('24時間を超える活動記録は対応していません');
+    }
     
     if (durationMinutes <= 30) {
       // 開始時刻の30分境界に揃える
@@ -154,15 +173,26 @@ export class ActivityService {
     const alignedMinutes = minutes < 30 ? 0 : 30;
     current.setMinutes(alignedMinutes, 0, 0);
 
-    while (current < endTime) {
+    // 無限ループ防止: 最大50スロット（25時間）で制限
+    let slotCount = 0;
+    const maxSlots = 50;
+
+    while (current < endTime && slotCount < maxSlots) {
       const slotLabel = formatDateTime(current, timezone);
       slots.push({
         start: new Date(current),
         label: slotLabel
       });
       current = new Date(current.getTime() + 30 * 60000);
+      slotCount++;
     }
 
+    if (slotCount >= maxSlots) {
+      console.error('❌ スロット分割の上限に達しました:', { slotCount, startTime, endTime });
+      throw new Error('活動時間が長すぎます（最大25時間）');
+    }
+
+    console.log(`✅ ${slots.length}個のタイムスロットを生成しました`);
     return slots;
   }
 

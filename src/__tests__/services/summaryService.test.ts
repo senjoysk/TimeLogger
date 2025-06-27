@@ -19,6 +19,7 @@ describe('SummaryService', () => {
       getActivityRecordsByTimeSlot: jest.fn(),
       saveDailySummary: jest.fn(),
       getDailySummary: jest.fn(),
+      updateActivityTime: jest.fn(),
     };
 
     mockAnalysisService = {

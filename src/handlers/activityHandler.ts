@@ -61,9 +61,10 @@ export class ActivityHandler implements IActivityHandler {
     
     // 複数記録がある場合の処理
     if (records.length > 1) {
-      const recordSummary = records.map(record => 
-        `• ${record.timeSlot}: [${record.analysis.category}] ${record.analysis.structuredContent} (${record.analysis.estimatedMinutes}分)`
-      ).join('\n');
+      const recordSummary = records.map(record => {
+        const timeDisplay = this.formatTimeDisplay(record, userTimezone);
+        return `• ${timeDisplay}: [${record.analysis.category}] ${record.analysis.structuredContent} (${record.analysis.estimatedMinutes}分)`;
+      }).join('\n');
       
       await message.reply(
         `📝 **活動記録を保存しました！**\n\n` +
@@ -72,14 +73,62 @@ export class ActivityHandler implements IActivityHandler {
       );
     } else {
       const record = records[0];
+      const timeDisplay = this.formatTimeDisplay(record, userTimezone);
+      
       await message.reply(
-        `📝 **活動記録を保存しました！**\n\n` +
-        `**カテゴリ:** ${record.analysis.category}${record.analysis.subCategory ? ` > ${record.analysis.subCategory}` : ''}\n` +
-        `**内容:** ${record.analysis.structuredContent}\n` +
-        `**推定時間:** ${record.analysis.estimatedMinutes}分\n` +
-        `**生産性:** ${'⭐'.repeat(record.analysis.productivityLevel)} (${record.analysis.productivityLevel}/5)\n` +
-        `**時間枠:** ${record.timeSlot}`
+        `✅ **活動記録を保存しました！**\n\n` +
+        `⏰ **時間:** ${timeDisplay} (${record.analysis.estimatedMinutes}分)\n` +
+        `📂 **カテゴリ:** ${record.analysis.category}${record.analysis.subCategory ? ` > ${record.analysis.subCategory}` : ''}\n` +
+        `⭐ **生産性:** ${'⭐'.repeat(record.analysis.productivityLevel)} (${record.analysis.productivityLevel}/5)\n` +
+        `\n💡 ${record.analysis.structuredContent}`
       );
+    }
+  }
+
+  /**
+   * 時刻表示をフォーマット
+   */
+  private formatTimeDisplay(record: any, userTimezone: string): string {
+    if (record.analysis.startTime && record.analysis.endTime) {
+      const startTime = new Date(record.analysis.startTime);
+      const endTime = new Date(record.analysis.endTime);
+      
+      const startTimeStr = startTime.toLocaleTimeString('ja-JP', {
+        hour: '2-digit',
+        minute: '2-digit',
+        timeZone: userTimezone
+      });
+      
+      const endTimeStr = endTime.toLocaleTimeString('ja-JP', {
+        hour: '2-digit',
+        minute: '2-digit',
+        timeZone: userTimezone
+      });
+      
+      return `${startTimeStr} - ${endTimeStr}`;
+    }
+    
+    // フォールバック: timeSlotをローカル時刻で表示
+    try {
+      const slotTime = new Date(record.timeSlot);
+      const slotEndTime = new Date(slotTime.getTime() + 30 * 60 * 1000);
+      
+      const startStr = slotTime.toLocaleTimeString('ja-JP', {
+        hour: '2-digit',
+        minute: '2-digit',
+        timeZone: userTimezone
+      });
+      
+      const endStr = slotEndTime.toLocaleTimeString('ja-JP', {
+        hour: '2-digit',
+        minute: '2-digit',
+        timeZone: userTimezone
+      });
+      
+      return `${startStr} - ${endStr}`;
+    } catch {
+      // 最終フォールバック
+      return record.timeSlot;
     }
   }
 }
