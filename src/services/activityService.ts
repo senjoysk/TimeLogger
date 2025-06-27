@@ -2,6 +2,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { ActivityRecord, ActivityAnalysis } from '../types';
 import { IDatabaseRepository, IAnalysisService } from '../repositories/interfaces';
 import { getCurrentTimeSlot, formatDateTime } from '../utils/timeUtils';
+import { ErrorHandler, ErrorType, withErrorHandling } from '../utils/errorHandler';
 
 /**
  * 活動記録管理サービス

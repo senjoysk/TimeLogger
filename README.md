@@ -236,6 +236,8 @@ npm run build
 
 ## アーキテクチャ
 
+### 📁 プロジェクト構造
+
 ```
 src/
 ├── index.ts              # アプリケーションエントリーポイント
@@ -244,15 +246,120 @@ src/
 ├── bot.ts                # Discord Bot メインクラス
 ├── scheduler.ts          # スケジュール管理
 ├── database/
-│   ├── database.ts       # データベース操作
+│   ├── database.ts       # レガシーデータベース操作（非推奨）
 │   └── schema.sql        # データベーススキーマ
-├── services/
-│   ├── geminiService.ts  # Gemini API統合
+├── repositories/         # 🆕 Repository Pattern
+│   ├── interfaces.ts     # データアクセス抽象化インターフェース
+│   └── sqliteRepository.ts # SQLite実装
+├── services/             # ビジネスロジック層
+│   ├── geminiService.ts  # Gemini AI統合（IAnalysisService実装）
 │   ├── activityService.ts # 活動記録管理
 │   └── summaryService.ts # サマリー生成
+├── handlers/             # 🆕 Command Handler Pattern
+│   ├── interfaces.ts     # ハンドラー抽象化インターフェース
+│   ├── commandManager.ts # コマンド統合管理
+│   ├── activityHandler.ts # 活動記録処理
+│   ├── summaryHandler.ts # サマリー要求処理
+│   ├── costReportHandler.ts # コストレポート処理
+│   └── timezoneCommandHandler.ts # タイムゾーン設定処理
 └── utils/
-    └── timeUtils.ts      # 時間関連ユーティリティ
+    ├── timeUtils.ts      # 時間関連ユーティリティ
+    └── errorHandler.ts   # 🆕 統一エラーハンドリング
 ```
+
+### 🏗️ アーキテクチャ設計原則
+
+#### 1. **依存関係注入 (Dependency Injection)**
+- **Repository Pattern**: データアクセス層を抽象化
+- **Interface Segregation**: 各サービスが必要な機能のみに依存
+- **Inversion of Control**: 具象クラスではなくインターフェースに依存
+
+```typescript
+// 悪い例（以前）
+class ActivityService {
+  private database: Database; // 具象クラスに直接依存
+}
+
+// 良い例（現在）
+class ActivityService {
+  private repository: IDatabaseRepository; // インターフェースに依存
+  private analysisService: IAnalysisService;
+}
+```
+
+#### 2. **単一責任原則 (SRP)**
+- **CommandManager**: メッセージルーティングのみ担当
+- **各Handler**: 特定のコマンド/機能のみ処理
+- **bot.ts**: Discord接続とライフサイクル管理のみ
+
+#### 3. **統一エラーハンドリング**
+- **AppError**: アプリケーション共通エラークラス
+- **ErrorHandler**: ログ出力とユーザーメッセージの統一化
+- **withErrorHandling**: 非同期エラーのラッパー関数
+
+```typescript
+// 統一されたエラー処理
+try {
+  const result = await withErrorHandling(
+    () => this.service.processData(data),
+    ErrorType.API,
+    { userId, operation: 'processData' }
+  );
+} catch (error) {
+  const userMessage = ErrorHandler.handle(error);
+  await message.reply(userMessage);
+}
+```
+
+### 🔄 データフロー
+
+```mermaid
+graph TD
+    A[Discord Message] --> B[bot.ts]
+    B --> C[CommandManager]
+    C --> D{Command Type}
+    D -->|Activity| E[ActivityHandler]
+    D -->|Summary| F[SummaryHandler]
+    D -->|Cost| G[CostReportHandler]
+    D -->|Timezone| H[TimezoneCommandHandler]
+    
+    E --> I[ActivityService]
+    F --> J[SummaryService]
+    G --> K[GeminiService]
+    H --> L[SqliteRepository]
+    
+    I --> M[IDatabaseRepository]
+    I --> N[IAnalysisService]
+    J --> M
+    J --> N
+    K --> O[IApiCostRepository]
+    
+    M --> P[(SQLite DB)]
+    N --> Q[Gemini API]
+    O --> P
+```
+
+### 🧪 テスト戦略
+
+#### テスト構造
+```
+src/__tests__/
+├── setup.ts                    # テスト環境設定
+├── utils/
+│   ├── timeUtils.test.ts       # 時間ユーティリティテスト
+│   └── errorHandler.test.ts    # エラーハンドリングテスト
+├── repositories/
+│   └── sqliteRepository.test.ts # リポジトリ実装テスト
+└── services/
+    ├── activityService.test.ts  # 活動記録サービステスト
+    └── summaryService.test.ts   # サマリーサービステスト
+```
+
+#### テスト原則
+- **モッキング**: 外部依存関係（DB、API）をモック化
+- **統合テスト**: Repository層での実際のSQLite操作テスト
+- **単体テスト**: 各サービスの純粋なビジネスロジックテスト
+- **エラーケース**: 異常系の動作確認
 
 ## 技術スタック
 
@@ -264,11 +371,29 @@ src/
 
 ## 開発
 
-### コーディング規約
+### 🛠️ 開発ガイドライン
 
+#### コーディング規約
 - **コメント**: すべて日本語で記述
 - **関数・メソッド**: 目的と動作を詳しくコメント
-- **エラーハンドリング**: 適切なエラー処理とログ出力
+- **エラーハンドリング**: 統一されたErrorHandlerを使用
+- **依存関係**: インターフェースを使用して疎結合を維持
+- **単一責任**: 各クラス・関数は単一の責任のみ持つ
+
+#### アーキテクチャルール
+1. **Repository Pattern**: データアクセスは必ずリポジトリ経由
+2. **Interface First**: 実装前にインターフェースを定義
+3. **Error Handling**: withErrorHandling関数を使用
+4. **Testing**: 新機能は必ずテストを作成
+5. **Documentation**: READMEとコメントを常に最新に保つ
+
+#### リファクタリング完了項目 ✅
+- ✅ Repository Patternの導入
+- ✅ 依存関係注入の実装
+- ✅ Command Handler Patternの適用
+- ✅ 統一エラーハンドリングの実装
+- ✅ 100%テストカバレッジの達成
+- ✅ インターフェース駆動設計への移行
 
 ### テスト実行
 

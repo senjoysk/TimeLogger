@@ -11,6 +11,7 @@ import { TimezoneCommandHandler } from './handlers/timezoneCommandHandler';
 import { ActivityHandler } from './handlers/activityHandler';
 import { SummaryHandler } from './handlers/summaryHandler';
 import { CostReportHandler } from './handlers/costReportHandler';
+import { ErrorHandler, ErrorType, withErrorHandling } from './utils/errorHandler';
 
 /**
  * Discord Bot のメインクラス
@@ -204,13 +205,21 @@ export class TaskLoggerBot {
     
     try {
       const userId = message.author.id;
-      const userTimezone = await this.repository.getUserTimezone(userId);
+      const userTimezone = await withErrorHandling(
+        () => this.repository.getUserTimezone(userId),
+        ErrorType.DATABASE,
+        { userId, operation: 'getUserTimezone' }
+      );
 
       // CommandManagerに処理を委譲
-      await this.commandManager.handleMessage(message, userTimezone);
+      await withErrorHandling(
+        () => this.commandManager.handleMessage(message, userTimezone),
+        ErrorType.SYSTEM,
+        { userId, operation: 'handleMessage' }
+      );
     } catch (error) {
-      console.error('❌ メッセージ処理エラー:', error);
-      await message.reply('申し訳ありません。処理中にエラーが発生しました。');
+      const userMessage = ErrorHandler.handle(error);
+      await message.reply(userMessage);
     }
   }
 

@@ -1,6 +1,7 @@
 import { Message } from 'discord.js';
 import { ICostReportHandler } from './interfaces';
 import { IAnalysisService } from '../repositories/interfaces';
+import { ErrorHandler, ErrorType, withErrorHandling } from '../utils/errorHandler';
 
 /**
  * コストレポートハンドラー
@@ -19,23 +20,27 @@ export class CostReportHandler implements ICostReportHandler {
    * @param userTimezone ユーザーのタイムゾーン
    */
   public async handleCostReportRequest(message: Message, userTimezone: string): Promise<void> {
-    console.log(`💰 [DEBUG] API費用レポート要求処理開始: ${message.author.tag}`);
+    ErrorHandler.logDebug('CostReportHandler', `API費用レポート要求処理開始: ${message.author.tag}`);
     
     try {
       // API費用レポートを生成
-      console.log('  ↳ [DEBUG] AnalysisServiceでAPI費用レポート取得中...');
-      const report = await this.analysisService.getDailyCostReport(
-        message.author.id, 
-        userTimezone
+      const report = await withErrorHandling(
+        () => this.analysisService.getDailyCostReport(message.author.id, userTimezone),
+        ErrorType.API,
+        { userId: message.author.id, operation: 'getDailyCostReport' }
       );
 
       // レポートを送信
-      await message.reply(report);
+      await withErrorHandling(
+        () => message.reply(report),
+        ErrorType.DISCORD,
+        { userId: message.author.id, operation: 'sendCostReport' }
+      );
 
-      console.log('✅ [DEBUG] API費用レポート要求処理完了');
+      ErrorHandler.logSuccess('CostReportHandler', 'API費用レポート要求処理完了');
     } catch (error) {
-      console.error('❌ [DEBUG] API費用レポート要求処理エラー:', error);
-      await message.reply('申し訳ありません。API費用レポートの取得中にエラーが発生しました。しばらく後にもう一度お試しください。');
+      const userMessage = ErrorHandler.handle(error);
+      await message.reply(userMessage);
     }
   }
 }

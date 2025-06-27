@@ -2,6 +2,7 @@ import { Message } from 'discord.js';
 import { IActivityHandler } from './interfaces';
 import { ActivityService } from '../services/activityService';
 import { getCurrentTimeSlot } from '../utils/timeUtils';
+import { ErrorHandler, ErrorType, AppError, withErrorHandling } from '../utils/errorHandler';
 
 /**
  * 活動記録ハンドラー
@@ -21,26 +22,29 @@ export class ActivityHandler implements IActivityHandler {
    * @param userTimezone ユーザーのタイムゾーン
    */
   public async handleActivityLog(message: Message, content: string, userTimezone: string): Promise<void> {
-    console.log(`📝 [DEBUG] 活動記録処理開始: ${message.author.tag} - "${content}"`);
+    ErrorHandler.logDebug('ActivityHandler', `活動記録処理開始: ${message.author.tag}`, { content });
     
     try {
       // 活動記録を処理・保存
-      console.log('  ↳ [DEBUG] ActivityServiceで処理中...');
-      const records = await this.activityService.processActivityRecord(
-        message.author.id, 
-        content, 
-        userTimezone
+      const records = await withErrorHandling(
+        () => this.activityService.processActivityRecord(message.author.id, content, userTimezone),
+        ErrorType.API,
+        { userId: message.author.id, operation: 'processActivityRecord' }
       );
 
-      console.log(`  ↳ [DEBUG] ${records.length}件の活動記録を作成`);
+      ErrorHandler.logDebug('ActivityHandler', `${records.length}件の活動記録を作成`);
 
       // 結果をユーザーに送信
-      await this.sendActivityResponse(message, records, userTimezone);
+      await withErrorHandling(
+        () => this.sendActivityResponse(message, records, userTimezone),
+        ErrorType.DISCORD,
+        { userId: message.author.id, operation: 'sendActivityResponse' }
+      );
 
-      console.log('✅ [DEBUG] 活動記録処理完了');
+      ErrorHandler.logSuccess('ActivityHandler', '活動記録処理完了');
     } catch (error) {
-      console.error('❌ [DEBUG] 活動記録処理エラー:', error);
-      await message.reply('申し訳ありません。活動記録の処理中にエラーが発生しました。しばらく後にもう一度お試しください。');
+      const userMessage = ErrorHandler.handle(error);
+      await message.reply(userMessage);
     }
   }
 

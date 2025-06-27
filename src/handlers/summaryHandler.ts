@@ -2,6 +2,7 @@ import { Message } from 'discord.js';
 import { ISummaryHandler } from './interfaces';
 import { SummaryService } from '../services/summaryService';
 import { getCurrentBusinessDate } from '../utils/timeUtils';
+import { ErrorHandler, ErrorType, AppError, withErrorHandling } from '../utils/errorHandler';
 
 /**
  * サマリーハンドラー
@@ -21,7 +22,7 @@ export class SummaryHandler implements ISummaryHandler {
    * @param dateString オプション：指定日付（YYYY-MM-DD形式）
    */
   public async handleSummaryRequest(message: Message, userTimezone: string, dateString?: string): Promise<void> {
-    console.log(`📊 [DEBUG] サマリー要求処理開始: ${message.author.tag}`);
+    ErrorHandler.logDebug('SummaryHandler', `サマリー要求処理開始: ${message.author.tag}`, { dateString });
     
     try {
       let targetDate: string | undefined;
@@ -30,15 +31,21 @@ export class SummaryHandler implements ISummaryHandler {
         // 日付形式の検証（YYYY-MM-DD）
         const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
         if (!dateRegex.test(dateString)) {
-          await message.reply('日付の形式が正しくありません。YYYY-MM-DD の形式で指定してください。例: 2025-06-27');
-          return;
+          throw new AppError(
+            '日付の形式が正しくありません。YYYY-MM-DD の形式で指定してください。例: 2025-06-27',
+            ErrorType.VALIDATION,
+            { userId: message.author.id, operation: 'validateDateFormat', dateString }
+          );
         }
         
         // 日付の妥当性チェック
         const date = new Date(dateString);
         if (isNaN(date.getTime())) {
-          await message.reply('指定された日付が無効です。正しい日付を入力してください。');
-          return;
+          throw new AppError(
+            '指定された日付が無効です。正しい日付を入力してください。',
+            ErrorType.VALIDATION,
+            { userId: message.author.id, operation: 'validateDate', dateString }
+          );
         }
         
         targetDate = dateString;
@@ -46,23 +53,26 @@ export class SummaryHandler implements ISummaryHandler {
         targetDate = getCurrentBusinessDate(userTimezone);
       }
 
-      console.log(`  ↳ [DEBUG] サマリー対象日: ${targetDate}`);
+      ErrorHandler.logDebug('SummaryHandler', `サマリー対象日: ${targetDate}`);
 
       // サマリーを取得
-      console.log('  ↳ [DEBUG] SummaryServiceでサマリー取得中...');
-      const summary = await this.summaryService.getDailySummary(
-        message.author.id, 
-        userTimezone, 
-        targetDate
+      const summary = await withErrorHandling(
+        () => this.summaryService.getDailySummary(message.author.id, userTimezone, targetDate),
+        ErrorType.API,
+        { userId: message.author.id, operation: 'getDailySummary', targetDate }
       );
 
       // サマリーをフォーマットして送信
-      await this.sendSummaryResponse(message, summary, targetDate);
+      await withErrorHandling(
+        () => this.sendSummaryResponse(message, summary, targetDate),
+        ErrorType.DISCORD,
+        { userId: message.author.id, operation: 'sendSummaryResponse' }
+      );
 
-      console.log('✅ [DEBUG] サマリー要求処理完了');
+      ErrorHandler.logSuccess('SummaryHandler', 'サマリー要求処理完了');
     } catch (error) {
-      console.error('❌ [DEBUG] サマリー要求処理エラー:', error);
-      await message.reply('申し訳ありません。サマリーの取得中にエラーが発生しました。しばらく後にもう一度お試しください。');
+      const userMessage = ErrorHandler.handle(error);
+      await message.reply(userMessage);
     }
   }
 
