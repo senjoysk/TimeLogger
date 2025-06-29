@@ -31,6 +31,8 @@ export interface IntegrationConfig {
   enableAutoAnalysis: boolean;
   /** キャッシュ有効期間（分） */
   cacheValidityMinutes: number;
+  /** 対象ユーザーID */
+  targetUserId: string;
 }
 
 /**
@@ -123,6 +125,7 @@ export class NewSystemIntegration {
 
   /**
    * Discord Botにメッセージハンドラーを統合
+   * 既存のハンドラーより優先して処理
    */
   integrateWithBot(client: Client): void {
     if (!this.isInitialized) {
@@ -134,39 +137,81 @@ export class NewSystemIntegration {
 
     console.log('🔗 Discord Botへの統合を開始...');
 
-    // メッセージイベントリスナーを追加
+    // 既存のmessageCreateリスナーを一時的に無効化
+    const existingListeners = client.listeners('messageCreate');
+    client.removeAllListeners('messageCreate');
+
+    // 新システムのメッセージハンドラーを最優先で追加
     client.on('messageCreate', async (message: Message) => {
-      await this.handleMessage(message);
+      const handled = await this.handleMessage(message);
+      
+      // 新システムで処理されなかった場合は既存のハンドラーに委譲
+      if (!handled) {
+        for (const listener of existingListeners) {
+          try {
+            await (listener as Function)(message);
+          } catch (error) {
+            console.error('❌ 旧システムハンドラーエラー:', error);
+          }
+        }
+      }
     });
 
-    console.log('✅ Discord Bot統合完了');
+    console.log('✅ Discord Bot統合完了（新システム優先モード）');
   }
 
   /**
    * メッセージを処理（既存システムとの互換性を保持）
+   * @returns 新システムで処理された場合true、そうでなければfalse
    */
-  private async handleMessage(message: Message): Promise<void> {
+  private async handleMessage(message: Message): Promise<boolean> {
     try {
-      // Bot自身のメッセージは無視
-      if (message.author.bot) return;
+      console.log('🔍 [新システム] メッセージ受信:', {
+        authorId: message.author?.id,
+        authorTag: message.author?.tag,
+        isBot: message.author?.bot,
+        isDM: message.channel.isDMBased(),
+        content: message.content,
+        timestamp: new Date().toISOString()
+      });
 
-      // DMでない場合は無視（必要に応じて変更）
-      if (!message.guild) return;
+      // Bot自身のメッセージは無視
+      if (message.author.bot) {
+        console.log('  ↳ [新システム] Botメッセージのため無視');
+        return false;
+      }
+
+      // DMのみを処理（ギルドチャンネルは無視）
+      if (message.guild) {
+        console.log('  ↳ [新システム] ギルドメッセージのため無視（DMのみ処理）');
+        return false;
+      }
 
       const userId = message.author.id;
       const content = message.content.trim();
       const timezone = this.config.defaultTimezone; // 設定から取得、将来的にはユーザー設定に
 
+      // 対象ユーザーのみ処理
+      if (userId !== this.config.targetUserId) {
+        console.log(`  ↳ [新システム] 対象外ユーザー (受信: ${userId}, 期待: ${this.config.targetUserId})`);
+        return false;
+      }
+
+      console.log(`✅ [新システム] 処理対象メッセージ: "${content}"`)
+
       // コマンド処理
       if (content.startsWith('!')) {
         await this.handleCommand(message, userId, content, timezone);
-        return;
+        return true;
       }
 
       // 通常のメッセージを活動ログとして記録
       if (content.length > 0 && content.length <= 2000) {
         await this.recordActivity(message, userId, content, timezone);
+        return true;
       }
+
+      return false; // 処理対象外
 
     } catch (error) {
       console.error('❌ メッセージ処理エラー:', error);
@@ -181,6 +226,8 @@ export class NewSystemIntegration {
       } catch (replyError) {
         console.error('❌ エラー返信失敗:', replyError);
       }
+      
+      return false; // エラーのため未処理扱い
     }
   }
 
@@ -444,7 +491,8 @@ export function createDefaultConfig(databasePath: string, geminiApiKey: string):
     debugMode: process.env.NODE_ENV !== 'production',
     defaultTimezone: 'Asia/Tokyo',
     enableAutoAnalysis: true,
-    cacheValidityMinutes: 60
+    cacheValidityMinutes: 60,
+    targetUserId: process.env.TARGET_USER_ID || '770478489203507241' // 設定ファイルから取得
   };
 }
 

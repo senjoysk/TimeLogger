@@ -19,8 +19,8 @@ interface InitializationOptions {
   createBackup: boolean;
   /** 詳細ログを出力するか */
   verbose: boolean;
-  /** データベースファイルパス（デフォルト：設定から取得） */
-  databasePath?: string;
+  /** データベースファイルパス */
+  databasePath: string;
 }
 
 /**
@@ -99,7 +99,7 @@ class DatabaseInitializer {
    */
   private async createBackup(): Promise<void> {
     try {
-      const dbPath = this.options.databasePath || config.database.path;
+      const dbPath = this.options.databasePath;
       const backupPath = `${dbPath}.backup.${new Date().toISOString().replace(/[:.]/g, '-')}`;
       
       if (fs.existsSync(dbPath)) {
@@ -125,12 +125,13 @@ class DatabaseInitializer {
       const schemaPath = path.join(__dirname, '../src/database/newSchema.sql');
       const schema = fs.readFileSync(schemaPath, 'utf8');
       
-      // 各SQL文を実行
-      const statements = schema.split(';').filter(stmt => stmt.trim());
+      // SQLを適切に分割して実行
+      const statements = this.splitSqlStatements(schema);
       
       for (const statement of statements) {
         if (statement.trim()) {
-          await this.executeQuery(statement.trim() + ';');
+          this.log(`🔧 実行中: ${statement.substring(0, 50)}...`);
+          await this.executeQuery(statement);
         }
       }
 
@@ -349,6 +350,75 @@ class DatabaseInitializer {
   }
 
   /**
+   * SQLスキーマを適切にステートメントに分割
+   * TRIGGER、VIEW、複数行構文に配慮した分割
+   */
+  private splitSqlStatements(schema: string): string[] {
+    const statements: string[] = [];
+    const lines = schema.split('\n');
+    let currentStatement = '';
+    let inBlock = false;
+
+    for (const line of lines) {
+      const trimmedLine = line.trim();
+      
+      // コメント行をスキップ
+      if (trimmedLine.startsWith('--') || trimmedLine === '') {
+        continue;
+      }
+
+      // ブロック開始の検出（TRIGGER、VIEW）
+      if (trimmedLine.match(/^(CREATE\s+TRIGGER|CREATE\s+VIEW)/i)) {
+        if (currentStatement.trim()) {
+          statements.push(currentStatement.trim() + ';');
+        }
+        currentStatement = trimmedLine;
+        inBlock = true;
+        continue;
+      }
+
+      // ブロック終了の検出
+      if (inBlock && trimmedLine.match(/^END;?$/i)) {
+        currentStatement += '\n' + trimmedLine;
+        if (!trimmedLine.endsWith(';')) {
+          currentStatement += ';';
+        }
+        statements.push(currentStatement.trim());
+        currentStatement = '';
+        inBlock = false;
+        continue;
+      }
+
+      // ブロック内の場合は行を追加
+      if (inBlock) {
+        currentStatement += '\n' + trimmedLine;
+        continue;
+      }
+
+      // 通常の文の処理
+      if (trimmedLine.endsWith(';')) {
+        currentStatement += '\n' + trimmedLine;
+        statements.push(currentStatement.trim());
+        currentStatement = '';
+      } else {
+        currentStatement += '\n' + trimmedLine;
+      }
+    }
+
+    // 残りの文があれば追加
+    if (currentStatement.trim()) {
+      const finalStatement = currentStatement.trim();
+      if (!finalStatement.endsWith(';')) {
+        statements.push(finalStatement + ';');
+      } else {
+        statements.push(finalStatement);
+      }
+    }
+
+    return statements.filter(stmt => stmt.trim().length > 0);
+  }
+
+  /**
    * データベース接続を閉じる
    */
   private async close(): Promise<void> {
@@ -371,11 +441,12 @@ async function main(): Promise<void> {
   try {
     // コマンドライン引数を解析
     const args = process.argv.slice(2);
+    const databasePath = config.database?.path || './data/tasks.db';
     const options: InitializationOptions = {
       migrateExistingData: !args.includes('--no-migrate'),
       createBackup: !args.includes('--no-backup'),
       verbose: args.includes('--verbose') || args.includes('-v'),
-      databasePath: config.database?.path || './data/tasks.db'
+      databasePath: databasePath
     };
 
     console.log('🚀 新活動記録システム初期化スクリプト');
@@ -400,13 +471,13 @@ async function main(): Promise<void> {
     }
 
     console.log('設定:');
-    console.log(`📁 データベース: ${options.databasePath}`);
+    console.log(`📁 データベース: ${databasePath}`);
     console.log(`🔄 データ移行: ${options.migrateExistingData ? 'する' : 'しない'}`);
     console.log(`📁 バックアップ: ${options.createBackup ? 'する' : 'しない'}`);
     console.log('');
 
     // 初期化実行
-    const initializer = new DatabaseInitializer(options.databasePath, options);
+    const initializer = new DatabaseInitializer(databasePath, options);
     const stats = await initializer.initialize();
 
     console.log('\n🎉 初期化が正常に完了しました！');

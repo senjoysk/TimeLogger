@@ -75,7 +75,8 @@ export class Scheduler {
             console.log(`  → ${userId} (${timezone}): 勤務時間内です`);
             // 現在の実装では単一ユーザー向けのためbot.sendActivityPrompt()を使用
             // マルチユーザー対応時はユーザー別メソッドを実装
-            await this.bot.sendActivityPrompt();
+            // 旧システムの30分問いかけは削除済み（新システムでは自然言語でいつでも記録可能）
+            console.log('⏰ 30分問いかけ機能は新システムでは不要のため無効化されています');
           }
         }
       } catch (error) {
@@ -182,14 +183,9 @@ export class Scheduler {
    */
   private async loadUserTimezones(): Promise<void> {
     try {
-      // リポジトリが初期化されているか確認
-      if (!this.repository) {
-        throw new Error('リポジトリが初期化されていません');
-      }
-      
-      // 現在はシングルユーザー対応のため、設定ファイルのユーザーIDのみ取得
+      // 新システムでは設定ベースのタイムゾーンを使用（旧リポジトリ依存を排除）
       const userId = config.discord.targetUserId;
-      const timezone = await this.repository.getUserTimezone(userId);
+      const timezone = 'Asia/Tokyo'; // デフォルトタイムゾーン（将来的に新システムで管理）
       this.userTimezones.set(userId, timezone);
       console.log(`  → ユーザー ${userId} のタイムゾーン: ${timezone}`);
     } catch (error) {
@@ -229,7 +225,7 @@ export class Scheduler {
     try {
       switch (scheduleName) {
         case 'activityPrompt':
-          await this.bot.sendActivityPrompt();
+          console.log('⏰ 30分問いかけ機能は新システムでは不要のため無効化されています');
           break;
         case 'dailySummary':
           await this.bot.sendDailySummary();

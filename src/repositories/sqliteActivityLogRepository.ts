@@ -49,12 +49,12 @@ export class SqliteActivityLogRepository implements IActivityLogRepository {
       const schemaPath = path.join(__dirname, '../database/newSchema.sql');
       const schema = fs.readFileSync(schemaPath, 'utf8');
       
-      // スキーマを実行（複数文に対応）
-      const statements = schema.split(';').filter(stmt => stmt.trim());
+      // スキーマを実行（複数文に対応、TRIGGERとVIEWを考慮）
+      const statements = this.splitSqlStatements(schema);
       
       for (const statement of statements) {
         if (statement.trim()) {
-          await this.runQuery(statement.trim() + ';');
+          await this.runQuery(statement.trim());
         }
       }
 
@@ -622,6 +622,61 @@ export class SqliteActivityLogRepository implements IActivityLogRepository {
       createdAt: row.created_at,
       updatedAt: row.updated_at
     };
+  }
+
+  /**
+   * SQL文を適切に分割（TRIGGER、VIEWなどの複数行文に対応）
+   */
+  private splitSqlStatements(schema: string): string[] {
+    const statements: string[] = [];
+    let current = '';
+    let inTrigger = false;
+    let inView = false;
+    
+    const lines = schema.split('\n');
+    
+    for (const line of lines) {
+      const trimmedLine = line.trim();
+      
+      // コメント行は無視
+      if (trimmedLine.startsWith('--') || trimmedLine === '') {
+        continue;
+      }
+      
+      current += line + '\n';
+      
+      // TRIGGER開始検知
+      if (trimmedLine.toUpperCase().includes('CREATE TRIGGER')) {
+        inTrigger = true;
+      }
+      
+      // VIEW開始検知
+      if (trimmedLine.toUpperCase().includes('CREATE VIEW')) {
+        inView = true;
+      }
+      
+      // TRIGGER終了検知（ENDで終わる）
+      if (inTrigger && trimmedLine.toUpperCase() === 'END;') {
+        statements.push(current.trim());
+        current = '';
+        inTrigger = false;
+        continue;
+      }
+      
+      // 通常の文終了（TRIGGERやVIEW以外）
+      if (!inTrigger && !inView && trimmedLine.endsWith(';')) {
+        statements.push(current.trim());
+        current = '';
+        inView = false; // VIEW終了
+      }
+    }
+    
+    // 最後の文があれば追加
+    if (current.trim()) {
+      statements.push(current.trim());
+    }
+    
+    return statements.filter(stmt => stmt.length > 0);
   }
 
   /**

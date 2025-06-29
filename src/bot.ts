@@ -1,20 +1,9 @@
-import { Client, GatewayIntentBits, Message, Partials } from 'discord.js';
+import { Client, GatewayIntentBits, Partials } from 'discord.js';
 import { config } from './config';
-import { isWorkingHours } from './utils/timeUtils';
 import { BotStatus } from './types';
 import { SqliteRepository } from './repositories/sqliteRepository';
 import { GeminiService } from './services/geminiService';
-import { ActivityService } from './services/activityService';
-import { SummaryService } from './services/summaryService';
-import { CommandManager } from './handlers/commandManager';
-import { TimezoneCommandHandler } from './handlers/timezoneCommandHandler';
-import { SummaryCommandHandler } from './handlers/summaryCommandHandler';
-import { CostCommandHandler } from './handlers/costCommandHandler';
-import { EditCommandHandler } from './handlers/editCommandHandler';
-import { ActivityHandler } from './handlers/activityHandler';
-import { SummaryHandler } from './handlers/summaryHandler';
-import { CostReportHandler } from './handlers/costReportHandler';
-import { ErrorHandler, ErrorType, withErrorHandling } from './utils/errorHandler';
+import { NewSystemIntegration, createDefaultConfig } from './integration';
 
 /**
  * Discord Bot のメインクラス
@@ -25,9 +14,7 @@ export class TaskLoggerBot {
   private status: BotStatus;
   private repository: SqliteRepository;
   private geminiService: GeminiService;
-  private activityService: ActivityService;
-  private summaryService: SummaryService;
-  private commandManager!: CommandManager;
+  private newSystemIntegration?: NewSystemIntegration;
 
   constructor() {
     // Discord クライアントの初期化
@@ -49,45 +36,50 @@ export class TaskLoggerBot {
       scheduledJobs: [],
     };
 
-    // サービスの初期化（依存関係注入）
+    // 最小限のサービス初期化（コストレポート用）
     this.repository = new SqliteRepository(config.database.path);
     this.geminiService = new GeminiService(this.repository);
-    this.activityService = new ActivityService(this.repository, this.geminiService);
-    this.summaryService = new SummaryService(this.repository, this.geminiService);
-
-    // ハンドラーの初期化
-    this.initializeCommandManager();
 
     this.setupEventHandlers();
   }
 
   /**
-   * コマンドマネージャーを初期化
+   * 新自然言語ログシステムを初期化
    */
-  private initializeCommandManager(): void {
-    // ハンドラーの作成
-    const activityHandler = new ActivityHandler(this.activityService);
-    const summaryHandler = new SummaryHandler(this.summaryService);
-    const costReportHandler = new CostReportHandler(this.geminiService);
-
-    // コマンドマネージャーの初期化
-    this.commandManager = new CommandManager(
-      activityHandler,
-      summaryHandler,
-      costReportHandler
-    );
-
-    // コマンドハンドラーの登録
-    const timezoneHandler = new TimezoneCommandHandler(this.repository);
-    const summaryCommandHandler = new SummaryCommandHandler(this.summaryService);
-    const costCommandHandler = new CostCommandHandler(this.geminiService);
-    const editCommandHandler = new EditCommandHandler(this.repository);
-    
-    this.commandManager.registerCommandHandler('timezone', timezoneHandler);
-    this.commandManager.registerCommandHandler('summary', summaryCommandHandler);
-    this.commandManager.registerCommandHandler('cost', costCommandHandler);
-    this.commandManager.registerCommandHandler('edit', editCommandHandler);
+  private async initializeNewSystem(): Promise<void> {
+    try {
+      console.log('🚀 新自然言語ログシステム統合開始...');
+      
+      // 統合設定を作成
+      const integrationConfig = createDefaultConfig(
+        config.database.path,
+        config.gemini.apiKey
+      );
+      
+      // デバッグモードとオートアナリシスを有効化
+      integrationConfig.debugMode = true;
+      integrationConfig.enableAutoAnalysis = true;
+      
+      // 新システムを初期化
+      this.newSystemIntegration = new NewSystemIntegration(integrationConfig);
+      await this.newSystemIntegration.initialize();
+      
+      // Discord Clientに統合
+      this.newSystemIntegration.integrateWithBot(this.client);
+      
+      console.log('✅ 新自然言語ログシステム統合完了！');
+      console.log('💡 新機能が利用可能:');
+      console.log('   - 自然言語でログ記録');
+      console.log('   - !edit でログ編集');
+      console.log('   - !summary でAI分析表示');
+      console.log('   - !logs でログ検索・表示');
+      
+    } catch (error) {
+      console.error('❌ 新システム統合エラー:', error);
+      console.warn('⚠️ 旧システムのみで動作を継続します');
+    }
   }
+
 
   /**
    * Bot を起動
@@ -96,8 +88,7 @@ export class TaskLoggerBot {
     try {
       console.log('🤖 Discord Bot を起動中...');
       
-      // データベースの初期化
-      await this.repository.initialize();
+      // 新システムでは独自のデータベース初期化を行うため、旧システムの初期化は不要
       
       await this.client.login(config.discord.token);
       this.status.isRunning = true;
@@ -118,6 +109,16 @@ export class TaskLoggerBot {
     this.status.isRunning = false;
     this.client.destroy();
     
+    // 新システムのシャットダウン
+    if (this.newSystemIntegration) {
+      try {
+        await this.newSystemIntegration.shutdown();
+        console.log('✅ 新システムのシャットダウン完了');
+      } catch (error) {
+        console.error('❌ 新システムシャットダウンエラー:', error);
+      }
+    }
+    
     // データベース接続を閉じる
     await this.repository.close();
     
@@ -129,31 +130,16 @@ export class TaskLoggerBot {
    */
   private setupEventHandlers(): void {
     // Bot が準備完了したときの処理
-    this.client.once('ready', () => {
+    this.client.once('ready', async () => {
       console.log(`✅ ${this.client.user?.tag} としてログインしました`);
       console.log(`🔧 [DEBUG] Bot ID: ${this.client.user?.id}`);
       console.log(`🔧 [DEBUG] 設定されたTARGET_USER_ID: ${config.discord.targetUserId}`);
       console.log(`🔧 [DEBUG] Intents: Guilds, DirectMessages, MessageContent`);
+      
+      // 新自然言語ログシステムを統合
+      await this.initializeNewSystem();
     });
 
-    // メッセージを受信したときの処理
-    this.client.on('messageCreate', async (message: Message) => {
-      console.log('🚨 [DEBUG] messageCreate イベント発火！');
-      
-      // パーシャルメッセージの場合はフルメッセージを取得
-      if (message.partial) {
-        console.log('📄 [DEBUG] パーシャルメッセージを検出、フルメッセージを取得中...');
-        try {
-          await message.fetch();
-          console.log('📄 [DEBUG] フルメッセージ取得完了');
-        } catch (error) {
-          console.error('❌ [DEBUG] フルメッセージ取得エラー:', error);
-          return;
-        }
-      }
-      
-      await this.handleMessage(message);
-    });
 
     // エラー処理
     this.client.on('error', (error) => {
@@ -161,128 +147,8 @@ export class TaskLoggerBot {
     });
   }
 
-  /**
-   * 受信したメッセージを処理
-   * @param message 受信したメッセージ
-   */
-  private async handleMessage(message: Message): Promise<void> {
-    // チャンネルがパーシャルの場合はフルチャンネルを取得
-    if (message.channel.partial) {
-      console.log('🔧 [DEBUG] パーシャルチャンネルを検出、フルチャンネルを取得中...');
-      try {
-        await message.channel.fetch();
-        console.log('🔧 [DEBUG] フルチャンネル取得完了');
-      } catch (error) {
-        console.error('❌ [DEBUG] フルチャンネル取得エラー:', error);
-        return;
-      }
-    }
-
-    // デバッグ: 全メッセージをログ出力
-    console.log('📨 [DEBUG] メッセージ受信:', {
-      authorId: message.author?.id,
-      authorTag: message.author?.tag,
-      isBot: message.author?.bot,
-      isDM: message.channel.isDMBased(),
-      channelType: message.channel.type,
-      content: message.content,
-      timestamp: new Date().toISOString()
-    });
-
-    // Bot自身のメッセージは無視
-    if (message.author.bot) {
-      console.log('  ↳ [DEBUG] Botのメッセージのため無視');
-      return;
-    }
-
-    // まず全てのメッセージを処理してみる（診断用）
-    console.log('🔍 [DEBUG] 全メッセージ処理モード - フィルタリングを一時的に無効化');
-    
-    // 対象ユーザー以外のメッセージは無視
-    if (message.author.id !== config.discord.targetUserId) {
-      console.log(`  ↳ [DEBUG] 対象外ユーザーのため無視 (受信: ${message.author.id}, 期待: ${config.discord.targetUserId})`);
-      return;
-    }
-
-    // DMのみを処理
-    if (!message.channel.isDMBased()) {
-      console.log('  ↳ [DEBUG] DMではないため無視 (チャンネルタイプ:', message.channel.type, ')');
-      return;
-    }
-
-    const content = message.content.trim();
-    console.log(`✅ 処理対象メッセージ: "${content}"`);
-    
-    try {
-      const userId = message.author.id;
-      const userTimezone = await withErrorHandling(
-        () => this.repository.getUserTimezone(userId),
-        ErrorType.DATABASE,
-        { userId, operation: 'getUserTimezone' }
-      );
-
-      // CommandManagerに処理を委譲
-      await withErrorHandling(
-        () => this.commandManager.handleMessage(message, userTimezone),
-        ErrorType.SYSTEM,
-        { userId, operation: 'handleMessage' }
-      );
-    } catch (error) {
-      const userMessage = ErrorHandler.handle(error);
-      await message.reply(userMessage);
-    }
-  }
 
 
-  /**
-   * 30分間の活動について問いかけ
-   */
-  public async sendActivityPrompt(): Promise<void> {
-    console.log('🕐 [DEBUG] 30分間隔問いかけ実行開始');
-    
-    try {
-      // 対象ユーザーを取得
-      console.log(`  ↳ [DEBUG] 対象ユーザー取得中: ${config.discord.targetUserId}`);
-      const user = await this.client.users.fetch(config.discord.targetUserId);
-      if (!user) {
-        console.error('  ↳ [DEBUG] ❌ 対象ユーザーが見つかりません');
-        return;
-      }
-      console.log(`  ↳ [DEBUG] ユーザー取得成功: ${user.tag}`);
-
-      // ユーザーのタイムゾーンを取得
-      const userTimezone = await this.repository.getUserTimezone(user.id);
-
-      // 働く時間帯でない場合はスキップ
-      if (!isWorkingHours(userTimezone)) {
-        console.log('  ↳ [DEBUG] 働く時間帯ではないため、問いかけをスキップしました');
-        return;
-      }
-
-      // DMチャンネルを作成/取得
-      console.log('  ↳ [DEBUG] DMチャンネル作成中...');
-      const dmChannel = await user.createDM();
-      
-      // 現在の時間枠を取得
-      const timeSlot = require('./utils/timeUtils').getCurrentTimeSlot(userTimezone);
-      console.log(`  ↳ [DEBUG] 時間枠: ${timeSlot.label}`);
-      
-      // 問いかけメッセージを送信
-      const promptMessage = 
-        `⏰ **${timeSlot.label}の活動記録**\n\n` +
-        `この30分間なにしてた？\n` +
-        `どんなことでも気軽に教えてください！`;
-
-      console.log('  ↳ [DEBUG] 問いかけメッセージ送信中...');
-      await dmChannel.send(promptMessage);
-      
-      console.log(`  ↳ [DEBUG] 問いかけメッセージ送信完了: ${timeSlot.label}`);
-      this.status.lastPromptTime = new Date();
-      
-    } catch (error) {
-      console.error('❌ [DEBUG] 問いかけ送信エラー:', error);
-    }
-  }
 
   /**
    * 日次サマリーを自動送信
@@ -299,13 +165,11 @@ export class TaskLoggerBot {
       // DMチャンネルを作成/取得
       const dmChannel = await user.createDM();
       
-      const userTimezone = await this.repository.getUserTimezone(config.discord.targetUserId);
+      // 新システムではデフォルトタイムゾーンを使用
+      const userTimezone = 'Asia/Tokyo';
       
-      // 日次サマリーを生成
-      const summary = await this.summaryService.getDailySummary(config.discord.targetUserId, userTimezone);
-      
-      // 簡潔なサマリーとして送信
-      const briefSummary = this.summaryService.formatBriefSummary(summary);
+      // TODO: 新システムでの日次サマリー機能に置き換える必要がある
+      const briefSummary = '🌅 今日一日お疲れさまでした！\n\n新システムでのサマリー機能は開発中です。';
       await dmChannel.send(briefSummary);
       
       console.log('✅ 日次サマリーを送信しました');
@@ -339,7 +203,7 @@ export class TaskLoggerBot {
       }
       const dmChannel = await user.createDM();
 
-      const userTimezone = await this.repository.getUserTimezone(user.id);
+      const userTimezone = 'Asia/Tokyo';
       const report = await this.geminiService.getDailyCostReport(user.id, userTimezone);
       await dmChannel.send(report);
       console.log('✅ APIコストレポートを送信しました');

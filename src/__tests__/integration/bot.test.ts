@@ -123,14 +123,12 @@ describe('TaskLoggerBot Integration Test', () => {
     });
 
     test('重要なメソッドが存在し実行可能である', async () => {
-      // 重要なパブリックメソッドの存在確認
-      expect(typeof bot.sendActivityPrompt).toBe('function');
+      // 重要なパブリックメソッドの存在確認（新システムでは30分問いかけは不要）
       expect(typeof bot.sendDailySummary).toBe('function');
       expect(typeof bot.sendApiCostReport).toBe('function');
       expect(typeof bot.sendCostAlert).toBe('function');
 
       // これらのメソッドが例外なく実行できることを確認
-      await expect(bot.sendActivityPrompt()).resolves.not.toThrow();
       await expect(bot.sendDailySummary()).resolves.not.toThrow();
       await expect(bot.sendApiCostReport()).resolves.not.toThrow();
       await expect(bot.sendCostAlert('テストメッセージ')).resolves.not.toThrow();
