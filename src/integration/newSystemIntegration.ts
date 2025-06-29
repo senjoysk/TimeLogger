@@ -189,7 +189,7 @@ export class NewSystemIntegration {
 
       const userId = message.author.id;
       const content = message.content.trim();
-      const timezone = this.config.defaultTimezone; // 設定から取得、将来的にはユーザー設定に
+      const timezone = await this.getUserTimezone(userId);
 
       // 対象ユーザーのみ処理
       if (userId !== this.config.targetUserId) {
@@ -477,6 +477,25 @@ export class NewSystemIntegration {
     } catch (error) {
       console.error('❌ システム統計取得エラー:', error);
       throw new ActivityLogError('システム統計の取得に失敗しました', 'GET_SYSTEM_STATS_ERROR', { error });
+    }
+  }
+
+  /**
+   * ユーザーのタイムゾーンを取得
+   * @param userId ユーザーID
+   * @returns タイムゾーン文字列
+   */
+  private async getUserTimezone(userId: string): Promise<string> {
+    try {
+      // TODO: 将来的にはユーザー設定テーブルから取得
+      // 現在は環境変数またはデフォルト値を使用
+      if (userId === this.config.targetUserId) {
+        return process.env.USER_TIMEZONE || 'Asia/Tokyo';
+      }
+      return this.config.defaultTimezone;
+    } catch (error) {
+      console.error('❌ タイムゾーン取得エラー:', error);
+      return this.config.defaultTimezone;
     }
   }
 }

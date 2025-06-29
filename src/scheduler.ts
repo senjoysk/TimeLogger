@@ -183,9 +183,9 @@ export class Scheduler {
    */
   private async loadUserTimezones(): Promise<void> {
     try {
-      // 新システムでは設定ベースのタイムゾーンを使用（旧リポジトリ依存を排除）
+      // 新システムでは環境変数ベースのタイムゾーンを使用
       const userId = config.discord.targetUserId;
-      const timezone = 'Asia/Tokyo'; // デフォルトタイムゾーン（将来的に新システムで管理）
+      const timezone = process.env.USER_TIMEZONE || 'Asia/Tokyo';
       this.userTimezones.set(userId, timezone);
       console.log(`  → ユーザー ${userId} のタイムゾーン: ${timezone}`);
     } catch (error) {

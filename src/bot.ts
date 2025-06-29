@@ -165,8 +165,8 @@ export class TaskLoggerBot {
       // DMチャンネルを作成/取得
       const dmChannel = await user.createDM();
       
-      // 新システムではデフォルトタイムゾーンを使用
-      const userTimezone = 'Asia/Tokyo';
+      // 新システムから適切なタイムゾーンを取得
+      const userTimezone = process.env.USER_TIMEZONE || 'Asia/Tokyo';
       
       // TODO: 新システムでの日次サマリー機能に置き換える必要がある
       const briefSummary = '🌅 今日一日お疲れさまでした！\n\n新システムでのサマリー機能は開発中です。';
@@ -203,7 +203,7 @@ export class TaskLoggerBot {
       }
       const dmChannel = await user.createDM();
 
-      const userTimezone = 'Asia/Tokyo';
+      const userTimezone = process.env.USER_TIMEZONE || 'Asia/Tokyo';
       const report = await this.geminiService.getDailyCostReport(user.id, userTimezone);
       await dmChannel.send(report);
       console.log('✅ APIコストレポートを送信しました');
