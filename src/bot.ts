@@ -1,8 +1,6 @@
 import { Client, GatewayIntentBits, Partials } from 'discord.js';
 import { config } from './config';
 import { BotStatus } from './types';
-import { SqliteRepository } from './repositories/sqliteRepository';
-import { GeminiService } from './services/geminiService';
 import { NewSystemIntegration, createDefaultConfig } from './integration';
 
 /**
@@ -12,8 +10,7 @@ import { NewSystemIntegration, createDefaultConfig } from './integration';
 export class TaskLoggerBot {
   private client: Client;
   private status: BotStatus;
-  private repository: SqliteRepository;
-  private geminiService: GeminiService;
+  // 旧システム削除: repositoryとgeminiServiceは新システム統合で代替
   private newSystemIntegration?: NewSystemIntegration;
 
   constructor() {
@@ -36,9 +33,9 @@ export class TaskLoggerBot {
       scheduledJobs: [],
     };
 
-    // 最小限のサービス初期化（コストレポート用）
-    this.repository = new SqliteRepository(config.database.path);
-    this.geminiService = new GeminiService(this.repository);
+    // 旧システム初期化は新システムの後に実行
+    // this.repository = new SqliteRepository(config.database.path);
+    // this.geminiService = new GeminiService(this.repository);
 
     this.setupEventHandlers();
   }
@@ -50,10 +47,9 @@ export class TaskLoggerBot {
     try {
       console.log('🚀 新自然言語ログシステム統合開始...');
       
-      // 統合設定を作成（新システム用の独立したDBファイル）
-      const newSystemDbPath = config.database.path.replace('.db', '_new.db');
+      // 統合設定を作成（既存DBファイルを使用）
       const integrationConfig = createDefaultConfig(
-        newSystemDbPath,
+        config.database.path,
         config.gemini.apiKey
       );
       
@@ -75,12 +71,14 @@ export class TaskLoggerBot {
       console.log('   - !summary でAI分析表示');
       console.log('   - !logs でログ検索・表示');
       
+      
     } catch (error) {
       console.error('❌ 新システム統合エラー:', error);
-      console.warn('⚠️ 旧システムのみで動作を継続します');
+      throw error; // 新システムの初期化に失敗したら起動を停止
     }
   }
 
+  // 旧システム初期化メソッド削除: 新システムのみ使用
 
   /**
    * Bot を起動
@@ -120,8 +118,7 @@ export class TaskLoggerBot {
       }
     }
     
-    // データベース接続を閉じる
-    await this.repository.close();
+    // 新システムのシャットダウンのみ実行（旧システム削除済み）
     
     console.log('✅ Discord Bot が停止しました');
   }
@@ -205,7 +202,14 @@ export class TaskLoggerBot {
       const dmChannel = await user.createDM();
 
       const userTimezone = process.env.USER_TIMEZONE || 'Asia/Tokyo';
-      const report = await this.geminiService.getDailyCostReport(user.id, userTimezone);
+      
+      if (!this.newSystemIntegration) {
+        console.warn('⚠️ 新システムが初期化されていません - コストレポートをスキップ');
+        return;
+      }
+      
+      // 新システム経由でコストレポートを取得
+      const report = await this.newSystemIntegration.getCostReport(user.id, userTimezone);
       await dmChannel.send(report);
       console.log('✅ APIコストレポートを送信しました');
     } catch (error) {
@@ -238,11 +242,32 @@ export class TaskLoggerBot {
   }
 
   /**
-   * データベースインスタンスを取得
+   * データベースインスタンスを取得（新システム経由）
    * @returns データベースインスタンス
    */
-  public getRepository(): SqliteRepository {
-    return this.repository;
+  public getRepository(): any {
+    return this.newSystemIntegration?.getRepository();
+  }
+
+  /**
+   * システム初期化が完了しているかチェック
+   */
+  public isSystemInitialized(): boolean {
+    return this.newSystemIntegration !== undefined;
+  }
+
+  /**
+   * システム初期化の完了を待つ
+   */
+  public async waitForSystemInitialization(timeoutMs: number = 30000): Promise<void> {
+    const startTime = Date.now();
+    
+    while (!this.isSystemInitialized()) {
+      if (Date.now() - startTime > timeoutMs) {
+        throw new Error('システム初期化がタイムアウトしました');
+      }
+      await new Promise(resolve => setTimeout(resolve, 100));
+    }
   }
 
 }

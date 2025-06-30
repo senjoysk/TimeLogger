@@ -75,14 +75,25 @@ export class NewSystemIntegration {
       // 2. サービス層の初期化
       this.activityLogService = new ActivityLogService(this.repository);
       
-      // 実際のSqliteRepositoryを使用してコスト管理機能を有効化
-      // 旧システムのSqliteRepositoryをインポートして使用
-      const { SqliteRepository } = require('../repositories/sqliteRepository');
-      const costRepository = new SqliteRepository(this.config.databasePath);
-      await costRepository.initialize();
-      
-      this.geminiService = new GeminiService(costRepository);
-      console.log('✅ GeminiService初期化完了（実際のリポジトリ使用）');
+      // コスト管理機能の初期化（エラーハンドリング付き）
+      try {
+        const { SqliteRepository } = require('../repositories/sqliteRepository');
+        const costRepository = new SqliteRepository(this.config.databasePath);
+        
+        // 旧システムリポジトリの初期化を試行（既存テーブルのみ使用）
+        try {
+          await costRepository.initialize();
+          this.geminiService = new GeminiService(costRepository);
+          console.log('✅ GeminiService初期化完了（旧システムリポジトリ使用）');
+        } catch (initError) {
+          console.warn('⚠️ 旧システムリポジトリ初期化失敗、コスト機能を無効化:', initError);
+          // コスト機能なしでダミーサービスを作成
+          this.geminiService = null as any;
+        }
+      } catch (requireError) {
+        console.warn('⚠️ 旧システムリポジトリが利用できません、コスト機能を無効化');
+        this.geminiService = null as any;
+      }
       
       this.analysisCacheService = new AnalysisCacheService(
         this.repository,
@@ -91,7 +102,7 @@ export class NewSystemIntegration {
       
       this.unifiedAnalysisService = new UnifiedAnalysisService(
         this.repository,
-        costRepository
+        this.geminiService ? (this.geminiService as any).costMonitor?.repository : this.repository
       );
       console.log('✅ サービス層初期化完了');
 
@@ -195,6 +206,7 @@ export class NewSystemIntegration {
 
       // コマンド処理
       if (content.startsWith('!')) {
+        console.log(`🔧 [新システム] コマンド検出: "${content}"`);
         await this.handleCommand(message, userId, content, timezone);
         return true;
       }
@@ -393,6 +405,26 @@ export class NewSystemIntegration {
       console.error('❌ ステータス表示エラー:', error);
       await message.reply('❌ ステータス情報の取得に失敗しました。');
     }
+  }
+
+  /**
+   * コストレポートを取得（旧システム代替）
+   */
+  async getCostReport(userId: string, timezone: string): Promise<string> {
+    try {
+      // GeminiService経由でコストレポートを取得
+      return await this.geminiService.getDailyCostReport(userId, timezone);
+    } catch (error) {
+      console.error('❌ コストレポート取得エラー:', error);
+      return '❌ コストレポートの取得に失敗しました。';
+    }
+  }
+
+  /**
+   * リポジトリインスタンスを取得（旧システム代替）
+   */
+  getRepository(): any {
+    return this.repository;
   }
 
   /**
