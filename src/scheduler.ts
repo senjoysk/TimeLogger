@@ -109,8 +109,10 @@ export class Scheduler {
           const hours = localTime.getHours();
           
           // 該当タイムゾーンで18:00かチェック
+          console.log(`  → ${userId} (${timezone}): 現在時刻 ${hours}:${localTime.getMinutes().toString().padStart(2, '0')}, サマリー設定時刻 ${config.app.summaryTime.hour}:00`);
+          
           if (hours === config.app.summaryTime.hour) {
-            console.log(`  → ${userId} (${timezone}): サマリー時刻です`);
+            console.log(`  → ${userId} (${timezone}): サマリー時刻です - 送信開始`);
             // 現在の実装では単一ユーザー向けのためbot.sendDailySummary()を使用
             // マルチユーザー対応時はユーザー別メソッドを実装
             await this.bot.sendDailySummary();

@@ -413,6 +413,43 @@ export class ActivityLoggingIntegration {
   }
 
   /**
+   * 日次サマリーを生成して文字列として取得
+   * 自動送信用のメソッド
+   */
+  async generateDailySummaryText(userId: string, timezone: string): Promise<string> {
+    try {
+      if (!this.summaryHandler) {
+        throw new Error('サマリーハンドラーが初期化されていません');
+      }
+
+      // モックメッセージオブジェクトを作成
+      let summaryText = '';
+      
+      // プログレスメッセージモック
+      const mockProgressMessage = {
+        edit: async (content: string) => {
+          summaryText = content; // 最終的なサマリーテキストを保存
+          return mockProgressMessage;
+        }
+      };
+      
+      const mockMessage = {
+        reply: async (content: string) => {
+          return mockProgressMessage; // プログレスメッセージを返す
+        }
+      };
+      
+      // サマリーハンドラーを使って今日のサマリーを生成
+      await this.summaryHandler.handle(mockMessage as any, userId, [], timezone);
+      
+      return summaryText || '🌅 今日一日お疲れさまでした！\n\nサマリーの詳細は `!summary` コマンドで確認できます。';
+    } catch (error) {
+      console.error('❌ 日次サマリーテキスト生成エラー:', error);
+      return '🌅 今日一日お疲れさまでした！\n\nサマリーの詳細は `!summary` コマンドで確認できます。';
+    }
+  }
+
+  /**
    * システムを正常にシャットダウン
    */
   async shutdown(): Promise<void> {

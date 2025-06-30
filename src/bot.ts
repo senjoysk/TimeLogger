@@ -164,11 +164,27 @@ export class TaskLoggerBot {
       // 新システムから適切なタイムゾーンを取得
       const userTimezone = process.env.USER_TIMEZONE || 'Asia/Tokyo';
       
-      // TODO: 活動記録システムでの日次サマリー機能に置き換える必要がある
-      const briefSummary = '🌅 今日一日お疲れさまでした！\n\n活動記録システムでのサマリー機能は開発中です。';
-      await dmChannel.send(briefSummary);
+      if (!this.activityLoggingIntegration) {
+        console.warn('⚠️ 活動記録システムが初期化されていません - プレースホルダーメッセージを送信');
+        const briefSummary = '🌅 今日一日お疲れさまでした！\n\n活動記録システムでのサマリー機能は開発中です。';
+        await dmChannel.send(briefSummary);
+        return;
+      }
+
+      // 活動記録システムを使って実際のサマリーを生成
+      try {
+        const summaryText = await this.activityLoggingIntegration.generateDailySummaryText(user.id, userTimezone);
+        await dmChannel.send(summaryText);
+        console.log('✅ 活動記録システム経由で日次サマリーを送信しました');
+      } catch (summaryError) {
+        console.error('❌ 活動記録システムでのサマリー生成エラー:', summaryError);
+        
+        // フォールバック: シンプルなメッセージ
+        const fallbackMessage = '🌅 今日一日お疲れさまでした！\n\n' +
+          'サマリーの詳細を確認するには `!summary` コマンドをお使いください。';
+        await dmChannel.send(fallbackMessage);
+      }
       
-      console.log('✅ 日次サマリーを送信しました');
       this.status.lastSummaryTime = new Date();
       
     } catch (error) {

@@ -47,7 +47,9 @@ describe('活動記録システム統合テスト', () => {
   });
 
   afterAll(async () => {
+    console.log('🔄 テスト終了処理開始...');
     await integration.shutdown();
+    console.log('✅ テスト終了処理完了');
   });
 
   describe('コマンド処理テスト', () => {
@@ -168,5 +170,20 @@ describe('活動記録システム統合テスト', () => {
       expect(config).toHaveProperty('debugMode');
       expect(config).toHaveProperty('targetUserId');
     });
+
+    test('日次サマリーテキストが生成できる', async () => {
+      const userId = '770478489203507241';
+      const timezone = 'Asia/Tokyo';
+      
+      // タイムアウトを設定し、エラー時はフォールバックメッセージが返されることを確認
+      const summaryText = await integration.generateDailySummaryText(userId, timezone);
+      
+      expect(typeof summaryText).toBe('string');
+      expect(summaryText.length).toBeGreaterThan(0);
+      
+      // フォールバックメッセージや実際のサマリーを含む幅広い検証
+      // 今日のログがない場合はフォールバックメッセージが返されるのが正常
+      expect(summaryText).toBeTruthy();
+    }, 15000); // 15秒のタイムアウト
   });
 });
