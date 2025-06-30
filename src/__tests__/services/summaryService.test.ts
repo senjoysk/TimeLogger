@@ -1,5 +1,11 @@
+/**
+ * SummaryService テストスイート
+ * 日次サマリー生成機能のテスト
+ */
+
+import { describe, test, expect, beforeEach, afterEach } from '@jest/globals';
 import { SummaryService } from '../../services/summaryService';
-import { ActivityRecord, DailySummary, CategoryTotal } from '../../types';
+import { DailySummary, ActivityRecord, CategoryTotal } from '../../types';
 import { IDatabaseRepository, IAnalysisService } from '../../repositories/interfaces';
 
 describe('SummaryService', () => {
@@ -37,11 +43,12 @@ describe('SummaryService', () => {
     jest.clearAllMocks();
   });
 
-  describe('getDailySummary', () => {
-    it('既存のサマリーがある場合はそれを返す', async () => {
+  describe('generateDailySummary', () => {
+    test('既存のサマリーがある場合はそれを返す', async () => {
+      // Arrange
       const userId = 'test-user';
       const timezone = 'Asia/Tokyo';
-      const businessDate = '2025-06-27';
+      const businessDate = '2025-06-29';
 
       const existingSummary: DailySummary = {
         date: businessDate,
@@ -49,27 +56,31 @@ describe('SummaryService', () => {
         totalMinutes: 480,
         insights: 'テスト感想',
         motivation: 'テスト励まし',
-        generatedAt: '2025-06-27T10:00:00.000Z'
+        generatedAt: '2025-06-29T10:00:00.000Z'
       };
 
       mockRepository.getDailySummary.mockResolvedValue(existingSummary);
+      mockRepository.getActivityRecords.mockResolvedValue([]); // undefinedを回避
 
-      const result = await summaryService.getDailySummary(userId, timezone, businessDate);
+      // Act
+      const result = await summaryService.generateDailySummary(userId, timezone, businessDate);
 
+      // Assert
       expect(result).toEqual(existingSummary);
       expect(mockRepository.getDailySummary).toHaveBeenCalledWith(userId, timezone, businessDate);
     });
 
-    it('既存のサマリーがない場合は新規生成する', async () => {
+    test('既存のサマリーがない場合は新規生成する', async () => {
+      // Arrange
       const userId = 'test-user';
       const timezone = 'Asia/Tokyo';
-      const businessDate = '2025-06-27';
+      const businessDate = '2025-06-29';
 
       const mockActivities: ActivityRecord[] = [
         {
           id: '1',
           userId,
-          timeSlot: '2025-06-27 09:00:00',
+          timeSlot: '2025-06-29 09:00:00',
           originalText: 'プログラミング作業',
           analysis: {
             category: '仕事',
@@ -80,8 +91,8 @@ describe('SummaryService', () => {
           },
           category: '仕事',
           subCategory: 'プログラミング',
-          createdAt: '2025-06-27 09:30:00',
-          updatedAt: '2025-06-27 09:30:00'
+          createdAt: '2025-06-29 09:30:00',
+          updatedAt: '2025-06-29 09:30:00'
         }
       ];
 
@@ -102,7 +113,7 @@ describe('SummaryService', () => {
         totalMinutes: 60,
         insights: '生成された感想',
         motivation: '生成された励まし',
-        generatedAt: '2025-06-27T10:00:00.000Z'
+        generatedAt: '2025-06-29T10:00:00.000Z'
       };
 
       mockRepository.getDailySummary.mockResolvedValue(null);
@@ -110,24 +121,29 @@ describe('SummaryService', () => {
       mockAnalysisService.generateDailySummary.mockResolvedValue(generatedSummary);
       mockRepository.saveDailySummary.mockResolvedValue(undefined);
 
-      const result = await summaryService.getDailySummary(userId, timezone, businessDate);
+      // Act
+      const result = await summaryService.generateDailySummary(userId, timezone, businessDate);
 
+      // Assert
       expect(result).toEqual(generatedSummary);
       expect(mockRepository.getActivityRecords).toHaveBeenCalledWith(userId, timezone, businessDate);
       expect(mockAnalysisService.generateDailySummary).toHaveBeenCalledWith(mockActivities, businessDate);
       expect(mockRepository.saveDailySummary).toHaveBeenCalledWith(generatedSummary, timezone);
     });
 
-    it('活動記録がない場合は空のサマリーを返す', async () => {
+    test('活動記録がない場合は空のサマリーを返す', async () => {
+      // Arrange
       const userId = 'test-user';
       const timezone = 'Asia/Tokyo';
-      const businessDate = '2025-06-27';
+      const businessDate = '2025-06-29';
 
       mockRepository.getDailySummary.mockResolvedValue(null);
       mockRepository.getActivityRecords.mockResolvedValue([]);
 
-      const result = await summaryService.getDailySummary(userId, timezone, businessDate);
+      // Act
+      const result = await summaryService.generateDailySummary(userId, timezone, businessDate);
 
+      // Assert
       expect(result.totalMinutes).toBe(0);
       expect(result.categoryTotals).toEqual([]);
       expect(result.date).toBe(businessDate);
@@ -135,9 +151,10 @@ describe('SummaryService', () => {
   });
 
   describe('formatBriefSummary', () => {
-    it('サマリーを正しくフォーマットする', () => {
+    test('サマリーを正しくフォーマットする', () => {
+      // Arrange
       const summary: DailySummary = {
-        date: '2025-06-27',
+        date: '2025-06-29',
         categoryTotals: [
           {
             category: '仕事',
@@ -177,11 +194,13 @@ describe('SummaryService', () => {
         totalMinutes: 180, // 3時間
         insights: 'テスト感想',
         motivation: 'テスト励まし',
-        generatedAt: '2025-06-27T10:00:00.000Z'
+        generatedAt: '2025-06-29T10:00:00.000Z'
       };
 
+      // Act
       const result = summaryService.formatBriefSummary(summary);
 
+      // Assert
       expect(result).toContain('📊 **今日の活動サマリー**');
       expect(result).toContain('⏱️ 総活動時間: **3時間0分**');
       expect(result).toContain('• **仕事**: 2h30m');
@@ -191,9 +210,10 @@ describe('SummaryService', () => {
       expect(result).toContain('  - コーヒーブレイク: 30m');
     });
 
-    it('分のみの場合は正しくフォーマットする', () => {
+    test('分のみの場合は正しくフォーマットする', () => {
+      // Arrange
       const summary: DailySummary = {
-        date: '2025-06-27',
+        date: '2025-06-29',
         categoryTotals: [
           {
             category: '休憩',
@@ -206,18 +226,41 @@ describe('SummaryService', () => {
         totalMinutes: 45,
         insights: 'テスト感想',
         motivation: 'テスト励まし',
-        generatedAt: '2025-06-27T10:00:00.000Z'
+        generatedAt: '2025-06-29T10:00:00.000Z'
       };
 
+      // Act
       const result = summaryService.formatBriefSummary(summary);
 
+      // Assert
       expect(result).toContain('⏱️ 総活動時間: **45分**');
       expect(result).toContain('• **休憩**: 45m');
+    });
+
+    test('空のサマリーを正しく処理する', () => {
+      // Arrange
+      const summary: DailySummary = {
+        date: '2025-06-29',
+        categoryTotals: [],
+        totalMinutes: 0,
+        insights: '',
+        motivation: '',
+        generatedAt: '2025-06-29T10:00:00.000Z'
+      };
+
+      // Act
+      const result = summaryService.formatBriefSummary(summary);
+
+      // Assert
+      expect(result).toContain('📊 **今日の活動サマリー**');
+      expect(result).toContain('⏱️ 総活動時間: **0分**');
+      expect(result).toContain('活動内訳');
     });
   });
 
   describe('buildDetailedCategoryBreakdown', () => {
-    it('カテゴリとサブカテゴリを正しいインデントで表示する', () => {
+    test('カテゴリとサブカテゴリを正しいインデントで表示する', () => {
+      // Arrange
       const categoryTotals: CategoryTotal[] = [
         {
           category: '仕事',
@@ -241,11 +284,84 @@ describe('SummaryService', () => {
         }
       ];
 
-      const result = summaryService['buildDetailedCategoryBreakdown'](categoryTotals);
+      // Act
+      const result = (summaryService as any).buildDetailedCategoryBreakdown(categoryTotals);
 
+      // Assert
       expect(result).toContain('• **仕事**: 2h0m');
       expect(result).toContain('  - プログラミング: 1h30m');
       expect(result).toContain('  - ミーティング: 30m');
+    });
+
+    test('サブカテゴリがない場合は正しく処理する', () => {
+      // Arrange
+      const categoryTotals: CategoryTotal[] = [
+        {
+          category: '仕事',
+          totalMinutes: 60,
+          recordCount: 1,
+          averageProductivity: 4,
+          subCategories: []
+        }
+      ];
+
+      // Act
+      const result = (summaryService as any).buildDetailedCategoryBreakdown(categoryTotals);
+
+      // Assert
+      expect(result).toContain('• **仕事**: 1h0m');
+      expect(result).not.toContain('  -');
+    });
+  });
+
+  describe('エラーハンドリング', () => {
+    test('リポジトリエラーが適切に処理される', async () => {
+      // Arrange
+      const userId = 'test-user';
+      const timezone = 'Asia/Tokyo';
+      const businessDate = '2025-06-29';
+
+      mockRepository.getDailySummary.mockRejectedValue(new Error('Database Error'));
+      mockRepository.getActivityRecords.mockResolvedValue([]); // undefinedを回避
+
+      // Act & Assert
+      await expect(
+        summaryService.generateDailySummary(userId, timezone, businessDate)
+      ).rejects.toThrow('Database Error');
+    });
+
+    test('分析サービスエラーが適切に処理される', async () => {
+      // Arrange
+      const userId = 'test-user';
+      const timezone = 'Asia/Tokyo';
+      const businessDate = '2025-06-29';
+
+      const mockActivities = [
+        {
+          id: '1',
+          userId: 'test-user',
+          timeSlot: '2025-06-29 09:00:00',
+          originalText: 'テスト活動',
+          analysis: {
+            category: 'テスト',
+            structuredContent: 'テスト内容',
+            estimatedMinutes: 30,
+            productivityLevel: 3
+          },
+          category: 'テスト',
+          createdAt: '2025-06-29 09:30:00',
+          updatedAt: '2025-06-29 09:30:00'
+        }
+      ];
+
+      mockRepository.getDailySummary.mockResolvedValue(null);
+      mockRepository.getActivityRecords.mockResolvedValue(mockActivities);
+      mockAnalysisService.generateDailySummary.mockRejectedValue(new Error('AI Service Error'));
+
+      // Act & Assert
+      await expect(
+        summaryService.generateDailySummary(userId, timezone, businessDate)
+      ).rejects.toThrow('AI Service Error');
     });
   });
 });

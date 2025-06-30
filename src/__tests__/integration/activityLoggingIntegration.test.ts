@@ -1,22 +1,22 @@
 /**
- * 新システムコマンド統合テスト
+ * 活動記録システム統合テスト
  * Discord Botでのコマンド処理の動作確認
  */
 
-import { NewSystemIntegration, createDefaultConfig } from '../../integration';
+import { ActivityLoggingIntegration, createDefaultConfig } from '../../integration';
 import { Message } from 'discord.js';
 
 // Discordメッセージのモック
 class MockMessage {
   public content: string;
-  public author: { id: string; bot: boolean };
+  public author: { id: string; bot: boolean; tag: string };
   public guild: any = null; // DM simulation
   public channel: { isDMBased: () => boolean } = { isDMBased: () => true };
   public replies: string[] = [];
 
   constructor(content: string, userId: string = '770478489203507241') {
     this.content = content;
-    this.author = { id: userId, bot: false };
+    this.author = { id: userId, bot: false, tag: 'test-user' };
   }
 
   async reply(message: string): Promise<void> {
@@ -28,8 +28,8 @@ class MockMessage {
   }
 }
 
-describe('新システムコマンド統合テスト', () => {
-  let integration: NewSystemIntegration;
+describe('活動記録システム統合テスト', () => {
+  let integration: ActivityLoggingIntegration;
 
   beforeAll(async () => {
     const config = createDefaultConfig(
@@ -38,7 +38,7 @@ describe('新システムコマンド統合テスト', () => {
     );
     config.debugMode = true;
     
-    integration = new NewSystemIntegration(config);
+    integration = new ActivityLoggingIntegration(config);
     await integration.initialize();
   });
 
@@ -128,6 +128,36 @@ describe('新システムコマンド統合テスト', () => {
       
       expect(result).toBe(false); // 対象外ユーザー無視
       expect(mockMessage.replies.length).toBe(0);
+    });
+  });
+
+  describe('システム健全性テスト', () => {
+    test('ヘルスチェックが正常に動作する', async () => {
+      const healthCheck = await integration.healthCheck();
+      
+      expect(healthCheck.healthy).toBe(true);
+      expect(healthCheck.details.initialized).toBe(true);
+      expect(healthCheck.details.database).toBe(true);
+      expect(healthCheck.details.services).toBe(true);
+      expect(healthCheck.details.handlers).toBe(true);
+    });
+
+    test('システム統計が取得できる', async () => {
+      const stats = await integration.getSystemStats();
+      
+      expect(stats).toHaveProperty('totalLogs');
+      expect(stats).toHaveProperty('isInitialized');
+      expect(stats).toHaveProperty('uptime');
+      expect(stats.isInitialized).toBe(true);
+    });
+
+    test('設定情報が取得できる', () => {
+      const config = integration.getConfig();
+      
+      expect(config).toHaveProperty('databasePath');
+      expect(config).toHaveProperty('geminiApiKey');
+      expect(config).toHaveProperty('debugMode');
+      expect(config).toHaveProperty('targetUserId');
     });
   });
 });

@@ -10,22 +10,31 @@ import {
 describe('TimeUtils', () => {
   describe('getCurrentBusinessDate', () => {
     it('午前5時以前の場合は前日の日付を返す', () => {
-      // モックを使用して特定の時刻をテスト
-      const mockDate = new Date('2025-06-27T03:00:00Z'); // UTC 3:00 = Asia/Kolkata 8:30
+      // 今日の日付を使用してテスト
+      const today = new Date();
+      const todayStr = today.toISOString().split('T')[0];
+      
+      // UTC 22:30 = Asia/Kolkata 4:00 (翌日の早朝、5時前)
+      const mockDate = new Date(todayStr + 'T22:30:00Z');
       jest.spyOn(Date, 'now').mockReturnValue(mockDate.getTime());
       
       const result = getCurrentBusinessDate('Asia/Kolkata');
-      expect(result).toBe('2025-06-27'); // 8:30なので同日
+      expect(result).toBe(todayStr); // 4:00なので前日扱い
       
       jest.restoreAllMocks();
     });
 
     it('午前5時以降の場合は当日の日付を返す', () => {
-      const mockDate = new Date('2025-06-27T00:00:00Z'); // UTC 0:00 = Asia/Kolkata 5:30
+      // 今日の日付を使用してテスト
+      const today = new Date();
+      const todayStr = today.toISOString().split('T')[0];
+      
+      // UTC 0:00 = Asia/Kolkata 5:30
+      const mockDate = new Date(todayStr + 'T00:00:00Z');
       jest.spyOn(Date, 'now').mockReturnValue(mockDate.getTime());
       
       const result = getCurrentBusinessDate('Asia/Kolkata');
-      expect(result).toBe('2025-06-27'); // 5:30なので同日
+      expect(result).toBe(todayStr); // 5:30なので同日
       
       jest.restoreAllMocks();
     });
