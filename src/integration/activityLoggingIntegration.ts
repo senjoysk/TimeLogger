@@ -288,6 +288,9 @@ export class ActivityLoggingIntegration {
       // 活動を記録
       const log = await this.activityLogService.recordActivity(userId, content, timezone);
 
+      // キャッシュを無効化（新しいログが追加されたため）
+      await this.analysisCacheService.invalidateCache(userId, log.businessDate);
+
       // 記録完了の確認（デバッグモードのみ）
       if (this.config.debugMode) {
         await message.react('✅');

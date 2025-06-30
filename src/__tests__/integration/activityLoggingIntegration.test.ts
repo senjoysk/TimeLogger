@@ -141,6 +141,22 @@ describe('活動記録システム統合テスト', () => {
       expect(result).toBe(true);
       // デバッグモードなのでリアクションが追加される想定
     });
+
+    test('ログ記録時にキャッシュが無効化される', async () => {
+      const mockMessage = new MockMessage('新しい活動ログ');
+      
+      // キャッシュサービスのinvalidateCacheメソッドをスパイ
+      const cacheService = (integration as any).analysisCacheService;
+      const invalidateSpy = jest.spyOn(cacheService, 'invalidateCache').mockResolvedValue(true);
+      
+      const handleMessage = (integration as any).handleMessage.bind(integration);
+      const result = await handleMessage(mockMessage as unknown as Message);
+      
+      expect(result).toBe(true);
+      expect(invalidateSpy).toHaveBeenCalled();
+      
+      invalidateSpy.mockRestore();
+    });
   });
 
   describe('エラーハンドリングテスト', () => {

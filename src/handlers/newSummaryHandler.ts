@@ -292,22 +292,10 @@ export class NewSummaryHandler implements INewSummaryHandler {
   private formatBusinessDate(businessDate: string, timezone: string): string {
     try {
       const date = new Date(businessDate + 'T12:00:00');
-      const today = new Date();
-      const yesterday = new Date(today);
-      yesterday.setDate(yesterday.getDate() - 1);
-
-      const businessDateOnly = businessDate;
-      const todayStr = format(today, 'yyyy-MM-dd');
-      const yesterdayStr = format(yesterday, 'yyyy-MM-dd');
-
-      if (businessDateOnly === todayStr) {
-        return '今日';
-      } else if (businessDateOnly === yesterdayStr) {
-        return '昨日';
-      } else {
-        const localDate = toZonedTime(date, timezone);
-        return format(localDate, 'M月d日(E)', { timeZone: timezone });
-      }
+      const localDate = toZonedTime(date, timezone);
+      
+      // 実際の日付を表示（yyyy/MM/dd形式）
+      return format(localDate, 'yyyy/MM/dd', { timeZone: timezone });
     } catch (error) {
       console.error('❌ 日付フォーマットエラー:', error);
       return businessDate;

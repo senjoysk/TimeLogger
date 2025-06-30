@@ -154,6 +154,15 @@ export class AnalysisCacheService implements IAnalysisCacheService {
           await this.invalidateCache(userId, businessDate);
           return null;
         }
+
+        // ログ内容の変更をチェック（最終更新時刻比較）
+        const latestLogUpdate = await this.getLatestLogUpdateTime(userId, businessDate);
+        if (latestLogUpdate && latestLogUpdate > cache.generatedAt) {
+          this.missCount++;
+          console.log(`📝 ログ内容変更によりキャッシュ無効: [${businessDate}] キャッシュ:${cache.generatedAt} < 最新:${latestLogUpdate}`);
+          await this.invalidateCache(userId, businessDate);
+          return null;
+        }
       }
 
       // 強制リフレッシュの時間をチェック
@@ -245,7 +254,39 @@ export class AnalysisCacheService implements IAnalysisCacheService {
    */
   async isCacheValid(userId: string, businessDate: string, currentLogCount: number): Promise<boolean> {
     try {
-      return await this.repository.isCacheValid(userId, businessDate, currentLogCount);
+      const cache = await this.repository.getAnalysisCache(userId, businessDate);
+      
+      if (!cache) {
+        return false; // キャッシュが存在しない
+      }
+
+      // キャッシュの年齢をチェック
+      const cacheAge = this.getCacheAgeMinutes(cache.generatedAt);
+      
+      if (cacheAge > this.strategy.maxAgeMinutes) {
+        return false; // 期限切れ
+      }
+
+      // ログ数の変更をチェック
+      if (this.strategy.invalidateOnLogCountChange) {
+        if (cache.logCount !== currentLogCount) {
+          return false; // ログ数が変更された
+        }
+
+        // ログ内容の変更をチェック（最終更新時刻比較）
+        const latestLogUpdate = await this.getLatestLogUpdateTime(userId, businessDate);
+        if (latestLogUpdate && latestLogUpdate > cache.generatedAt) {
+          return false; // ログ内容が変更された
+        }
+      }
+
+      // 強制リフレッシュの時間をチェック
+      const forceRefreshMinutes = this.strategy.forceRefreshHours * 60;
+      if (cacheAge > forceRefreshMinutes) {
+        return false; // 強制リフレッシュ時間到達
+      }
+
+      return true; // キャッシュは有効
     } catch (error) {
       console.error('❌ キャッシュ有効性チェックエラー:', error);
       return false;
@@ -347,6 +388,34 @@ export class AnalysisCacheService implements IAnalysisCacheService {
 ⚡ ヒット率: ${hitRatePercent}% (${this.hitCount}/${totalRequests})
 💨 ミス回数: ${this.missCount}
 ⚙️ 設定: ${this.strategy.maxAgeMinutes}分有効, ${this.strategy.autoCleanupDays}日で削除`;
+  }
+
+  /**
+   * 指定日の最新ログ更新時刻を取得
+   */
+  private async getLatestLogUpdateTime(userId: string, businessDate: string): Promise<string | null> {
+    try {
+      // SQLiteリポジトリに専用メソッドを追加する代わりに、
+      // 既存のメソッドを使用してログを取得し、最新のupdated_atを検索
+      const logs = await this.repository.getLogsByDate(userId, businessDate);
+      
+      if (logs.length === 0) {
+        return null;
+      }
+
+      // 最新のupdated_atを見つける
+      let latestUpdate = logs[0].updatedAt;
+      for (const log of logs) {
+        if (log.updatedAt > latestUpdate) {
+          latestUpdate = log.updatedAt;
+        }
+      }
+
+      return latestUpdate;
+    } catch (error) {
+      console.error('❌ 最新ログ更新時刻取得エラー:', error);
+      return null; // エラー時はキャッシュを維持
+    }
   }
 
   /**
