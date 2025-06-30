@@ -592,8 +592,15 @@ export class ActivityLoggingIntegration {
    */
   private async getUserTimezone(userId: string): Promise<string> {
     try {
-      // TODO: 将来的にはユーザー設定テーブルから取得
-      // 現在は環境変数またはデフォルト値を使用
+      // データベースからユーザーのタイムゾーンを取得
+      if ('getUserTimezone' in this.repository) {
+        const dbTimezone = await (this.repository as any).getUserTimezone(userId);
+        if (dbTimezone) {
+          return dbTimezone;
+        }
+      }
+
+      // フォールバック: 環境変数またはデフォルト値を使用
       if (userId === this.config.targetUserId) {
         return process.env.USER_TIMEZONE || 'Asia/Tokyo';
       }

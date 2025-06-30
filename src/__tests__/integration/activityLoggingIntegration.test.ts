@@ -101,7 +101,8 @@ describe('活動記録システム統合テスト', () => {
       expect(mockMessage.replies.length).toBeGreaterThan(0);
       expect(mockMessage.replies[0]).toContain('タイムゾーン設定');
       expect(mockMessage.replies[0]).toContain('Asia/Kolkata');
-      expect(mockMessage.replies[0]).toContain('USER_TIMEZONE');
+      // 新機能では即座に適用されるメッセージが表示される
+      expect(mockMessage.replies[0]).toMatch(/設定完了|即座に適用/);
     });
 
     test('!help コマンドにコマンド一覧が表示される', async () => {

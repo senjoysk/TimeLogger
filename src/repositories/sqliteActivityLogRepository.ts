@@ -924,6 +924,82 @@ export class SqliteActivityLogRepository implements IActivityLogRepository, IApi
     }
   }
 
+  // === ユーザー設定管理 ===
+
+  /**
+   * ユーザーのタイムゾーン設定を保存
+   * @param userId ユーザーID
+   * @param timezone IANA タイムゾーン名
+   */
+  async saveUserTimezone(userId: string, timezone: string): Promise<void> {
+    try {
+      const sql = `
+        INSERT OR REPLACE INTO user_settings (user_id, timezone)
+        VALUES (?, ?)
+      `;
+      
+      await this.runQuery(sql, [userId, timezone]);
+      console.log(`✅ ユーザータイムゾーン設定保存: ${userId} -> ${timezone}`);
+    } catch (error) {
+      console.error('❌ ユーザータイムゾーン設定保存エラー:', error);
+      throw new ActivityLogError('ユーザータイムゾーン設定の保存に失敗しました', 'SAVE_USER_TIMEZONE_ERROR', { error, userId, timezone });
+    }
+  }
+
+  /**
+   * ユーザーのタイムゾーン設定を取得
+   * @param userId ユーザーID
+   * @returns タイムゾーン名（設定がない場合はnull）
+   */
+  async getUserTimezone(userId: string): Promise<string | null> {
+    try {
+      const sql = `
+        SELECT timezone 
+        FROM user_settings 
+        WHERE user_id = ?
+      `;
+      
+      const row = await this.getQuery(sql, [userId]);
+      
+      if (row && row.timezone) {
+        console.log(`📍 ユーザータイムゾーン取得: ${userId} -> ${row.timezone}`);
+        return row.timezone;
+      }
+      
+      console.log(`📍 ユーザータイムゾーン未設定: ${userId}`);
+      return null;
+    } catch (error) {
+      console.error('❌ ユーザータイムゾーン取得エラー:', error);
+      throw new ActivityLogError('ユーザータイムゾーン設定の取得に失敗しました', 'GET_USER_TIMEZONE_ERROR', { error, userId });
+    }
+  }
+
+  /**
+   * 全ユーザーのタイムゾーン設定を取得
+   * @returns ユーザーIDとタイムゾーンのマップ
+   */
+  async getAllUserTimezones(): Promise<{ [userId: string]: string }> {
+    try {
+      const sql = `
+        SELECT user_id, timezone 
+        FROM user_settings
+      `;
+      
+      const rows = await this.allQuery(sql);
+      const timezones: { [userId: string]: string } = {};
+      
+      for (const row of rows) {
+        timezones[row.user_id] = row.timezone;
+      }
+      
+      console.log(`📍 全ユーザータイムゾーン取得: ${Object.keys(timezones).length}件`);
+      return timezones;
+    } catch (error) {
+      console.error('❌ 全ユーザータイムゾーン取得エラー:', error);
+      throw new ActivityLogError('全ユーザータイムゾーン設定の取得に失敗しました', 'GET_ALL_USER_TIMEZONES_ERROR', { error });
+    }
+  }
+
   /**
    * データベース接続を閉じる
    */

@@ -109,9 +109,21 @@ export class NewTimezoneHandler implements INewTimezoneHandler {
    */
   private async showCurrentTimezone(message: Message, userId: string): Promise<void> {
     try {
-      // TODO: データベースからユーザーのタイムゾーンを取得
-      // 現在は環境変数またはデフォルト値を使用
-      const currentTimezone = process.env.USER_TIMEZONE || 'Asia/Tokyo';
+      // データベースからユーザーのタイムゾーンを取得
+      let currentTimezone = 'Asia/Tokyo'; // デフォルト
+      
+      if ('getUserTimezone' in this.repository) {
+        const dbTimezone = await (this.repository as any).getUserTimezone(userId);
+        if (dbTimezone) {
+          currentTimezone = dbTimezone;
+        } else {
+          // 環境変数をフォールバックとして使用
+          currentTimezone = process.env.USER_TIMEZONE || 'Asia/Tokyo';
+        }
+      } else {
+        // 古いリポジトリの場合は環境変数を使用
+        currentTimezone = process.env.USER_TIMEZONE || 'Asia/Tokyo';
+      }
       
       const now = new Date();
       const localTime = now.toLocaleString('ja-JP', { 
@@ -188,19 +200,43 @@ export class NewTimezoneHandler implements INewTimezoneHandler {
         return;
       }
 
-      // TODO: データベースにユーザーのタイムゾーンを保存
-      // 現在は環境変数のみサポート
-      await message.reply(`⚙️ **タイムゾーン設定**\n\n` +
-                         `🎯 設定したいタイムゾーン: \`${timezone}\`\n\n` +
-                         `💡 **現在の設定方法:**\n` +
-                         `環境変数 \`USER_TIMEZONE\` に以下を設定してください:\n` +
-                         `\`\`\`\n` +
-                         `export USER_TIMEZONE="${timezone}"\n` +
-                         `\`\`\`\n\n` +
-                         `🔄 設定後はBotを再起動してください。\n\n` +
-                         `📝 **今後の予定:** データベース保存による動的設定変更に対応予定です。`);
+      // データベースにユーザーのタイムゾーンを保存
+      if ('saveUserTimezone' in this.repository) {
+        await (this.repository as any).saveUserTimezone(userId, timezone);
+        
+        // 現在時刻を新しいタイムゾーンで表示
+        const now = new Date();
+        const localTime = now.toLocaleString('ja-JP', { 
+          timeZone: timezone,
+          year: 'numeric',
+          month: '2-digit',
+          day: '2-digit',
+          hour: '2-digit',
+          minute: '2-digit',
+          second: '2-digit'
+        });
+
+        await message.reply(`✅ **タイムゾーン設定完了**\n\n` +
+                           `🎯 新しいタイムゾーン: \`${timezone}\`\n` +
+                           `🕐 現在時刻: ${localTime}\n\n` +
+                           `💡 **即座に適用されました！**\n` +
+                           `• ログ表示: \`!logs\` で新しいタイムゾーンで時刻表示\n` +
+                           `• サマリー: \`!summary\` で新しいタイムゾーンで分析\n` +
+                           `• 今後の記録も新しいタイムゾーンで処理されます\n\n` +
+                           `🔄 設定変更は即座に反映され、Botの再起動は不要です。`);
+      } else {
+        // フォールバック（古いリポジトリの場合）
+        await message.reply(`⚙️ **タイムゾーン設定**\n\n` +
+                           `🎯 設定したいタイムゾーン: \`${timezone}\`\n\n` +
+                           `💡 **現在の設定方法:**\n` +
+                           `環境変数 \`USER_TIMEZONE\` に以下を設定してください:\n` +
+                           `\`\`\`\n` +
+                           `export USER_TIMEZONE="${timezone}"\n` +
+                           `\`\`\`\n\n` +
+                           `🔄 設定後はBotを再起動してください。`);
+      }
       
-      console.log(`⚙️ タイムゾーン設定情報送信完了: ${userId} -> ${timezone}`);
+      console.log(`⚙️ タイムゾーン設定完了: ${userId} -> ${timezone}`);
     } catch (error) {
       console.error('❌ タイムゾーン設定エラー:', error);
       throw new ActivityLogError('タイムゾーンの設定に失敗しました', 'SET_TIMEZONE_ERROR', { error });
@@ -238,8 +274,8 @@ export class NewTimezoneHandler implements INewTimezoneHandler {
 • 部分一致で検索されます
 
 **設定方法:**
-現在は環境変数での設定のみサポート。
-将来的にはコマンドでの動的変更に対応予定です。
+\`!timezone set <タイムゾーン名>\` でリアルタイム設定変更可能。
+Botの再起動は不要で、即座に全機能に反映されます。
 
 **その他のコマンド:**
 \`!logs\` - ログ表示（設定したタイムゾーンで時刻表示）
