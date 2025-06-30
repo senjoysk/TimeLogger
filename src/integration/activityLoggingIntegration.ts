@@ -14,7 +14,9 @@ import { NewSummaryHandler } from '../handlers/newSummaryHandler';
 import { LogsCommandHandler } from '../handlers/logsCommandHandler';
 import { NewTimezoneHandler } from '../handlers/newTimezoneHandler';
 import { GeminiService } from '../services/geminiService';
+import { GapDetectionService } from '../services/gapDetectionService';
 import { ActivityLogError } from '../types/activityLog';
+import { GapHandler } from '../handlers/gapHandler';
 
 /**
  * 活動記録システム統合設定インターフェース
@@ -46,12 +48,14 @@ export class ActivityLoggingIntegration {
   private geminiService!: GeminiService;
   private unifiedAnalysisService!: UnifiedAnalysisService;
   private analysisCacheService!: AnalysisCacheService;
+  private gapDetectionService!: GapDetectionService;
 
   // ハンドラー層
   private editHandler!: NewEditCommandHandler;
   private summaryHandler!: NewSummaryHandler;
   private logsHandler!: LogsCommandHandler;
   private timezoneHandler!: NewTimezoneHandler;
+  private gapHandler!: GapHandler;
 
   // 設定
   private config: ActivityLoggingConfig;
@@ -91,6 +95,9 @@ export class ActivityLoggingIntegration {
         this.repository,
         this.repository // 統合システムでは単一リポジトリを使用
       );
+      
+      this.gapDetectionService = new GapDetectionService(this.repository);
+      
       console.log('✅ サービス層初期化完了');
 
       // 3. ハンドラー層の初期化
@@ -101,6 +108,10 @@ export class ActivityLoggingIntegration {
       );
       this.logsHandler = new LogsCommandHandler(this.activityLogService);
       this.timezoneHandler = new NewTimezoneHandler(this.repository);
+      this.gapHandler = new GapHandler(
+        this.gapDetectionService,
+        this.activityLogService
+      );
       console.log('✅ ハンドラー層初期化完了');
 
       this.isInitialized = true;
@@ -271,6 +282,11 @@ export class ActivityLoggingIntegration {
         await this.timezoneHandler.handle(message, userId, args);
         break;
 
+      case 'gap':
+      case 'ギャップ':
+        await this.gapHandler.handle(message, userId, args, timezone);
+        break;
+
       default:
         // 他のコマンドは既存システムに委譲または無視
         console.log(`📝 未対応コマンド: ${command}`);
@@ -349,6 +365,7 @@ export class ActivityLoggingIntegration {
 \`!summary\` - 今日の活動サマリー表示
 \`!edit\` - ログの編集・削除
 \`!logs\` - 生ログの表示・検索
+\`!gap\` - 未記録時間の検出・記録
 \`!cost\` - API使用コスト確認
 \`!timezone\` - タイムゾーン表示・検索・設定
 \`!status\` - システム状態確認

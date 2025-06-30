@@ -24,9 +24,10 @@ export interface IActivityLogService {
    * @param userId ユーザーID
    * @param content 活動内容（自然言語）
    * @param timezone ユーザーのタイムゾーン
+   * @param inputTime 記録時刻（省略時は現在時刻）
    * @returns 作成されたActivityLog
    */
-  recordActivity(userId: string, content: string, timezone: string): Promise<ActivityLog>;
+  recordActivity(userId: string, content: string, timezone: string, inputTime?: string): Promise<ActivityLog>;
 
   /**
    * 指定日の活動ログを取得
@@ -126,7 +127,7 @@ export class ActivityLogService implements IActivityLogService {
   /**
    * 新しい活動を記録
    */
-  async recordActivity(userId: string, content: string, timezone: string): Promise<ActivityLog> {
+  async recordActivity(userId: string, content: string, timezone: string, inputTime?: string): Promise<ActivityLog> {
     try {
       // 入力内容の検証
       if (!content || content.trim().length === 0) {
@@ -137,8 +138,8 @@ export class ActivityLogService implements IActivityLogService {
         throw new ActivityLogError('活動内容が長すぎます（2000文字以内）', 'CONTENT_TOO_LONG');
       }
 
-      // 現在時刻を入力時刻として記録
-      const inputTimestamp = new Date().toISOString();
+      // 入力時刻を設定（指定がない場合は現在時刻）
+      const inputTimestamp = inputTime || new Date().toISOString();
       
       // 業務日を計算
       const businessDateInfo = this.calculateBusinessDate(timezone, inputTimestamp);
