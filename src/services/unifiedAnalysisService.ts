@@ -168,8 +168,9 @@ export class UnifiedAnalysisService implements IUnifiedAnalysisService {
     try {
       const prompt = this.buildUnifiedPrompt(logs, timezone, businessDate);
       
-      // デバッグ情報: プロンプトサイズ
+      // デバッグ情報: プロンプトサイズと内容
       console.log(`📝 プロンプトサイズ: ${prompt.length}文字, 推定トークン: ${Math.ceil(prompt.length / 4)}`);
+      console.log(`📝 送信プロンプト詳細:\n${prompt}`);
       
       // Gemini API 呼び出し
       const result = await this.model.generateContent(prompt);
@@ -279,6 +280,9 @@ export class UnifiedAnalysisService implements IUnifiedAnalysisService {
       return `${index + 1}. [${timeStr}投稿] ${log.content}`;
     }).join('\n');
 
+    // タイムゾーンに基づくUTC変換例を計算
+    const tzExamples = this.getTimezoneConversionExamples(timezone, businessDate);
+
     return `
 あなたは時間管理とタスク解析の専門家です。
 ユーザーの1日の活動ログを統合的に分析し、正確な時間配分とタイムラインを生成してください。
@@ -291,6 +295,14 @@ export class UnifiedAnalysisService implements IUnifiedAnalysisService {
 
 【活動ログ一覧】（投稿時刻順）
 ${logList}
+
+【極めて重要な時刻処理ルール】
+1. **ログ内の時刻は全て ${timezone} タイムゾーンの時刻です**
+2. **ログ内に記載された時刻（例: 10:20-10:50）は絶対に変更しないでください**
+3. **出力時はこれらの時刻をUTCに正確に変換してください**
+   ${tzExamples}
+4. **投稿時刻は参考情報です。活動の実際の時刻はログ内容に記載された時刻です**
+5. **必ず上記の変換例に従って、${timezone}の時刻をUTCに変換してください**
 
 【重要な分析指針】
 1. **時間解釈の精度**：
@@ -388,13 +400,24 @@ ${logList}
       return `${index + 1}. [${timeStr}投稿] ${log.content}`;
     }).join('\n');
 
+    // タイムゾーンに基づくUTC変換例を計算
+    const tzExamples = this.getTimezoneConversionExamples(timezone, businessDate);
+
     return `
 ${timeRange}の活動ログを分析してください。
 
 【対象時間帯】: ${timeRange}
 【業務日】: ${businessDate} 
+【ユーザータイムゾーン】: ${timezone}
 【ログ一覧】:
 ${logList}
+
+【極めて重要な時刻処理ルール】
+1. **ログ内の時刻は全て ${timezone} タイムゾーンの時刻です**
+2. **ログ内に記載された時刻は絶対に変更しないでください**
+3. **出力時はこれらの時刻をUTCに正確に変換してください**
+   ${tzExamples}
+4. **必ず上記の変換例に従って、${timezone}の時刻をUTCに変換してください**
 
 この時間帯の活動を分析し、カテゴリ分類とタイムラインを生成してください。
 出力形式は統合分析と同じJSON形式です。
@@ -685,5 +708,49 @@ ${logList}
     const promptOverhead = 2000; // プロンプト固定部分
     
     return Math.ceil(totalChars * 1.5) + promptOverhead;
+  }
+
+  /**
+   * タイムゾーン変換例を生成
+   */
+  private getTimezoneConversionExamples(timezone: string, businessDate: string): string {
+    // 業務日の代表的な時刻での変換例を生成
+    const exampleTimes = ['09:00', '10:20', '12:00', '14:30', '17:00'];
+    const examples = exampleTimes.map(localTime => {
+      // ローカル時刻をDateオブジェクトに変換
+      const localDateTime = new Date(`${businessDate}T${localTime}:00`);
+      // タイムゾーンを考慮してUTCに変換
+      const utcTime = toZonedTime(localDateTime, 'UTC');
+      const localInTz = toZonedTime(localDateTime, timezone);
+      
+      // タイムゾーンオフセットを計算
+      const offset = (localInTz.getTime() - utcTime.getTime()) / (1000 * 60 * 60);
+      
+      // UTC時刻を計算（ローカル時刻からオフセットを引く）
+      const [hours, minutes] = localTime.split(':').map(Number);
+      let utcHours = hours - Math.floor(offset);
+      let utcMinutes = minutes - (offset % 1) * 60;
+      
+      // 分の調整
+      if (utcMinutes < 0) {
+        utcMinutes += 60;
+        utcHours -= 1;
+      } else if (utcMinutes >= 60) {
+        utcMinutes -= 60;
+        utcHours += 1;
+      }
+      
+      // 時間の調整（24時間形式）
+      if (utcHours < 0) {
+        utcHours += 24;
+      } else if (utcHours >= 24) {
+        utcHours -= 24;
+      }
+      
+      const utcTimeStr = `${String(utcHours).padStart(2, '0')}:${String(Math.round(utcMinutes)).padStart(2, '0')}`;
+      return `   - ${timezone}の${localTime} → UTC ${utcTimeStr}`;
+    }).join('\n');
+    
+    return examples;
   }
 }
