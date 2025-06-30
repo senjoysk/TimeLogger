@@ -10,7 +10,7 @@ import { Message } from 'discord.js';
 class MockMessage {
   public content: string;
   public author: { id: string; bot: boolean; tag: string };
-  public guild: any = null; // DM simulation
+  public guild: null = null; // DM simulation - 明示的にnullを設定
   public channel: { isDMBased: () => boolean } = { isDMBased: () => true };
   public replies: string[] = [];
 
@@ -32,6 +32,10 @@ describe('活動記録システム統合テスト', () => {
   let integration: ActivityLoggingIntegration;
 
   beforeAll(async () => {
+    // 環境変数を明示的に設定
+    process.env.TARGET_USER_ID = '770478489203507241';
+    process.env.USER_TIMEZONE = 'Asia/Tokyo';
+    
     const config = createDefaultConfig(
       ':memory:',
       'test-api-key'
@@ -56,7 +60,7 @@ describe('活動記録システム統合テスト', () => {
       
       expect(result).toBe(true); // 処理成功
       expect(mockMessage.replies.length).toBeGreaterThan(0); // 何らかの返信がある
-      expect(mockMessage.replies[0]).toContain('コスト'); // コスト情報が含まれている
+      expect(mockMessage.replies[0]).toContain('API使用量レポート'); // コスト情報が含まれている
     });
 
     test('!timezone コマンドが正しく処理される', async () => {
@@ -132,6 +136,11 @@ describe('活動記録システム統合テスト', () => {
   });
 
   describe('システム健全性テスト', () => {
+    test('設定値を確認する', () => {
+      const config = integration.getConfig();
+      expect(config.targetUserId).toBe('770478489203507241');
+    });
+
     test('ヘルスチェックが正常に動作する', async () => {
       const healthCheck = await integration.healthCheck();
       
