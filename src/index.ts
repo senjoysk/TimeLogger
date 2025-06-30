@@ -35,11 +35,11 @@ class Application {
       console.log('⏳ システム初期化の完了を待機中...');
       await this.bot.waitForSystemInitialization();
       
-      // スケジューラーの初期化（新システム初期化完了後）
+      // スケジューラーの初期化（活動記録システム初期化完了後）
       console.log('📅 スケジューラーを初期化中...');
       const repository = this.bot.getRepository();
       if (!repository) {
-        console.warn('⚠️ リポジトリが取得できませんが、新システムで続行します');
+        console.warn('⚠️ リポジトリが取得できませんが、活動記録システムで続行します');
       }
       this.scheduler = new Scheduler(this.bot, repository);
       

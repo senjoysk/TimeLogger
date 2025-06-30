@@ -1,14 +1,14 @@
 /**
- * 新活動記録システム統合エントリーポイント
- * 既存Botに新システムを簡単に統合するためのファサード
+ * 活動記録システム統合エントリーポイント
+ * 既存Botに活動記録システムを簡単に統合するためのファサード
  */
 
 export { 
-  NewSystemIntegration, 
-  IntegrationConfig,
+  ActivityLoggingIntegration, 
+  ActivityLoggingConfig,
   createDefaultConfig,
-  createNewSystemIntegration 
-} from './newSystemIntegration';
+  createActivityLoggingIntegration 
+} from './activityLoggingIntegration';
 
 export { 
   SystemMigrator, 
@@ -20,21 +20,21 @@ export {
 
 import { Client } from 'discord.js';
 import { 
-  NewSystemIntegration, 
-  IntegrationConfig, 
+  ActivityLoggingIntegration, 
+  ActivityLoggingConfig, 
   createDefaultConfig 
-} from './newSystemIntegration';
+} from './activityLoggingIntegration';
 import { config } from '../config';
 
 /**
- * 既存BotClientに新システムを統合する便利関数
+ * 既存BotClientに活動記録システムを統合する便利関数
  */
-export async function integrateNewSystem(
+export async function integrateActivityLogging(
   discordClient: Client,
-  customConfig?: Partial<IntegrationConfig>
-): Promise<NewSystemIntegration> {
+  customConfig?: Partial<ActivityLoggingConfig>
+): Promise<ActivityLoggingIntegration> {
   try {
-    console.log('🚀 新活動記録システム統合を開始...');
+    console.log('🚀 活動記録システム統合を開始...');
 
     // デフォルト設定を生成
     const defaultConfig = createDefaultConfig(
@@ -43,7 +43,7 @@ export async function integrateNewSystem(
     );
 
     // カスタム設定をマージ
-    const finalConfig: IntegrationConfig = {
+    const finalConfig: ActivityLoggingConfig = {
       ...defaultConfig,
       ...customConfig
     };
@@ -57,14 +57,14 @@ export async function integrateNewSystem(
       throw new Error('データベースパスが設定されていません');
     }
 
-    // 新システムを初期化
-    const integration = new NewSystemIntegration(finalConfig);
+    // 活動記録システムを初期化
+    const integration = new ActivityLoggingIntegration(finalConfig);
     await integration.initialize();
 
     // Discord Botに統合
     integration.integrateWithBot(discordClient);
 
-    console.log('✅ 新活動記録システム統合完了！');
+    console.log('✅ 活動記録システム統合完了！');
     
     // ヘルスチェックを実行
     const healthCheck = await integration.healthCheck();
@@ -75,7 +75,7 @@ export async function integrateNewSystem(
     return integration;
 
   } catch (error) {
-    console.error('❌ 新システム統合エラー:', error);
+    console.error('❌ 活動記録システム統合エラー:', error);
     throw error;
   }
 }
@@ -86,7 +86,7 @@ export async function integrateNewSystem(
 export async function createTestIntegration(
   databasePath?: string,
   geminiApiKey?: string
-): Promise<NewSystemIntegration> {
+): Promise<ActivityLoggingIntegration> {
   const testConfig = createDefaultConfig(
     databasePath || './test-database.db',
     geminiApiKey || process.env.GEMINI_API_KEY || 'test-key'
@@ -96,7 +96,7 @@ export async function createTestIntegration(
   testConfig.debugMode = true;
   testConfig.enableAutoAnalysis = false; // テスト中は自動分析を無効
 
-  const integration = new NewSystemIntegration(testConfig);
+  const integration = new ActivityLoggingIntegration(testConfig);
   await integration.initialize();
   
   return integration;
@@ -105,7 +105,7 @@ export async function createTestIntegration(
 /**
  * 設定ファイルから統合設定を読み込み
  */
-export function loadConfigFromEnv(): IntegrationConfig {
+export function loadConfigFromEnv(): ActivityLoggingConfig {
   return {
     databasePath: process.env.DATABASE_PATH || './data/tasks.db',
     geminiApiKey: process.env.GEMINI_API_KEY || '',
@@ -120,10 +120,10 @@ export function loadConfigFromEnv(): IntegrationConfig {
 /**
  * システム統計を取得する便利関数
  */
-export async function getSystemOverview(integration: NewSystemIntegration): Promise<{
+export async function getSystemOverview(integration: ActivityLoggingIntegration): Promise<{
   health: any;
   stats: any;
-  config: IntegrationConfig;
+  config: ActivityLoggingConfig;
 }> {
   const [health, stats] = await Promise.all([
     integration.healthCheck(),
@@ -140,7 +140,7 @@ export async function getSystemOverview(integration: NewSystemIntegration): Prom
 /**
  * 緊急時のシステム停止
  */
-export async function emergencyShutdown(integration: NewSystemIntegration): Promise<void> {
+export async function emergencyShutdown(integration: ActivityLoggingIntegration): Promise<void> {
   try {
     console.log('🚨 緊急シャットダウンを実行中...');
     await integration.shutdown();

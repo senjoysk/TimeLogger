@@ -1,6 +1,6 @@
 /**
- * 新活動記録システム統合クラス
- * 既存のDiscord Botに新しい自然言語ログシステムを統合
+ * 活動記録システム統合クラス
+ * Discord Botに自然言語活動ログシステムを統合
  */
 
 import { Client, Message } from 'discord.js';
@@ -16,9 +16,9 @@ import { GeminiService } from '../services/geminiService';
 import { ActivityLogError } from '../types/activityLog';
 
 /**
- * 統合設定インターフェース
+ * 活動記録システム統合設定インターフェース
  */
-export interface IntegrationConfig {
+export interface ActivityLoggingConfig {
   /** データベースパス */
   databasePath: string;
   /** Google Gemini APIキー */
@@ -36,9 +36,9 @@ export interface IntegrationConfig {
 }
 
 /**
- * 新システム統合クラス
+ * 活動記録システム統合クラス
  */
-export class NewSystemIntegration {
+export class ActivityLoggingIntegration {
   // サービス層
   private repository!: SqliteActivityLogRepository;
   private activityLogService!: ActivityLogService;
@@ -52,19 +52,19 @@ export class NewSystemIntegration {
   private logsHandler!: LogsCommandHandler;
 
   // 設定
-  private config: IntegrationConfig;
+  private config: ActivityLoggingConfig;
   private isInitialized: boolean = false;
 
-  constructor(config: IntegrationConfig) {
+  constructor(config: ActivityLoggingConfig) {
     this.config = config;
   }
 
   /**
-   * 新システムを初期化
+   * 活動記録システムを初期化
    */
   async initialize(): Promise<void> {
     try {
-      console.log('🚀 新活動記録システムの初期化を開始...');
+      console.log('🚀 活動記録システムの初期化を開始...');
 
       // 1. データベース接続とRepository初期化
       this.repository = new SqliteActivityLogRepository(this.config.databasePath);
@@ -75,10 +75,10 @@ export class NewSystemIntegration {
       // 2. サービス層の初期化
       this.activityLogService = new ActivityLogService(this.repository);
       
-      // コスト管理機能の初期化（新システム統合版）
+      // コスト管理機能の初期化（統合版）
       // SqliteActivityLogRepositoryがIApiCostRepositoryも実装しているため、同じインスタンスを使用
       this.geminiService = new GeminiService(this.repository);
-      console.log('✅ GeminiService初期化完了（新システム統合リポジトリ使用）');
+      console.log('✅ GeminiService初期化完了（統合リポジトリ使用）');
       
       this.analysisCacheService = new AnalysisCacheService(
         this.repository,
@@ -87,7 +87,7 @@ export class NewSystemIntegration {
       
       this.unifiedAnalysisService = new UnifiedAnalysisService(
         this.repository,
-        this.repository // 新システムでは単一リポジトリを使用
+        this.repository // 統合システムでは単一リポジトリを使用
       );
       console.log('✅ サービス層初期化完了');
 
@@ -101,12 +101,12 @@ export class NewSystemIntegration {
       console.log('✅ ハンドラー層初期化完了');
 
       this.isInitialized = true;
-      console.log('🎉 新活動記録システム初期化完了！');
+      console.log('🎉 活動記録システム初期化完了！');
 
     } catch (error) {
-      console.error('❌ 新システム初期化エラー:', error);
+      console.error('❌ 活動記録システム初期化エラー:', error);
       throw new ActivityLogError(
-        '新システムの初期化に失敗しました', 
+        '活動記録システムの初期化に失敗しました', 
         'INTEGRATION_INIT_ERROR', 
         { error }
       );
@@ -120,7 +120,7 @@ export class NewSystemIntegration {
   integrateWithBot(client: Client): void {
     if (!this.isInitialized) {
       throw new ActivityLogError(
-        '新システムが初期化されていません', 
+        '活動記録システムが初期化されていません', 
         'SYSTEM_NOT_INITIALIZED'
       );
     }
@@ -131,32 +131,32 @@ export class NewSystemIntegration {
     const existingListeners = client.listeners('messageCreate');
     client.removeAllListeners('messageCreate');
 
-    // 新システムのメッセージハンドラーを最優先で追加
+    // 活動記録システムのメッセージハンドラーを最優先で追加
     client.on('messageCreate', async (message: Message) => {
       const handled = await this.handleMessage(message);
       
-      // 新システムで処理されなかった場合は既存のハンドラーに委譲
+      // 活動記録システムで処理されなかった場合は既存のハンドラーに委譲
       if (!handled) {
         for (const listener of existingListeners) {
           try {
             await (listener as Function)(message);
           } catch (error) {
-            console.error('❌ 旧システムハンドラーエラー:', error);
+            console.error('❌ レガシーハンドラーエラー:', error);
           }
         }
       }
     });
 
-    console.log('✅ Discord Bot統合完了（新システム優先モード）');
+    console.log('✅ Discord Bot統合完了（活動記録システム優先モード）');
   }
 
   /**
    * メッセージを処理（既存システムとの互換性を保持）
-   * @returns 新システムで処理された場合true、そうでなければfalse
+   * @returns 活動記録システムで処理された場合true、そうでなければfalse
    */
   private async handleMessage(message: Message): Promise<boolean> {
     try {
-      console.log('🔍 [新システム] メッセージ受信:', {
+      console.log('🔍 [活動記録] メッセージ受信:', {
         authorId: message.author?.id,
         authorTag: message.author?.tag,
         isBot: message.author?.bot,
@@ -167,13 +167,13 @@ export class NewSystemIntegration {
 
       // Bot自身のメッセージは無視
       if (message.author.bot) {
-        console.log('  ↳ [新システム] Botメッセージのため無視');
+        console.log('  ↳ [活動記録] Botメッセージのため無視');
         return false;
       }
 
       // DMのみを処理（ギルドチャンネルは無視）
       if (message.guild) {
-        console.log('  ↳ [新システム] ギルドメッセージのため無視（DMのみ処理）');
+        console.log('  ↳ [活動記録] ギルドメッセージのため無視（DMのみ処理）');
         return false;
       }
 
@@ -183,15 +183,15 @@ export class NewSystemIntegration {
 
       // 対象ユーザーのみ処理
       if (userId !== this.config.targetUserId) {
-        console.log(`  ↳ [新システム] 対象外ユーザー (受信: ${userId}, 期待: ${this.config.targetUserId})`);
+        console.log(`  ↳ [活動記録] 対象外ユーザー (受信: ${userId}, 期待: ${this.config.targetUserId})`);
         return false;
       }
 
-      console.log(`✅ [新システム] 処理対象メッセージ: "${content}"`)
+      console.log(`✅ [活動記録] 処理対象メッセージ: "${content}"`)
 
       // コマンド処理
       if (content.startsWith('!')) {
-        console.log(`🔧 [新システム] コマンド検出: "${content}"`);
+        console.log(`🔧 [活動記録] コマンド検出: "${content}"`);
         await this.handleCommand(message, userId, content, timezone);
         return true;
       }
@@ -333,7 +333,7 @@ export class NewSystemIntegration {
    * システム全般のヘルプを表示
    */
   private async showGeneralHelp(message: Message): Promise<void> {
-    const helpMessage = `🤖 **TimeLogger 新システム**
+    const helpMessage = `🤖 **TimeLogger 活動記録システム**
 
 **📝 活動記録**
 メッセージを送信するだけで自動記録されます
@@ -393,7 +393,7 @@ export class NewSystemIntegration {
   }
 
   /**
-   * コストレポートを取得（旧システム代替）
+   * コストレポートを取得
    */
   async getCostReport(userId: string, timezone: string): Promise<string> {
     try {
@@ -406,7 +406,7 @@ export class NewSystemIntegration {
   }
 
   /**
-   * リポジトリインスタンスを取得（旧システム代替）
+   * リポジトリインスタンスを取得
    */
   getRepository(): any {
     return this.repository;
@@ -417,7 +417,7 @@ export class NewSystemIntegration {
    */
   async shutdown(): Promise<void> {
     try {
-      console.log('🔄 新システムのシャットダウンを開始...');
+      console.log('🔄 活動記録システムのシャットダウンを開始...');
 
       if (this.repository) {
         await this.repository.close();
@@ -425,7 +425,7 @@ export class NewSystemIntegration {
       }
 
       this.isInitialized = false;
-      console.log('✅ 新システムのシャットダウン完了');
+      console.log('✅ 活動記録システムのシャットダウン完了');
     } catch (error) {
       console.error('❌ シャットダウンエラー:', error);
       throw error;
@@ -470,7 +470,7 @@ export class NewSystemIntegration {
   /**
    * 設定を取得
    */
-  getConfig(): IntegrationConfig {
+  getConfig(): ActivityLoggingConfig {
     return { ...this.config };
   }
 
@@ -556,7 +556,7 @@ export class NewSystemIntegration {
       const currentTimezone = await this.getUserTimezone(userId);
       const response = `🌍 **タイムゾーン設定**\n\n` +
                       `現在のタイムゾーン: \`${currentTimezone}\`\n\n` +
-                      `ℹ️ 新システムでは環境変数 \`USER_TIMEZONE\` でタイムゾーンを設定できます。\n` +
+                      `ℹ️ 環境変数 \`USER_TIMEZONE\` でタイムゾーンを設定できます。\n` +
                       `例: Asia/Tokyo, America/New_York, Europe/London など`;
       
       await message.reply(response);
@@ -592,7 +592,7 @@ export class NewSystemIntegration {
 /**
  * デフォルト設定を生成
  */
-export function createDefaultConfig(databasePath: string, geminiApiKey: string): IntegrationConfig {
+export function createDefaultConfig(databasePath: string, geminiApiKey: string): ActivityLoggingConfig {
   return {
     databasePath,
     geminiApiKey,
@@ -605,10 +605,10 @@ export function createDefaultConfig(databasePath: string, geminiApiKey: string):
 }
 
 /**
- * 新システム統合のファクトリー関数
+ * 活動記録システム統合のファクトリー関数
  */
-export async function createNewSystemIntegration(config: IntegrationConfig): Promise<NewSystemIntegration> {
-  const integration = new NewSystemIntegration(config);
+export async function createActivityLoggingIntegration(config: ActivityLoggingConfig): Promise<ActivityLoggingIntegration> {
+  const integration = new ActivityLoggingIntegration(config);
   await integration.initialize();
   return integration;
 }

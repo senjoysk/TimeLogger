@@ -1,7 +1,7 @@
 import { Client, GatewayIntentBits, Partials } from 'discord.js';
 import { config } from './config';
 import { BotStatus } from './types';
-import { NewSystemIntegration, createDefaultConfig } from './integration';
+import { ActivityLoggingIntegration, createDefaultConfig } from './integration';
 
 /**
  * Discord Bot のメインクラス
@@ -10,8 +10,8 @@ import { NewSystemIntegration, createDefaultConfig } from './integration';
 export class TaskLoggerBot {
   private client: Client;
   private status: BotStatus;
-  // 旧システム削除: repositoryとgeminiServiceは新システム統合で代替
-  private newSystemIntegration?: NewSystemIntegration;
+  // 活動記録システム統合
+  private activityLoggingIntegration?: ActivityLoggingIntegration;
 
   constructor() {
     // Discord クライアントの初期化
@@ -33,19 +33,17 @@ export class TaskLoggerBot {
       scheduledJobs: [],
     };
 
-    // 旧システム初期化は新システムの後に実行
-    // this.repository = new SqliteRepository(config.database.path);
-    // this.geminiService = new GeminiService(this.repository);
+    // 活動記録システムで統合管理
 
     this.setupEventHandlers();
   }
 
   /**
-   * 新自然言語ログシステムを初期化
+   * 活動記録システムを初期化
    */
-  private async initializeNewSystem(): Promise<void> {
+  private async initializeActivityLogging(): Promise<void> {
     try {
-      console.log('🚀 新自然言語ログシステム統合開始...');
+      console.log('🚀 活動記録システム統合開始...');
       
       // 統合設定を作成（既存DBファイルを使用）
       const integrationConfig = createDefaultConfig(
@@ -57,15 +55,15 @@ export class TaskLoggerBot {
       integrationConfig.debugMode = true;
       integrationConfig.enableAutoAnalysis = true;
       
-      // 新システムを初期化
-      this.newSystemIntegration = new NewSystemIntegration(integrationConfig);
-      await this.newSystemIntegration.initialize();
+      // 活動記録システムを初期化
+      this.activityLoggingIntegration = new ActivityLoggingIntegration(integrationConfig);
+      await this.activityLoggingIntegration.initialize();
       
       // Discord Clientに統合
-      this.newSystemIntegration.integrateWithBot(this.client);
+      this.activityLoggingIntegration.integrateWithBot(this.client);
       
-      console.log('✅ 新自然言語ログシステム統合完了！');
-      console.log('💡 新機能が利用可能:');
+      console.log('✅ 活動記録システム統合完了！');
+      console.log('💡 機能が利用可能:');
       console.log('   - 自然言語でログ記録');
       console.log('   - !edit でログ編集');
       console.log('   - !summary でAI分析表示');
@@ -87,7 +85,7 @@ export class TaskLoggerBot {
     try {
       console.log('🤖 Discord Bot を起動中...');
       
-      // 新システムでは独自のデータベース初期化を行うため、旧システムの初期化は不要
+      // 活動記録システムで独自のデータベース初期化を行う
       
       await this.client.login(config.discord.token);
       this.status.isRunning = true;
@@ -108,17 +106,17 @@ export class TaskLoggerBot {
     this.status.isRunning = false;
     this.client.destroy();
     
-    // 新システムのシャットダウン
-    if (this.newSystemIntegration) {
+    // 活動記録システムのシャットダウン
+    if (this.activityLoggingIntegration) {
       try {
-        await this.newSystemIntegration.shutdown();
-        console.log('✅ 新システムのシャットダウン完了');
+        await this.activityLoggingIntegration.shutdown();
+        console.log('✅ 活動記録システムのシャットダウン完了');
       } catch (error) {
-        console.error('❌ 新システムシャットダウンエラー:', error);
+        console.error('❌ 活動記録システムシャットダウンエラー:', error);
       }
     }
     
-    // 新システムのシャットダウンのみ実行（旧システム削除済み）
+    // 活動記録システムのシャットダウンのみ実行
     
     console.log('✅ Discord Bot が停止しました');
   }
@@ -134,8 +132,8 @@ export class TaskLoggerBot {
       console.log(`🔧 [DEBUG] 設定されたTARGET_USER_ID: ${config.discord.targetUserId}`);
       console.log(`🔧 [DEBUG] Intents: Guilds, DirectMessages, MessageContent`);
       
-      // 新自然言語ログシステムを統合
-      await this.initializeNewSystem();
+      // 活動記録システムを統合
+      await this.initializeActivityLogging();
     });
 
 
@@ -166,8 +164,8 @@ export class TaskLoggerBot {
       // 新システムから適切なタイムゾーンを取得
       const userTimezone = process.env.USER_TIMEZONE || 'Asia/Tokyo';
       
-      // TODO: 新システムでの日次サマリー機能に置き換える必要がある
-      const briefSummary = '🌅 今日一日お疲れさまでした！\n\n新システムでのサマリー機能は開発中です。';
+      // TODO: 活動記録システムでの日次サマリー機能に置き換える必要がある
+      const briefSummary = '🌅 今日一日お疲れさまでした！\n\n活動記録システムでのサマリー機能は開発中です。';
       await dmChannel.send(briefSummary);
       
       console.log('✅ 日次サマリーを送信しました');
@@ -203,13 +201,13 @@ export class TaskLoggerBot {
 
       const userTimezone = process.env.USER_TIMEZONE || 'Asia/Tokyo';
       
-      if (!this.newSystemIntegration) {
-        console.warn('⚠️ 新システムが初期化されていません - コストレポートをスキップ');
+      if (!this.activityLoggingIntegration) {
+        console.warn('⚠️ 活動記録システムが初期化されていません - コストレポートをスキップ');
         return;
       }
       
-      // 新システム経由でコストレポートを取得
-      const report = await this.newSystemIntegration.getCostReport(user.id, userTimezone);
+      // 活動記録システム経由でコストレポートを取得
+      const report = await this.activityLoggingIntegration.getCostReport(user.id, userTimezone);
       await dmChannel.send(report);
       console.log('✅ APIコストレポートを送信しました');
     } catch (error) {
@@ -242,18 +240,18 @@ export class TaskLoggerBot {
   }
 
   /**
-   * データベースインスタンスを取得（新システム経由）
+   * データベースインスタンスを取得（活動記録システム経由）
    * @returns データベースインスタンス
    */
   public getRepository(): any {
-    return this.newSystemIntegration?.getRepository();
+    return this.activityLoggingIntegration?.getRepository();
   }
 
   /**
    * システム初期化が完了しているかチェック
    */
   public isSystemInitialized(): boolean {
-    return this.newSystemIntegration !== undefined;
+    return this.activityLoggingIntegration !== undefined;
   }
 
   /**
