@@ -168,6 +168,9 @@ export class UnifiedAnalysisService implements IUnifiedAnalysisService {
     try {
       const prompt = this.buildUnifiedPrompt(logs, timezone, businessDate);
       
+      // デバッグ情報: プロンプトサイズ
+      console.log(`📝 プロンプトサイズ: ${prompt.length}文字, 推定トークン: ${Math.ceil(prompt.length / 4)}`);
+      
       // Gemini API 呼び出し
       const result = await this.model.generateContent(prompt);
       const response = result.response;
@@ -179,6 +182,15 @@ export class UnifiedAnalysisService implements IUnifiedAnalysisService {
       }
 
       const responseText = response.text();
+      
+      // デバッグ情報: レスポンステキストの詳細
+      console.log(`📝 Geminiレスポンス詳細: 文字数=${responseText.length}, 最後の100文字="${responseText.slice(-100)}"`);
+      
+      // 不完全なJSONの検出
+      if (!responseText.trim().endsWith('}')) {
+        console.warn('⚠️ Geminiレスポンスが不完全です（}で終わっていません）');
+        console.log(`📝 レスポンス全文:\n${responseText}`);
+      }
       
       // レスポンスをパース
       const geminiResponse = this.parseGeminiResponse(responseText);
@@ -220,6 +232,15 @@ export class UnifiedAnalysisService implements IUnifiedAnalysisService {
         }
 
         const responseText = response.text();
+        
+        // デバッグ情報: チャンクレスポンステキストの詳細
+        console.log(`📝 チャンク${i + 1}レスポンス詳細: 文字数=${responseText.length}, 最後の50文字="${responseText.slice(-50)}"`);
+        
+        // 不完全なJSONの検出
+        if (!responseText.trim().endsWith('}')) {
+          console.warn(`⚠️ チャンク${i + 1}のレスポンスが不完全です`);
+        }
+        
         const chunkResult = this.parseGeminiResponse(responseText);
         chunkResults.push(chunkResult);
       }
@@ -501,13 +522,73 @@ ${logList}
   }
 
   /**
+   * 不完全なJSONの修復を試行
+   */
+  private repairIncompleteJson(jsonText: string): string {
+    try {
+      let repaired = jsonText.trim();
+      
+      // 引用符が途中で終わっている場合を修復
+      if (repaired.endsWith('"')) {
+        // 最後の不完全な値を削除
+        const lastCommaIndex = repaired.lastIndexOf(',');
+        const lastColonIndex = repaired.lastIndexOf(':');
+        
+        if (lastColonIndex > lastCommaIndex) {
+          // 最後のプロパティが不完全
+          repaired = repaired.substring(0, lastCommaIndex > 0 ? lastCommaIndex : repaired.lastIndexOf('{'));
+        }
+      }
+      
+      // 配列やオブジェクトの途中で終わっている場合を修復
+      let openBraces = 0;
+      let openBrackets = 0;
+      let inString = false;
+      let escaped = false;
+      
+      for (let i = 0; i < repaired.length; i++) {
+        const char = repaired[i];
+        
+        if (!inString) {
+          if (char === '{') openBraces++;
+          else if (char === '}') openBraces--;
+          else if (char === '[') openBrackets++;
+          else if (char === ']') openBrackets--;
+          else if (char === '"') inString = true;
+        } else {
+          if (char === '"' && !escaped) inString = false;
+          escaped = char === '\\' && !escaped;
+        }
+      }
+      
+      // 必要な閉じ括弧を追加
+      repaired += ']'.repeat(openBrackets);
+      repaired += '}'.repeat(openBraces);
+      
+      console.log(`🔧 JSON修復完了: ${repaired.length}文字`);
+      return repaired;
+      
+    } catch (error) {
+      console.error('❌ JSON修復失敗:', error);
+      // 修復できない場合は最小限の有効なJSONを返す
+      return '{"categories":[],"timeline":[],"timeDistribution":{"totalEstimatedMinutes":0,"workingMinutes":0,"breakMinutes":0,"unaccountedMinutes":0,"overlapMinutes":0},"insights":{"productivityScore":70,"workBalance":{"focusTimeRatio":0.5,"meetingTimeRatio":0.2,"breakTimeRatio":0.2,"adminTimeRatio":0.1},"suggestions":[],"highlights":[],"motivation":"分析中にエラーが発生しました"},"warnings":[],"confidence":0.5}';
+    }
+  }
+
+  /**
    * Geminiレスポンスをパース
    */
   private parseGeminiResponse(responseText: string): GeminiAnalysisResponse {
     try {
       // JSONのみを抽出
       const jsonMatch = responseText.match(/\{[\s\S]*\}/);
-      const jsonText = jsonMatch ? jsonMatch[0] : responseText;
+      let jsonText = jsonMatch ? jsonMatch[0] : responseText;
+      
+      // 不完全なJSONの修復を試行
+      if (!jsonText.trim().endsWith('}')) {
+        console.log('🔧 不完全なJSONの修復を試行...');
+        jsonText = this.repairIncompleteJson(jsonText);
+      }
       
       const parsed = JSON.parse(jsonText);
       
