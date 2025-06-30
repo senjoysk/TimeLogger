@@ -50,9 +50,10 @@ export class TaskLoggerBot {
     try {
       console.log('🚀 新自然言語ログシステム統合開始...');
       
-      // 統合設定を作成
+      // 統合設定を作成（新システム用の独立したDBファイル）
+      const newSystemDbPath = config.database.path.replace('.db', '_new.db');
       const integrationConfig = createDefaultConfig(
-        config.database.path,
+        newSystemDbPath,
         config.gemini.apiKey
       );
       

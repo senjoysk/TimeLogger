@@ -68,27 +68,21 @@ export class NewSystemIntegration {
 
       // 1. データベース接続とRepository初期化
       this.repository = new SqliteActivityLogRepository(this.config.databasePath);
-      // Repository is initialized in constructor
-      console.log('✅ データベース接続完了');
+      // リポジトリの初期化を明示的に実行
+      await this.repository.initializeDatabase();
+      console.log('✅ データベース接続・初期化完了');
 
       // 2. サービス層の初期化
       this.activityLogService = new ActivityLogService(this.repository);
       
-      // Create a mock cost repository for the integration
-      const mockCostRepository = {
-        recordApiCall: async () => {},
-        getTodayStats: async () => ({
-          totalCalls: 0,
-          totalInputTokens: 0,
-          totalOutputTokens: 0,
-          estimatedCost: 0,
-          operationBreakdown: {}
-        }),
-        checkCostAlerts: async () => null,
-        generateDailyReport: async () => 'No cost data available'
-      };
+      // 実際のSqliteRepositoryを使用してコスト管理機能を有効化
+      // 旧システムのSqliteRepositoryをインポートして使用
+      const { SqliteRepository } = require('../repositories/sqliteRepository');
+      const costRepository = new SqliteRepository(this.config.databasePath);
+      await costRepository.initialize();
       
-      this.geminiService = new GeminiService(mockCostRepository);
+      this.geminiService = new GeminiService(costRepository);
+      console.log('✅ GeminiService初期化完了（実際のリポジトリ使用）');
       
       this.analysisCacheService = new AnalysisCacheService(
         this.repository,
@@ -97,7 +91,7 @@ export class NewSystemIntegration {
       
       this.unifiedAnalysisService = new UnifiedAnalysisService(
         this.repository,
-        mockCostRepository
+        costRepository
       );
       console.log('✅ サービス層初期化完了');
 
@@ -239,7 +233,7 @@ export class NewSystemIntegration {
     const command = parts[0].toLowerCase();
     const args = parts.slice(1);
 
-    console.log(`🎮 コマンド処理: ${command} (${userId})`);
+    console.log(`🎮 コマンド処理: ${command} (${userId}), args: [${args.join(', ')}]`);
 
     switch (command) {
       case 'edit':
@@ -265,6 +259,16 @@ export class NewSystemIntegration {
       case 'status':
       case 'ステータス':
         await this.showSystemStatus(message, userId);
+        break;
+
+      case 'cost':
+      case 'コスト':
+        await this.handleCostCommand(message, userId, timezone);
+        break;
+
+      case 'timezone':
+      case 'タイムゾーン':
+        await this.handleTimezoneCommand(message, userId);
         break;
 
       default:
@@ -342,6 +346,9 @@ export class NewSystemIntegration {
 \`!summary\` - 今日の活動サマリー表示
 \`!edit\` - ログの編集・削除
 \`!logs\` - 生ログの表示・検索
+\`!cost\` - API使用コスト確認
+\`!timezone\` - タイムゾーン設定確認
+\`!status\` - システム状態確認
 
 **📊 分析機能**
 ・カテゴリ別時間集計
@@ -477,6 +484,71 @@ export class NewSystemIntegration {
     } catch (error) {
       console.error('❌ システム統計取得エラー:', error);
       throw new ActivityLogError('システム統計の取得に失敗しました', 'GET_SYSTEM_STATS_ERROR', { error });
+    }
+  }
+
+  /**
+   * コストコマンドを処理
+   * @param message Discordメッセージ
+   * @param userId ユーザーID
+   * @param timezone タイムゾーン
+   */
+  private async handleCostCommand(message: Message, userId: string, timezone: string): Promise<void> {
+    try {
+      console.log(`💰 コスト情報要求: ${userId}, timezone: ${timezone}`);
+      
+      // GeminiServiceが利用可能かチェック
+      if (!this.geminiService) {
+        console.error('❌ GeminiServiceが初期化されていません');
+        await message.reply('❌ コスト情報の取得機能が利用できません。');
+        return;
+      }
+
+      console.log('🔍 GeminiService利用可能、コストレポート生成中...');
+
+      // API使用コストレポートを生成
+      const costReport = await this.geminiService.getDailyCostReport(userId, timezone);
+      
+      console.log(`📊 コストレポート生成完了: ${costReport.substring(0, 100)}...`);
+
+      // Discordに送信
+      await message.reply(costReport);
+      
+      console.log(`✅ コストレポート送信完了: ${userId}`);
+      
+    } catch (error) {
+      console.error('❌ コストコマンドエラー:', error);
+      console.error('❌ エラー詳細:', {
+        name: (error as Error).name,
+        message: (error as Error).message,
+        stack: (error as Error).stack?.split('\n').slice(0, 3)
+      });
+      await message.reply('❌ コスト情報の取得中にエラーが発生しました。しばらく後でもう一度お試しください。');
+    }
+  }
+
+  /**
+   * タイムゾーンコマンドを処理
+   * @param message Discordメッセージ
+   * @param userId ユーザーID
+   */
+  private async handleTimezoneCommand(message: Message, userId: string): Promise<void> {
+    try {
+      console.log(`🌍 タイムゾーン情報要求: ${userId}`);
+      
+      const currentTimezone = await this.getUserTimezone(userId);
+      const response = `🌍 **タイムゾーン設定**\n\n` +
+                      `現在のタイムゾーン: \`${currentTimezone}\`\n\n` +
+                      `ℹ️ 新システムでは環境変数 \`USER_TIMEZONE\` でタイムゾーンを設定できます。\n` +
+                      `例: Asia/Tokyo, America/New_York, Europe/London など`;
+      
+      await message.reply(response);
+      
+      console.log(`✅ タイムゾーン情報送信完了: ${userId}`);
+      
+    } catch (error) {
+      console.error('❌ タイムゾーンコマンドエラー:', error);
+      await message.reply('❌ タイムゾーン情報の取得中にエラーが発生しました。');
     }
   }
 

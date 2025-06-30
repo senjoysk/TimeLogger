@@ -37,13 +37,13 @@ export class SqliteActivityLogRepository implements IActivityLogRepository {
     }
 
     this.db = new Database(databasePath);
-    this.initializeDatabase();
+    // 初期化は非同期で行うため、ここでは実行しない
   }
 
   /**
    * データベースの初期化（テーブル作成）
    */
-  private async initializeDatabase(): Promise<void> {
+  public async initializeDatabase(): Promise<void> {
     try {
       // 新スキーマファイルから読み込み
       const schemaPath = path.join(__dirname, '../database/newSchema.sql');
@@ -52,15 +52,27 @@ export class SqliteActivityLogRepository implements IActivityLogRepository {
       // スキーマを実行（複数文に対応、TRIGGERとVIEWを考慮）
       const statements = this.splitSqlStatements(schema);
       
-      for (const statement of statements) {
-        if (statement.trim()) {
-          await this.runQuery(statement.trim());
+      console.log(`📝 実行予定のSQL文数: ${statements.length}`);
+      
+      for (let i = 0; i < statements.length; i++) {
+        const statement = statements[i].trim();
+        if (statement) {
+          try {
+            console.log(`🔧 SQL文 ${i + 1}/${statements.length} 実行中: ${statement.substring(0, 100)}...`);
+            await this.runQuery(statement);
+            console.log(`✅ SQL文 ${i + 1} 実行完了`);
+          } catch (error) {
+            console.error(`❌ SQL文 ${i + 1} 実行エラー:`, error);
+            console.error(`問題のSQL文:`, statement);
+            throw error;
+          }
         }
       }
 
       this.connected = true;
       console.log('✅ 新活動ログデータベースの初期化が完了しました');
     } catch (error) {
+      console.error('スキーマ作成エラー:', error);
       console.error('❌ データベース初期化エラー:', error);
       throw new ActivityLogError('データベースの初期化に失敗しました', 'DB_INIT_ERROR', { error });
     }
