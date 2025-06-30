@@ -247,16 +247,19 @@ ${this.getUsageInsight(stats)}
     );
 
     const formattedLogs = sortedLogs.map((log, index) => {
+      // inputTimestampはUTC形式で保存されている
       const inputTime = new Date(log.inputTimestamp);
-      const localTime = toZonedTime(inputTime, timezone);
-      const timeStr = format(localTime, 'HH:mm', { timeZone: timezone });
+      
+      // ユーザーのタイムゾーンで時刻を表示
+      const userLocalTime = toZonedTime(inputTime, timezone);
+      const timeStr = format(userLocalTime, 'HH:mm', { timeZone: timezone });
       
       // 内容を80文字で切り詰め
       const contentPreview = log.content.length > 80 
         ? log.content.substring(0, 77) + '...'
         : log.content;
       
-      return `${index + 1}. **[${timeStr}]** ${contentPreview}`;
+      return `**[${timeStr}]** ${contentPreview}`;
     }).join('\n');
 
     const footer = `\n💡 **操作**: \`!edit\` でログ編集 | \`!summary\` で分析結果表示`;

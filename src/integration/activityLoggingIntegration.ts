@@ -12,6 +12,7 @@ import { AnalysisCacheService } from '../services/analysisCacheService';
 import { NewEditCommandHandler } from '../handlers/newEditCommandHandler';
 import { NewSummaryHandler } from '../handlers/newSummaryHandler';
 import { LogsCommandHandler } from '../handlers/logsCommandHandler';
+import { NewTimezoneHandler } from '../handlers/newTimezoneHandler';
 import { GeminiService } from '../services/geminiService';
 import { ActivityLogError } from '../types/activityLog';
 
@@ -50,6 +51,7 @@ export class ActivityLoggingIntegration {
   private editHandler!: NewEditCommandHandler;
   private summaryHandler!: NewSummaryHandler;
   private logsHandler!: LogsCommandHandler;
+  private timezoneHandler!: NewTimezoneHandler;
 
   // 設定
   private config: ActivityLoggingConfig;
@@ -98,6 +100,7 @@ export class ActivityLoggingIntegration {
         this.activityLogService
       );
       this.logsHandler = new LogsCommandHandler(this.activityLogService);
+      this.timezoneHandler = new NewTimezoneHandler(this.repository);
       console.log('✅ ハンドラー層初期化完了');
 
       this.isInitialized = true;
@@ -265,7 +268,7 @@ export class ActivityLoggingIntegration {
 
       case 'timezone':
       case 'タイムゾーン':
-        await this.handleTimezoneCommand(message, userId);
+        await this.timezoneHandler.handle(message, userId, args);
         break;
 
       default:
@@ -344,7 +347,7 @@ export class ActivityLoggingIntegration {
 \`!edit\` - ログの編集・削除
 \`!logs\` - 生ログの表示・検索
 \`!cost\` - API使用コスト確認
-\`!timezone\` - タイムゾーン設定確認
+\`!timezone\` - タイムゾーン表示・検索・設定
 \`!status\` - システム状態確認
 
 **📊 分析機能**
@@ -489,7 +492,7 @@ export class ActivityLoggingIntegration {
         details.services = !!(this.activityLogService && this.unifiedAnalysisService);
 
         // ハンドラー存在チェック
-        details.handlers = !!(this.editHandler && this.summaryHandler && this.logsHandler);
+        details.handlers = !!(this.editHandler && this.summaryHandler && this.logsHandler && this.timezoneHandler);
       }
 
       const healthy = details.initialized && details.database && details.services && details.handlers;
@@ -581,30 +584,6 @@ export class ActivityLoggingIntegration {
     }
   }
 
-  /**
-   * タイムゾーンコマンドを処理
-   * @param message Discordメッセージ
-   * @param userId ユーザーID
-   */
-  private async handleTimezoneCommand(message: Message, userId: string): Promise<void> {
-    try {
-      console.log(`🌍 タイムゾーン情報要求: ${userId}`);
-      
-      const currentTimezone = await this.getUserTimezone(userId);
-      const response = `🌍 **タイムゾーン設定**\n\n` +
-                      `現在のタイムゾーン: \`${currentTimezone}\`\n\n` +
-                      `ℹ️ 環境変数 \`USER_TIMEZONE\` でタイムゾーンを設定できます。\n` +
-                      `例: Asia/Tokyo, America/New_York, Europe/London など`;
-      
-      await message.reply(response);
-      
-      console.log(`✅ タイムゾーン情報送信完了: ${userId}`);
-      
-    } catch (error) {
-      console.error('❌ タイムゾーンコマンドエラー:', error);
-      await message.reply('❌ タイムゾーン情報の取得中にエラーが発生しました。');
-    }
-  }
 
   /**
    * ユーザーのタイムゾーンを取得

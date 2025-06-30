@@ -73,7 +73,35 @@ describe('活動記録システム統合テスト', () => {
       
       expect(result).toBe(true);
       expect(mockMessage.replies.length).toBeGreaterThan(0);
-      expect(mockMessage.replies[0]).toContain('タイムゾーン');
+      expect(mockMessage.replies[0]).toContain('タイムゾーン設定');
+      expect(mockMessage.replies[0]).toContain('Asia/Tokyo'); // デフォルト
+      expect(mockMessage.replies[0]).toContain('現在時刻');
+    });
+
+    test('!timezone search コマンドが正しく処理される', async () => {
+      const mockMessage = new MockMessage('!timezone search Kolkata');
+      
+      const handleMessage = (integration as any).handleMessage.bind(integration);
+      const result = await handleMessage(mockMessage as unknown as Message);
+      
+      expect(result).toBe(true);
+      expect(mockMessage.replies.length).toBeGreaterThan(0);
+      expect(mockMessage.replies[0]).toContain('検索結果');
+      expect(mockMessage.replies[0]).toContain('Asia/Kolkata');
+      expect(mockMessage.replies[0]).toContain('インド');
+    });
+
+    test('!timezone set コマンドが正しく処理される', async () => {
+      const mockMessage = new MockMessage('!timezone set Asia/Kolkata');
+      
+      const handleMessage = (integration as any).handleMessage.bind(integration);
+      const result = await handleMessage(mockMessage as unknown as Message);
+      
+      expect(result).toBe(true);
+      expect(mockMessage.replies.length).toBeGreaterThan(0);
+      expect(mockMessage.replies[0]).toContain('タイムゾーン設定');
+      expect(mockMessage.replies[0]).toContain('Asia/Kolkata');
+      expect(mockMessage.replies[0]).toContain('USER_TIMEZONE');
     });
 
     test('!help コマンドにコマンド一覧が表示される', async () => {
