@@ -10,6 +10,7 @@ import {
   IActivityLogRepository,
   LogSearchCriteria
 } from './activityLogRepository';
+import { IApiCostRepository } from './interfaces';
 import {
   ActivityLog,
   CreateActivityLogRequest,
@@ -24,8 +25,9 @@ import * as path from 'path';
 
 /**
  * SQLite実装クラス
+ * 活動ログとAPIコストモニタリングの両方を実装
  */
-export class SqliteActivityLogRepository implements IActivityLogRepository {
+export class SqliteActivityLogRepository implements IActivityLogRepository, IApiCostRepository {
   private db: Database;
   private connected: boolean = false;
 
@@ -689,6 +691,237 @@ export class SqliteActivityLogRepository implements IActivityLogRepository {
     }
     
     return statements.filter(stmt => stmt.length > 0);
+  }
+
+  // === APIコスト監視機能（IApiCostRepository実装） ===
+
+  /**
+   * API呼び出しを記録
+   */
+  async recordApiCall(operation: string, inputTokens: number, outputTokens: number): Promise<void> {
+    try {
+      const id = uuidv4();
+      const now = new Date().toISOString();
+      
+      // Gemini 1.5 Flash料金計算（参考: https://ai.google.dev/pricing）
+      const inputCostPer1k = 0.075 / 1000;  // $0.075 per 1K input tokens
+      const outputCostPer1k = 0.30 / 1000;  // $0.30 per 1K output tokens
+      
+      const inputCost = (inputTokens / 1000) * inputCostPer1k;
+      const outputCost = (outputTokens / 1000) * outputCostPer1k;
+      const totalCost = inputCost + outputCost;
+
+      // api_costs テーブルが存在しない場合は作成
+      await this.ensureApiCostsTable();
+
+      const sql = `
+        INSERT INTO api_costs (
+          id, operation, input_tokens, output_tokens, 
+          total_cost, timestamp, created_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?)
+      `;
+
+      await this.runQuery(sql, [
+        id,
+        operation,
+        inputTokens,
+        outputTokens,
+        totalCost,
+        now,
+        now
+      ]);
+
+      console.log(`📊 API呼び出しを記録: ${operation} (入力: ${inputTokens}, 出力: ${outputTokens}, コスト: $${totalCost.toFixed(4)})`);
+    } catch (error) {
+      console.error('❌ API呼び出し記録エラー:', error);
+      // エラー時も処理を継続（コスト記録失敗で本来の機能を止めない）
+    }
+  }
+
+  /**
+   * 今日の統計を取得
+   */
+  async getTodayStats(timezone: string = 'Asia/Tokyo'): Promise<{
+    totalCalls: number;
+    totalInputTokens: number;
+    totalOutputTokens: number;
+    estimatedCost: number;
+    operationBreakdown: Record<string, { calls: number; inputTokens: number; outputTokens: number; cost: number }>;
+  }> {
+    try {
+      // 今日の範囲を計算（タイムゾーン考慮）
+      const now = new Date();
+      const zonedNow = toZonedTime(now, timezone);
+      const startOfDay = new Date(zonedNow);
+      startOfDay.setHours(0, 0, 0, 0);
+      const endOfDay = new Date(zonedNow);
+      endOfDay.setHours(23, 59, 59, 999);
+
+      await this.ensureApiCostsTable();
+
+      const sql = `
+        SELECT 
+          operation,
+          COUNT(*) as calls,
+          SUM(input_tokens) as total_input_tokens,
+          SUM(output_tokens) as total_output_tokens,
+          SUM(total_cost) as total_cost
+        FROM api_costs 
+        WHERE timestamp >= ? AND timestamp <= ?
+        GROUP BY operation
+      `;
+
+      const rows = await this.allQuery(sql, [
+        startOfDay.toISOString(),
+        endOfDay.toISOString()
+      ]) as any[];
+
+      let totalCalls = 0;
+      let totalInputTokens = 0;
+      let totalOutputTokens = 0;
+      let estimatedCost = 0;
+      const operationBreakdown: Record<string, any> = {};
+
+      rows.forEach(row => {
+        totalCalls += row.calls;
+        totalInputTokens += row.total_input_tokens;
+        totalOutputTokens += row.total_output_tokens;
+        estimatedCost += row.total_cost;
+
+        operationBreakdown[row.operation] = {
+          calls: row.calls,
+          inputTokens: row.total_input_tokens,
+          outputTokens: row.total_output_tokens,
+          cost: row.total_cost
+        };
+      });
+
+      return {
+        totalCalls,
+        totalInputTokens,
+        totalOutputTokens,
+        estimatedCost,
+        operationBreakdown
+      };
+    } catch (error) {
+      console.error('❌ 今日の統計取得エラー:', error);
+      // エラー時はデフォルト値を返す
+      return {
+        totalCalls: 0,
+        totalInputTokens: 0,
+        totalOutputTokens: 0,
+        estimatedCost: 0,
+        operationBreakdown: {}
+      };
+    }
+  }
+
+  /**
+   * コスト警告をチェック
+   */
+  async checkCostAlerts(timezone: string = 'Asia/Tokyo'): Promise<{ message: string; level: 'warning' | 'critical' } | null> {
+    try {
+      const stats = await this.getTodayStats(timezone);
+      
+      // 警告しきい値（設定可能にすべきだが、現在は固定値）
+      const warningCost = 1.0;  // $1.00
+      const criticalCost = 5.0; // $5.00
+      
+      if (stats.estimatedCost >= criticalCost) {
+        return {
+          message: `本日のAPI使用料が$${stats.estimatedCost.toFixed(2)}に達しました（危険レベル）`,
+          level: 'critical'
+        };
+      } else if (stats.estimatedCost >= warningCost) {
+        return {
+          message: `本日のAPI使用料が$${stats.estimatedCost.toFixed(2)}に達しました（警告レベル）`,
+          level: 'warning'
+        };
+      }
+      
+      return null;
+    } catch (error) {
+      console.error('❌ コスト警告チェックエラー:', error);
+      return null;
+    }
+  }
+
+  /**
+   * 日次レポートを生成
+   */
+  async generateDailyReport(timezone: string): Promise<string> {
+    try {
+      const stats = await this.getTodayStats(timezone);
+      
+      const now = new Date();
+      const zonedNow = toZonedTime(now, timezone);
+      const dateStr = format(zonedNow, 'yyyy年MM月dd日', { timeZone: timezone });
+      
+      let report = `📊 **API使用量レポート - ${dateStr}**\n\n`;
+      
+      report += `**📈 本日の合計**\n`;
+      report += `• 呼び出し回数: ${stats.totalCalls}回\n`;
+      report += `• 入力トークン: ${stats.totalInputTokens.toLocaleString()}\n`;
+      report += `• 出力トークン: ${stats.totalOutputTokens.toLocaleString()}\n`;
+      report += `• 推定費用: $${stats.estimatedCost.toFixed(4)}\n\n`;
+      
+      if (Object.keys(stats.operationBreakdown).length > 0) {
+        report += `**🔍 操作別内訳**\n`;
+        Object.entries(stats.operationBreakdown)
+          .sort(([,a], [,b]) => b.cost - a.cost)
+          .forEach(([operation, data]) => {
+            report += `• **${operation}**: ${data.calls}回, $${data.cost.toFixed(4)}\n`;
+          });
+        report += `\n`;
+      }
+      
+      // 使用量に応じたコメント
+      if (stats.estimatedCost >= 5.0) {
+        report += `🚨 **注意**: 本日の使用量が高額になっています。`;
+      } else if (stats.estimatedCost >= 1.0) {
+        report += `⚠️ **警告**: 本日の使用量が増加しています。`;
+      } else {
+        report += `✅ **良好**: 本日の使用量は適正範囲内です。`;
+      }
+      
+      return report;
+    } catch (error) {
+      console.error('❌ 日次レポート生成エラー:', error);
+      return '❌ レポートの生成中にエラーが発生しました。';
+    }
+  }
+
+  /**
+   * API費用テーブルが存在することを確認（なければ作成）
+   */
+  private async ensureApiCostsTable(): Promise<void> {
+    try {
+      const createTableSql = `
+        CREATE TABLE IF NOT EXISTS api_costs (
+          id TEXT PRIMARY KEY,
+          operation TEXT NOT NULL,
+          input_tokens INTEGER NOT NULL,
+          output_tokens INTEGER NOT NULL,
+          total_cost REAL NOT NULL,
+          timestamp TEXT NOT NULL,
+          created_at TEXT NOT NULL
+        )
+      `;
+      
+      await this.runQuery(createTableSql);
+      
+      // インデックスの作成
+      const createIndexSql = `
+        CREATE INDEX IF NOT EXISTS idx_api_costs_timestamp 
+        ON api_costs(timestamp)
+      `;
+      
+      await this.runQuery(createIndexSql);
+      
+    } catch (error) {
+      console.error('❌ API費用テーブル作成エラー:', error);
+      throw error;
+    }
   }
 
   /**

@@ -75,25 +75,10 @@ export class NewSystemIntegration {
       // 2. サービス層の初期化
       this.activityLogService = new ActivityLogService(this.repository);
       
-      // コスト管理機能の初期化（エラーハンドリング付き）
-      try {
-        const { SqliteRepository } = require('../repositories/sqliteRepository');
-        const costRepository = new SqliteRepository(this.config.databasePath);
-        
-        // 旧システムリポジトリの初期化を試行（既存テーブルのみ使用）
-        try {
-          await costRepository.initialize();
-          this.geminiService = new GeminiService(costRepository);
-          console.log('✅ GeminiService初期化完了（旧システムリポジトリ使用）');
-        } catch (initError) {
-          console.warn('⚠️ 旧システムリポジトリ初期化失敗、コスト機能を無効化:', initError);
-          // コスト機能なしでダミーサービスを作成
-          this.geminiService = null as any;
-        }
-      } catch (requireError) {
-        console.warn('⚠️ 旧システムリポジトリが利用できません、コスト機能を無効化');
-        this.geminiService = null as any;
-      }
+      // コスト管理機能の初期化（新システム統合版）
+      // SqliteActivityLogRepositoryがIApiCostRepositoryも実装しているため、同じインスタンスを使用
+      this.geminiService = new GeminiService(this.repository);
+      console.log('✅ GeminiService初期化完了（新システム統合リポジトリ使用）');
       
       this.analysisCacheService = new AnalysisCacheService(
         this.repository,
@@ -102,7 +87,7 @@ export class NewSystemIntegration {
       
       this.unifiedAnalysisService = new UnifiedAnalysisService(
         this.repository,
-        this.geminiService ? (this.geminiService as any).costMonitor?.repository : this.repository
+        this.repository // 新システムでは単一リポジトリを使用
       );
       console.log('✅ サービス層初期化完了');
 
