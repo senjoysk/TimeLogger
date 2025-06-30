@@ -4,7 +4,7 @@
  */
 
 import { IActivityLogRepository } from '../repositories/activityLogRepository';
-import { ActivityLog } from '../types/activityLog';
+import { DailyAnalysisResult, TimelineEntry } from '../types/activityLog';
 import { toZonedTime, format } from 'date-fns-tz';
 
 /**
@@ -34,13 +34,12 @@ export interface GapDetectionConfig {
  */
 export interface IGapDetectionService {
   /**
-   * 指定日の活動ギャップを検出
-   * @param userId ユーザーID
-   * @param businessDate 業務日（YYYY-MM-DD）
+   * 分析結果からギャップを検出
+   * @param analysisResult 分析結果
    * @param timezone タイムゾーン
    * @returns 検出されたギャップのリスト
    */
-  detectGaps(userId: string, businessDate: string, timezone: string): Promise<TimeGap[]>;
+  detectGapsFromAnalysis(analysisResult: DailyAnalysisResult, timezone: string): Promise<TimeGap[]>;
 }
 
 /**
@@ -64,54 +63,52 @@ export class GapDetectionService implements IGapDetectionService {
     };
   }
 
-  /**
-   * 指定日の活動ギャップを検出
-   */
-  async detectGaps(userId: string, businessDate: string, timezone: string): Promise<TimeGap[]> {
-    try {
-      // 業務日の活動ログを取得
-      const logs = await this.repository.getLogsByDate(userId, businessDate);
-      
-      // 論理削除されていないログのみを対象にする
-      const activeLogs = logs.filter(log => !log.isDeleted);
-      
-      if (activeLogs.length === 0) {
-        // ログがない場合は、全時間帯がギャップ
-        return this.createFullDayGap(businessDate, timezone);
-      }
 
-      // ログを時刻順にソート
-      const sortedLogs = this.sortLogsByTime(activeLogs);
+  /**
+   * 分析結果からギャップを検出
+   */
+  async detectGapsFromAnalysis(analysisResult: DailyAnalysisResult, timezone: string): Promise<TimeGap[]> {
+    try {
+      console.log(`📊 分析結果からギャップ検出: ${analysisResult.timeline.length}個のタイムライン`);
+      
+      if (!analysisResult.timeline || analysisResult.timeline.length === 0) {
+        // タイムラインがない場合は全時間帯がギャップ
+        return this.createFullDayGapFromDate(analysisResult.businessDate, timezone);
+      }
+      
+      // タイムラインを時刻順にソート
+      const sortedTimeline = this.sortTimelineByTime(analysisResult.timeline);
       
       // 検出対象時間帯の範囲を計算
-      const { rangeStart, rangeEnd } = this.calculateDetectionRange(businessDate, timezone);
+      const { rangeStart, rangeEnd } = this.calculateDetectionRange(analysisResult.businessDate, timezone);
       
-      // ギャップを検出
       const gaps: TimeGap[] = [];
       
-      // ケース1: 開始時刻から最初のログまでのギャップ
-      const firstGap = this.detectFirstGap(sortedLogs[0], rangeStart, timezone);
+      // ケース1: 開始時刻から最初の活動まで
+      const firstGap = this.detectFirstGapFromTimeline(sortedTimeline[0], rangeStart, timezone);
       if (firstGap) {
         gaps.push(firstGap);
       }
       
-      // ケース2: ログ間のギャップ
-      for (let i = 0; i < sortedLogs.length - 1; i++) {
-        const gap = this.detectLogGap(sortedLogs[i], sortedLogs[i + 1], timezone);
+      // ケース2: 活動間のギャップ
+      for (let i = 0; i < sortedTimeline.length - 1; i++) {
+        const gap = this.detectTimelineGap(sortedTimeline[i], sortedTimeline[i + 1], timezone);
         if (gap) {
           gaps.push(gap);
         }
       }
       
-      // ケース3: 最後のログから終了時刻までのギャップ
-      const lastGap = this.detectLastGap(sortedLogs[sortedLogs.length - 1], rangeEnd, timezone);
+      // ケース3: 最後の活動から終了時刻まで
+      const lastGap = this.detectLastGapFromTimeline(sortedTimeline[sortedTimeline.length - 1], rangeEnd, timezone);
       if (lastGap) {
         gaps.push(lastGap);
       }
       
+      console.log(`📊 分析結果ベースギャップ検出完了: ${gaps.length}件`);
       return gaps;
+      
     } catch (error) {
-      console.error('❌ ギャップ検出エラー:', error);
+      console.error('❌ 分析結果ベースギャップ検出エラー:', error);
       throw error;
     }
   }
@@ -120,13 +117,13 @@ export class GapDetectionService implements IGapDetectionService {
    * 検出対象時間帯の範囲を計算
    */
   private calculateDetectionRange(businessDate: string, timezone: string): { rangeStart: Date; rangeEnd: Date } {
-    // 業務日の開始時刻を計算（現地時間で7:30）
-    const startLocal = new Date(`${businessDate}T00:00:00`);
-    startLocal.setHours(this.config.startHour, this.config.startMinute, 0, 0);
+    // 業務日の開始時刻を計算（指定タイムゾーンで7:30）
+    const startTimeStr = `${businessDate}T${this.config.startHour.toString().padStart(2, '0')}:${this.config.startMinute.toString().padStart(2, '0')}:00`;
+    const startLocal = new Date(startTimeStr);
     
-    // 業務日の終了時刻を計算（現地時間で18:30）
-    const endLocal = new Date(`${businessDate}T00:00:00`);
-    endLocal.setHours(this.config.endHour, this.config.endMinute, 0, 0);
+    // 業務日の終了時刻を計算（指定タイムゾーンで18:30）
+    const endTimeStr = `${businessDate}T${this.config.endHour.toString().padStart(2, '0')}:${this.config.endMinute.toString().padStart(2, '0')}:00`;
+    const endLocal = new Date(endTimeStr);
     
     // 現在時刻を取得
     const now = new Date();
@@ -134,17 +131,21 @@ export class GapDetectionService implements IGapDetectionService {
     
     // 今日の場合は現在時刻と終了時刻の早い方を使用
     const today = format(nowLocal, 'yyyy-MM-dd', { timeZone: timezone });
-    if (businessDate === today && nowLocal < endLocal) {
-      return { rangeStart: startLocal, rangeEnd: nowLocal };
+    if (businessDate === today) {
+      const currentTime = new Date(format(nowLocal, "yyyy-MM-dd'T'HH:mm:ss", { timeZone: timezone }));
+      if (currentTime < endLocal) {
+        return { rangeStart: startLocal, rangeEnd: currentTime };
+      }
     }
     
     return { rangeStart: startLocal, rangeEnd: endLocal };
   }
 
+
   /**
    * ログがない場合の全時間帯ギャップを作成
    */
-  private createFullDayGap(businessDate: string, timezone: string): TimeGap[] {
+  private createFullDayGapFromDate(businessDate: string, timezone: string): TimeGap[] {
     const { rangeStart, rangeEnd } = this.calculateDetectionRange(businessDate, timezone);
     
     const gap = this.createGap(rangeStart, rangeEnd, timezone);
@@ -152,52 +153,9 @@ export class GapDetectionService implements IGapDetectionService {
   }
 
   /**
-   * 開始時刻から最初のログまでのギャップを検出
-   */
-  private detectFirstGap(firstLog: ActivityLog, rangeStart: Date, timezone: string): TimeGap | null {
-    const logTime = new Date(firstLog.inputTimestamp);
-    const logLocal = toZonedTime(logTime, timezone);
-    
-    // ログが範囲開始時刻より前の場合はギャップなし
-    if (logLocal <= rangeStart) {
-      return null;
-    }
-    
-    return this.createGap(rangeStart, logLocal, timezone);
-  }
-
-  /**
-   * ログ間のギャップを検出
-   */
-  private detectLogGap(prevLog: ActivityLog, nextLog: ActivityLog, timezone: string): TimeGap | null {
-    const prevTime = new Date(prevLog.inputTimestamp);
-    const nextTime = new Date(nextLog.inputTimestamp);
-    
-    const prevLocal = toZonedTime(prevTime, timezone);
-    const nextLocal = toZonedTime(nextTime, timezone);
-    
-    return this.createGap(prevLocal, nextLocal, timezone);
-  }
-
-  /**
-   * 最後のログから終了時刻までのギャップを検出
-   */
-  private detectLastGap(lastLog: ActivityLog, rangeEnd: Date, timezone: string): TimeGap | null {
-    const logTime = new Date(lastLog.inputTimestamp);
-    const logLocal = toZonedTime(logTime, timezone);
-    
-    // ログが範囲終了時刻より後の場合はギャップなし
-    if (logLocal >= rangeEnd) {
-      return null;
-    }
-    
-    return this.createGap(logLocal, rangeEnd, timezone);
-  }
-
-  /**
    * ギャップを作成（最小時間以上の場合のみ）
    */
-  private createGap(start: Date, end: Date, timezone: string): TimeGap | null {
+  private createGap(start: Date, end: Date, _timezone: string): TimeGap | null {
     const durationMs = end.getTime() - start.getTime();
     const durationMinutes = Math.floor(durationMs / (1000 * 60));
     
@@ -206,28 +164,82 @@ export class GapDetectionService implements IGapDetectionService {
       return null;
     }
     
-    // UTC時刻に変換
-    const startUtc = new Date(start.getTime() - start.getTimezoneOffset() * 60 * 1000);
-    const endUtc = new Date(end.getTime() - end.getTimezoneOffset() * 60 * 1000);
+    // ローカル時刻をそのままISO形式に変換（UTCとして扱う）
+    const startTime = start.toISOString();
+    const endTime = end.toISOString();
     
     return {
-      startTime: startUtc.toISOString(),
-      endTime: endUtc.toISOString(),
-      startTimeLocal: format(start, 'HH:mm', { timeZone: timezone }),
-      endTimeLocal: format(end, 'HH:mm', { timeZone: timezone }),
+      startTime,
+      endTime,
+      startTimeLocal: format(start, 'HH:mm'),
+      endTimeLocal: format(end, 'HH:mm'),
       durationMinutes
     };
   }
 
+
   /**
-   * ログを時刻順にソート
+   * タイムラインを時刻順にソート
    */
-  private sortLogsByTime(logs: ActivityLog[]): ActivityLog[] {
-    return [...logs].sort((a, b) => {
-      const timeA = new Date(a.inputTimestamp).getTime();
-      const timeB = new Date(b.inputTimestamp).getTime();
+  private sortTimelineByTime(timeline: TimelineEntry[]): TimelineEntry[] {
+    return [...timeline].sort((a, b) => {
+      const timeA = new Date(a.startTime).getTime();
+      const timeB = new Date(b.startTime).getTime();
       return timeA - timeB;
     });
+  }
+
+  /**
+   * タイムライン：開始時刻から最初の活動までのギャップを検出
+   */
+  private detectFirstGapFromTimeline(firstEntry: TimelineEntry, rangeStart: Date, timezone: string): TimeGap | null {
+    const entryStartTime = new Date(firstEntry.startTime);
+    const entryStartLocal = toZonedTime(entryStartTime, timezone);
+    
+    // 活動の現地開始時刻を文字列に変換してからDateオブジェクトに変換（タイムゾーン問題回避）
+    const entryStartLocalTime = new Date(format(entryStartLocal, "yyyy-MM-dd'T'HH:mm:ss", { timeZone: timezone }));
+    
+    // 活動が範囲開始時刻より前の場合はギャップなし
+    if (entryStartLocalTime <= rangeStart) {
+      return null;
+    }
+    
+    return this.createGap(rangeStart, entryStartLocalTime, timezone);
+  }
+
+  /**
+   * タイムライン：活動間のギャップを検出
+   */
+  private detectTimelineGap(prevEntry: TimelineEntry, nextEntry: TimelineEntry, timezone: string): TimeGap | null {
+    const prevEndTime = new Date(prevEntry.endTime);
+    const nextStartTime = new Date(nextEntry.startTime);
+    
+    const prevEndLocal = toZonedTime(prevEndTime, timezone);
+    const nextStartLocal = toZonedTime(nextStartTime, timezone);
+    
+    // 現地時刻を文字列に変換してからDateオブジェクトに変換（タイムゾーン問題回避）
+    const prevEndLocalTime = new Date(format(prevEndLocal, "yyyy-MM-dd'T'HH:mm:ss", { timeZone: timezone }));
+    const nextStartLocalTime = new Date(format(nextStartLocal, "yyyy-MM-dd'T'HH:mm:ss", { timeZone: timezone }));
+    
+    return this.createGap(prevEndLocalTime, nextStartLocalTime, timezone);
+  }
+
+  /**
+   * タイムライン：最後の活動から終了時刻までのギャップを検出
+   */
+  private detectLastGapFromTimeline(lastEntry: TimelineEntry, rangeEnd: Date, timezone: string): TimeGap | null {
+    const entryEndTime = new Date(lastEntry.endTime);
+    const entryEndLocal = toZonedTime(entryEndTime, timezone);
+    
+    // 活動の現地終了時刻を文字列に変換してからDateオブジェクトに変換（タイムゾーン問題回避）
+    const entryEndLocalTime = new Date(format(entryEndLocal, "yyyy-MM-dd'T'HH:mm:ss", { timeZone: timezone }));
+    
+    // 活動が範囲終了時刻より後の場合はギャップなし
+    if (entryEndLocalTime >= rangeEnd) {
+      return null;
+    }
+    
+    return this.createGap(entryEndLocalTime, rangeEnd, timezone);
   }
 
   /**

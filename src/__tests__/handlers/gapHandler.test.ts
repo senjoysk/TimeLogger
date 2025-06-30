@@ -48,6 +48,11 @@ class MockGapDetectionService {
     return this.gaps;
   }
 
+  async detectGapsFromAnalysis(analysisResult: any, timezone: string): Promise<TimeGap[]> {
+    console.log(`📊 分析結果からギャップ検出: ${analysisResult.timeline.length}個のタイムライン`);
+    return this.gaps;
+  }
+
   setTestGaps(gaps: TimeGap[]) {
     this.gaps = gaps;
   }
@@ -77,17 +82,43 @@ class MockActivityLogService {
   }
 }
 
+// モック統合分析サービス
+class MockUnifiedAnalysisService {
+  async analyzeDaily(params: any) {
+    return {
+      businessDate: params.businessDate,
+      timeline: [
+        {
+          startTime: new Date('2025-06-30T09:00:00Z').toISOString(),
+          endTime: new Date('2025-06-30T09:30:00Z').toISOString(),
+          category: 'プログラミング',
+          summary: 'テスト作業'
+        },
+        {
+          startTime: new Date('2025-06-30T10:00:00Z').toISOString(),
+          endTime: new Date('2025-06-30T10:30:00Z').toISOString(),
+          category: '会議',
+          summary: '1on1会議'
+        }
+      ]
+    };
+  }
+}
+
 describe('GapHandler', () => {
   let handler: GapHandler;
   let mockGapDetectionService: MockGapDetectionService;
   let mockActivityLogService: MockActivityLogService;
+  let mockUnifiedAnalysisService: MockUnifiedAnalysisService;
 
   beforeEach(() => {
     mockGapDetectionService = new MockGapDetectionService();
     mockActivityLogService = new MockActivityLogService();
+    mockUnifiedAnalysisService = new MockUnifiedAnalysisService();
     handler = new GapHandler(
       mockGapDetectionService as any,
-      mockActivityLogService as any
+      mockActivityLogService as any,
+      mockUnifiedAnalysisService as any
     );
   });
 

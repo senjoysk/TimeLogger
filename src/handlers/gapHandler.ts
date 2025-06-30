@@ -14,12 +14,11 @@ import {
   TextInputStyle,
   ButtonInteraction,
   ModalSubmitInteraction,
-  InteractionCollector,
   MessageComponentInteraction
 } from 'discord.js';
 import { IGapDetectionService } from '../services/gapDetectionService';
 import { IActivityLogService } from '../services/activityLogService';
-import { format } from 'date-fns-tz';
+import { IUnifiedAnalysisService } from '../services/unifiedAnalysisService';
 
 /**
  * ギャップハンドラーインターフェース
@@ -47,13 +46,14 @@ export class GapHandler implements IGapHandler {
 
   constructor(
     private gapDetectionService: IGapDetectionService,
-    private activityLogService: IActivityLogService
+    private activityLogService: IActivityLogService,
+    private unifiedAnalysisService: IUnifiedAnalysisService
   ) {}
 
   /**
    * ギャップ検出コマンドを処理
    */
-  async handle(message: Message, userId: string, args: string[], timezone: string): Promise<void> {
+  async handle(message: Message, userId: string, _args: string[], timezone: string): Promise<void> {
     try {
       console.log(`🔍 ギャップ検出開始: ${userId}`);
 
@@ -61,12 +61,25 @@ export class GapHandler implements IGapHandler {
       const businessInfo = this.activityLogService.calculateBusinessDate(timezone);
       const businessDate = businessInfo.businessDate;
 
-      // ギャップを検出
-      const gaps = await this.gapDetectionService.detectGaps(userId, businessDate, timezone);
+      // 進行状況メッセージを送信
+      const progressMessage = await message.reply('🔍 ギャップを検出中です...');
+
+      // 分析結果を取得してギャップ検出を実行
+      console.log(`📊 分析結果を取得中... (userId: ${userId}, businessDate: ${businessDate}, timezone: ${timezone})`);
+      const analysisResult = await this.unifiedAnalysisService.analyzeDaily({
+        userId,
+        businessDate,
+        timezone,
+        forceRefresh: false // キャッシュを活用
+      });
+
+      console.log(`📊 分析結果取得完了: ${analysisResult.timeline.length}個のタイムライン`);
+      const gaps = await this.gapDetectionService.detectGapsFromAnalysis(analysisResult, timezone);
+      console.log(`✅ 分析結果ベースでギャップ検出完了: ${gaps.length}件`);
 
       if (gaps.length === 0) {
         // ギャップがない場合
-        await message.reply('✅ 7:30〜18:30の間に15分以上の記録の空白はありませんでした。');
+        await progressMessage.edit('✅ 7:30〜18:30の間に15分以上の記録の空白はありませんでした。');
         return;
       }
 
@@ -74,25 +87,27 @@ export class GapHandler implements IGapHandler {
       const embed = this.createGapEmbed(gaps, businessDate, timezone);
       const components = this.createGapButtons(gaps);
 
-      const reply = await message.reply({
+      await progressMessage.edit({
+        content: '',
         embeds: [embed],
         components
       });
 
       // ボタンインタラクションのリスナーを設定
-      this.setupInteractionListeners(reply, userId, timezone, gaps);
+      this.setupInteractionListeners(progressMessage, userId, timezone, gaps);
 
       console.log(`🔍 ギャップ検出完了: ${gaps.length}件のギャップを検出`);
     } catch (error) {
       console.error('❌ ギャップ検出エラー:', error);
-      await message.reply('❌ ギャップの検出中にエラーが発生しました。');
+      const errorMessage = `❌ ギャップの検出中にエラーが発生しました\n\nエラー詳細: ${error instanceof Error ? error.message : String(error)}`;
+      await message.reply(errorMessage);
     }
   }
 
   /**
    * ギャップ表示用のEmbedを作成
    */
-  private createGapEmbed(gaps: any[], businessDate: string, timezone: string): EmbedBuilder {
+  private createGapEmbed(gaps: any[], businessDate: string, _timezone: string): EmbedBuilder {
     const embed = new EmbedBuilder()
       .setTitle('📋 未登録の時間帯')
       .setDescription('以下の時間帯の活動記録がありません。')
@@ -113,9 +128,7 @@ export class GapHandler implements IGapHandler {
       });
     });
 
-    embed.setFooter({ 
-      text: `${businessDate} の活動記録 • ボタンをクリックして記録を追加` 
-    });
+    embed.setFooter({ text: `${businessDate} の活動記録 • ボタンをクリックして記録を追加` });
 
     return embed;
   }

@@ -110,7 +110,8 @@ export class ActivityLoggingIntegration {
       this.timezoneHandler = new NewTimezoneHandler(this.repository);
       this.gapHandler = new GapHandler(
         this.gapDetectionService,
-        this.activityLogService
+        this.activityLogService,
+        this.unifiedAnalysisService
       );
       console.log('✅ ハンドラー層初期化完了');
 
@@ -284,6 +285,7 @@ export class ActivityLoggingIntegration {
 
       case 'gap':
       case 'ギャップ':
+        console.log(`🔧 gapコマンド実行: ユーザー=${userId}, タイムゾーン=${timezone}, ハンドラー存在=${!!this.gapHandler}`);
         await this.gapHandler.handle(message, userId, args, timezone);
         break;
 
