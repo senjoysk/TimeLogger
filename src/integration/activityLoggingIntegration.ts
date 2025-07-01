@@ -79,11 +79,12 @@ export class ActivityLoggingIntegration {
       console.log('✅ データベース接続・初期化完了');
 
       // 2. サービス層の初期化
-      this.activityLogService = new ActivityLogService(this.repository);
-      
       // コスト管理機能の初期化（統合版）
       // SqliteActivityLogRepositoryがIApiCostRepositoryも実装しているため、同じインスタンスを使用
       this.geminiService = new GeminiService(this.repository);
+      
+      // ActivityLogServiceにGeminiServiceを注入（リアルタイム分析のため）
+      this.activityLogService = new ActivityLogService(this.repository, this.geminiService);
       console.log('✅ GeminiService初期化完了（統合リポジトリ使用）');
       
       this.analysisCacheService = new AnalysisCacheService(

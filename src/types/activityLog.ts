@@ -13,6 +13,15 @@ export interface ActivityLog {
   isDeleted: boolean;        // 論理削除フラグ
   createdAt: string;         // 作成日時（UTC）
   updatedAt: string;         // 更新日時（UTC）
+  
+  // リアルタイム分析結果（新機能）
+  startTime?: string;        // 活動開始時刻（UTC、ISO 8601形式）
+  endTime?: string;          // 活動終了時刻（UTC、ISO 8601形式）
+  totalMinutes?: number;     // 総活動時間（分）
+  confidence?: number;       // 分析の信頼度 (0-1)
+  analysisMethod?: string;   // 時刻抽出手法
+  categories?: string;       // カテゴリ（カンマ区切り）
+  analysisWarnings?: string; // 警告メッセージ（セミコロン区切り）
 }
 
 // 活動ログ作成用（ID等は自動生成）
@@ -21,6 +30,15 @@ export interface CreateActivityLogRequest {
   content: string;
   inputTimestamp: string;
   businessDate: string;
+  
+  // リアルタイム分析結果（オプション）
+  startTime?: string;
+  endTime?: string;
+  totalMinutes?: number;
+  confidence?: number;
+  analysisMethod?: string;
+  categories?: string;
+  analysisWarnings?: string;
 }
 
 // 統合分析結果の型定義

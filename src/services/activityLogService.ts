@@ -14,6 +14,12 @@ import {
   BusinessDateInfo,
   ActivityLogError
 } from '../types/activityLog';
+import { RealTimeActivityAnalyzer } from './realTimeActivityAnalyzer';
+import { GeminiService } from './geminiService';
+import { 
+  DetailedActivityAnalysis,
+  RecentActivityContext 
+} from '../types/realTimeAnalysis';
 
 /**
  * 活動ログサービスインターフェース
@@ -120,9 +126,15 @@ export interface IActivityLogService {
  * ActivityLogServiceの実装
  */
 export class ActivityLogService implements IActivityLogService {
+  private realTimeAnalyzer: RealTimeActivityAnalyzer;
+  
   constructor(
-    private repository: IActivityLogRepository
-  ) {}
+    private repository: IActivityLogRepository,
+    geminiService: GeminiService
+  ) {
+    // リアルタイム分析システムを初期化
+    this.realTimeAnalyzer = new RealTimeActivityAnalyzer(geminiService);
+  }
 
   /**
    * 新しい活動を記録
@@ -144,18 +156,67 @@ export class ActivityLogService implements IActivityLogService {
       // 業務日を計算
       const businessDateInfo = this.calculateBusinessDate(timezone, inputTimestamp);
 
+      console.log('🚀 リアルタイム分析を開始します...');
+      
+      // 最近の活動コンテキストを取得
+      const recentContext = await this.buildRecentActivityContext(userId, timezone);
+      
+      // リアルタイム活動分析を実行
+      let detailedAnalysis: DetailedActivityAnalysis | null = null;
+      let analysisWarnings: string[] = [];
+      
+      try {
+        detailedAnalysis = await this.realTimeAnalyzer.analyzeActivity(
+          content.trim(),
+          timezone,
+          new Date(inputTimestamp),
+          recentContext
+        );
+        
+        // 警告がある場合はログ出力
+        if (detailedAnalysis.warnings.length > 0) {
+          analysisWarnings = detailedAnalysis.warnings.map(w => w.message);
+          console.log(`⚠️ 分析警告 (${detailedAnalysis.warnings.length}件):`, analysisWarnings);
+        }
+        
+        console.log(`✅ リアルタイム分析完了: 信頼度 ${Math.round(detailedAnalysis.confidence * 100)}%`);
+        console.log(`🕐 分析結果: ${detailedAnalysis.summary}`);
+        
+      } catch (analysisError) {
+        console.error('⚠️ リアルタイム分析に失敗しました。基本記録を続行します:', analysisError);
+        // 分析に失敗しても基本記録は続行
+      }
+
       // ログ作成リクエストを構築
       const request: CreateActivityLogRequest = {
         userId,
         content: content.trim(),
         inputTimestamp,
-        businessDate: businessDateInfo.businessDate
+        businessDate: businessDateInfo.businessDate,
+        // リアルタイム分析結果を含める
+        ...(detailedAnalysis && {
+          startTime: detailedAnalysis.timeAnalysis.startTime,
+          endTime: detailedAnalysis.timeAnalysis.endTime,
+          totalMinutes: detailedAnalysis.timeAnalysis.totalMinutes,
+          confidence: detailedAnalysis.confidence,
+          analysisMethod: detailedAnalysis.timeAnalysis.method,
+          categories: detailedAnalysis.activities.map(a => a.category).join(', '),
+          analysisWarnings: analysisWarnings.length > 0 ? analysisWarnings.join('; ') : undefined
+        })
       };
 
       // リポジトリ経由で保存
       const savedLog = await this.repository.saveLog(request);
 
-      console.log(`📝 活動記録を保存: [${businessDateInfo.businessDate}] ${content.substring(0, 50)}...`);
+      // 成功ログ（分析結果を含む）
+      if (detailedAnalysis) {
+        console.log(`📝 高精度活動記録を保存: [${businessDateInfo.businessDate}] ${detailedAnalysis.summary}`);
+        if (analysisWarnings.length > 0) {
+          console.log(`⚠️ 注意事項: ${analysisWarnings.join(', ')}`);
+        }
+      } else {
+        console.log(`📝 基本活動記録を保存: [${businessDateInfo.businessDate}] ${content.substring(0, 50)}...`);
+      }
       
       return savedLog;
     } catch (error) {
@@ -426,5 +487,52 @@ export class ActivityLogService implements IActivityLogService {
     const moreText = logs.length > 10 ? `\n\n他 ${logs.length - 10} 件の結果があります。` : '';
 
     return `🔍 **「${query}」の検索結果:** ${logs.length}件\n\n${formatted}${moreText}`;
+  }
+
+  /**
+   * 最近の活動コンテキストを構築
+   * リアルタイム分析で使用する履歴情報を準備
+   */
+  private async buildRecentActivityContext(userId: string, timezone: string): Promise<RecentActivityContext> {
+    try {
+      // 今日と昨日の活動ログを取得（最大10件）
+      const today = this.calculateBusinessDate(timezone).businessDate;
+      const yesterday = new Date(new Date(today).getTime() - 24 * 60 * 60 * 1000)
+        .toISOString().split('T')[0];
+      
+      const [todayLogs, yesterdayLogs] = await Promise.all([
+        this.repository.getLogsByDate(userId, today),
+        this.repository.getLogsByDate(userId, yesterday)
+      ]);
+      
+      // 最新10件を選択（今日優先、昨日で補完）
+      const recentLogs = [...todayLogs, ...yesterdayLogs]
+        .sort((a, b) => new Date(b.inputTimestamp).getTime() - new Date(a.inputTimestamp).getTime())
+        .slice(0, 10)
+        .map(log => ({
+          id: log.id,
+          content: log.content,
+          inputTimestamp: log.inputTimestamp,
+          startTime: log.startTime,
+          endTime: log.endTime,
+          businessDate: log.businessDate
+        }));
+      
+      console.log(`📚 コンテキスト構築: 最近の活動 ${recentLogs.length}件を取得`);
+      
+      return {
+        recentLogs,
+        currentSession: {
+          startTime: new Date().toISOString(),
+          timezone,
+          activeSessionMinutes: 0 // 必要に応じて計算
+        }
+      };
+      
+    } catch (error) {
+      console.error('コンテキスト構築エラー:', error);
+      // エラー時は空のコンテキストを返す
+      return { recentLogs: [] };
+    }
   }
 }
