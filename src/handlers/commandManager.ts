@@ -1,7 +1,6 @@
 import { Message } from 'discord.js';
 import { 
   ICommandHandler, 
-  IActivityHandler, 
   ICostReportHandler 
 } from './interfaces';
 
@@ -11,14 +10,11 @@ import {
  */
 export class CommandManager {
   private commandHandlers: Map<string, ICommandHandler> = new Map();
-  private activityHandler: IActivityHandler;
   private costReportHandler: ICostReportHandler;
 
   constructor(
-    activityHandler: IActivityHandler,
     costReportHandler: ICostReportHandler
   ) {
-    this.activityHandler = activityHandler;
     this.costReportHandler = costReportHandler;
   }
 
@@ -52,9 +48,8 @@ export class CommandManager {
       return true;
     }
 
-    // 通常の活動記録として処理
-    await this.activityHandler.handleActivityLog(message, content, userTimezone);
-    return true;
+    // 通常の活動記録は新システム（ActivityLoggingIntegration）で処理
+    return false; // 新システムに委譲
   }
 
   /**

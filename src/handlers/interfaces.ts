@@ -14,18 +14,6 @@ export interface ICommandHandler {
   handle(message: Message, args: string[]): Promise<boolean>;
 }
 
-/**
- * 活動記録ハンドラーの抽象化インターフェース
- */
-export interface IActivityHandler {
-  /**
-   * 活動記録を処理する
-   * @param message Discordメッセージオブジェクト
-   * @param content メッセージ内容
-   * @param userTimezone ユーザーのタイムゾーン
-   */
-  handleActivityLog(message: Message, content: string, userTimezone: string): Promise<void>;
-}
 
 
 /**

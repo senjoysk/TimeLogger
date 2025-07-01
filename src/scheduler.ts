@@ -1,7 +1,7 @@
 import * as cron from 'node-cron';
 import { TaskLoggerBot } from './bot';
 import { config } from './config';
-import { SqliteRepository } from './repositories/sqliteRepository';
+import { SqliteActivityLogRepository } from './repositories/sqliteActivityLogRepository';
 import { toZonedTime } from 'date-fns-tz';
 
 /**
@@ -10,11 +10,11 @@ import { toZonedTime } from 'date-fns-tz';
  */
 export class Scheduler {
   private bot: TaskLoggerBot;
-  private repository: SqliteRepository;
+  private repository: SqliteActivityLogRepository;
   private jobs: Map<string, cron.ScheduledTask> = new Map();
   private userTimezones: Map<string, string> = new Map();
 
-  constructor(bot: TaskLoggerBot, repository: SqliteRepository) {
+  constructor(bot: TaskLoggerBot, repository: SqliteActivityLogRepository) {
     this.bot = bot;
     this.repository = repository;
   }

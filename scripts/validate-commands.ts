@@ -6,11 +6,9 @@
  */
 
 import { CommandManager } from '../src/handlers/commandManager';
-import { ActivityHandler } from '../src/handlers/activityHandler';
 import { CostReportHandler } from '../src/handlers/costReportHandler';
 import { SqliteActivityLogRepository } from '../src/repositories/sqliteActivityLogRepository';
 import { GeminiService } from '../src/services/geminiService';
-import { ActivityService } from '../src/services/activityService';
 import { runCommandValidation } from '../src/utils/commandValidator';
 import { ActivityLogService } from '../src/services/activityLogService';
 import { UnifiedAnalysisService } from '../src/services/unifiedAnalysisService';
@@ -51,16 +49,13 @@ async function createProductionCommandManager(): Promise<CommandManager> {
 
   const activityLogService = new ActivityLogService(repository);
   const unifiedAnalysisService = new UnifiedAnalysisService(repository, repository);
-  const activityService = new ActivityService(repository as any, geminiService);
 
-  // ハンドラーの作成
-  const activityHandler = new ActivityHandler(activityService);
+  // ハンドラーの作成（新システムのみ）
   const summaryHandler = new NewSummaryHandler(activityLogService, unifiedAnalysisService);
   const costReportHandler = new CostReportHandler(geminiService);
 
   // CommandManagerの初期化（本番環境と同じ）
   const commandManager = new CommandManager(
-    activityHandler,
     costReportHandler
   );
 
