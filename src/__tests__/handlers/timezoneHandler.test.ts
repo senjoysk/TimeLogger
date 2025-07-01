@@ -2,7 +2,7 @@
  * 新タイムゾーンハンドラーのテスト
  */
 
-import { NewTimezoneHandler } from '../../handlers/newTimezoneHandler';
+import { TimezoneHandler } from '../../handlers/timezoneHandler';
 import { Message } from 'discord.js';
 
 // ActivityLogRepositoryのモック
@@ -32,11 +32,11 @@ class MockMessage {
   }
 }
 
-describe('NewTimezoneHandler', () => {
-  let handler: NewTimezoneHandler;
+describe('TimezoneHandler', () => {
+  let handler: TimezoneHandler;
 
   beforeEach(() => {
-    handler = new NewTimezoneHandler(mockRepository);
+    handler = new TimezoneHandler(mockRepository);
     // 環境変数をクリア
     delete process.env.USER_TIMEZONE;
   });

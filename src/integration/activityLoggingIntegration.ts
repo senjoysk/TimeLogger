@@ -9,10 +9,10 @@ import { SqliteActivityLogRepository } from '../repositories/sqliteActivityLogRe
 import { ActivityLogService } from '../services/activityLogService';
 import { UnifiedAnalysisService } from '../services/unifiedAnalysisService';
 import { AnalysisCacheService } from '../services/analysisCacheService';
-import { NewEditCommandHandler } from '../handlers/newEditCommandHandler';
-import { NewSummaryHandler } from '../handlers/newSummaryHandler';
+import { EditCommandHandler } from '../handlers/editCommandHandler';
+import { SummaryHandler } from '../handlers/summaryHandler';
 import { LogsCommandHandler } from '../handlers/logsCommandHandler';
-import { NewTimezoneHandler } from '../handlers/newTimezoneHandler';
+import { TimezoneHandler } from '../handlers/timezoneHandler';
 import { GeminiService } from '../services/geminiService';
 import { GapDetectionService } from '../services/gapDetectionService';
 import { ActivityLogError } from '../types/activityLog';
@@ -51,10 +51,10 @@ export class ActivityLoggingIntegration {
   private gapDetectionService!: GapDetectionService;
 
   // ハンドラー層
-  private editHandler!: NewEditCommandHandler;
-  private summaryHandler!: NewSummaryHandler;
+  private editHandler!: EditCommandHandler;
+  private summaryHandler!: SummaryHandler;
   private logsHandler!: LogsCommandHandler;
-  private timezoneHandler!: NewTimezoneHandler;
+  private timezoneHandler!: TimezoneHandler;
   private gapHandler!: GapHandler;
 
   // 設定
@@ -101,13 +101,13 @@ export class ActivityLoggingIntegration {
       console.log('✅ サービス層初期化完了');
 
       // 3. ハンドラー層の初期化
-      this.editHandler = new NewEditCommandHandler(this.activityLogService);
-      this.summaryHandler = new NewSummaryHandler(
+      this.editHandler = new EditCommandHandler(this.activityLogService);
+      this.summaryHandler = new SummaryHandler(
         this.unifiedAnalysisService, 
         this.activityLogService
       );
       this.logsHandler = new LogsCommandHandler(this.activityLogService);
-      this.timezoneHandler = new NewTimezoneHandler(this.repository);
+      this.timezoneHandler = new TimezoneHandler(this.repository);
       this.gapHandler = new GapHandler(
         this.gapDetectionService,
         this.activityLogService,

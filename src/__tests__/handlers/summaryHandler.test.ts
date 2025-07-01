@@ -1,9 +1,9 @@
 /**
- * NewSummaryHandler テスト
+ * SummaryHandler テスト
  * サマリーコマンドとキャッシュ動作の確認
  */
 
-import { NewSummaryHandler } from '../../handlers/newSummaryHandler';
+import { SummaryHandler } from '../../handlers/summaryHandler';
 import { Message } from 'discord.js';
 import { DailyAnalysisResult } from '../../types/activityLog';
 
@@ -125,15 +125,15 @@ class MockActivityLogService {
   }
 }
 
-describe('NewSummaryHandler', () => {
-  let summaryHandler: NewSummaryHandler;
+describe('SummaryHandler', () => {
+  let summaryHandler: SummaryHandler;
   let mockUnifiedAnalysisService: MockUnifiedAnalysisService;
   let mockActivityLogService: MockActivityLogService;
 
   beforeEach(() => {
     mockUnifiedAnalysisService = new MockUnifiedAnalysisService();
     mockActivityLogService = new MockActivityLogService();
-    summaryHandler = new NewSummaryHandler(
+    summaryHandler = new SummaryHandler(
       mockUnifiedAnalysisService as any,
       mockActivityLogService as any
     );

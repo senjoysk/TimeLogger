@@ -1,5 +1,5 @@
 /**
- * 新サマリーコマンドハンドラー
+ * サマリーコマンドハンドラー
  * 統合分析による日次サマリー生成
  */
 
@@ -29,9 +29,9 @@ export interface ParsedSummaryCommand {
 }
 
 /**
- * 新サマリーハンドラーインターフェース
+ * サマリーハンドラーインターフェース
  */
-export interface INewSummaryHandler {
+export interface ISummaryHandler {
   /**
    * サマリーコマンドを処理
    * @param message Discordメッセージ
@@ -49,9 +49,9 @@ export interface INewSummaryHandler {
 }
 
 /**
- * NewSummaryHandlerの実装
+ * SummaryHandlerの実装
  */
-export class NewSummaryHandler implements INewSummaryHandler {
+export class SummaryHandler implements ISummaryHandler {
   constructor(
     private unifiedAnalysisService: IUnifiedAnalysisService,
     private activityLogService: IActivityLogService

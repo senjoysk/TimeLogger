@@ -1,5 +1,5 @@
 /**
- * 新タイムゾーンコマンドハンドラー
+ * タイムゾーンコマンドハンドラー
  * タイムゾーンの検索・設定・表示機能
  */
 
@@ -31,9 +31,9 @@ export interface TimezoneSearchResult {
 }
 
 /**
- * 新タイムゾーンハンドラーインターフェース
+ * タイムゾーンハンドラーインターフェース
  */
-export interface INewTimezoneHandler {
+export interface ITimezoneHandler {
   /**
    * タイムゾーンコマンドを処理
    * @param message Discordメッセージ
@@ -50,9 +50,9 @@ export interface INewTimezoneHandler {
 }
 
 /**
- * NewTimezoneHandlerの実装
+ * TimezoneHandlerの実装
  */
-export class NewTimezoneHandler implements INewTimezoneHandler {
+export class TimezoneHandler implements ITimezoneHandler {
   constructor(
     private repository: IActivityLogRepository
   ) {}

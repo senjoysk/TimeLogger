@@ -1,5 +1,5 @@
 /**
- * 新活動記録編集コマンドハンドラー
+ * 活動記録編集コマンドハンドラー
  * 自然言語ログ方式に対応
  */
 
@@ -28,9 +28,9 @@ export interface ParsedEditCommand {
 }
 
 /**
- * 新編集コマンドハンドラーインターフェース
+ * 編集コマンドハンドラーインターフェース
  */
-export interface INewEditCommandHandler {
+export interface IEditCommandHandler {
   /**
    * 編集コマンドを処理
    * @param message Discordメッセージ
@@ -48,9 +48,9 @@ export interface INewEditCommandHandler {
 }
 
 /**
- * NewEditCommandHandlerの実装
+ * EditCommandHandlerの実装
  */
-export class NewEditCommandHandler implements INewEditCommandHandler {
+export class EditCommandHandler implements IEditCommandHandler {
   constructor(
     private activityLogService: IActivityLogService
   ) {}
