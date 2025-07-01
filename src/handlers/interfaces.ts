@@ -1,29 +1,5 @@
-import { Message } from 'discord.js';
+// 現在、このファイルにはアクティブなインターフェースは含まれていません
+// すべてのインターフェースは削除されたCommandManagerと関連する機能で使用されていました
+// 新システムではActivityLoggingIntegrationが直接コマンド処理を行います
 
-/**
- * コマンドハンドラーの抽象化インターフェース
- * 各コマンドの処理を独立したハンドラーに分離
- */
-export interface ICommandHandler {
-  /**
-   * コマンドを処理する
-   * @param message Discordメッセージオブジェクト
-   * @param args コマンド引数
-   * @returns 処理が成功した場合true、該当しない場合false
-   */
-  handle(message: Message, args: string[]): Promise<boolean>;
-}
-
-
-
-/**
- * コストレポートハンドラーの抽象化インターフェース
- */
-export interface ICostReportHandler {
-  /**
-   * コストレポートリクエストを処理する
-   * @param message Discordメッセージオブジェクト
-   * @param userTimezone ユーザーのタイムゾーン
-   */
-  handleCostReportRequest(message: Message, userTimezone: string): Promise<void>;
-}
+// TODO: このファイル自体を削除するか、新システム用のインターフェースで置き換えることを検討してください
