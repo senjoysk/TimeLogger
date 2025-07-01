@@ -2,7 +2,6 @@ import { Message } from 'discord.js';
 import { 
   ICommandHandler, 
   IActivityHandler, 
-  ISummaryHandler, 
   ICostReportHandler 
 } from './interfaces';
 
@@ -13,16 +12,13 @@ import {
 export class CommandManager {
   private commandHandlers: Map<string, ICommandHandler> = new Map();
   private activityHandler: IActivityHandler;
-  private summaryHandler: ISummaryHandler;
   private costReportHandler: ICostReportHandler;
 
   constructor(
     activityHandler: IActivityHandler,
-    summaryHandler: ISummaryHandler,
     costReportHandler: ICostReportHandler
   ) {
     this.activityHandler = activityHandler;
-    this.summaryHandler = summaryHandler;
     this.costReportHandler = costReportHandler;
   }
 
@@ -49,16 +45,7 @@ export class CommandManager {
       return await this.handleCommand(message, content);
     }
 
-    // 特定キーワードの場合
-    if (this.isSummaryRequest(content)) {
-      const dateMatch = content.match(/(\d{4}-\d{2}-\d{2})/);
-      await this.summaryHandler.handleSummaryRequest(
-        message, 
-        userTimezone, 
-        dateMatch ? dateMatch[1] : undefined
-      );
-      return true;
-    }
+    // 特定キーワードの場合（レガシー機能は削除済み）
 
     if (this.isCostReportRequest(content)) {
       await this.costReportHandler.handleCostReportRequest(message, userTimezone);

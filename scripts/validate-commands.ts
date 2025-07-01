@@ -7,24 +7,25 @@
 
 import { CommandManager } from '../src/handlers/commandManager';
 import { ActivityHandler } from '../src/handlers/activityHandler';
-import { SummaryHandler } from '../src/handlers/summaryHandler';
 import { CostReportHandler } from '../src/handlers/costReportHandler';
-import { TimezoneCommandHandler } from '../src/handlers/timezoneCommandHandler';
-import { SummaryCommandHandler } from '../src/handlers/summaryCommandHandler';
-import { CostCommandHandler } from '../src/handlers/costCommandHandler';
-import { SqliteRepository } from '../src/repositories/sqliteRepository';
+import { SqliteActivityLogRepository } from '../src/repositories/sqliteActivityLogRepository';
 import { GeminiService } from '../src/services/geminiService';
 import { ActivityService } from '../src/services/activityService';
-import { SummaryService } from '../src/services/summaryService';
 import { runCommandValidation } from '../src/utils/commandValidator';
+import { ActivityLogService } from '../src/services/activityLogService';
+import { UnifiedAnalysisService } from '../src/services/unifiedAnalysisService';
+import { NewEditCommandHandler } from '../src/handlers/newEditCommandHandler';
+import { NewSummaryHandler } from '../src/handlers/newSummaryHandler';
+import { LogsCommandHandler } from '../src/handlers/logsCommandHandler';
+import { NewTimezoneHandler } from '../src/handlers/newTimezoneHandler';
 
 /**
  * 本番環境と同じ構成でCommandManagerを作成
  */
 async function createProductionCommandManager(): Promise<CommandManager> {
   // メモリ内データベースでテスト用のサービスを初期化
-  const repository = new SqliteRepository(':memory:');
-  await repository.initialize();
+  const repository = new SqliteActivityLogRepository(':memory:');
+  await repository.initializeDatabase();
 
   // モックを使わずに実際のサービスを使用（外部API呼び出しのみモック）
   const geminiService = new GeminiService(repository);
@@ -48,29 +49,30 @@ async function createProductionCommandManager(): Promise<CommandManager> {
   MockedGeminiService.getDailyCostReport = jest.fn().mockResolvedValue('テスト用のコストレポート');
   MockedGeminiService.checkCostAlerts = jest.fn().mockResolvedValue(null);
 
-  const activityService = new ActivityService(repository, geminiService);
-  const summaryService = new SummaryService(repository, geminiService);
+  const activityLogService = new ActivityLogService(repository);
+  const unifiedAnalysisService = new UnifiedAnalysisService(repository, repository);
+  const activityService = new ActivityService(repository as any, geminiService);
 
   // ハンドラーの作成
   const activityHandler = new ActivityHandler(activityService);
-  const summaryHandler = new SummaryHandler(summaryService);
+  const summaryHandler = new NewSummaryHandler(activityLogService, unifiedAnalysisService);
   const costReportHandler = new CostReportHandler(geminiService);
 
   // CommandManagerの初期化（本番環境と同じ）
   const commandManager = new CommandManager(
     activityHandler,
-    summaryHandler,
     costReportHandler
   );
 
   // コマンドハンドラーの登録（本番環境と同じ）
-  const timezoneHandler = new TimezoneCommandHandler(repository);
-  const summaryCommandHandler = new SummaryCommandHandler(summaryService);
-  const costCommandHandler = new CostCommandHandler(geminiService);
+  const timezoneHandler = new NewTimezoneHandler(activityLogService);
+  const editHandler = new NewEditCommandHandler(activityLogService);
+  const logsHandler = new LogsCommandHandler(activityLogService);
   
   commandManager.registerCommandHandler('timezone', timezoneHandler);
-  commandManager.registerCommandHandler('summary', summaryCommandHandler);
-  commandManager.registerCommandHandler('cost', costCommandHandler);
+  commandManager.registerCommandHandler('edit', editHandler);
+  commandManager.registerCommandHandler('logs', logsHandler);
+  commandManager.registerCommandHandler('summary', summaryHandler);
 
   return commandManager;
 }

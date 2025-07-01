@@ -27,18 +27,6 @@ export interface IActivityHandler {
   handleActivityLog(message: Message, content: string, userTimezone: string): Promise<void>;
 }
 
-/**
- * サマリーハンドラーの抽象化インターフェース
- */
-export interface ISummaryHandler {
-  /**
-   * サマリーリクエストを処理する
-   * @param message Discordメッセージオブジェクト
-   * @param userTimezone ユーザーのタイムゾーン
-   * @param dateString オプション：指定日付
-   */
-  handleSummaryRequest(message: Message, userTimezone: string, dateString?: string): Promise<void>;
-}
 
 /**
  * コストレポートハンドラーの抽象化インターフェース
