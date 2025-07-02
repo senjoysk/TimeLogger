@@ -103,10 +103,9 @@ export interface WorkBalance {
 // 分析警告・注意事項
 export interface AnalysisWarning {
   type: WarningType;
-  severity: 'low' | 'medium' | 'high';
+  level: WarningLevel;
   message: string;
-  affectedTimeRanges: TimeRange[];
-  suggestions: string[];
+  details: Record<string, any>;
 }
 
 export type WarningType = 
@@ -116,6 +115,15 @@ export type WarningType =
   | 'low_confidence'      // 低信頼度推定
   | 'excessive_work_time' // 長時間労働
   | 'insufficient_breaks'; // 休憩不足
+
+export enum WarningLevel {
+  /** 情報レベル */
+  INFO = 'info',
+  /** 警告レベル */
+  WARNING = 'warning',
+  /** エラーレベル */
+  ERROR = 'error'
+}
 
 // 時間範囲
 export interface TimeRange {

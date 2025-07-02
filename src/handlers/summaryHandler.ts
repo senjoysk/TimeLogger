@@ -214,13 +214,13 @@ export class SummaryHandler implements ISummaryHandler {
 
     // 警告・注意事項
     if (result.warnings.length > 0) {
-      const importantWarnings = result.warnings.filter(w => w.severity !== 'low');
+      const importantWarnings = result.warnings.filter(w => w.level !== 'info');
       
       if (importantWarnings.length > 0) {
         sections.push(`\n⚠️ **注意事項**`);
         
         for (const warning of importantWarnings.slice(0, 3)) {
-          const severityEmoji = warning.severity === 'high' ? '🚨' : '⚠️';
+          const severityEmoji = warning.level === 'error' ? '🚨' : '⚠️';
           sections.push(`${severityEmoji} ${warning.message}`);
         }
       }

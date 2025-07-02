@@ -10,7 +10,15 @@ CREATE TABLE IF NOT EXISTS activity_logs (
     business_date TEXT NOT NULL,    -- 業務日（YYYY-MM-DD、5am基準）
     is_deleted BOOLEAN DEFAULT FALSE, -- 論理削除フラグ
     created_at TEXT NOT NULL DEFAULT (datetime('now', 'utc')),
-    updated_at TEXT NOT NULL DEFAULT (datetime('now', 'utc'))
+    updated_at TEXT NOT NULL DEFAULT (datetime('now', 'utc')),
+    -- リアルタイム分析結果カラム（新機能）
+    start_time TEXT,                -- 活動開始時刻（UTC、ISO 8601形式）
+    end_time TEXT,                  -- 活動終了時刻（UTC、ISO 8601形式）
+    total_minutes INTEGER,          -- 総活動時間（分）
+    confidence REAL,                -- 分析の信頼度 (0-1)
+    analysis_method TEXT,           -- 時刻抽出手法
+    categories TEXT,                -- カテゴリ（カンマ区切り）
+    analysis_warnings TEXT          -- 警告メッセージ（セミコロン区切り）
 );
 
 -- 分析結果キャッシュテーブル
@@ -50,6 +58,13 @@ ON daily_analysis_cache(generated_at);
 
 CREATE INDEX IF NOT EXISTS idx_user_settings_timezone 
 ON user_settings(timezone);
+
+-- 分析結果用インデックス
+CREATE INDEX IF NOT EXISTS idx_activity_logs_analysis 
+ON activity_logs(start_time, end_time, confidence);
+
+CREATE INDEX IF NOT EXISTS idx_activity_logs_categories 
+ON activity_logs(categories);
 
 -- トリガー: updated_at の自動更新
 CREATE TRIGGER IF NOT EXISTS update_activity_logs_updated_at

@@ -224,19 +224,12 @@ export enum ActivityPriority {
 export interface AnalysisWarning {
   /** 警告タイプ */
   type: WarningType;
-  /** 重要度 */
-  severity: 'low' | 'medium' | 'high';
+  /** 警告レベル */
+  level: WarningLevel;
   /** 警告メッセージ */
   message: string;
-  /** 影響を受ける時間範囲 */
-  affectedTimeRange?: {
-    startTime: string;
-    endTime: string;
-  };
-  /** 対処提案 */
-  suggestions: string[];
-  /** 関連データ */
-  relatedData?: any;
+  /** 詳細情報 */
+  details: Record<string, any>;
 }
 
 
@@ -423,12 +416,3 @@ export enum WarningLevel {
   ERROR = 'error'
 }
 
-/**
- * 分析警告
- */
-export interface AnalysisWarning {
-  type: WarningType;
-  level: WarningLevel;
-  message: string;
-  details: Record<string, any>;
-}

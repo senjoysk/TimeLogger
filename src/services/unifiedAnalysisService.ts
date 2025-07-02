@@ -369,16 +369,13 @@ ${logList}
   "warnings": [
     {
       "type": "警告タイプ（time_overlap/time_gap/inconsistent_input等）",
-      "severity": "重要度（low/medium/high）",
+      "level": "警告レベル（info/warning/error）",
       "message": "警告メッセージ",
-      "affectedTimeRanges": [
-        {
-          "startTime": "開始時刻",
-          "endTime": "終了時刻",
-          "description": "説明"
-        }
-      ],
-      "suggestions": ["対処提案1", "対処提案2"]
+      "details": {
+        "affectedTimeRange": "影響を受ける時間範囲",
+        "suggestions": ["対処提案1", "対処提案2"],
+        "otherDetails": "その他の詳細情報"
+      }
     }
   ],
   "confidence": 全体分析信頼度（0-1）

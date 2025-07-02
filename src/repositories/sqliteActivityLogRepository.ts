@@ -98,14 +98,24 @@ export class SqliteActivityLogRepository implements IActivityLogRepository, IApi
         businessDate: request.businessDate,
         isDeleted: false,
         createdAt: now,
-        updatedAt: now
+        updatedAt: now,
+        // リアルタイム分析結果（存在する場合）
+        startTime: request.startTime,
+        endTime: request.endTime,
+        totalMinutes: request.totalMinutes,
+        confidence: request.confidence,
+        analysisMethod: request.analysisMethod,
+        categories: request.categories,
+        analysisWarnings: request.analysisWarnings
       };
 
       const sql = `
         INSERT INTO activity_logs (
           id, user_id, content, input_timestamp, business_date, 
-          is_deleted, created_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+          is_deleted, created_at, updated_at,
+          start_time, end_time, total_minutes, confidence, 
+          analysis_method, categories, analysis_warnings
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `;
 
       await this.runQuery(sql, [
@@ -116,7 +126,14 @@ export class SqliteActivityLogRepository implements IActivityLogRepository, IApi
         log.businessDate,
         log.isDeleted ? 1 : 0,
         log.createdAt,
-        log.updatedAt
+        log.updatedAt,
+        log.startTime || null,
+        log.endTime || null,
+        log.totalMinutes || null,
+        log.confidence || null,
+        log.analysisMethod || null,
+        log.categories || null,
+        log.analysisWarnings || null
       ]);
 
       console.log(`✅ 活動ログを保存しました: ${log.id}`);
@@ -626,7 +643,7 @@ export class SqliteActivityLogRepository implements IActivityLogRepository, IApi
    * データベース行をActivityLogオブジェクトにマッピング
    */
   private mapRowToActivityLog(row: any): ActivityLog {
-    return {
+    const log: ActivityLog = {
       id: row.id,
       userId: row.user_id,
       content: row.content,
@@ -636,6 +653,17 @@ export class SqliteActivityLogRepository implements IActivityLogRepository, IApi
       createdAt: row.created_at,
       updatedAt: row.updated_at
     };
+
+    // リアルタイム分析結果フィールドをマッピング（存在する場合のみ）
+    if (row.start_time !== undefined) log.startTime = row.start_time;
+    if (row.end_time !== undefined) log.endTime = row.end_time;
+    if (row.total_minutes !== undefined) log.totalMinutes = row.total_minutes;
+    if (row.confidence !== undefined) log.confidence = row.confidence;
+    if (row.analysis_method !== undefined) log.analysisMethod = row.analysis_method;
+    if (row.categories !== undefined) log.categories = row.categories;
+    if (row.analysis_warnings !== undefined) log.analysisWarnings = row.analysis_warnings;
+
+    return log;
   }
 
   /**
