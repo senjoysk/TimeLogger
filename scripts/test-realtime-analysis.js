@@ -65,16 +65,16 @@ async function testRealTimeAnalysis() {
         console.log(`   🎯 信頼度: ${(result.timeAnalysis.confidence * 100).toFixed(1)}%`);
         console.log(`   📊 手法: ${result.timeAnalysis.method}`);
         
-        if (result.activityAnalysis.activities.length > 0) {
+        if (result.activities && result.activities.length > 0) {
           console.log('   🏷️ 活動:');
-          result.activityAnalysis.activities.forEach(activity => {
+          result.activities.forEach(activity => {
             console.log(`      - ${activity.content} (${activity.timePercentage}%, ${activity.confidence.toFixed(2)})`);
           });
         }
         
-        if (result.validationResult.warnings.length > 0) {
+        if (result.warnings && result.warnings.length > 0) {
           console.log('   ⚠️ 警告:');
-          result.validationResult.warnings.forEach(warning => {
+          result.warnings.forEach(warning => {
             console.log(`      - ${warning.type}: ${warning.message}`);
           });
         }
