@@ -409,8 +409,9 @@ export const TIME_EXPRESSION_NORMALIZER = {
    */
   clarifyVagueExpressions(input: string): string {
     const clarifications = {
-      'さっき': '30分前',
-      '先ほど': '30分前',
+      // 具体的な時間表現がある場合は曖昧表現を置換しない
+      'さっき': input.match(/さっき\s*\d+\s*(分|時間)/) ? 'さっき' : '30分前',
+      '先ほど': input.match(/先ほど\s*\d+\s*(分|時間)/) ? '先ほど' : '30分前',
       'ちょっと前': '15分前',
       '少し前': '15分前',
       '今': '0分前',

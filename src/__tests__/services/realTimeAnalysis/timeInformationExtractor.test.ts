@@ -193,10 +193,10 @@ describe('TimeInformationExtractor', () => {
 
       expect(result.totalMinutes).toBe(60); // 1時間
       
-      // 終了時刻が開始時刻の翌日になっているか確認
+      // 時刻の正当性を確認：1時間の差があること
       const startTime = new Date(result.startTime);
       const endTime = new Date(result.endTime);
-      expect(endTime.getDate()).toBe(startTime.getDate() + 1);
+      expect(endTime.getTime() - startTime.getTime()).toBe(60 * 60 * 1000);
     });
 
     test('タイムスタンプ付き入力を正しく処理する', async () => {

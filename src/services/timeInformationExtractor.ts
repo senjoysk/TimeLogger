@@ -67,6 +67,13 @@ export class TimeInformationExtractor {
           basicAnalysis,
           context
         );
+        
+        // パターンマッチがない場合はGeminiの信頼度も下げる
+        if (patternMatches.length === 0 || (basicAnalysis.confidence !== undefined && basicAnalysis.confidence <= 0.3)) {
+          geminiAnalysis.timeInfo.confidence = Math.min(geminiAnalysis.timeInfo.confidence, 0.4);
+          geminiAnalysis.timeInfo.method = TimeExtractionMethod.INFERRED;
+        }
+        
         finalAnalysis = geminiAnalysis;
       }
 
@@ -154,7 +161,14 @@ export class TimeInformationExtractor {
     const bestMatch = matches.sort((a, b) => b.confidence - a.confidence)[0];
     
     // パターンに基づいて基本的な時刻を推定
-    return this.extractTimeFromPattern(bestMatch, inputTimestamp, timezone);
+    const result = this.extractTimeFromPattern(bestMatch, inputTimestamp, timezone);
+    
+    // 曖昧なパターンの場合は信頼度を下げる
+    if (bestMatch.patternName === 'relative_vague' || bestMatch.confidence < 0.6) {
+      result.confidence = Math.min(result.confidence || 0.5, 0.4);
+    }
+    
+    return result;
   }
 
   /**
@@ -219,14 +233,19 @@ export class TimeInformationExtractor {
       const endTimeZoned = new Date(inputTime);
       endTimeZoned.setHours(parsed.endHour, parsed.endMinute || 0, 0, 0);
 
-      // 終了時刻が開始時刻より前の場合は翌日とみなす
-      if (endTimeZoned <= startTimeZoned) {
+      // 深夜をまたぐ時刻範囲の処理
+      if (parsed.startHour >= 22 && parsed.endHour <= 6) {
+        // 23:30から0:30のような場合：開始時刻は前日、終了時刻は当日
+        startTimeZoned.setDate(startTimeZoned.getDate() - 1);
+      } else if (endTimeZoned <= startTimeZoned) {
+        // 通常の日付境界の場合：終了時刻を翌日とみなす
         endTimeZoned.setDate(endTimeZoned.getDate() + 1);
       }
 
       // タイムゾーン時刻をUTCに変換
       const startTime = fromZonedTime(startTimeZoned, timezone);
       const endTime = fromZonedTime(endTimeZoned, timezone);
+
 
       const totalMinutes = Math.round((endTime.getTime() - startTime.getTime()) / (1000 * 60));
 
@@ -259,16 +278,20 @@ export class TimeInformationExtractor {
         return { confidence: 0.3 };
       }
 
-      // 単一時刻の場合は、その時刻から入力時刻までの時間を計算
-      const startTime = new Date(inputTime);
-      startTime.setHours(parsed.startHour, parsed.startMinute || 0, 0, 0);
+      // タイムゾーン時刻として開始・終了時刻を構築
+      const startTimeZoned = new Date(inputTime);
+      startTimeZoned.setHours(parsed.startHour, parsed.startMinute || 0, 0, 0);
       
-      const endTime = new Date(inputTime);
+      const endTimeZoned = new Date(inputTime);
 
       // 開始時刻が入力時刻より後の場合は前日とみなす
-      if (startTime > endTime) {
-        startTime.setDate(startTime.getDate() - 1);
+      if (startTimeZoned > endTimeZoned) {
+        startTimeZoned.setDate(startTimeZoned.getDate() - 1);
       }
+
+      // タイムゾーン時刻をUTCに変換
+      const startTime = fromZonedTime(startTimeZoned, timezone);
+      const endTime = fromZonedTime(endTimeZoned, timezone);
 
       const totalMinutes = Math.round((endTime.getTime() - startTime.getTime()) / (1000 * 60));
 
@@ -303,9 +326,13 @@ export class TimeInformationExtractor {
 
       const durationMinutes = parsed.durationMinutes;
 
-      // 入力時刻から継続時間分さかのぼって開始時刻を推定
-      const endTime = new Date(inputTime);
-      const startTime = new Date(endTime.getTime() - durationMinutes * 60 * 1000);
+      // タイムゾーン時刻として終了・開始時刻を設定
+      const endTimeZoned = new Date(inputTime);
+      const startTimeZoned = new Date(endTimeZoned.getTime() - durationMinutes * 60 * 1000);
+
+      // タイムゾーン時刻をUTCに変換
+      const startTime = fromZonedTime(startTimeZoned, timezone);
+      const endTime = fromZonedTime(endTimeZoned, timezone);
 
       return {
         startTime: startTime.toISOString(),
@@ -338,8 +365,13 @@ export class TimeInformationExtractor {
 
       const relativeMinutes = Math.abs(parsed.relativeMinutes); // 負の値を正に変換
 
-      const endTime = new Date(inputTime);
-      const startTime = new Date(endTime.getTime() - relativeMinutes * 60 * 1000);
+      // タイムゾーン時刻として終了時刻を設定
+      const endTimeZoned = new Date(inputTime);
+      const startTimeZoned = new Date(endTimeZoned.getTime() - relativeMinutes * 60 * 1000);
+
+      // タイムゾーン時刻をUTCに変換
+      const startTime = fromZonedTime(startTimeZoned, timezone);
+      const endTime = fromZonedTime(endTimeZoned, timezone);
 
       return {
         startTime: startTime.toISOString(),
