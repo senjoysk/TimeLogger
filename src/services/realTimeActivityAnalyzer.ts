@@ -53,17 +53,27 @@ export class RealTimeActivityAnalyzer {
   ): Promise<DetailedActivityAnalysis> {
     const analysisStartTime = Date.now();
     
+    // inputTimestampをDateオブジェクトに正規化
+    const normalizedTimestamp = inputTimestamp instanceof Date 
+      ? inputTimestamp 
+      : new Date(inputTimestamp);
+    
+    if (isNaN(normalizedTimestamp.getTime())) {
+      throw new Error(`無効なinputTimestamp: ${inputTimestamp}`);
+    }
+    
     try {
+      
       console.log('🚀 リアルタイム活動分析開始');
       console.log(`📝 入力: "${input.substring(0, 100)}${input.length > 100 ? '...' : ''}"`)
-      console.log(`🌍 タイムゾーン: ${timezone}, 入力時刻: ${inputTimestamp.toISOString()}`);
+      console.log(`🌍 タイムゾーン: ${timezone}, 入力時刻: ${normalizedTimestamp.toISOString()}`);
       
       // Phase 1: 時刻情報の詳細抽出
       console.log('⏰ Phase 1: 時刻情報抽出開始...');
       const timeAnalysis = await this.timeExtractor.extractTimeInformation(
         input,
         timezone,
-        inputTimestamp,
+        normalizedTimestamp,
         context
       );
       console.log(`✅ Phase 1完了: ${timeAnalysis.startTime} - ${timeAnalysis.endTime} (${timeAnalysis.totalMinutes}分, 信頼度: ${timeAnalysis.confidence})`);
@@ -91,7 +101,7 @@ export class RealTimeActivityAnalyzer {
         validationResult,
         input,
         timezone,
-        inputTimestamp,
+        normalizedTimestamp,
         analysisStartTime
       );
       
@@ -108,7 +118,7 @@ export class RealTimeActivityAnalyzer {
       return this.createFallbackAnalysis(
         input,
         timezone,
-        inputTimestamp,
+        normalizedTimestamp,
         error,
         analysisStartTime
       );

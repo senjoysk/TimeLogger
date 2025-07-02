@@ -3,7 +3,7 @@
  * ユーザー入力から時刻情報を高精度で抽出・解析
  */
 
-import { toZonedTime, format } from 'date-fns-tz';
+import { toZonedTime, format, fromZonedTime } from 'date-fns-tz';
 import { 
   TimeAnalysisResult, 
   TimeExtractionMethod, 
@@ -39,26 +39,39 @@ export class TimeInformationExtractor {
     const startTime = Date.now();
 
     try {
-      console.log(`🕐 時刻抽出開始: "${input.substring(0, 50)}..."`);
-
       // 1. 入力の正規化
       const normalizedInput = this.normalizeInput(input);
-
       // 2. パターンマッチングによる基本解析
       const patternMatches = this.patternMatcher.matchPatterns(normalizedInput);
       const basicAnalysis = this.analyzePatternMatches(patternMatches, inputTimestamp, timezone);
 
-      // 3. Geminiによる高度解析
-      const geminiAnalysis = await this.analyzeWithGemini(
-        normalizedInput, 
-        timezone, 
-        inputTimestamp, 
-        basicAnalysis,
-        context
-      );
+      let finalAnalysis: any;
+
+      // 3. 基本解析の信頼度が高い場合はそれを優先、低い場合はGeminiを使用
+      if (basicAnalysis.confidence && basicAnalysis.confidence > 0.6 && basicAnalysis.startTime) {
+        finalAnalysis = {
+          timeInfo: {
+            startTime: basicAnalysis.startTime,
+            endTime: basicAnalysis.endTime,
+            confidence: basicAnalysis.confidence,
+            method: basicAnalysis.method,
+            timezone: basicAnalysis.timezone
+          }
+        };
+      } else {
+        // Geminiによる高度解析
+        const geminiAnalysis = await this.analyzeWithGemini(
+          normalizedInput, 
+          timezone, 
+          inputTimestamp, 
+          basicAnalysis,
+          context
+        );
+        finalAnalysis = geminiAnalysis;
+      }
 
       // 4. コンテキストベース補正
-      const contextAdjusted = this.adjustWithContext(geminiAnalysis, context, inputTimestamp);
+      const contextAdjusted = this.adjustWithContext(finalAnalysis, context, inputTimestamp);
 
       // 5. 最終検証と結果構築
       const finalResult = this.buildFinalResult(
@@ -69,7 +82,6 @@ export class TimeInformationExtractor {
         startTime
       );
 
-      console.log(`✅ 時刻抽出完了: ${finalResult.startTime} - ${finalResult.endTime} (信頼度: ${finalResult.confidence})`);
       return finalResult;
 
     } catch (error) {
@@ -104,8 +116,8 @@ export class TimeInformationExtractor {
   private preprocessTimeLog(input: string): string {
     let processed = input;
 
-    // タイムスタンプ形式の除去: "[08:19]" -> ""
-    processed = processed.replace(/^\[?\d{1,2}:\d{2}\]?\s*/, '');
+    // タイムスタンプ形式の除去: "[08:19]" -> ""（角括弧必須）
+    processed = processed.replace(/^\[\d{1,2}:\d{2}\]\s*/, '');
 
     // 冗長な表現の簡略化
     const simplifications = {
@@ -139,7 +151,7 @@ export class TimeInformationExtractor {
     }
 
     // 最も信頼度の高いマッチを使用
-    const bestMatch = matches[0];
+    const bestMatch = matches.sort((a, b) => b.confidence - a.confidence)[0];
     
     // パターンに基づいて基本的な時刻を推定
     return this.extractTimeFromPattern(bestMatch, inputTimestamp, timezone);
@@ -156,18 +168,24 @@ export class TimeInformationExtractor {
     const zonedInputTime = toZonedTime(inputTimestamp, timezone);
     
     // パターンタイプに応じた処理
-    switch (match.patternName) {
+    switch (match.name || match.patternName) {
       case 'explicit_time_range_colon':
       case 'explicit_time_range_japanese':
+      case 'explicit_time_range_simple':
         return this.handleExplicitTimeRange(match, zonedInputTime, timezone);
       
       case 'duration_hours':
       case 'duration_minutes':
+      case 'duration_hours_minutes':
         return this.handleDurationPattern(match, zonedInputTime, timezone);
       
       case 'relative_recent_duration':
       case 'relative_ago':
         return this.handleRelativeTimePattern(match, zonedInputTime, timezone);
+      
+      case 'single_time_colon':
+      case 'single_time_japanese':
+        return this.handleSingleTimePattern(match, zonedInputTime, timezone);
       
       default:
         return {
@@ -186,23 +204,70 @@ export class TimeInformationExtractor {
     timezone: string
   ): Partial<TimeAnalysisResult> {
     try {
-      // マッチしたグループから時刻を抽出
-      const groups = match.groups;
-      const startHour = parseInt(groups[1], 10);
-      const startMinute = parseInt(groups[2], 10);
-      const endHour = parseInt(groups[3], 10);
-      const endMinute = parseInt(groups[4], 10);
-
-      // 同日の時刻として構築
-      const startTime = new Date(inputTime);
-      startTime.setHours(startHour, startMinute, 0, 0);
+      // パース結果から時刻を抽出
+      const parsed = match.parsed || match.parsedInfo;
       
-      const endTime = new Date(inputTime);
-      endTime.setHours(endHour, endMinute, 0, 0);
+      if (!parsed || parsed.startHour === undefined) {
+        console.warn('明示的時刻範囲の解析に失敗:', match);
+        return { confidence: 0.3 };
+      }
+
+      // タイムゾーン時刻として開始・終了時刻を構築
+      const startTimeZoned = new Date(inputTime);
+      startTimeZoned.setHours(parsed.startHour, parsed.startMinute || 0, 0, 0);
+      
+      const endTimeZoned = new Date(inputTime);
+      endTimeZoned.setHours(parsed.endHour, parsed.endMinute || 0, 0, 0);
 
       // 終了時刻が開始時刻より前の場合は翌日とみなす
-      if (endTime <= startTime) {
-        endTime.setDate(endTime.getDate() + 1);
+      if (endTimeZoned <= startTimeZoned) {
+        endTimeZoned.setDate(endTimeZoned.getDate() + 1);
+      }
+
+      // タイムゾーン時刻をUTCに変換
+      const startTime = fromZonedTime(startTimeZoned, timezone);
+      const endTime = fromZonedTime(endTimeZoned, timezone);
+
+      const totalMinutes = Math.round((endTime.getTime() - startTime.getTime()) / (1000 * 60));
+
+      return {
+        startTime: startTime.toISOString(),
+        endTime: endTime.toISOString(),
+        totalMinutes,
+        method: TimeExtractionMethod.EXPLICIT,
+        confidence: match.confidence || 0.9,
+        timezone
+      };
+    } catch (error) {
+      console.error('明示的時刻範囲の解析エラー:', error);
+      return { confidence: 0.3 };
+    }
+  }
+
+  /**
+   * 単一時刻パターンの処理
+   */
+  private handleSingleTimePattern(
+    match: any,
+    inputTime: Date,
+    timezone: string
+  ): Partial<TimeAnalysisResult> {
+    try {
+      const parsed = match.parsed || match.parsedInfo;
+      
+      if (!parsed || parsed.startHour === undefined) {
+        return { confidence: 0.3 };
+      }
+
+      // 単一時刻の場合は、その時刻から入力時刻までの時間を計算
+      const startTime = new Date(inputTime);
+      startTime.setHours(parsed.startHour, parsed.startMinute || 0, 0, 0);
+      
+      const endTime = new Date(inputTime);
+
+      // 開始時刻が入力時刻より後の場合は前日とみなす
+      if (startTime > endTime) {
+        startTime.setDate(startTime.getDate() - 1);
       }
 
       const totalMinutes = Math.round((endTime.getTime() - startTime.getTime()) / (1000 * 60));
@@ -212,11 +277,11 @@ export class TimeInformationExtractor {
         endTime: endTime.toISOString(),
         totalMinutes,
         method: TimeExtractionMethod.EXPLICIT,
-        confidence: 0.9,
+        confidence: match.confidence || 0.7,
         timezone
       };
     } catch (error) {
-      console.error('明示的時刻範囲の解析エラー:', error);
+      console.error('単一時刻の解析エラー:', error);
       return { confidence: 0.3 };
     }
   }
@@ -229,28 +294,31 @@ export class TimeInformationExtractor {
     inputTime: Date,
     timezone: string
   ): Partial<TimeAnalysisResult> {
-    // 継続時間から逆算して開始時刻を推定
-    const groups = match.groups;
-    let durationMinutes = 0;
+    try {
+      const parsed = match.parsed || match.parsedInfo;
+      
+      if (!parsed || !parsed.durationMinutes) {
+        return { confidence: 0.3 };
+      }
 
-    if (match.patternName === 'duration_hours') {
-      durationMinutes = parseInt(groups[1], 10) * 60;
-    } else if (match.patternName === 'duration_minutes') {
-      durationMinutes = parseInt(groups[1], 10);
+      const durationMinutes = parsed.durationMinutes;
+
+      // 入力時刻から継続時間分さかのぼって開始時刻を推定
+      const endTime = new Date(inputTime);
+      const startTime = new Date(endTime.getTime() - durationMinutes * 60 * 1000);
+
+      return {
+        startTime: startTime.toISOString(),
+        endTime: endTime.toISOString(),
+        totalMinutes: durationMinutes,
+        method: TimeExtractionMethod.RELATIVE,
+        confidence: match.confidence || 0.7,
+        timezone
+      };
+    } catch (error) {
+      console.error('継続時間パターンの解析エラー:', error);
+      return { confidence: 0.3 };
     }
-
-    // 入力時刻から継続時間分さかのぼって開始時刻を推定
-    const endTime = new Date(inputTime);
-    const startTime = new Date(endTime.getTime() - durationMinutes * 60 * 1000);
-
-    return {
-      startTime: startTime.toISOString(),
-      endTime: endTime.toISOString(),
-      totalMinutes: durationMinutes,
-      method: TimeExtractionMethod.RELATIVE,
-      confidence: 0.7,
-      timezone
-    };
   }
 
   /**
@@ -261,30 +329,30 @@ export class TimeInformationExtractor {
     inputTime: Date,
     timezone: string
   ): Partial<TimeAnalysisResult> {
-    const groups = match.groups;
-    let relativeMinutes = 0;
+    try {
+      const parsed = match.parsed || match.parsedInfo;
+      
+      if (!parsed || parsed.relativeMinutes === undefined) {
+        return { confidence: 0.3 };
+      }
 
-    // "さっき30分" or "30分前" の形式を解析
-    if (groups[2] && groups[3]) {
-      const value = parseInt(groups[2], 10);
-      const unit = groups[3];
-      relativeMinutes = unit === '時間' ? value * 60 : value;
-    } else {
-      // "さっき" のような曖昧な表現はデフォルト30分
-      relativeMinutes = 30;
+      const relativeMinutes = Math.abs(parsed.relativeMinutes); // 負の値を正に変換
+
+      const endTime = new Date(inputTime);
+      const startTime = new Date(endTime.getTime() - relativeMinutes * 60 * 1000);
+
+      return {
+        startTime: startTime.toISOString(),
+        endTime: endTime.toISOString(),
+        totalMinutes: relativeMinutes,
+        method: TimeExtractionMethod.RELATIVE,
+        confidence: match.confidence || 0.6,
+        timezone
+      };
+    } catch (error) {
+      console.error('相対時刻パターンの解析エラー:', error);
+      return { confidence: 0.3 };
     }
-
-    const endTime = new Date(inputTime);
-    const startTime = new Date(endTime.getTime() - relativeMinutes * 60 * 1000);
-
-    return {
-      startTime: startTime.toISOString(),
-      endTime: endTime.toISOString(),
-      totalMinutes: relativeMinutes,
-      method: TimeExtractionMethod.RELATIVE,
-      confidence: 0.6,
-      timezone
-    };
   }
 
   /**

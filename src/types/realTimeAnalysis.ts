@@ -307,10 +307,16 @@ export interface GeminiTimeAnalysisResponse {
 export interface TimePatternMatch {
   /** マッチしたパターン名 */
   patternName: string;
+  /** パターン名（代替形式） */
+  name?: string;
   /** マッチした内容 */
   match: string;
   /** キャプチャグループ */
   groups: string[];
+  /** パース結果 */
+  parsed?: any;
+  /** パース結果（代替形式） */
+  parsedInfo?: any;
   /** 信頼度 */
   confidence: number;
   /** 文字列内の位置 */

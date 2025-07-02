@@ -50,9 +50,9 @@ export const TIME_PATTERNS: TimePattern[] = [
   // === 明示的時刻範囲パターン ===
   {
     name: 'explicit_time_range_colon',
-    regex: /(\d{1,2}):(\d{2})\s*[-〜～から]\s*(\d{1,2}):(\d{2})/g,
+    regex: /(\d{1,2}):(\d{2})\s*(?:[-〜～]|から)\s*(\d{1,2}):(\d{2})(?:まで)?/g,
     componentType: TimeComponentType.START_TIME,
-    baseConfidence: 0.95,
+    baseConfidence: 0.98, // 最も具体的なパターンなので最高信頼度
     parser: (match) => ({
       startHour: parseInt(match[1], 10),
       startMinute: parseInt(match[2], 10),
@@ -62,7 +62,7 @@ export const TIME_PATTERNS: TimePattern[] = [
   },
   {
     name: 'explicit_time_range_japanese',
-    regex: /(\d{1,2})時(\d{1,2})?分?\s*[-〜～から]\s*(\d{1,2})時(\d{1,2})?分?/g,
+    regex: /(\d{1,2})時(\d{1,2})?分?\s*(?:[-〜～]|から)\s*(\d{1,2})時(\d{1,2})?分?(?:まで)?/g,
     componentType: TimeComponentType.START_TIME,
     baseConfidence: 0.9,
     parser: (match) => ({
@@ -141,7 +141,7 @@ export const TIME_PATTERNS: TimePattern[] = [
     name: 'relative_recent_duration',
     regex: /(さっき|先ほど)\s*(\d+)\s*(分|時間)/g,
     componentType: TimeComponentType.RELATIVE_TIME,
-    baseConfidence: 0.7,
+    baseConfidence: 0.85, // 具体的な相対時刻なので信頼度を上げる
     parser: (match) => {
       const value = parseInt(match[2], 10);
       const unit = match[3];
@@ -154,7 +154,7 @@ export const TIME_PATTERNS: TimePattern[] = [
     name: 'relative_ago',
     regex: /(\d+)\s*(分|時間)\s*前/g,
     componentType: TimeComponentType.RELATIVE_TIME,
-    baseConfidence: 0.75,
+    baseConfidence: 0.85, // 具体的な相対時刻なので信頼度を上げる
     parser: (match) => {
       const value = parseInt(match[1], 10);
       const unit = match[2];
@@ -251,7 +251,7 @@ export const TIME_PATTERNS: TimePattern[] = [
     name: 'until_time',
     regex: /(\d{1,2}):?(\d{2})?\s*まで/g,
     componentType: TimeComponentType.END_TIME,
-    baseConfidence: 0.7,
+    baseConfidence: 0.4, // 部分的なパターンなので低信頼度
     parser: (match) => ({
       endHour: parseInt(match[1], 10),
       endMinute: match[2] ? parseInt(match[2], 10) : 0
@@ -275,12 +275,15 @@ export class TimePatternMatcher {
 
       while ((match = pattern.regex.exec(input)) !== null) {
         try {
-          // const parsedInfo = pattern.parser(match); // 現在未使用
+          const parsedInfo = pattern.parser(match);
           
           matches.push({
             patternName: pattern.name,
+            name: pattern.name,
             match: match[0],
             groups: Array.from(match),
+            parsed: parsedInfo,
+            parsedInfo: parsedInfo,
             confidence: this.calculateConfidence(pattern, match, input),
             position: {
               start: match.index!,
@@ -330,15 +333,21 @@ export class TimePatternMatcher {
    * マッチ結果をソート・重複除去
    */
   private sortAndDeduplicateMatches(matches: TimePatternMatch[]): TimePatternMatch[] {
-    // 信頼度順でソート
-    const sorted = matches.sort((a, b) => b.confidence - a.confidence);
+    // 信頼度順でソート（信頼度が同じ場合はマッチ長の長い順）
+    const sorted = matches.sort((a, b) => {
+      if (Math.abs(a.confidence - b.confidence) < 0.01) {
+        return b.match.length - a.match.length;
+      }
+      return b.confidence - a.confidence;
+    });
     
     // 重複する位置のマッチを除去（信頼度が高いものを優先）
     const deduplicated: TimePatternMatch[] = [];
     
     for (const match of sorted) {
       const hasOverlap = deduplicated.some(existing => 
-        this.hasPositionOverlap(match.position, existing.position)
+        this.hasPositionOverlap(match.position, existing.position) ||
+        this.isSubsetMatch(match, existing)
       );
       
       if (!hasOverlap) {
@@ -347,6 +356,17 @@ export class TimePatternMatcher {
     }
 
     return deduplicated;
+  }
+
+  /**
+   * あるマッチが他のマッチの部分集合かチェック
+   */
+  private isSubsetMatch(match: TimePatternMatch, existing: TimePatternMatch): boolean {
+    // 一方が他方に完全に含まれている場合
+    return (match.position.start >= existing.position.start && 
+            match.position.end <= existing.position.end) ||
+           (existing.position.start >= match.position.start && 
+            existing.position.end <= match.position.end);
   }
 
   /**
@@ -379,7 +399,7 @@ export const TIME_EXPRESSION_NORMALIZER = {
     normalized = normalized.replace(/[：]/g, ':');
     
     // 範囲表現を統一
-    normalized = normalized.replace(/[〜～]/g, '-');
+    normalized = normalized.replace(/[〜～]/g, 'から');
 
     return normalized;
   },
@@ -393,6 +413,7 @@ export const TIME_EXPRESSION_NORMALIZER = {
       '先ほど': '30分前',
       'ちょっと前': '15分前',
       '少し前': '15分前',
+      '今': '0分前',
       '午前': '午前中',
       '午後': '午後の',
       '夜': '夕方から夜',

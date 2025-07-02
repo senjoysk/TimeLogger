@@ -36,7 +36,7 @@ describe('TimePatternMatcher', () => {
       const matches = matcher.matchPatterns(input);
       
       expect(matches).toHaveLength(1);
-      expect(matches[0].patternName).toBe('explicit_time_single_colon');
+      expect(matches[0].patternName).toBe('single_time_colon');
       expect(matches[0].groups).toEqual(expect.arrayContaining(['9', '30']));
     });
   });

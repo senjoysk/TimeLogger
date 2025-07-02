@@ -55,8 +55,8 @@ async function testRealTimeAnalysis() {
       try {
         const result = await analyzer.analyzeActivity(
           testCase.input,
-          testCase.inputTimestamp,
-          testCase.timezone
+          testCase.timezone,
+          testCase.inputTimestamp
         );
         
         console.log('✅ 分析結果:');
