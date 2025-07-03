@@ -106,7 +106,13 @@ export class SqliteActivityLogRepository implements IActivityLogRepository, IApi
         confidence: request.confidence,
         analysisMethod: request.analysisMethod,
         categories: request.categories,
-        analysisWarnings: request.analysisWarnings
+        analysisWarnings: request.analysisWarnings,
+        // 開始・終了ログマッチング機能（存在する場合）
+        logType: request.logType || 'complete',
+        matchStatus: request.matchStatus || 'unmatched',
+        matchedLogId: request.matchedLogId,
+        activityKey: request.activityKey,
+        similarityScore: request.similarityScore
       };
 
       const sql = `

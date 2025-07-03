@@ -18,7 +18,13 @@ CREATE TABLE IF NOT EXISTS activity_logs (
     confidence REAL,                -- 分析の信頼度 (0-1)
     analysis_method TEXT,           -- 時刻抽出手法
     categories TEXT,                -- カテゴリ（カンマ区切り）
-    analysis_warnings TEXT          -- 警告メッセージ（セミコロン区切り）
+    analysis_warnings TEXT,         -- 警告メッセージ（セミコロン区切り）
+    -- 開始・終了ログマッチング機能カラム（Phase 2）
+    log_type TEXT DEFAULT 'complete' CHECK (log_type IN ('complete', 'start_only', 'end_only')),
+    match_status TEXT DEFAULT 'unmatched' CHECK (match_status IN ('unmatched', 'matched', 'ignored')),
+    matched_log_id TEXT,            -- マッチング相手のログID
+    activity_key TEXT,              -- 活動内容の分類キー
+    similarity_score REAL           -- マッチング時の類似度スコア
 );
 
 -- 分析結果キャッシュテーブル
@@ -58,6 +64,19 @@ ON daily_analysis_cache(generated_at);
 
 CREATE INDEX IF NOT EXISTS idx_user_settings_timezone 
 ON user_settings(timezone);
+
+-- 開始・終了ログマッチング機能用インデックス（Phase 2）
+CREATE INDEX IF NOT EXISTS idx_activity_logs_log_type 
+ON activity_logs(log_type);
+
+CREATE INDEX IF NOT EXISTS idx_activity_logs_match_status 
+ON activity_logs(match_status);
+
+CREATE INDEX IF NOT EXISTS idx_activity_logs_matched_log_id 
+ON activity_logs(matched_log_id);
+
+CREATE INDEX IF NOT EXISTS idx_activity_logs_activity_key 
+ON activity_logs(activity_key);
 
 -- 分析結果用インデックス
 CREATE INDEX IF NOT EXISTS idx_activity_logs_analysis 

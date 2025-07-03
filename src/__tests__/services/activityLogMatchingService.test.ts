@@ -12,10 +12,13 @@ import {
   ActivityLog,
   MatchingCandidate
 } from '../../types/activityLog';
+import { GeminiService } from '../../services/geminiService';
 
 describe('ActivityLogMatchingService', () => {
   let service: ActivityLogMatchingService;
+  let serviceWithGemini: ActivityLogMatchingService;
   let mockStrategy: MatchingStrategy;
+  let mockGeminiService: jest.Mocked<GeminiService>;
 
   beforeEach(() => {
     // デフォルトのマッチング戦略
@@ -29,7 +32,18 @@ describe('ActivityLogMatchingService', () => {
       contentSimilarityWeight: 0.7
     };
 
+    // 基本サービス（Geminiなし）
     service = new ActivityLogMatchingService(mockStrategy);
+
+    // Gemini連携サービス用のモック作成
+    mockGeminiService = {
+      analyzeActivity: jest.fn(),
+      generateDailySummary: jest.fn(),
+      getDailyCostReport: jest.fn(),
+    } as any;
+
+    // Gemini連携サービス
+    serviceWithGemini = new ActivityLogMatchingService(mockStrategy, mockGeminiService);
   });
 
   describe('ログタイプ判定', () => {
@@ -275,6 +289,69 @@ describe('ActivityLogMatchingService', () => {
         expect(candidates).toHaveLength(1);
         // 時間スコア0.0 * 0.3 + 内容スコア1.0 * 0.7 = 0.7になるため、期待値を調整
         expect(candidates[0].score).toBeLessThan(0.8); // 時間スコア0.0で全体スコアが低下
+      });
+    });
+  });
+
+  describe('Gemini連携強化機能', () => {
+    describe('🔴 Red: 意味的類似性判定', () => {
+      it('異なる表現だが同じ意味の活動をマッチングできる', async () => {
+        // Arrange: 異なる表現だが同じ意味のログ
+        const startLog: ActivityLog = {
+          id: 'start-004',
+          userId: 'user-001',
+          content: '今からミーティングを始めます',
+          inputTimestamp: '2025-07-03T10:00:00.000Z',
+          businessDate: '2025-07-03',
+          isDeleted: false,
+          createdAt: '2025-07-03T10:00:00.000Z',
+          updatedAt: '2025-07-03T10:00:00.000Z',
+          logType: 'start_only',
+          matchStatus: 'unmatched',
+          activityKey: 'ミーティング'
+        };
+
+        const endCandidates: ActivityLog[] = [
+          {
+            id: 'end-004',
+            userId: 'user-001',
+            content: '会議が終わりました',
+            inputTimestamp: '2025-07-03T11:00:00.000Z',
+            businessDate: '2025-07-03',
+            isDeleted: false,
+            createdAt: '2025-07-03T11:00:00.000Z',
+            updatedAt: '2025-07-03T11:00:00.000Z',
+            logType: 'end_only',
+            matchStatus: 'unmatched',
+            activityKey: '会議'
+          }
+        ];
+
+        // Act
+        const candidates = await serviceWithGemini.findMatchingCandidatesWithSemantic(startLog, endCandidates);
+
+        // Assert
+        expect(candidates).toHaveLength(1);
+        expect(candidates[0].score).toBeGreaterThan(0.7); // 意味的類似性により高スコア
+        expect(candidates[0].reason).toContain('意味的類似性');
+      });
+
+      it('Geminiによるログタイプ分析ができる', async () => {
+        // Arrange
+        const request: LogTypeAnalysisRequest = {
+          content: 'プロジェクトの資料作成をスタートしました',
+          inputTimestamp: '2025-07-03T10:00:00.000Z',
+          timezone: 'Asia/Tokyo'
+        };
+
+        // Act
+        const result = await serviceWithGemini.analyzeLogTypeWithGemini(request);
+
+        // Assert
+        expect(result.logType).toBe('start_only');
+        expect(result.confidence).toBeGreaterThan(0.8);
+        expect(result.reasoning).toContain('Gemini');
+        expect(result.activityKey).toContain('資料作成');
       });
     });
   });
