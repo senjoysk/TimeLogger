@@ -45,7 +45,7 @@ describe('新システム統合コマンド', () => {
     const { GapDetectionService } = await import('../../services/gapDetectionService');
     const gapService = new GapDetectionService(repository);
     
-    // モック分析結果を作成
+    // DailyAnalysisResult型に合わせたモック分析結果を作成
     const mockAnalysisResult = {
       businessDate: '2025-06-30',
       timeline: [
@@ -53,21 +53,51 @@ describe('新システム統合コマンド', () => {
           startTime: new Date('2025-06-30T09:00:00+09:00').toISOString(),
           endTime: new Date('2025-06-30T09:30:00+09:00').toISOString(),
           category: 'プログラミング',
-          summary: 'テスト作業'
+          content: 'テスト作業',
+          confidence: 0.9,
+          sourceLogIds: []
         },
         {
           startTime: new Date('2025-06-30T11:00:00+09:00').toISOString(),
           endTime: new Date('2025-06-30T11:30:00+09:00').toISOString(),
           category: '会議',
-          summary: '1on1会議'
+          content: '1on1会議',
+          confidence: 0.9,
+          sourceLogIds: []
         }
       ],
       totalLogCount: 2,
-      categories: [{ category: 'プログラミング', count: 1, totalMinutes: 30 }, { category: '会議', count: 1, totalMinutes: 30 }],
-      timeDistribution: { morning: 30, afternoon: 30, evening: 0 },
-      insights: { productivityHours: ['09:00'], focusTime: 60, breakTime: 0, workPattern: 'normal' },
+      categories: [
+        { 
+          category: 'プログラミング', 
+          estimatedMinutes: 30, 
+          confidence: 0.9, 
+          logCount: 1, 
+          representativeActivities: ['テスト作業'] 
+        },
+        { 
+          category: '会議', 
+          estimatedMinutes: 30, 
+          confidence: 0.9, 
+          logCount: 1, 
+          representativeActivities: ['1on1会議'] 
+        }
+      ],
+      timeDistribution: {
+        totalEstimatedMinutes: 60,
+        workingMinutes: 60,
+        breakMinutes: 0,
+        unaccountedMinutes: 600,
+        overlapMinutes: 0
+      },
+      insights: {
+        productivityScore: 85,
+        workBalance: { focusTimeRatio: 0.5, meetingTimeRatio: 0.5, breakTimeRatio: 0, adminTimeRatio: 0 },
+        suggestions: ['バランスの良い作業です'],
+        highlights: ['プログラミングと会議'],
+        motivation: '良いペースで進んでいます'
+      },
       warnings: [],
-      confidence: 0.9,
       generatedAt: new Date().toISOString()
     };
 
@@ -111,10 +141,21 @@ describe('新システム統合コマンド', () => {
       timeline: [],
       totalLogCount: 0,
       categories: [],
-      timeDistribution: { morning: 0, afternoon: 0, evening: 0 },
-      insights: { productivityHours: [], focusTime: 0, breakTime: 0, workPattern: 'normal' },
+      timeDistribution: {
+        totalEstimatedMinutes: 0,
+        workingMinutes: 0,
+        breakMinutes: 0,
+        unaccountedMinutes: 660,
+        overlapMinutes: 0
+      },
+      insights: {
+        productivityScore: 0,
+        workBalance: { focusTimeRatio: 0, meetingTimeRatio: 0, breakTimeRatio: 0, adminTimeRatio: 0 },
+        suggestions: [],
+        highlights: [],
+        motivation: '今日はお休みでしたね'
+      },
       warnings: [],
-      confidence: 0.0,
       generatedAt: new Date().toISOString()
     };
 

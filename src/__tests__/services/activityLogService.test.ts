@@ -52,8 +52,9 @@ describe('ActivityLogService', () => {
     // モックをリセット
     jest.clearAllMocks();
     
-    // サービスインスタンスを作成
-    service = new ActivityLogService(mockRepository as any);
+    // サービスインスタンスを作成（GeminiServiceモックも追加）
+    const mockGeminiService = {} as any; // 簡易モック
+    service = new ActivityLogService(mockRepository as any, mockGeminiService);
 
     // 基本的なモック設定
     mockRepository.calculateBusinessDate.mockReturnValue({
