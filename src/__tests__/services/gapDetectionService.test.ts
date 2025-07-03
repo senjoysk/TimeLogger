@@ -28,7 +28,6 @@ class MockRepository {
 describe('GapDetectionService', () => {
   let service: GapDetectionService;
   let mockRepository: MockRepository;
-  const userId = 'test-user';
   const businessDate = '2025-06-30';
   const timezone = 'Asia/Tokyo';
 
@@ -41,7 +40,7 @@ describe('GapDetectionService', () => {
     mockRepository.clearLogs();
   });
 
-  describe.skip('ギャップ検出', () => {
+  describe('ギャップ検出', () => {
     test('ログがない場合、全時間帯がギャップとして検出される', async () => {
       // 空の分析結果を作成
       const mockAnalysisResult: DailyAnalysisResult = {
@@ -75,7 +74,7 @@ describe('GapDetectionService', () => {
       expect(gaps[0].durationMinutes).toBe(660); // 11時間
     });
 
-    test.skip('開始時刻から最初のログまでのギャップが検出される', async () => {
+    test('開始時刻から最初のログまでのギャップが検出される', async () => {
       // 9:00に1つの活動がある分析結果を作成
       const mockAnalysisResult: DailyAnalysisResult = {
         businessDate,
@@ -122,106 +121,203 @@ describe('GapDetectionService', () => {
       expect(firstGap!.durationMinutes).toBe(90); // 1.5時間
     });
 
-    test.skip('ログ間の15分以上のギャップが検出される', async () => {
-      // 9:00と11:00にログを追加（9:30-11:00のギャップ = 1.5時間）
-      const log1Time = new Date('2025-06-30T09:00:00+09:00');
-      const log2Time = new Date('2025-06-30T11:00:00+09:00');
-      
-      mockRepository.addTestLog({
-        id: 'log1',
-        userId,
+    test('ログ間の15分以上のギャップが検出される', async () => {
+      // 9:00-9:30と11:00-11:30の2つの活動がある分析結果（間に90分のギャップ）
+      const mockAnalysisResult: DailyAnalysisResult = {
         businessDate,
-        content: '作業1',
-        inputTimestamp: log1Time.toISOString(),
-        isDeleted: false,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
-      });
-
-      mockRepository.addTestLog({
-        id: 'log2',
-        userId,
-        businessDate,
-        content: '作業2',
-        inputTimestamp: log2Time.toISOString(),
-        isDeleted: false,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
-      });
-
-      // 既存のログベーステストは一時的にスキップ
-      const gaps: any[] = [];
+        timeline: [
+          {
+            startTime: '2025-06-30T00:00:00.000Z', // JST 9:00
+            endTime: '2025-06-30T00:30:00.000Z',   // JST 9:30
+            category: '作業',
+            content: '作業1',
+            confidence: 0.9,
+            sourceLogIds: []
+          },
+          {
+            startTime: '2025-06-30T02:00:00.000Z', // JST 11:00
+            endTime: '2025-06-30T02:30:00.000Z',   // JST 11:30
+            category: '作業',
+            content: '作業2',
+            confidence: 0.9,
+            sourceLogIds: []
+          }
+        ],
+        totalLogCount: 2,
+        categories: [
+          { 
+            category: '作業', 
+            estimatedMinutes: 60, 
+            confidence: 0.9, 
+            logCount: 2, 
+            representativeActivities: ['作業1', '作業2'] 
+          }
+        ],
+        timeDistribution: {
+          totalEstimatedMinutes: 60,
+          workingMinutes: 60,
+          breakMinutes: 0,
+          unaccountedMinutes: 600,
+          overlapMinutes: 0
+        },
+        insights: {
+          productivityScore: 75,
+          workBalance: { focusTimeRatio: 1.0, meetingTimeRatio: 0, breakTimeRatio: 0, adminTimeRatio: 0 },
+          suggestions: ['集中して作業できています'],
+          highlights: ['作業セッション'],
+          motivation: '良いペースです'
+        },
+        warnings: [],
+        generatedAt: new Date().toISOString()
+      };
       
-      // 9:30〜11:00のギャップが検出されるべき（9:00+30分後から11:00まで）
+      const gaps = await service.detectGapsFromAnalysis(mockAnalysisResult, timezone);
+      
+      // 期待されるギャップ：
+      // 1. 7:30-9:00 (90分) - 開始から最初の活動まで
+      // 2. 9:30-11:00 (90分) - 活動間のギャップ
+      // 3. 11:30-18:30 (420分) - 最後の活動から終了まで
+      expect(gaps.length).toBe(3);
+      
+      // 9:30〜11:00のギャップが検出されるべき（活動間の90分ギャップ）
       const logGap = gaps.find(g => g.startTimeLocal === '09:30' && g.endTimeLocal === '11:00');
       expect(logGap).toBeDefined();
       expect(logGap!.durationMinutes).toBe(90); // 1.5時間
     });
 
-    test.skip('15分未満のギャップは検出されない', async () => {
-      // 40分間隔でログを追加（9:00+30分=9:30から9:40まで = 10分のギャップ）
-      const log1Time = new Date('2025-06-30T09:00:00+09:00');
-      const log2Time = new Date('2025-06-30T09:40:00+09:00');
-      
-      mockRepository.addTestLog({
-        id: 'log1',
-        userId,
+    test('15分未満のギャップは検出されない', async () => {
+      // 9:00-9:30と9:40-10:10の2つの活動（間に10分の短いギャップ）
+      const mockAnalysisResult: DailyAnalysisResult = {
         businessDate,
-        content: '作業1',
-        inputTimestamp: log1Time.toISOString(),
-        isDeleted: false,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
-      });
-
-      mockRepository.addTestLog({
-        id: 'log2',
-        userId,
-        businessDate,
-        content: '作業2',
-        inputTimestamp: log2Time.toISOString(),
-        isDeleted: false,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
-      });
-
-      // 既存のログベーステストは一時的にスキップ
-      const gaps: any[] = [];
+        timeline: [
+          {
+            startTime: '2025-06-30T00:00:00.000Z', // JST 9:00
+            endTime: '2025-06-30T00:30:00.000Z',   // JST 9:30
+            category: '作業',
+            content: '作業1',
+            confidence: 0.9,
+            sourceLogIds: []
+          },
+          {
+            startTime: '2025-06-30T00:40:00.000Z', // JST 9:40
+            endTime: '2025-06-30T01:10:00.000Z',   // JST 10:10
+            category: '作業',
+            content: '作業2',
+            confidence: 0.9,
+            sourceLogIds: []
+          }
+        ],
+        totalLogCount: 2,
+        categories: [
+          { 
+            category: '作業', 
+            estimatedMinutes: 60, 
+            confidence: 0.9, 
+            logCount: 2, 
+            representativeActivities: ['作業1', '作業2'] 
+          }
+        ],
+        timeDistribution: {
+          totalEstimatedMinutes: 60,
+          workingMinutes: 60,
+          breakMinutes: 0,
+          unaccountedMinutes: 600,
+          overlapMinutes: 0
+        },
+        insights: {
+          productivityScore: 80,
+          workBalance: { focusTimeRatio: 1.0, meetingTimeRatio: 0, breakTimeRatio: 0, adminTimeRatio: 0 },
+          suggestions: ['集中して作業できています'],
+          highlights: ['継続的な作業'],
+          motivation: '良いリズムです'
+        },
+        warnings: [],
+        generatedAt: new Date().toISOString()
+      };
       
-      // 9:30〜9:40のギャップは検出されない（10分は15分未満）
+      const gaps = await service.detectGapsFromAnalysis(mockAnalysisResult, timezone);
+      
+      // 期待されるギャップ：
+      // 1. 7:30-9:00 (90分) - 開始から最初の活動まで
+      // 2. 10:10-18:30 (500分) - 最後の活動から終了まで
+      // 9:30-9:40の10分ギャップは15分未満なので検出されない
+      expect(gaps.length).toBe(2);
+      
+      // 9:30〜9:40の短いギャップは検出されない（10分は15分未満）
       const shortGap = gaps.find(g => g.startTimeLocal === '09:30' && g.endTimeLocal === '09:40');
       expect(shortGap).toBeUndefined();
+      
+      // 代わりに7:30-9:00と10:10-18:30のギャップが検出される
+      const firstGap = gaps.find(g => g.startTimeLocal === '07:30');
+      const lastGap = gaps.find(g => g.endTimeLocal === '18:30');
+      expect(firstGap).toBeDefined();
+      expect(lastGap).toBeDefined();
     });
 
     test('削除されたログは無視される', async () => {
-      // 削除済みログを追加
-      mockRepository.addTestLog({
-        id: 'log1',
-        userId,
+      // 削除されたログは分析結果のタイムラインに含まれないため、
+      // 空のタイムラインと同じ結果になることをテスト
+      const mockAnalysisResult: DailyAnalysisResult = {
         businessDate,
-        content: '削除された作業',
-        inputTimestamp: new Date(`${businessDate}T09:00:00+09:00`).toISOString(),
-        isDeleted: true, // 削除フラグ
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
-      });
-
-      // 既存のログベーステストは一時的にスキップ
-      const gaps: any[] = [];
+        timeline: [], // 削除されたログは分析結果に含まれない
+        totalLogCount: 0, // 削除されたログはカウントされない
+        categories: [],
+        timeDistribution: {
+          totalEstimatedMinutes: 0,
+          workingMinutes: 0,
+          breakMinutes: 0,
+          unaccountedMinutes: 660,
+          overlapMinutes: 0
+        },
+        insights: {
+          productivityScore: 0,
+          workBalance: { focusTimeRatio: 0, meetingTimeRatio: 0, breakTimeRatio: 0, adminTimeRatio: 0 },
+          suggestions: [],
+          highlights: [],
+          motivation: '削除されたログは分析対象外です'
+        },
+        warnings: [],
+        generatedAt: new Date().toISOString()
+      };
+      
+      const gaps = await service.detectGapsFromAnalysis(mockAnalysisResult, timezone);
       
       // 削除されたログは無視され、全時間帯がギャップとなる
       expect(gaps.length).toBe(1);
       expect(gaps[0].startTimeLocal).toBe('07:30');
       expect(gaps[0].endTimeLocal).toBe('18:30');
+      expect(gaps[0].durationMinutes).toBe(660); // 11時間
     });
 
     test('今日の場合は現在時刻まででギャップを検出', async () => {
-      // 特定の日付でテストする代わりに、過去の日付でテスト
+      // 現在日時のテストでは、過去の日付を使用して一貫性を保つ
       const pastDate = '2025-06-29'; // 明確に過去の日付
-      // 過去のテストはスキップ
-      const gaps: any[] = [];
+      const mockAnalysisResult: DailyAnalysisResult = {
+        businessDate: pastDate,
+        timeline: [], // 活動なし
+        totalLogCount: 0,
+        categories: [],
+        timeDistribution: {
+          totalEstimatedMinutes: 0,
+          workingMinutes: 0,
+          breakMinutes: 0,
+          unaccountedMinutes: 660,
+          overlapMinutes: 0
+        },
+        insights: {
+          productivityScore: 0,
+          workBalance: { focusTimeRatio: 0, meetingTimeRatio: 0, breakTimeRatio: 0, adminTimeRatio: 0 },
+          suggestions: [],
+          highlights: [],
+          motivation: '過去の日付テスト'
+        },
+        warnings: [],
+        generatedAt: new Date().toISOString()
+      };
       
-      // 過去の日付の場合は18:30までのギャップ
+      const gaps = await service.detectGapsFromAnalysis(mockAnalysisResult, timezone);
+      
+      // 過去の日付の場合は18:30までのギャップ（一日全体）
       expect(gaps.length).toBe(1);
       expect(gaps[0].startTimeLocal).toBe('07:30');
       expect(gaps[0].endTimeLocal).toBe('18:30');
@@ -229,32 +325,70 @@ describe('GapDetectionService', () => {
     });
 
     test('実際のシナリオをテスト：間隔のあるログ', async () => {
-      // ユーザーが報告したシナリオを再現
-      const logs = [
-        { time: '09:00', content: '通勤' },
-        { time: '09:30', content: '1on1 住吉さん' },
-        { time: '10:30', content: '1on1 美和くん' },
-        { time: '11:30', content: 'メールやスラック返信' }
-      ];
-
-      logs.forEach((log, index) => {
-        const logTime = new Date(`${businessDate}T${log.time}:00+09:00`);
-        mockRepository.addTestLog({
-          id: `log${index + 1}`,
-          userId,
-          businessDate,
-          content: log.content,
-          inputTimestamp: logTime.toISOString(),
-          isDeleted: false,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString()
-        });
-      });
-
-      // 既存のログベーステストは一時的にスキップ
-      const gaps: any[] = [];
+      // ユーザーが報告したシナリオを再現（各活動30分と仮定）
+      const mockAnalysisResult: DailyAnalysisResult = {
+        businessDate,
+        timeline: [
+          {
+            startTime: '2025-06-30T00:00:00.000Z', // JST 9:00
+            endTime: '2025-06-30T00:30:00.000Z',   // JST 9:30
+            category: '通勤',
+            content: '通勤',
+            confidence: 0.9,
+            sourceLogIds: []
+          },
+          {
+            startTime: '2025-06-30T00:30:00.000Z', // JST 9:30
+            endTime: '2025-06-30T01:00:00.000Z',   // JST 10:00
+            category: '会議',
+            content: '1on1 住吉さん',
+            confidence: 0.9,
+            sourceLogIds: []
+          },
+          {
+            startTime: '2025-06-30T01:30:00.000Z', // JST 10:30
+            endTime: '2025-06-30T02:00:00.000Z',   // JST 11:00
+            category: '会議',
+            content: '1on1 美和くん',
+            confidence: 0.9,
+            sourceLogIds: []
+          },
+          {
+            startTime: '2025-06-30T02:30:00.000Z', // JST 11:30
+            endTime: '2025-06-30T03:00:00.000Z',   // JST 12:00
+            category: 'コミュニケーション',
+            content: 'メールやスラック返信',
+            confidence: 0.9,
+            sourceLogIds: []
+          }
+        ],
+        totalLogCount: 4,
+        categories: [
+          { category: '通勤', estimatedMinutes: 30, confidence: 0.9, logCount: 1, representativeActivities: ['通勤'] },
+          { category: '会議', estimatedMinutes: 60, confidence: 0.9, logCount: 2, representativeActivities: ['1on1 住吉さん', '1on1 美和くん'] },
+          { category: 'コミュニケーション', estimatedMinutes: 30, confidence: 0.9, logCount: 1, representativeActivities: ['メールやスラック返信'] }
+        ],
+        timeDistribution: {
+          totalEstimatedMinutes: 120,
+          workingMinutes: 120,
+          breakMinutes: 0,
+          unaccountedMinutes: 540,
+          overlapMinutes: 0
+        },
+        insights: {
+          productivityScore: 85,
+          workBalance: { focusTimeRatio: 0.25, meetingTimeRatio: 0.5, breakTimeRatio: 0, adminTimeRatio: 0.25 },
+          suggestions: ['会議が多めの日でした'],
+          highlights: ['1on1会議', 'コミュニケーション'],
+          motivation: 'チームワークが素晴らしいです'
+        },
+        warnings: [],
+        generatedAt: new Date().toISOString()
+      };
       
-      // 期待されるギャップ（30分間の活動を仮定）：
+      const gaps = await service.detectGapsFromAnalysis(mockAnalysisResult, timezone);
+      
+      // 期待されるギャップ：
       // 1. 7:30-9:00 (90分) - 開始から最初のログまで
       // 2. 10:00-10:30 (30分) - 9:30+30分後から10:30まで
       // 3. 11:00-11:30 (30分) - 10:30+30分後から11:30まで
