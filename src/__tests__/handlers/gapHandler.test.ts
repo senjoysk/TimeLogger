@@ -13,8 +13,12 @@ class MockMessage {
   public author: { id: string; bot: boolean; tag: string };
   public guild: null = null;
   public channel: { isDMBased: () => boolean } = { isDMBased: () => true };
-  public replies: any[] = [];
   public components: any[] = [];
+  public lastEditContent: string = '';
+  public lastEditOptions: any = null;
+  
+  // 返されたReplyMessageを管理
+  private replyMessages: MockMessage[] = [];
 
   constructor(content: string, userId: string = '770478489203507241') {
     this.content = content;
@@ -22,14 +26,19 @@ class MockMessage {
   }
 
   async reply(options: any): Promise<MockMessage> {
-    this.replies.push(options);
     const replyMessage = new MockMessage('Reply');
+    replyMessage.lastEditContent = typeof options === 'string' ? options : (options.content || '');
+    replyMessage.lastEditOptions = typeof options === 'object' ? options : { content: options };
     replyMessage.components = options.components || [];
+    
+    this.replyMessages.push(replyMessage);
     return replyMessage;
   }
 
   async edit(options: any): Promise<void> {
     this.components = options.components || [];
+    this.lastEditContent = typeof options === 'string' ? options : (options.content || '');
+    this.lastEditOptions = typeof options === 'object' ? options : { content: options };
   }
 
   createMessageComponentCollector(options: any): any {
@@ -37,6 +46,15 @@ class MockMessage {
       on: jest.fn(),
       stop: jest.fn()
     };
+  }
+  
+  // テスト用ヘルパーメソッド
+  getLastReply(): MockMessage | undefined {
+    return this.replyMessages[this.replyMessages.length - 1];
+  }
+  
+  getAllReplies(): MockMessage[] {
+    return this.replyMessages;
   }
 }
 
@@ -129,8 +147,9 @@ describe('GapHandler', () => {
 
       await handler.handle(mockMessage as unknown as Message, '770478489203507241', [], 'Asia/Tokyo');
 
-      expect(mockMessage.replies.length).toBe(1);
-      expect(mockMessage.replies[0]).toBe('✅ 7:30〜18:30の間に15分以上の記録の空白はありませんでした。');
+      const replies = mockMessage.getAllReplies();
+      expect(replies.length).toBe(1);
+      expect(replies[0].lastEditContent).toBe('✅ 7:30〜18:30の間に15分以上の記録の空白はありませんでした。');
     });
 
     test('ギャップがある場合、Embedとボタンを表示', async () => {
@@ -155,17 +174,18 @@ describe('GapHandler', () => {
 
       await handler.handle(mockMessage as unknown as Message, '770478489203507241', [], 'Asia/Tokyo');
 
-      expect(mockMessage.replies.length).toBe(1);
-      const reply = mockMessage.replies[0];
+      const replies = mockMessage.getAllReplies();
+      expect(replies.length).toBe(1);
+      const reply = replies[0];
       
       // Embedの確認
-      expect(reply.embeds).toBeDefined();
-      expect(reply.embeds.length).toBe(1);
+      expect(reply.lastEditOptions.embeds).toBeDefined();
+      expect(reply.lastEditOptions.embeds.length).toBe(1);
       
       // ボタンの確認
-      expect(reply.components).toBeDefined();
-      expect(reply.components.length).toBeGreaterThan(0);
-      expect(reply.components[0].components.length).toBe(2); // 2つのギャップ = 2つのボタン
+      expect(reply.lastEditOptions.components).toBeDefined();
+      expect(reply.lastEditOptions.components.length).toBeGreaterThan(0);
+      expect(reply.lastEditOptions.components[0].components.length).toBe(2); // 2つのギャップ = 2つのボタン
     });
 
     test('複数のギャップが正しくフォーマットされる', async () => {
@@ -183,7 +203,9 @@ describe('GapHandler', () => {
 
       await handler.handle(mockMessage as unknown as Message, '770478489203507241', [], 'Asia/Tokyo');
 
-      const reply = mockMessage.replies[0];
+      const replies = mockMessage.getAllReplies();
+      expect(replies.length).toBe(1);
+      const reply = replies[0];
       const embed = reply.lastEditOptions.embeds[0];
       
       // Embedのフィールドを確認
@@ -201,8 +223,10 @@ describe('GapHandler', () => {
 
       await handler.handle(mockMessage as unknown as Message, '770478489203507241', [], 'Asia/Tokyo');
 
-      expect(mockMessage.replies.length).toBe(1);
-      expect(mockMessage.replies[0].lastEditContent).toBe('❌ ギャップの検出中にエラーが発生しました\n\nエラー詳細: Test error');
+      const replies = mockMessage.getAllReplies();
+      expect(replies.length).toBe(2); // 進行メッセージ + エラーメッセージ
+      expect(replies[0].lastEditContent).toBe('🔍 ギャップを検出中です...'); // 進行メッセージ
+      expect(replies[1].lastEditContent).toBe('❌ ギャップの検出中にエラーが発生しました\n\nエラー詳細: Test error'); // エラーメッセージ
     });
   });
 
@@ -225,7 +249,9 @@ describe('GapHandler', () => {
 
       await handler.handle(mockMessage as unknown as Message, '770478489203507241', [], 'Asia/Tokyo');
 
-      const reply = mockMessage.replies[0];
+      const replies = mockMessage.getAllReplies();
+      expect(replies.length).toBe(1);
+      const reply = replies[0];
       
       // 2行に分割されることを確認（1行最大5個）
       expect(reply.lastEditOptions.components.length).toBe(2);
