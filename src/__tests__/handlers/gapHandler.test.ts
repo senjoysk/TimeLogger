@@ -184,7 +184,7 @@ describe('GapHandler', () => {
       await handler.handle(mockMessage as unknown as Message, '770478489203507241', [], 'Asia/Tokyo');
 
       const reply = mockMessage.replies[0];
-      const embed = reply.embeds[0];
+      const embed = reply.lastEditOptions.embeds[0];
       
       // Embedのフィールドを確認
       expect(embed.data.fields[0].name).toBe('1. 09:00 〜 09:30');
@@ -197,12 +197,12 @@ describe('GapHandler', () => {
       const mockMessage = new MockMessage('!gap');
       
       // エラーをスロー
-      jest.spyOn(mockGapDetectionService, 'detectGaps').mockRejectedValue(new Error('Test error'));
+      jest.spyOn(mockGapDetectionService, 'detectGapsFromAnalysis').mockRejectedValue(new Error('Test error'));
 
       await handler.handle(mockMessage as unknown as Message, '770478489203507241', [], 'Asia/Tokyo');
 
       expect(mockMessage.replies.length).toBe(1);
-      expect(mockMessage.replies[0]).toBe('❌ ギャップの検出中にエラーが発生しました。');
+      expect(mockMessage.replies[0].lastEditContent).toBe('❌ ギャップの検出中にエラーが発生しました\n\nエラー詳細: Test error');
     });
   });
 
@@ -228,9 +228,9 @@ describe('GapHandler', () => {
       const reply = mockMessage.replies[0];
       
       // 2行に分割されることを確認（1行最大5個）
-      expect(reply.components.length).toBe(2);
-      expect(reply.components[0].components.length).toBe(5); // 1行目: 5個
-      expect(reply.components[1].components.length).toBe(1); // 2行目: 1個
+      expect(reply.lastEditOptions.components.length).toBe(2);
+      expect(reply.lastEditOptions.components[0].components.length).toBe(5); // 1行目: 5個
+      expect(reply.lastEditOptions.components[1].components.length).toBe(1); // 2行目: 1個
     });
   });
 });

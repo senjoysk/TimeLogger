@@ -16,7 +16,7 @@ import {
   ModalSubmitInteraction,
   MessageComponentInteraction
 } from 'discord.js';
-import { IGapDetectionService } from '../services/gapDetectionService';
+import { IGapDetectionService, TimeGap } from '../services/gapDetectionService';
 import { IActivityLogService } from '../services/activityLogService';
 import { IUnifiedAnalysisService } from '../services/unifiedAnalysisService';
 
@@ -38,11 +38,11 @@ export interface IGapHandler {
  * ギャップハンドラーの実装
  */
 export class GapHandler implements IGapHandler {
-  // ボタンのカスタムID接頭辞
-  private readonly BUTTON_PREFIX = 'gap_record_';
-  
-  // モーダルのカスタムID接頭辞
-  private readonly MODAL_PREFIX = 'gap_modal_';
+  // 定数定義
+  private static readonly BUTTON_PREFIX = 'gap_record_';
+  private static readonly MODAL_PREFIX = 'gap_modal_';
+  private static readonly INTERACTION_TIMEOUT = 300000; // 5分
+  private static readonly MAX_BUTTONS_PER_ROW = 5;
 
   constructor(
     private gapDetectionService: IGapDetectionService,
@@ -55,36 +55,26 @@ export class GapHandler implements IGapHandler {
    */
   async handle(message: Message, userId: string, _args: string[], timezone: string): Promise<void> {
     try {
-      console.log(`🔍 ギャップ検出開始: ${userId}`);
-
-      // 今日の業務日を計算
       const businessInfo = this.activityLogService.calculateBusinessDate(timezone);
       const businessDate = businessInfo.businessDate;
 
-      // 進行状況メッセージを送信
       const progressMessage = await message.reply('🔍 ギャップを検出中です...');
 
-      // 分析結果を取得してギャップ検出を実行
-      console.log(`📊 分析結果を取得中... (userId: ${userId}, businessDate: ${businessDate}, timezone: ${timezone})`);
       const analysisResult = await this.unifiedAnalysisService.analyzeDaily({
         userId,
         businessDate,
         timezone,
-        forceRefresh: false // キャッシュを活用
+        forceRefresh: false
       });
 
-      console.log(`📊 分析結果取得完了: ${analysisResult.timeline.length}個のタイムライン`);
       const gaps = await this.gapDetectionService.detectGapsFromAnalysis(analysisResult, timezone);
-      console.log(`✅ 分析結果ベースでギャップ検出完了: ${gaps.length}件`);
 
       if (gaps.length === 0) {
-        // ギャップがない場合
         await progressMessage.edit('✅ 7:30〜18:30の間に15分以上の記録の空白はありませんでした。');
         return;
       }
 
-      // ギャップがある場合、Embedで表示
-      const embed = this.createGapEmbed(gaps, businessDate, timezone);
+      const embed = this.createGapEmbed(gaps, businessDate);
       const components = this.createGapButtons(gaps);
 
       await progressMessage.edit({
@@ -93,10 +83,7 @@ export class GapHandler implements IGapHandler {
         components
       });
 
-      // ボタンインタラクションのリスナーを設定
       this.setupInteractionListeners(progressMessage, userId, timezone, gaps);
-
-      console.log(`🔍 ギャップ検出完了: ${gaps.length}件のギャップを検出`);
     } catch (error) {
       console.error('❌ ギャップ検出エラー:', error);
       const errorMessage = `❌ ギャップの検出中にエラーが発生しました\n\nエラー詳細: ${error instanceof Error ? error.message : String(error)}`;
@@ -107,7 +94,7 @@ export class GapHandler implements IGapHandler {
   /**
    * ギャップ表示用のEmbedを作成
    */
-  private createGapEmbed(gaps: any[], businessDate: string, _timezone: string): EmbedBuilder {
+  private createGapEmbed(gaps: TimeGap[], businessDate: string): EmbedBuilder {
     const embed = new EmbedBuilder()
       .setTitle('📋 未登録の時間帯')
       .setDescription('以下の時間帯の活動記録がありません。')
@@ -136,18 +123,16 @@ export class GapHandler implements IGapHandler {
   /**
    * ギャップ記録用のボタンを作成
    */
-  private createGapButtons(gaps: any[]): ActionRowBuilder<ButtonBuilder>[] {
+  private createGapButtons(gaps: TimeGap[]): ActionRowBuilder<ButtonBuilder>[] {
     const rows: ActionRowBuilder<ButtonBuilder>[] = [];
     let currentRow = new ActionRowBuilder<ButtonBuilder>();
     let buttonCount = 0;
 
     gaps.forEach((gap, index) => {
-      // ボタンのラベルを作成
       const label = `${gap.startTimeLocal} 〜 ${gap.endTimeLocal}`;
       
-      // ボタンを作成
       const button = new ButtonBuilder()
-        .setCustomId(`${this.BUTTON_PREFIX}${index}`)
+        .setCustomId(`${GapHandler.BUTTON_PREFIX}${index}`)
         .setLabel(label)
         .setStyle(ButtonStyle.Primary)
         .setEmoji('📝');
@@ -155,8 +140,7 @@ export class GapHandler implements IGapHandler {
       currentRow.addComponents(button);
       buttonCount++;
 
-      // 1行に最大5個のボタン
-      if (buttonCount === 5) {
+      if (buttonCount === GapHandler.MAX_BUTTONS_PER_ROW) {
         rows.push(currentRow);
         currentRow = new ActionRowBuilder<ButtonBuilder>();
         buttonCount = 0;
@@ -178,11 +162,10 @@ export class GapHandler implements IGapHandler {
     message: Message, 
     userId: string, 
     timezone: string,
-    gaps: any[]
+    gaps: TimeGap[]
   ): void {
-    // 5分間のタイムアウト
     const collector = message.createMessageComponentCollector({
-      time: 300000 // 5分
+      time: GapHandler.INTERACTION_TIMEOUT
     });
 
     collector.on('collect', async (interaction: MessageComponentInteraction) => {
@@ -195,8 +178,7 @@ export class GapHandler implements IGapHandler {
         return;
       }
 
-      // ボタンクリックの処理
-      if (interaction.isButton() && interaction.customId.startsWith(this.BUTTON_PREFIX)) {
+      if (interaction.isButton() && interaction.customId.startsWith(GapHandler.BUTTON_PREFIX)) {
         await this.handleButtonClick(interaction as ButtonInteraction, gaps, timezone);
       }
     });
@@ -225,11 +207,10 @@ export class GapHandler implements IGapHandler {
    */
   private async handleButtonClick(
     interaction: ButtonInteraction, 
-    gaps: any[],
+    gaps: TimeGap[],
     timezone: string
   ): Promise<void> {
-    // ギャップのインデックスを取得
-    const gapIndex = parseInt(interaction.customId.replace(this.BUTTON_PREFIX, ''));
+    const gapIndex = parseInt(interaction.customId.replace(GapHandler.BUTTON_PREFIX, ''));
     const gap = gaps[gapIndex];
 
     if (!gap) {
@@ -240,32 +221,28 @@ export class GapHandler implements IGapHandler {
       return;
     }
 
-    // モーダルを作成
     const modal = this.createActivityModal(gap, gapIndex);
     
-    // モーダルを表示
     await interaction.showModal(modal);
 
-    // モーダル送信を待機
     try {
       const modalSubmit = await interaction.awaitModalSubmit({
-        time: 300000, // 5分
-        filter: (i) => i.customId === `${this.MODAL_PREFIX}${gapIndex}`
+        time: GapHandler.INTERACTION_TIMEOUT,
+        filter: (i) => i.customId === `${GapHandler.MODAL_PREFIX}${gapIndex}`
       });
 
       await this.handleModalSubmit(modalSubmit, gap, timezone);
     } catch (error) {
-      // タイムアウトした場合は何もしない
-      console.log('モーダルがタイムアウトしました');
+      // タイムアウト時は何もしない
     }
   }
 
   /**
    * 活動入力モーダルを作成
    */
-  private createActivityModal(gap: any, index: number): ModalBuilder {
+  private createActivityModal(gap: TimeGap, index: number): ModalBuilder {
     const modal = new ModalBuilder()
-      .setCustomId(`${this.MODAL_PREFIX}${index}`)
+      .setCustomId(`${GapHandler.MODAL_PREFIX}${index}`)
       .setTitle('活動内容を入力');
 
     // 時間帯を表示
@@ -301,31 +278,25 @@ export class GapHandler implements IGapHandler {
    */
   private async handleModalSubmit(
     interaction: ModalSubmitInteraction,
-    gap: any,
+    gap: TimeGap,
     timezone: string
   ): Promise<void> {
     try {
-      // 入力された活動内容を取得
       const activityContent = interaction.fields.getTextInputValue('activity_content');
 
-      // ギャップの開始時刻を使用してログを記録
       const startTime = new Date(gap.startTime);
-      const log = await this.activityLogService.recordActivity(
+      await this.activityLogService.recordActivity(
         interaction.user.id,
         activityContent,
         timezone,
         startTime.toISOString()
       );
 
-      // 成功メッセージを送信
       await interaction.reply({
         content: `✅ ${gap.startTimeLocal} 〜 ${gap.endTimeLocal} の活動を記録しました:\n> ${activityContent}`,
         ephemeral: true
       });
-
-      console.log(`📝 ギャップ活動を記録: ${log.id}`);
     } catch (error) {
-      console.error('❌ 活動記録エラー:', error);
       await interaction.reply({
         content: '❌ 活動の記録中にエラーが発生しました。',
         ephemeral: true
