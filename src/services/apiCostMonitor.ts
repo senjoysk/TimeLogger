@@ -9,9 +9,9 @@ export class ApiCostMonitor {
   private repository: IApiCostRepository;
   private config = config;
   
-  // Gemini 1.5 Flash の料金（2024年6月時点の推定）
-  private readonly PRICE_PER_INPUT_TOKEN = 0.00000075; // $0.075/1M tokens
-  private readonly PRICE_PER_OUTPUT_TOKEN = 0.0000003;  // $0.3/1M tokens
+  // Gemini 2.0 Flash の料金（2024年12月時点の公式料金）
+  private readonly PRICE_PER_INPUT_TOKEN = 0.0000001; // $0.10/1M tokens
+  private readonly PRICE_PER_OUTPUT_TOKEN = 0.0000004;  // $0.40/1M tokens
 
   constructor(repository: IApiCostRepository) {
     this.repository = repository;
