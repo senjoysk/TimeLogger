@@ -13,6 +13,7 @@ import { EditCommandHandler } from '../handlers/editCommandHandler';
 import { SummaryHandler } from '../handlers/summaryHandler';
 import { LogsCommandHandler } from '../handlers/logsCommandHandler';
 import { TimezoneHandler } from '../handlers/timezoneHandler';
+import { UnmatchedCommandHandler } from '../handlers/unmatchedCommandHandler';
 import { GeminiService } from '../services/geminiService';
 import { GapDetectionService } from '../services/gapDetectionService';
 import { ActivityLogError } from '../types/activityLog';
@@ -56,6 +57,7 @@ export class ActivityLoggingIntegration {
   private logsHandler!: LogsCommandHandler;
   private timezoneHandler!: TimezoneHandler;
   private gapHandler!: GapHandler;
+  private unmatchedHandler!: UnmatchedCommandHandler;
 
   // 設定
   private config: ActivityLoggingConfig;
@@ -114,6 +116,7 @@ export class ActivityLoggingIntegration {
         this.activityLogService,
         this.unifiedAnalysisService
       );
+      this.unmatchedHandler = new UnmatchedCommandHandler(this.activityLogService);
       console.log('✅ ハンドラー層初期化完了');
 
       this.isInitialized = true;
@@ -288,6 +291,13 @@ export class ActivityLoggingIntegration {
       case 'ギャップ':
         console.log(`🔧 gapコマンド実行: ユーザー=${userId}, タイムゾーン=${timezone}, ハンドラー存在=${!!this.gapHandler}`);
         await this.gapHandler.handle(message, userId, args, timezone);
+        break;
+
+      case 'unmatched':
+      case 'マッチング':
+      case 'match':
+        console.log(`🔗 unmatchedコマンド実行: ユーザー=${userId}, タイムゾーン=${timezone}, ハンドラー存在=${!!this.unmatchedHandler}`);
+        await this.unmatchedHandler.handle(message, userId, args, timezone);
         break;
 
       default:
