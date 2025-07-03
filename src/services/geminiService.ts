@@ -19,12 +19,12 @@ export class GeminiService implements IAnalysisService {
     // Gemini API の初期化
     this.genAI = new GoogleGenerativeAI(config.gemini.apiKey);
     
-    // Gemini 1.5 Flash モデルを使用（高速で日本語対応）
+    // Gemini 2.0 Flash モデルを使用（精度向上・コスト効率）
     this.model = this.genAI.getGenerativeModel({ 
-      model: 'gemini-1.5-flash',
+      model: 'gemini-2.0-flash',
       generationConfig: {
-        temperature: 0.3, // 一貫性を重視した低い温度設定
-        topP: 0.95,       // 適度な多様性
+        temperature: 0.2, // より一貫性を重視した低い温度設定
+        topP: 0.9,        // 精度重視の設定
         maxOutputTokens: 1000, // 十分な出力長
       },
     });
