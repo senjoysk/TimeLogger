@@ -114,8 +114,9 @@ export class SqliteActivityLogRepository implements IActivityLogRepository, IApi
           id, user_id, content, input_timestamp, business_date, 
           is_deleted, created_at, updated_at,
           start_time, end_time, total_minutes, confidence, 
-          analysis_method, categories, analysis_warnings
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          analysis_method, categories, analysis_warnings,
+          log_type, match_status, matched_log_id, activity_key, similarity_score
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `;
 
       await this.runQuery(sql, [
@@ -133,7 +134,12 @@ export class SqliteActivityLogRepository implements IActivityLogRepository, IApi
         log.confidence || null,
         log.analysisMethod || null,
         log.categories || null,
-        log.analysisWarnings || null
+        log.analysisWarnings || null,
+        log.logType || 'complete',
+        log.matchStatus || 'unmatched',
+        log.matchedLogId || null,
+        log.activityKey || null,
+        log.similarityScore || null
       ]);
 
       console.log(`✅ 活動ログを保存しました: ${log.id}`);
@@ -663,6 +669,13 @@ export class SqliteActivityLogRepository implements IActivityLogRepository, IApi
     if (row.categories !== undefined) log.categories = row.categories;
     if (row.analysis_warnings !== undefined) log.analysisWarnings = row.analysis_warnings;
 
+    // 開始・終了ログマッチング関連フィールドをマッピング（存在する場合のみ）
+    if (row.log_type !== undefined) log.logType = row.log_type;
+    if (row.match_status !== undefined) log.matchStatus = row.match_status;
+    if (row.matched_log_id !== undefined) log.matchedLogId = row.matched_log_id;
+    if (row.activity_key !== undefined) log.activityKey = row.activity_key;
+    if (row.similarity_score !== undefined) log.similarityScore = row.similarity_score;
+
     return log;
   }
 
@@ -1025,6 +1038,148 @@ export class SqliteActivityLogRepository implements IActivityLogRepository, IApi
     } catch (error) {
       console.error('❌ 全ユーザータイムゾーン取得エラー:', error);
       throw new ActivityLogError('全ユーザータイムゾーン設定の取得に失敗しました', 'GET_ALL_USER_TIMEZONES_ERROR', { error });
+    }
+  }
+
+  // === 開始・終了ログマッチング関連メソッド ===
+
+  /**
+   * ログのマッチング情報を更新
+   * @param logId ログID
+   * @param matchInfo マッチング情報
+   */
+  async updateLogMatching(logId: string, matchInfo: {
+    matchStatus?: string;
+    matchedLogId?: string;
+    similarityScore?: number;
+  }): Promise<void> {
+    try {
+      const setParts: string[] = [];
+      const params: any[] = [];
+
+      if (matchInfo.matchStatus !== undefined) {
+        setParts.push('match_status = ?');
+        params.push(matchInfo.matchStatus);
+      }
+
+      if (matchInfo.matchedLogId !== undefined) {
+        setParts.push('matched_log_id = ?');
+        params.push(matchInfo.matchedLogId);
+      }
+
+      if (matchInfo.similarityScore !== undefined) {
+        setParts.push('similarity_score = ?');
+        params.push(matchInfo.similarityScore);
+      }
+
+      if (setParts.length === 0) {
+        return; // 更新するものがない
+      }
+
+      setParts.push('updated_at = ?');
+      params.push(new Date().toISOString());
+      params.push(logId);
+
+      const sql = `UPDATE activity_logs SET ${setParts.join(', ')} WHERE id = ?`;
+      await this.runQuery(sql, params);
+
+      console.log(`✅ ログマッチング情報を更新しました: ${logId}`);
+    } catch (error) {
+      console.error('❌ ログマッチング情報更新エラー:', error);
+      throw new ActivityLogError('ログマッチング情報の更新に失敗しました', 'UPDATE_LOG_MATCHING_ERROR', { error, logId, matchInfo });
+    }
+  }
+
+  /**
+   * 未マッチのログを取得（指定されたログタイプ）
+   * @param userId ユーザーID
+   * @param logType ログタイプ
+   * @param businessDate 業務日（オプション）
+   * @returns 未マッチログ配列
+   */
+  async getUnmatchedLogs(userId: string, logType: string, businessDate?: string): Promise<ActivityLog[]> {
+    try {
+      let sql = `
+        SELECT * FROM activity_logs 
+        WHERE user_id = ? 
+          AND log_type = ? 
+          AND match_status = 'unmatched'
+          AND is_deleted = 0
+      `;
+      const params = [userId, logType];
+
+      if (businessDate) {
+        sql += ' AND business_date = ?';
+        params.push(businessDate);
+      }
+
+      sql += ' ORDER BY input_timestamp ASC';
+
+      const rows = await this.allQuery(sql, params) as any[];
+      return rows.map(this.mapRowToActivityLog);
+    } catch (error) {
+      console.error('❌ 未マッチログ取得エラー:', error);
+      throw new ActivityLogError('未マッチログの取得に失敗しました', 'GET_UNMATCHED_LOGS_ERROR', { error, userId, logType, businessDate });
+    }
+  }
+
+  /**
+   * マッチング済みログペアを取得
+   * @param userId ユーザーID
+   * @param businessDate 業務日（オプション）
+   * @returns マッチング済みログペア配列
+   */
+  async getMatchedLogPairs(userId: string, businessDate?: string): Promise<{ startLog: ActivityLog; endLog: ActivityLog }[]> {
+    try {
+      let sql = `
+        SELECT 
+          start_log.*,
+          end_log.id as end_id,
+          end_log.content as end_content,
+          end_log.input_timestamp as end_input_timestamp,
+          end_log.log_type as end_log_type,
+          end_log.activity_key as end_activity_key
+        FROM activity_logs start_log
+        JOIN activity_logs end_log ON start_log.matched_log_id = end_log.id
+        WHERE start_log.user_id = ?
+          AND start_log.log_type = 'start_only'
+          AND start_log.match_status = 'matched'
+          AND start_log.is_deleted = 0
+          AND end_log.is_deleted = 0
+      `;
+      const params = [userId];
+
+      if (businessDate) {
+        sql += ' AND start_log.business_date = ?';
+        params.push(businessDate);
+      }
+
+      sql += ' ORDER BY start_log.input_timestamp ASC';
+
+      const rows = await this.allQuery(sql, params) as any[];
+      
+      return rows.map(row => {
+        const startLog = this.mapRowToActivityLog(row);
+        const endLog: ActivityLog = {
+          id: row.end_id,
+          userId: row.user_id,
+          content: row.end_content,
+          inputTimestamp: row.end_input_timestamp,
+          businessDate: row.business_date,
+          isDeleted: false,
+          createdAt: row.created_at,
+          updatedAt: row.updated_at,
+          logType: row.end_log_type,
+          matchStatus: 'matched',
+          matchedLogId: startLog.id,
+          activityKey: row.end_activity_key
+        };
+
+        return { startLog, endLog };
+      });
+    } catch (error) {
+      console.error('❌ マッチング済みログペア取得エラー:', error);
+      throw new ActivityLogError('マッチング済みログペアの取得に失敗しました', 'GET_MATCHED_LOG_PAIRS_ERROR', { error, userId, businessDate });
     }
   }
 
