@@ -241,25 +241,45 @@ ${this.getUsageInsight(stats)}
       return `${header}\n\nログがありません。`;
     }
 
-    // 入力時刻順でソート
-    const sortedLogs = [...logs].sort((a, b) => 
-      new Date(a.inputTimestamp).getTime() - new Date(b.inputTimestamp).getTime()
-    );
+    // start_time順でソート（nullの場合はinputTimestampを使用）
+    const sortedLogs = [...logs].sort((a, b) => {
+      const aTime = a.startTime ? new Date(a.startTime).getTime() : new Date(a.inputTimestamp).getTime();
+      const bTime = b.startTime ? new Date(b.startTime).getTime() : new Date(b.inputTimestamp).getTime();
+      return aTime - bTime;
+    });
 
-    const formattedLogs = sortedLogs.map((log, index) => {
-      // inputTimestampはUTC形式で保存されている
-      const inputTime = new Date(log.inputTimestamp);
+    const formattedLogs = sortedLogs.map((log) => {
+      let timeDisplay = '';
       
-      // ユーザーのタイムゾーンで時刻を表示
-      const userLocalTime = toZonedTime(inputTime, timezone);
-      const timeStr = format(userLocalTime, 'HH:mm', { timeZone: timezone });
+      // start_timeとend_timeがある場合
+      if (log.startTime && log.endTime) {
+        const startTime = toZonedTime(new Date(log.startTime), timezone);
+        const endTime = toZonedTime(new Date(log.endTime), timezone);
+        const startStr = format(startTime, 'HH:mm', { timeZone: timezone });
+        const endStr = format(endTime, 'HH:mm', { timeZone: timezone });
+        timeDisplay = `${startStr}-${endStr}`;
+      } else {
+        // ない場合はinputTimestampを使用
+        const inputTime = toZonedTime(new Date(log.inputTimestamp), timezone);
+        const timeStr = format(inputTime, 'HH:mm', { timeZone: timezone });
+        timeDisplay = timeStr;
+      }
       
-      // 内容を80文字で切り詰め
-      const contentPreview = log.content.length > 80 
-        ? log.content.substring(0, 77) + '...'
-        : log.content;
+      // 追加情報の構築
+      const additionalInfo = [];
+      if (log.categories) {
+        additionalInfo.push(`[${log.categories}]`);
+      }
+      if (log.totalMinutes) {
+        additionalInfo.push(`${log.totalMinutes}分`);
+      }
+      if (log.analysisMethod) {
+        additionalInfo.push(`(${log.analysisMethod})`);
+      }
       
-      return `**[${timeStr}]** ${contentPreview}`;
+      const infoStr = additionalInfo.length > 0 ? ` ${additionalInfo.join(' ')}` : '';
+      
+      return `**${timeDisplay}** ${log.content}${infoStr}`;
     }).join('\n');
 
     const footer = `\n💡 **操作**: \`!edit\` でログ編集 | \`!summary\` で分析結果表示`;
