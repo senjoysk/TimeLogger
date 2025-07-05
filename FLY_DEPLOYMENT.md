@@ -2,6 +2,20 @@
 
 このドキュメントでは、TimeLogger BotをFly.ioにデプロイする手順を説明します。
 
+## 開発・本番環境の分離
+
+### 開発環境（ローカル）
+- **データベース**: `./data/tasks.db`
+- **実行コマンド**: `npm run dev`
+- **設定ファイル**: `.env.development`
+- **NODE_ENV**: `development`
+
+### 本番環境（Fly.io）
+- **データベース**: `/app/data/activity_logs.db`
+- **実行コマンド**: `fly deploy`
+- **設定**: Fly.io secrets
+- **NODE_ENV**: `production`
+
 ## 前提条件
 
 - Fly.ioアカウント（https://fly.io/）
@@ -40,6 +54,9 @@ fly deploy --app timelogger-bot
 ### 4. 環境変数の設定
 
 ```bash
+# 環境設定
+fly secrets set NODE_ENV="production"
+
 # Discord Bot Token
 fly secrets set DISCORD_BOT_TOKEN="your-discord-bot-token"
 
@@ -51,6 +68,9 @@ fly secrets set TARGET_USER_ID="your-discord-user-id"
 
 # Discord Client ID（オプション）
 fly secrets set DISCORD_CLIENT_ID="your-discord-client-id"
+
+# データベースパス（オプション、デフォルト: /app/data/activity_logs.db）
+fly secrets set DATABASE_PATH="/app/data/activity_logs.db"
 ```
 
 ### 5. 永続ストレージの作成
@@ -150,11 +170,67 @@ fly status
 fly scale memory 512
 ```
 
+## 開発フロー
+
+### 日常の開発作業
+1. **ローカル開発**
+   ```bash
+   # 開発環境で実行
+   npm run dev
+   
+   # または環境を明示的に指定
+   NODE_ENV=development npm run dev
+   ```
+
+2. **テスト実行**
+   ```bash
+   npm test
+   npm run test:coverage
+   ```
+
+3. **本番環境での動作確認**
+   ```bash
+   # 本番環境設定でローカル実行
+   npm run dev:prod
+   ```
+
+### デプロイ手順
+1. **コードの準備**
+   ```bash
+   # テスト実行
+   npm test
+   
+   # ビルド確認
+   npm run build
+   
+   # mainブランチにマージ
+   git checkout main
+   git merge feature/your-feature
+   ```
+
+2. **本番デプロイ**
+   ```bash
+   # デプロイ実行
+   fly deploy --app timelogger-bot
+   
+   # 状態確認
+   fly status --app timelogger-bot
+   
+   # ログ確認
+   fly logs --app timelogger-bot
+   ```
+
+3. **デプロイ後の確認**
+   - Discordで各コマンドの動作確認
+   - `!cost`, `!summary`, `!timezone` コマンドのテスト
+   - エラーログの監視
+
 ## 注意事項
 
 - 無料枠では、リソースに制限があります
 - データベースは定期的にバックアップすることを推奨します
 - 環境変数の変更後は、アプリケーションの再起動が必要です
+- **自動デプロイは設定していません** - 手動でのデプロイが必要です
 
 ## コスト管理
 
