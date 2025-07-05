@@ -4,6 +4,7 @@ import { ActivityAnalysis, ActivityRecord, DailySummary, CategoryTotal, SubCateg
 import { IAnalysisService, IApiCostRepository } from '../repositories/interfaces';
 import { ApiCostMonitor } from './apiCostMonitor';
 import { toZonedTime, format } from 'date-fns-tz';
+import { ClassificationResult, MessageClassification } from '../types/todo';
 
 /**
  * Google Gemini API サービスクラス
@@ -428,5 +429,191 @@ ${categoryList}
     return await this.costMonitor.checkCostAlerts(timezone);
   }
 
-  
+  // ================================================================
+  // TODO判定機能（AI分類）
+  // ================================================================
+
+  /**
+   * AIを使用してメッセージを分類
+   * @param message 分類対象のメッセージ
+   * @returns 分類結果
+   */
+  public async classifyMessageWithAI(message: string): Promise<ClassificationResult> {
+    try {
+      // 空メッセージの処理
+      if (!message.trim()) {
+        return {
+          classification: 'UNCERTAIN',
+          confidence: 0,
+          reason: 'メッセージが空です'
+        };
+      }
+
+      // 極端に長いメッセージの処理
+      if (message.length > 5000) {
+        message = message.substring(0, 5000) + '...';
+      }
+
+      const prompt = this.buildClassificationPrompt(message);
+      
+      console.log('🧠 Gemini でメッセージ分類中:', message.substring(0, 100) + '...');
+      
+      // Gemini APIを呼び出し
+      const result = await this.model.generateContent(prompt);
+      
+      // API使用量を記録
+      await this.costMonitor.recordApiCall(
+        'message_classification',
+        this.estimateTokens(prompt),
+        this.estimateTokens(result.response.text())
+      );
+
+      const response = result.response.text();
+      console.log('🤖 Gemini分類結果:', response);
+
+      // JSONレスポンスをパース
+      const parsed = this.parseClassificationResponse(response);
+      
+      return parsed;
+      
+    } catch (error) {
+      console.error('❌ Gemini分類エラー:', error);
+      
+      // フォールバック: パターンベース分類
+      return this.fallbackClassification(message);
+    }
+  }
+
+  /**
+   * 分類用プロンプトを構築
+   */
+  private buildClassificationPrompt(message: string): string {
+    return `
+以下のメッセージを分析して、4つのカテゴリに分類してください：
+
+1. **TODO**: 将来実行予定のタスク・作業
+   - 例: "資料を作成する", "会議の準備をする", "明日までに完了させる"
+   - 特徴: 未来形、意図表現、期日指定
+   
+2. **ACTIVITY_LOG**: 現在・過去の活動記録
+   - 例: "資料作成中", "会議に参加した", "作業を完了した"
+   - 特徴: 過去形、現在進行形、完了表現
+   
+3. **MEMO**: 参考情報・メモ・アイデア
+   - 例: "参考リンク", "調べた結果", "メモ: 重要なポイント"
+   - 特徴: 情報記録、参考資料、備忘録
+   
+4. **UNCERTAIN**: 判定が困難な場合
+   - 例: 短すぎる文、文脈不明、雑談
+
+メッセージ: "${message}"
+
+以下のJSON形式で回答してください。他の文章は一切含めないでください：
+{
+  "classification": "TODO|ACTIVITY_LOG|MEMO|UNCERTAIN",
+  "confidence": 0.85,
+  "reason": "判定理由を日本語で説明",
+  "suggested_action": "TODOの場合の推奨アクション（任意）",
+  "priority": 0,
+  "due_date_suggestion": "期日が含まれる場合のISO日付（任意）"
+}`;
+  }
+
+  /**
+   * 分類レスポンスをパース
+   */
+  private parseClassificationResponse(response: string): ClassificationResult {
+    try {
+      // JSONブロックを抽出
+      const jsonMatch = response.match(/\{[\s\S]*\}/);
+      if (!jsonMatch) {
+        throw new Error('JSON形式のレスポンスが見つかりません');
+      }
+
+      const parsed = JSON.parse(jsonMatch[0]);
+      
+      // バリデーション
+      const validClassifications: MessageClassification[] = ['TODO', 'ACTIVITY_LOG', 'MEMO', 'UNCERTAIN'];
+      if (!validClassifications.includes(parsed.classification)) {
+        throw new Error(`無効な分類: ${parsed.classification}`);
+      }
+
+      return {
+        classification: parsed.classification,
+        confidence: Math.max(0, Math.min(1, parsed.confidence || 0)),
+        reason: parsed.reason || '分析完了',
+        suggestedAction: parsed.suggested_action,
+        priority: this.validatePriority(parsed.priority),
+        dueDateSuggestion: parsed.due_date_suggestion
+      };
+      
+    } catch (error) {
+      console.error('分類レスポンスパースエラー:', error);
+      console.error('レスポンス内容:', response);
+      
+      // フォールバックとして基本的な分類を返す
+      return {
+        classification: 'UNCERTAIN',
+        confidence: 0.3,
+        reason: 'AI分析結果の解析に失敗しました'
+      };
+    }
+  }
+
+  /**
+   * 優先度をバリデーション
+   */
+  private validatePriority(priority: any): number {
+    if (typeof priority === 'number') {
+      return Math.max(-1, Math.min(1, Math.round(priority)));
+    }
+    return 0;
+  }
+
+  /**
+   * フォールバック分類（AIエラー時）
+   */
+  private fallbackClassification(message: string): ClassificationResult {
+    const lowerMessage = message.toLowerCase();
+
+    // 簡単なパターンマッチング
+    if (/する$|やる$|つもり|予定|しよう/.test(message)) {
+      return {
+        classification: 'TODO',
+        confidence: 0.6,
+        reason: 'パターンマッチング: TODO関連キーワード検出'
+      };
+    }
+
+    if (/した$|やった$|完了|終わり|参加した/.test(message)) {
+      return {
+        classification: 'ACTIVITY_LOG',
+        confidence: 0.6,
+        reason: 'パターンマッチング: 活動ログ関連キーワード検出'
+      };
+    }
+
+    if (/参考|リンク|メモ|情報/.test(message)) {
+      return {
+        classification: 'MEMO',
+        confidence: 0.5,
+        reason: 'パターンマッチング: メモ関連キーワード検出'
+      };
+    }
+
+    return {
+      classification: 'UNCERTAIN',
+      confidence: 0.3,
+      reason: 'フォールバック分類: 明確なパターンが見つかりません'
+    };
+  }
+
+  /**
+   * トークン数を推定（概算）
+   */
+  private estimateTokens(text: string): number {
+    // 日本語と英語の混在を考慮した簡易推定
+    // 1トークン ≈ 2-4文字（日本語は多め）
+    return Math.ceil(text.length / 3);
+  }
 }

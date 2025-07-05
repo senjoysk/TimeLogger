@@ -21,7 +21,7 @@ export class ApiCostMonitor {
    * API呼び出しを記録
    */
   public async recordApiCall(
-    operation: 'analyzeActivity' | 'generateDailySummary',
+    operation: 'analyzeActivity' | 'generateDailySummary' | 'message_classification',
     inputTokens: number,
     outputTokens: number
   ): Promise<void> {
