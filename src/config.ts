@@ -1,7 +1,20 @@
 import dotenv from 'dotenv';
 
-// 環境変数の読み込み
-dotenv.config();
+// 環境判定と環境別設定ファイルの読み込み
+const NODE_ENV = process.env.NODE_ENV || 'development';
+const isDevelopment = NODE_ENV === 'development';
+const isProduction = NODE_ENV === 'production';
+
+// 環境に応じた設定ファイルを読み込み
+if (isDevelopment) {
+  dotenv.config({ path: '.env.development' });
+} else if (isProduction) {
+  dotenv.config({ path: '.env.production' });
+} else {
+  dotenv.config(); // デフォルト（.env）
+}
+
+console.log(`🚀 環境: ${NODE_ENV}`);
 
 /**
  * アプリケーション設定
@@ -23,7 +36,7 @@ export const config = {
   
   // データベース設定
   database: {
-    path: process.env.DATABASE_PATH || './data/activity_logs.db',
+    path: process.env.DATABASE_PATH || (isDevelopment ? './data/tasks.db' : './data/activity_logs.db'),
   },
   
   // アプリケーション設定
@@ -44,8 +57,12 @@ export const config = {
     },
   },
   
-  // 開発環境判定
-  isDevelopment: process.env.NODE_ENV === 'development',
+  // 環境判定
+  environment: {
+    nodeEnv: NODE_ENV,
+    isDevelopment,
+    isProduction,
+  },
 } as const;
 
 /**
@@ -55,6 +72,8 @@ export const config = {
 export function validateConfig(): void {
   // デバッグ: 環境変数の状態を出力
   console.log('🔍 環境変数のチェック:');
+  console.log(`   - 環境: ${config.environment.nodeEnv}`);
+  console.log(`   - データベースパス: ${config.database.path}`);
   console.log(`   - DISCORD_TOKEN: ${process.env.DISCORD_TOKEN ? '設定済み' : '未設定'}`);
   console.log(`   - DISCORD_BOT_TOKEN: ${process.env.DISCORD_BOT_TOKEN ? '設定済み' : '未設定'}`);
   console.log(`   - 実際のトークン長: ${config.discord.token.length}文字`);
@@ -75,7 +94,7 @@ export function validateConfig(): void {
   if (missingFields.length > 0) {
     console.error('❌ 必須の環境変数が設定されていません:');
     missingFields.forEach(field => console.error(`   - ${field}`));
-    console.error('\n.env.exampleを参考に.envファイルを作成してください。');
+    console.error(`\n.env.${config.environment.nodeEnv}を参考に環境変数を設定してください。`);
     process.exit(1);
   }
 
