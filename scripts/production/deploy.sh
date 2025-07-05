@@ -34,14 +34,33 @@ fi
 echo "🚀 Fly.ioへのデプロイを開始します..."
 echo "📱 アプリ: $APP_NAME"
 
-# シークレットの一括設定
-echo "🔐 シークレットを設定中..."
+# 事前チェック
+echo "🔍 事前チェック実行中..."
+
+# flyctlコマンドの存在確認
+if ! command -v fly &> /dev/null; then
+    echo "❌ エラー: flyctlコマンドが見つかりません"
+    echo "📝 https://fly.io/docs/hands-on/install-flyctl/ からインストールしてください"
+    exit 1
+fi
+
+# ログイン状態確認
+if ! fly auth whoami &> /dev/null; then
+    echo "❌ エラー: Fly.ioにログインしていません"
+    echo "📝 'fly auth login' を実行してください"
+    exit 1
+fi
+
+echo "✅ 事前チェック完了"
+
+# シークレットの一括設定（ステージング）
+echo "🔐 シークレットをステージング中..."
 while IFS='=' read -r key value; do
     # コメント行と空行をスキップ
     [[ $key =~ ^#.*$ ]] && continue
     [[ -z $key ]] && continue
     
-    # シークレットを設定
+    # シークレットを設定（ステージングのみ）
     if [ "$DRY_RUN" = true ]; then
         echo "  [DRY-RUN] fly secrets set \"$key=***\" --app \"$APP_NAME\" --stage"
     else
@@ -49,16 +68,8 @@ while IFS='=' read -r key value; do
     fi
 done < .env.fly
 
-# シークレットをデプロイ
-echo "📤 シークレットをデプロイ中..."
-if [ "$DRY_RUN" = true ]; then
-    echo "  [DRY-RUN] fly secrets deploy --app \"$APP_NAME\""
-else
-    fly secrets deploy --app "$APP_NAME"
-fi
-
-# アプリのデプロイ
-echo "🏗️ アプリをビルド・デプロイ中..."
+# アプリのデプロイ（シークレットも同時に適用される）
+echo "🏗️ アプリをビルド・デプロイ中（シークレットも適用）..."
 if [ "$DRY_RUN" = true ]; then
     echo "  [DRY-RUN] fly deploy --app \"$APP_NAME\""
 else
