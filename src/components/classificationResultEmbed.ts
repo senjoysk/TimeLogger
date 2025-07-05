@@ -1,0 +1,368 @@
+/**
+ * AI判定結果表示用のEmbedコンポーネント
+ * Discord.jsを使用してインタラクティブな判定結果を表示
+ */
+
+import { 
+  EmbedBuilder, 
+  ActionRowBuilder, 
+  ButtonBuilder, 
+  ButtonStyle, 
+  ColorResolvable
+} from 'discord.js';
+import { ClassificationResult, MessageClassification } from '../types/todo';
+
+/**
+ * 分類結果表示用Embedの設定
+ */
+interface ClassificationEmbedOptions {
+  originalMessage: string;
+  result: ClassificationResult;
+  userId: string;
+  timestamp?: Date;
+}
+
+/**
+ * AI判定結果を表示するEmbedを生成
+ */
+export function createClassificationResultEmbed(options: ClassificationEmbedOptions): EmbedBuilder {
+  const { originalMessage, result, timestamp = new Date() } = options;
+  
+  // 分類に応じた色とアイコンを設定
+  const colorConfig = getClassificationColor(result.classification);
+  
+  // 信頼度の表示形式
+  const confidencePercent = Math.round(result.confidence * 100);
+  const confidenceBar = createConfidenceBar(result.confidence);
+  
+  // 基本的なEmbed構造
+  const embed = new EmbedBuilder()
+    .setTitle(`${colorConfig.icon} AI分析結果`)
+    .setDescription(`**元のメッセージ**\n> ${originalMessage.substring(0, 200)}${originalMessage.length > 200 ? '...' : ''}`)
+    .setColor(colorConfig.color)
+    .setTimestamp(timestamp)
+    .setFooter({ 
+      text: 'この判定が正しければ確認ボタンを、間違っていれば正しい分類ボタンを押してください' 
+    });
+
+  // 分類結果フィールド
+  embed.addFields({
+    name: '🤖 AI判定',
+    value: `**${getClassificationLabel(result.classification)}**`,
+    inline: true
+  });
+
+  // 信頼度フィールド
+  embed.addFields({
+    name: '📊 信頼度',
+    value: `${confidencePercent}%\n${confidenceBar}`,
+    inline: true
+  });
+
+  // 判定理由
+  if (result.reason) {
+    embed.addFields({
+      name: '💭 判定理由',
+      value: result.reason,
+      inline: false
+    });
+  }
+
+  // TODO固有の情報
+  if (result.classification === 'TODO') {
+    const todoInfo: string[] = [];
+    
+    if (result.priority !== undefined) {
+      const priorityLabel = getPriorityLabel(result.priority);
+      todoInfo.push(`**優先度**: ${priorityLabel}`);
+    }
+    
+    if (result.dueDateSuggestion) {
+      todoInfo.push(`**期日候補**: ${result.dueDateSuggestion}`);
+    }
+    
+    if (result.suggestedAction) {
+      todoInfo.push(`**推奨アクション**: ${result.suggestedAction}`);
+    }
+
+    if (todoInfo.length > 0) {
+      embed.addFields({
+        name: '📋 TODO詳細',
+        value: todoInfo.join('\n'),
+        inline: false
+      });
+    }
+  }
+
+  return embed;
+}
+
+/**
+ * 分類確認用のボタンを生成
+ */
+export function createClassificationButtons(
+  sessionId: string,
+  suggestedClassification: MessageClassification
+): ActionRowBuilder<ButtonBuilder> {
+  
+  const buttons = new ActionRowBuilder<ButtonBuilder>();
+  
+  // 確認ボタン（AI判定が正しい場合）
+  buttons.addComponents(
+    new ButtonBuilder()
+      .setCustomId(`confirm_${suggestedClassification.toLowerCase()}_${sessionId}`)
+      .setLabel(`✅ ${getClassificationLabel(suggestedClassification)}として登録`)
+      .setStyle(getButtonStyle(suggestedClassification))
+  );
+
+  // 他の分類オプション
+  const alternatives: MessageClassification[] = ['TODO', 'ACTIVITY_LOG', 'MEMO'];
+  const alternativeButtons = alternatives
+    .filter(alt => alt !== suggestedClassification)
+    .slice(0, 2) // 最大2つの代替案
+    .map(alt => 
+      new ButtonBuilder()
+        .setCustomId(`classify_${alt.toLowerCase()}_${sessionId}`)
+        .setLabel(`${getClassificationIcon(alt)} ${getClassificationLabel(alt)}`)
+        .setStyle(ButtonStyle.Secondary)
+    );
+
+  buttons.addComponents(...alternativeButtons);
+
+  // 無視ボタン
+  buttons.addComponents(
+    new ButtonBuilder()
+      .setCustomId(`ignore_${sessionId}`)
+      .setLabel('❌ 無視')
+      .setStyle(ButtonStyle.Danger)
+  );
+
+  return buttons;
+}
+
+/**
+ * TODO一覧表示用のEmbedを生成
+ */
+export function createTodoListEmbed(
+  todos: Array<{
+    id: string;
+    content: string;
+    status: string;
+    priority: number;
+    due_date?: string;
+    created_at: string;
+  }>,
+  userId: string
+): EmbedBuilder {
+  const embed = new EmbedBuilder()
+    .setTitle('📋 TODO一覧')
+    .setColor(0x00ff00)
+    .setTimestamp()
+    .setFooter({ text: 'ボタンをクリックしてTODOを操作できます' });
+
+  if (todos.length === 0) {
+    embed.setDescription('現在登録されているTODOはありません。\n新しいメッセージを送信してTODOを作成しましょう！');
+    return embed;
+  }
+
+  // TODO項目を表示（最大10件）
+  const displayTodos = todos.slice(0, 10);
+  
+  const todoList = displayTodos.map((todo, index) => {
+    const priorityIcon = getPriorityIcon(todo.priority);
+    const statusIcon = getStatusIcon(todo.status);
+    const dueDate = todo.due_date ? ` (期日: ${todo.due_date})` : '';
+    
+    return `${index + 1}. ${statusIcon} ${priorityIcon} ${todo.content}${dueDate}`;
+  }).join('\n');
+
+  embed.setDescription(todoList);
+
+  if (todos.length > 10) {
+    embed.addFields({
+      name: '⚠️ 表示制限',
+      value: `${todos.length - 10}件の追加のTODOがあります。`,
+      inline: false
+    });
+  }
+
+  return embed;
+}
+
+/**
+ * TODO操作用のボタンを生成
+ */
+export function createTodoActionButtons(
+  todoId: string,
+  status: string
+): ActionRowBuilder<ButtonBuilder> {
+  
+  const buttons = new ActionRowBuilder<ButtonBuilder>();
+  
+  if (status === 'pending' || status === 'in_progress') {
+    buttons.addComponents(
+      new ButtonBuilder()
+        .setCustomId(`todo_complete_${todoId}`)
+        .setLabel('✅ 完了')
+        .setStyle(ButtonStyle.Success)
+    );
+  }
+
+  if (status === 'pending') {
+    buttons.addComponents(
+      new ButtonBuilder()
+        .setCustomId(`todo_start_${todoId}`)
+        .setLabel('🚀 開始')
+        .setStyle(ButtonStyle.Primary)
+    );
+  }
+
+  buttons.addComponents(
+    new ButtonBuilder()
+      .setCustomId(`todo_edit_${todoId}`)
+      .setLabel('✏️ 編集')
+      .setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder()
+      .setCustomId(`todo_delete_${todoId}`)
+      .setLabel('🗑️ 削除')
+      .setStyle(ButtonStyle.Danger)
+  );
+
+  return buttons;
+}
+
+// =============================================================================
+// ユーティリティ関数
+// =============================================================================
+
+/**
+ * 分類に応じた色とアイコンを取得
+ */
+function getClassificationColor(classification: MessageClassification): { color: ColorResolvable; icon: string } {
+  switch (classification) {
+    case 'TODO':
+      return { color: 0x00ff00, icon: '📋' }; // 緑
+    case 'ACTIVITY_LOG':
+      return { color: 0x0099ff, icon: '📝' }; // 青
+    case 'MEMO':
+      return { color: 0xffaa00, icon: '📄' }; // オレンジ
+    case 'UNCERTAIN':
+      return { color: 0x888888, icon: '❓' }; // グレー
+    default:
+      return { color: 0x888888, icon: '❓' };
+  }
+}
+
+/**
+ * 分類のラベルを取得
+ */
+function getClassificationLabel(classification: MessageClassification): string {
+  switch (classification) {
+    case 'TODO':
+      return 'TODO';
+    case 'ACTIVITY_LOG':
+      return '活動ログ';
+    case 'MEMO':
+      return 'メモ';
+    case 'UNCERTAIN':
+      return '不明';
+    default:
+      return '不明';
+  }
+}
+
+/**
+ * 分類のアイコンを取得
+ */
+function getClassificationIcon(classification: MessageClassification): string {
+  const config = getClassificationColor(classification);
+  return config.icon;
+}
+
+/**
+ * ボタンスタイルを取得
+ */
+function getButtonStyle(classification: MessageClassification): ButtonStyle {
+  switch (classification) {
+    case 'TODO':
+      return ButtonStyle.Success;
+    case 'ACTIVITY_LOG':
+      return ButtonStyle.Primary;
+    case 'MEMO':
+      return ButtonStyle.Secondary;
+    case 'UNCERTAIN':
+      return ButtonStyle.Secondary;
+    default:
+      return ButtonStyle.Secondary;
+  }
+}
+
+/**
+ * 信頼度バーを生成
+ */
+function createConfidenceBar(confidence: number): string {
+  const length = 10;
+  const filled = Math.round(confidence * length);
+  const empty = length - filled;
+  
+  return '█'.repeat(filled) + '░'.repeat(empty);
+}
+
+/**
+ * 優先度のラベルを取得
+ */
+function getPriorityLabel(priority: number): string {
+  switch (priority) {
+    case 1:
+      return '🔴 高';
+    case 0:
+      return '🟡 普通';
+    case -1:
+      return '🟢 低';
+    default:
+      return '🟡 普通';
+  }
+}
+
+/**
+ * 優先度のアイコンを取得
+ */
+function getPriorityIcon(priority: number): string {
+  switch (priority) {
+    case 1:
+      return '🔴';
+    case 0:
+      return '🟡';
+    case -1:
+      return '🟢';
+    default:
+      return '🟡';
+  }
+}
+
+/**
+ * ステータスのアイコンを取得
+ */
+function getStatusIcon(status: string): string {
+  switch (status) {
+    case 'pending':
+      return '⏳';
+    case 'in_progress':
+      return '🚀';
+    case 'completed':
+      return '✅';
+    case 'cancelled':
+      return '❌';
+    default:
+      return '❓';
+  }
+}
+
+/**
+ * セッションIDを生成
+ */
+export function generateSessionId(userId: string, timestamp: Date = new Date()): string {
+  const timeStr = timestamp.getTime().toString();
+  const randomStr = Math.random().toString(36).substring(2, 8);
+  return `${userId}_${timeStr}_${randomStr}`;
+}

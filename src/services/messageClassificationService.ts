@@ -35,6 +35,11 @@ export interface IMessageClassificationService {
  * Gemini AIを使用した自動分類
  */
 export class MessageClassificationService implements IMessageClassificationService {
+  private geminiService?: any; // GeminiServiceのインスタンス（オプション）
+
+  constructor(geminiService?: any) {
+    this.geminiService = geminiService;
+  }
   private readonly classificationPromptTemplate = `
 以下のメッセージを分析して、以下の4つのカテゴリに分類してください：
 
@@ -95,7 +100,18 @@ export class MessageClassificationService implements IMessageClassificationServi
         return preClassification;
       }
 
-      // AI分析を実行（現在はモック実装）
+      // AI分析を実行
+      if (this.geminiService && this.geminiService.classifyMessageWithAI) {
+        try {
+          const aiResult = await this.geminiService.classifyMessageWithAI(message);
+          console.log('🤖 Gemini AI分類結果:', aiResult);
+          return aiResult;
+        } catch (error) {
+          console.warn('Gemini AI分類エラー、フォールバックを使用:', error);
+        }
+      }
+      
+      // フォールバック: モック分析
       return this.mockAiClassification(message);
       
     } catch (error) {
