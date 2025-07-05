@@ -10,7 +10,7 @@ export type TodoStatus = 'pending' | 'in_progress' | 'completed' | 'cancelled';
 /**
  * TODOソースタイプ
  */
-export type TodoSourceType = 'manual' | 'ai_suggested' | 'activity_derived';
+export type TodoSourceType = 'manual' | 'ai_suggested' | 'ai_classified' | 'activity_derived';
 
 /**
  * TODOタスク

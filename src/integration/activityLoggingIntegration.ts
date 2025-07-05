@@ -17,6 +17,8 @@ import { UnmatchedCommandHandler } from '../handlers/unmatchedCommandHandler';
 import { TodoCommandHandler } from '../handlers/todoCommandHandler';
 import { GeminiService } from '../services/geminiService';
 import { MessageClassificationService } from '../services/messageClassificationService';
+import { IntegratedSummaryService } from '../services/integratedSummaryService';
+import { ActivityTodoCorrelationService } from '../services/activityTodoCorrelationService';
 import { GapDetectionService } from '../services/gapDetectionService';
 import { ActivityLogError } from '../types/activityLog';
 import { GapHandler } from '../handlers/gapHandler';
@@ -53,6 +55,8 @@ export class ActivityLoggingIntegration {
   private unifiedAnalysisService!: UnifiedAnalysisService;
   private analysisCacheService!: AnalysisCacheService;
   private gapDetectionService!: GapDetectionService;
+  private correlationService!: ActivityTodoCorrelationService;
+  private integratedSummaryService!: IntegratedSummaryService;
 
   // ハンドラー層
   private editHandler!: EditCommandHandler;
@@ -107,14 +111,21 @@ export class ActivityLoggingIntegration {
       
       // TODO機能サービスの初期化
       this.messageClassificationService = new MessageClassificationService(this.geminiService);
+      this.correlationService = new ActivityTodoCorrelationService(this.repository);
+      this.integratedSummaryService = new IntegratedSummaryService(
+        this.repository,
+        this.correlationService,
+        this.unifiedAnalysisService
+      );
       
-      console.log('✅ サービス層初期化完了');
+      console.log('✅ サービス層初期化完了（TODO統合機能含む）');
 
       // 3. ハンドラー層の初期化
       this.editHandler = new EditCommandHandler(this.activityLogService);
       this.summaryHandler = new SummaryHandler(
         this.unifiedAnalysisService, 
-        this.activityLogService
+        this.activityLogService,
+        this.integratedSummaryService
       );
       this.logsHandler = new LogsCommandHandler(this.activityLogService);
       this.timezoneHandler = new TimezoneHandler(this.repository);
