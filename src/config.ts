@@ -23,7 +23,7 @@ console.log(`🚀 環境: ${NODE_ENV}`);
 export const config = {
   // Discord Bot設定
   discord: {
-    token: process.env.DISCORD_TOKEN || process.env.DISCORD_BOT_TOKEN || '',
+    token: process.env.DISCORD_TOKEN || '',
     clientId: process.env.DISCORD_CLIENT_ID || '',
     targetUserId: process.env.TARGET_USER_ID || '',
     commandPrefix: process.env.COMMAND_PREFIX || '!',
@@ -31,7 +31,7 @@ export const config = {
   
   // Google Gemini API設定
   gemini: {
-    apiKey: process.env.GOOGLE_API_KEY || process.env.GOOGLE_GEMINI_API_KEY || '',
+    apiKey: process.env.GOOGLE_API_KEY || '',
   },
   
   // データベース設定
@@ -75,10 +75,8 @@ export function validateConfig(): void {
   console.log(`   - 環境: ${config.environment.nodeEnv}`);
   console.log(`   - データベースパス: ${config.database.path}`);
   console.log(`   - DISCORD_TOKEN: ${process.env.DISCORD_TOKEN ? '設定済み' : '未設定'}`);
-  console.log(`   - DISCORD_BOT_TOKEN: ${process.env.DISCORD_BOT_TOKEN ? '設定済み' : '未設定'}`);
   console.log(`   - 実際のトークン長: ${config.discord.token.length}文字`);
   console.log(`   - トークンプレビュー: ${config.discord.token.substring(0, 10)}...`);
-  console.log(`   - トークン最初の5文字: "${config.discord.token.substring(0, 5)}"`);
 
   const requiredFields = [
     { key: 'DISCORD_TOKEN', value: config.discord.token },
