@@ -23,7 +23,27 @@ describe('SqliteActivityLogRepository TODO機能', () => {
     }
 
     repository = new SqliteActivityLogRepository(testDbPath);
-    await repository.initializeDatabase();
+    
+    // 直接スキーマを実行（initializeDatabaseの代わり）
+    const runQuery = (repository as any).runQuery.bind(repository);
+    
+    // 最小限のTODOテーブル作成
+    await runQuery(`
+      CREATE TABLE IF NOT EXISTS todo_tasks (
+          id TEXT PRIMARY KEY,
+          user_id TEXT NOT NULL,
+          content TEXT NOT NULL,
+          status TEXT DEFAULT 'pending',
+          priority INTEGER DEFAULT 0,
+          due_date TEXT,
+          created_at TEXT NOT NULL DEFAULT (datetime('now', 'utc')),
+          updated_at TEXT NOT NULL DEFAULT (datetime('now', 'utc')),
+          completed_at TEXT,
+          source_type TEXT DEFAULT 'manual',
+          related_activity_id TEXT,
+          ai_confidence REAL
+      )
+    `);
   });
 
   afterEach(async () => {
@@ -160,6 +180,9 @@ describe('SqliteActivityLogRepository TODO機能', () => {
         dueDate: new Date().toISOString()
       };
 
+      // 時間差を作るために少し待つ
+      await new Promise(resolve => setTimeout(resolve, 1));
+      
       await repository.updateTodo(created.id, update);
       const updated = await repository.getTodoById(created.id);
 

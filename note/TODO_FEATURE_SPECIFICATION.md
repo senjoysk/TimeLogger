@@ -418,3 +418,129 @@ describe('TODO機能', () => {
 ---
 
 この仕様書は、TDD開発方針に基づいて段階的に実装し、各フェーズで十分なテストを行いながら品質を確保していく予定です。
+
+---
+
+## 📚 付録: 完全なデータベーススキーマ
+
+### 実装された完全なTODO機能スキーマ
+
+```sql
+-- TODO管理機能用データベーススキーマ
+-- TimeLoggerBotのTODO機能拡張
+
+-- TODOタスクテーブル
+CREATE TABLE IF NOT EXISTS todo_tasks (
+    id TEXT PRIMARY KEY,                    -- UUID
+    user_id TEXT NOT NULL,                  -- Discord User ID
+    content TEXT NOT NULL,                  -- TODO内容
+    status TEXT DEFAULT 'pending' CHECK (status IN ('pending', 'in_progress', 'completed', 'cancelled')),
+    priority INTEGER DEFAULT 0,             -- 優先度 (0: 通常, 1: 高, -1: 低)
+    due_date TEXT,                          -- 期日 (ISO 8601)
+    created_at TEXT NOT NULL DEFAULT (datetime('now', 'utc')),
+    updated_at TEXT NOT NULL DEFAULT (datetime('now', 'utc')),
+    completed_at TEXT,                      -- 完了日時
+    source_type TEXT DEFAULT 'manual' CHECK (source_type IN ('manual', 'ai_suggested', 'activity_derived')),
+    related_activity_id TEXT,               -- 関連する活動ログID
+    ai_confidence REAL,                     -- AI判定の信頼度 (0.0-1.0)
+    FOREIGN KEY (related_activity_id) REFERENCES activity_logs(id)
+);
+
+-- メッセージ分類履歴テーブル（学習用）
+CREATE TABLE IF NOT EXISTS message_classifications (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    message_content TEXT NOT NULL,
+    ai_classification TEXT NOT NULL,        -- AIの判定結果
+    ai_confidence REAL NOT NULL,            -- AIの信頼度
+    user_classification TEXT,               -- ユーザーの最終選択
+    classified_at TEXT NOT NULL DEFAULT (datetime('now', 'utc')),
+    feedback TEXT,                          -- ユーザーフィードバック
+    is_correct BOOLEAN                      -- AI判定が正しかったか
+);
+
+-- インデックス
+CREATE INDEX IF NOT EXISTS idx_todo_tasks_user_id ON todo_tasks(user_id);
+CREATE INDEX IF NOT EXISTS idx_todo_tasks_status ON todo_tasks(status);
+CREATE INDEX IF NOT EXISTS idx_todo_tasks_due_date ON todo_tasks(due_date);
+CREATE INDEX IF NOT EXISTS idx_todo_tasks_created_at ON todo_tasks(created_at);
+CREATE INDEX IF NOT EXISTS idx_todo_tasks_priority ON todo_tasks(priority, status);
+CREATE INDEX IF NOT EXISTS idx_todo_tasks_related_activity ON todo_tasks(related_activity_id);
+
+CREATE INDEX IF NOT EXISTS idx_message_classifications_user_id ON message_classifications(user_id);
+CREATE INDEX IF NOT EXISTS idx_message_classifications_ai_classification ON message_classifications(ai_classification);
+CREATE INDEX IF NOT EXISTS idx_message_classifications_classified_at ON message_classifications(classified_at);
+
+-- トリガー: updated_at の自動更新
+CREATE TRIGGER IF NOT EXISTS update_todo_tasks_updated_at
+    AFTER UPDATE ON todo_tasks
+    FOR EACH ROW
+BEGIN
+    UPDATE todo_tasks 
+    SET updated_at = datetime('now', 'utc')
+    WHERE id = NEW.id;
+END;
+
+-- トリガー: ステータスがcompletedに変更されたときにcompleted_atを設定
+CREATE TRIGGER IF NOT EXISTS set_todo_tasks_completed_at
+    AFTER UPDATE ON todo_tasks
+    FOR EACH ROW
+    WHEN NEW.status = 'completed' AND OLD.status != 'completed'
+BEGIN
+    UPDATE todo_tasks 
+    SET completed_at = datetime('now', 'utc')
+    WHERE id = NEW.id;
+END;
+
+-- ビュー: アクティブなTODO（デバッグ用）
+CREATE VIEW IF NOT EXISTS v_active_todos AS
+SELECT 
+    t.id,
+    t.user_id,
+    t.content,
+    t.status,
+    t.priority,
+    t.due_date,
+    t.created_at,
+    t.updated_at,
+    a.content as related_activity_content
+FROM todo_tasks t
+LEFT JOIN activity_logs a ON t.related_activity_id = a.id
+WHERE t.status IN ('pending', 'in_progress')
+ORDER BY t.priority DESC, t.created_at ASC;
+
+-- ビュー: 今日完了したTODO（サマリー用）
+CREATE VIEW IF NOT EXISTS v_today_completed_todos AS
+SELECT 
+    t.id,
+    t.user_id,
+    t.content,
+    t.completed_at,
+    (julianday(t.completed_at) - julianday(t.created_at)) * 24 as completion_hours
+FROM todo_tasks t
+WHERE t.status = 'completed'
+  AND date(t.completed_at) = date('now', 'localtime')
+ORDER BY t.completed_at DESC;
+
+-- ビュー: 分類精度統計（AI改善用）
+CREATE VIEW IF NOT EXISTS v_classification_accuracy AS
+SELECT 
+    ai_classification,
+    COUNT(*) as total_count,
+    SUM(CASE WHEN is_correct = 1 THEN 1 ELSE 0 END) as correct_count,
+    CAST(SUM(CASE WHEN is_correct = 1 THEN 1 ELSE 0 END) AS REAL) / COUNT(*) as accuracy,
+    AVG(ai_confidence) as avg_confidence
+FROM message_classifications
+WHERE user_classification IS NOT NULL
+GROUP BY ai_classification;
+```
+
+### スキーマ設計のポイント
+
+1. **統合設計**: 既存のactivity_logsテーブルとの外部キー関係
+2. **トリガー活用**: updated_atとcompleted_atの自動更新
+3. **インデックス最適化**: 検索性能を考慮した複合インデックス
+4. **ビュー提供**: デバッグ用とサマリー用の便利なビュー
+5. **学習機能**: message_classificationsテーブルでAI精度向上
+
+実際の実装では、このスキーマがnewSchema.sqlに統合されています。

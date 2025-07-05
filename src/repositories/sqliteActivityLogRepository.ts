@@ -58,8 +58,26 @@ export class SqliteActivityLogRepository implements IActivityLogRepository, IApi
    */
   public async initializeDatabase(): Promise<void> {
     try {
-      // 新スキーマファイルから読み込み
-      const schemaPath = path.join(__dirname, '../database/newSchema.sql');
+      // 新スキーマファイルから読み込み（柔軟なパス解決）
+      let schemaPath = path.join(__dirname, '../database/newSchema.sql');
+      
+      // srcディレクトリからのパスも試す
+      if (!fs.existsSync(schemaPath)) {
+        schemaPath = path.join(__dirname, '../../src/database/newSchema.sql');
+      }
+      
+      // プロジェクトルートからのパスも試す
+      if (!fs.existsSync(schemaPath)) {
+        schemaPath = path.join(process.cwd(), 'src/database/newSchema.sql');
+      }
+      
+      console.log(`📁 スキーマファイルパス: ${schemaPath}`);
+      console.log(`📁 ファイル存在確認: ${fs.existsSync(schemaPath)}`);
+      
+      if (!fs.existsSync(schemaPath)) {
+        throw new Error(`スキーマファイルが見つかりません: ${schemaPath}`);
+      }
+      
       const schema = fs.readFileSync(schemaPath, 'utf8');
       
       // スキーマを実行（複数文に対応、TRIGGERとVIEWを考慮）
