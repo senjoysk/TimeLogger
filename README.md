@@ -232,32 +232,73 @@ DiscordのDMで以下のコマンドが使用できます：
 
 ### Bot管理スクリプト
 
-#### 基本操作
+#### 開発環境操作
 ```bash
 # Bot起動
-npm run bot:start
+npm run dev:start
 
 # Bot停止
-npm run bot:stop
+npm run dev:stop
 
-# Bot再起動
-npm run bot:restart
+# Bot再起動（ビルド付き）
+npm run dev:restart
 
 # Bot状況確認
-npm run bot:status
+npm run dev:status
 
 # ログ確認
-npm run bot:logs
+npm run dev:logs
+
+# ログリアルタイム監視
+npm run dev:watch
+
+# テスト・ビルド確認
+npm run dev:test
+```
+
+#### 本番環境操作
+```bash
+# 本番デプロイ
+npm run prod:deploy
+
+# 本番環境起動
+npm run prod:start
+
+# 本番環境停止
+npm run prod:stop
+
+# 本番ステータス確認
+npm run prod:status
+
+# データベースバックアップ
+npm run prod:backup
+
+# 環境変数更新
+npm run prod:secrets
 ```
 
 #### 詳細説明
+
+**開発環境（ローカル）**
 | スクリプト | 機能 | 使用例 |
 |-----------|------|--------|
-| `bot:start` | Botを安全に起動（既存プロセスチェック付き） | 開発開始時 |
-| `bot:stop` | 全てのBotプロセスを停止 | 開発終了時 |
-| `bot:restart` | Bot停止→ビルド→起動を一括実行 | コード修正後 |
-| `bot:status` | 実行中のプロセス状況を表示 | デバッグ時 |
-| `bot:logs` | リアルタイムログを表示 | 動作確認時 |
+| `dev:start` | 開発モードでBotを起動 | 開発開始時 |
+| `dev:stop` | 開発環境のBotプロセスを停止 | 開発終了時 |
+| `dev:restart` | Bot停止→ビルド→起動を一括実行 | コード修正後 |
+| `dev:status` | 開発環境のプロセス状況を表示 | デバッグ時 |
+| `dev:logs` | 開発環境のログを表示 | 動作確認時 |
+| `dev:watch` | ログをリアルタイム監視 | 開発中の監視 |
+| `dev:test` | テスト・ビルド確認 | コード品質確認 |
+
+**本番環境（Fly.io）**
+| スクリプト | 機能 | 使用例 |
+|-----------|------|--------|
+| `prod:deploy` | Fly.ioに本番デプロイ | リリース時 |
+| `prod:start` | 本番環境のBot起動 | サーバー起動 |
+| `prod:stop` | 本番環境のBot停止 | メンテナンス時 |
+| `prod:status` | 本番環境の詳細ステータス確認 | 運用監視 |
+| `prod:backup` | 本番データベースバックアップ | 定期バックアップ |
+| `prod:secrets` | 本番環境変数の更新 | 設定変更時 |
 
 ### データ管理スクリプト
 
