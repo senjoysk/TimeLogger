@@ -3,7 +3,7 @@
  * Discord Botに自然言語活動ログシステムを統合
  */
 
-import { Client, Message } from 'discord.js';
+import { Client, Message, ButtonInteraction } from 'discord.js';
 // Removed better-sqlite3 import - using sqlite3 via repository
 import { SqliteActivityLogRepository } from '../repositories/sqliteActivityLogRepository';
 import { ActivityLogService } from '../services/activityLogService';
@@ -14,7 +14,9 @@ import { SummaryHandler } from '../handlers/summaryHandler';
 import { LogsCommandHandler } from '../handlers/logsCommandHandler';
 import { TimezoneHandler } from '../handlers/timezoneHandler';
 import { UnmatchedCommandHandler } from '../handlers/unmatchedCommandHandler';
+import { TodoCommandHandler } from '../handlers/todoCommandHandler';
 import { GeminiService } from '../services/geminiService';
+import { MessageClassificationService } from '../services/messageClassificationService';
 import { GapDetectionService } from '../services/gapDetectionService';
 import { ActivityLogError } from '../types/activityLog';
 import { GapHandler } from '../handlers/gapHandler';
@@ -47,6 +49,7 @@ export class ActivityLoggingIntegration {
   private repository!: SqliteActivityLogRepository;
   private activityLogService!: ActivityLogService;
   private geminiService!: GeminiService;
+  private messageClassificationService!: MessageClassificationService;
   private unifiedAnalysisService!: UnifiedAnalysisService;
   private analysisCacheService!: AnalysisCacheService;
   private gapDetectionService!: GapDetectionService;
@@ -58,6 +61,7 @@ export class ActivityLoggingIntegration {
   private timezoneHandler!: TimezoneHandler;
   private gapHandler!: GapHandler;
   private unmatchedHandler!: UnmatchedCommandHandler;
+  private todoHandler!: TodoCommandHandler;
 
   // 設定
   private config: ActivityLoggingConfig;
@@ -101,6 +105,9 @@ export class ActivityLoggingIntegration {
       
       this.gapDetectionService = new GapDetectionService(this.repository);
       
+      // TODO機能サービスの初期化
+      this.messageClassificationService = new MessageClassificationService(this.geminiService);
+      
       console.log('✅ サービス層初期化完了');
 
       // 3. ハンドラー層の初期化
@@ -117,7 +124,16 @@ export class ActivityLoggingIntegration {
         this.unifiedAnalysisService
       );
       this.unmatchedHandler = new UnmatchedCommandHandler(this.activityLogService);
-      console.log('✅ ハンドラー層初期化完了');
+      
+      // TODO機能ハンドラーの初期化
+      this.todoHandler = new TodoCommandHandler(
+        this.repository, // ITodoRepository
+        this.repository, // IMessageClassificationRepository  
+        this.geminiService,
+        this.messageClassificationService
+      );
+      
+      console.log('✅ ハンドラー層初期化完了（TODO機能統合済み）');
 
       this.isInitialized = true;
       console.log('🎉 活動記録システム初期化完了！');
@@ -166,7 +182,14 @@ export class ActivityLoggingIntegration {
       }
     });
 
-    console.log('✅ Discord Bot統合完了（活動記録システム優先モード）');
+    // ボタンインタラクションハンドラーを追加（TODO機能）
+    client.on('interactionCreate', async (interaction) => {
+      if (interaction.isButton()) {
+        await this.handleButtonInteraction(interaction);
+      }
+    });
+
+    console.log('✅ Discord Bot統合完了（活動記録システム + TODO機能統合）');
   }
 
   /**
@@ -215,9 +238,14 @@ export class ActivityLoggingIntegration {
         return true;
       }
 
-      // 通常のメッセージを活動ログとして記録
+      // 通常のメッセージを活動ログとして記録 + TODO分類処理
       if (content.length > 0 && content.length <= 2000) {
+        // 1. 活動ログとして記録
         await this.recordActivity(message, userId, content, timezone);
+        
+        // 2. AI分析でTODO分類も実行
+        await this.todoHandler.handleMessageClassification(message, userId, timezone);
+        
         return true;
       }
 
@@ -300,10 +328,54 @@ export class ActivityLoggingIntegration {
         await this.unmatchedHandler.handle(message, userId, args, timezone);
         break;
 
+      case 'todo':
+      case 'タスク':
+        console.log(`📋 todoコマンド実行: ユーザー=${userId}, タイムゾーン=${timezone}`);
+        await this.todoHandler.handleCommand(message, userId, args, timezone);
+        break;
+
       default:
         // 他のコマンドは既存システムに委譲または無視
         console.log(`📝 未対応コマンド: ${command}`);
         break;
+    }
+  }
+
+  /**
+   * ボタンインタラクションを処理（TODO機能）
+   */
+  private async handleButtonInteraction(interaction: ButtonInteraction): Promise<void> {
+    try {
+      // ユーザー確認
+      const userId = interaction.user.id;
+      if (userId !== this.config.targetUserId) {
+        await interaction.reply({ 
+          content: '❌ このボタンは使用できません。', 
+          ephemeral: true 
+        });
+        return;
+      }
+
+      const timezone = await this.getUserTimezone(userId);
+      
+      console.log(`🔘 ボタンインタラクション処理: ${userId} - ${interaction.customId}`);
+      
+      // TODOハンドラーに委譲
+      await this.todoHandler.handleButtonInteraction(interaction, userId, timezone);
+      
+    } catch (error) {
+      console.error('❌ ボタンインタラクション処理エラー:', error);
+      
+      if (!interaction.replied) {
+        try {
+          await interaction.reply({ 
+            content: '❌ ボタン操作の処理中にエラーが発生しました。', 
+            ephemeral: true 
+          });
+        } catch (replyError) {
+          console.error('❌ エラー返信失敗:', replyError);
+        }
+      }
     }
   }
 
@@ -641,6 +713,38 @@ export class ActivityLoggingIntegration {
     } catch (error) {
       console.error('❌ タイムゾーン取得エラー:', error);
       return this.config.defaultTimezone;
+    }
+  }
+
+  /**
+   * システムリソースをクリーンアップ（TODO機能統合対応）
+   */
+  async destroy(): Promise<void> {
+    try {
+      console.log('🧹 活動記録システムのクリーンアップ開始...');
+
+      // TODO機能ハンドラーのクリーンアップ
+      if (this.todoHandler && typeof this.todoHandler.destroy === 'function') {
+        this.todoHandler.destroy();
+        console.log('✅ TODO機能ハンドラークリーンアップ完了');
+      }
+
+      // データベースリポジトリのクリーンアップ
+      if (this.repository && typeof this.repository.close === 'function') {
+        await this.repository.close();
+        console.log('✅ データベース接続クリーンアップ完了');
+      }
+
+      this.isInitialized = false;
+      console.log('🎉 活動記録システムクリーンアップ完了');
+
+    } catch (error) {
+      console.error('❌ システムクリーンアップエラー:', error);
+      throw new ActivityLogError(
+        'システムクリーンアップに失敗しました', 
+        'SYSTEM_CLEANUP_ERROR', 
+        { error }
+      );
     }
   }
 }
