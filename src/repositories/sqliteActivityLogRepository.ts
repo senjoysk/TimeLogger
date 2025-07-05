@@ -10,7 +10,7 @@ import {
   IActivityLogRepository,
   LogSearchCriteria
 } from './activityLogRepository';
-import { IApiCostRepository } from './interfaces';
+import { IApiCostRepository, ITodoRepository, IMessageClassificationRepository } from './interfaces';
 import {
   ActivityLog,
   CreateActivityLogRequest,
@@ -20,14 +20,25 @@ import {
   BusinessDateInfo,
   ActivityLogError
 } from '../types/activityLog';
+import {
+  Todo,
+  CreateTodoRequest,
+  UpdateTodoRequest,
+  GetTodosOptions,
+  TodoStats,
+  TodoStatus,
+  MessageClassificationHistory,
+  MessageClassification,
+  TodoError
+} from '../types/todo';
 import * as fs from 'fs';
 import * as path from 'path';
 
 /**
  * SQLite実装クラス
- * 活動ログとAPIコストモニタリングの両方を実装
+ * 活動ログ、APIコストモニタリング、TODO管理、メッセージ分類の統合実装
  */
-export class SqliteActivityLogRepository implements IActivityLogRepository, IApiCostRepository {
+export class SqliteActivityLogRepository implements IActivityLogRepository, IApiCostRepository, ITodoRepository, IMessageClassificationRepository {
   private db: Database;
   private connected: boolean = false;
 
@@ -1187,6 +1198,444 @@ export class SqliteActivityLogRepository implements IActivityLogRepository, IApi
       console.error('❌ マッチング済みログペア取得エラー:', error);
       throw new ActivityLogError('マッチング済みログペアの取得に失敗しました', 'GET_MATCHED_LOG_PAIRS_ERROR', { error, userId, businessDate });
     }
+  }
+
+  // ================================================================
+  // TODO管理機能の実装
+  // ================================================================
+
+  /**
+   * TODOを作成
+   */
+  async createTodo(request: CreateTodoRequest): Promise<Todo> {
+    const todo: Todo = {
+      id: uuidv4(),
+      userId: request.userId,
+      content: request.content,
+      status: 'pending',
+      priority: request.priority || 0,
+      dueDate: request.dueDate,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      sourceType: request.sourceType || 'manual',
+      relatedActivityId: request.relatedActivityId,
+      aiConfidence: request.aiConfidence,
+    };
+
+    const sql = `
+      INSERT INTO todo_tasks (
+        id, user_id, content, status, priority, due_date, 
+        created_at, updated_at, source_type, related_activity_id, ai_confidence
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `;
+
+    try {
+      await this.runQuery(sql, [
+        todo.id,
+        todo.userId,
+        todo.content,
+        todo.status,
+        todo.priority,
+        todo.dueDate,
+        todo.createdAt,
+        todo.updatedAt,
+        todo.sourceType,
+        todo.relatedActivityId,
+        todo.aiConfidence,
+      ]);
+      return todo;
+    } catch (error) {
+      throw new TodoError('TODOの作成に失敗しました', 'CREATE_TODO_ERROR', { error, request });
+    }
+  }
+
+  /**
+   * IDでTODOを取得
+   */
+  async getTodoById(id: string): Promise<Todo | null> {
+    const sql = 'SELECT * FROM todo_tasks WHERE id = ?';
+    
+    try {
+      const row = await this.getQuery(sql, [id]);
+      return row ? this.mapRowToTodo(row) : null;
+    } catch (error) {
+      throw new TodoError('TODO取得に失敗しました', 'GET_TODO_ERROR', { error, id });
+    }
+  }
+
+  /**
+   * ユーザーIDでTODO一覧を取得
+   */
+  async getTodosByUserId(userId: string, options?: GetTodosOptions): Promise<Todo[]> {
+    let sql = 'SELECT * FROM todo_tasks WHERE user_id = ?';
+    const params: any[] = [userId];
+
+    if (options?.status) {
+      sql += ' AND status = ?';
+      params.push(options.status);
+    }
+
+    if (options?.orderBy === 'priority') {
+      sql += ' ORDER BY priority DESC, created_at ASC';
+    } else if (options?.orderBy === 'created') {
+      sql += ' ORDER BY created_at DESC';
+    } else if (options?.orderBy === 'due_date') {
+      sql += ' ORDER BY due_date ASC NULLS LAST';
+    }
+
+    if (options?.limit) {
+      sql += ' LIMIT ?';
+      params.push(options.limit);
+      
+      if (options?.offset) {
+        sql += ' OFFSET ?';
+        params.push(options.offset);
+      }
+    }
+
+    try {
+      const rows = await this.allQuery(sql, params);
+      return rows.map(row => this.mapRowToTodo(row));
+    } catch (error) {
+      throw new TodoError('TODO一覧取得に失敗しました', 'GET_TODOS_ERROR', { error, userId, options });
+    }
+  }
+
+  /**
+   * TODOを更新
+   */
+  async updateTodo(id: string, update: UpdateTodoRequest): Promise<void> {
+    const updateFields: string[] = [];
+    const params: any[] = [];
+
+    if (update.content !== undefined) {
+      updateFields.push('content = ?');
+      params.push(update.content);
+    }
+    if (update.priority !== undefined) {
+      updateFields.push('priority = ?');
+      params.push(update.priority);
+    }
+    if (update.dueDate !== undefined) {
+      updateFields.push('due_date = ?');
+      params.push(update.dueDate);
+    }
+    if (update.status !== undefined) {
+      updateFields.push('status = ?');
+      params.push(update.status);
+    }
+
+    if (updateFields.length === 0) {
+      return; // 更新する項目がない
+    }
+
+    updateFields.push('updated_at = ?');
+    params.push(new Date().toISOString());
+    params.push(id);
+
+    const sql = `UPDATE todo_tasks SET ${updateFields.join(', ')} WHERE id = ?`;
+
+    try {
+      await this.runQuery(sql, params);
+    } catch (error) {
+      throw new TodoError('TODO更新に失敗しました', 'UPDATE_TODO_ERROR', { error, id, update });
+    }
+  }
+
+  /**
+   * TODOステータスを更新
+   */
+  async updateTodoStatus(id: string, status: TodoStatus): Promise<void> {
+    const updateFields = ['status = ?', 'updated_at = ?'];
+    const params = [status, new Date().toISOString()];
+
+    if (status === 'completed') {
+      updateFields.push('completed_at = ?');
+      params.push(new Date().toISOString());
+    }
+
+    params.push(id);
+    const sql = `UPDATE todo_tasks SET ${updateFields.join(', ')} WHERE id = ?`;
+
+    try {
+      await this.runQuery(sql, params);
+    } catch (error) {
+      throw new TodoError('TODOステータス更新に失敗しました', 'UPDATE_TODO_STATUS_ERROR', { error, id, status });
+    }
+  }
+
+  /**
+   * TODOを削除
+   */
+  async deleteTodo(id: string): Promise<void> {
+    const sql = 'DELETE FROM todo_tasks WHERE id = ?';
+    
+    try {
+      await this.runQuery(sql, [id]);
+    } catch (error) {
+      throw new TodoError('TODO削除に失敗しました', 'DELETE_TODO_ERROR', { error, id });
+    }
+  }
+
+  /**
+   * キーワードでTODOを検索
+   */
+  async searchTodos(userId: string, keyword: string): Promise<Todo[]> {
+    const sql = 'SELECT * FROM todo_tasks WHERE user_id = ? AND content LIKE ? ORDER BY created_at DESC';
+    const searchPattern = `%${keyword}%`;
+    
+    try {
+      const rows = await this.allQuery(sql, [userId, searchPattern]);
+      return rows.map(row => this.mapRowToTodo(row));
+    } catch (error) {
+      throw new TodoError('TODO検索に失敗しました', 'SEARCH_TODOS_ERROR', { error, userId, keyword });
+    }
+  }
+
+  /**
+   * TODO統計を取得
+   */
+  async getTodoStats(userId: string): Promise<TodoStats> {
+    const sql = `
+      SELECT 
+        COUNT(*) as total,
+        SUM(CASE WHEN status = 'pending' THEN 1 ELSE 0 END) as pending,
+        SUM(CASE WHEN status = 'in_progress' THEN 1 ELSE 0 END) as in_progress,
+        SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) as completed,
+        SUM(CASE WHEN status = 'cancelled' THEN 1 ELSE 0 END) as cancelled,
+        SUM(CASE WHEN status = 'completed' AND date(completed_at) = date('now', 'localtime') THEN 1 ELSE 0 END) as today_completed,
+        SUM(CASE WHEN status = 'completed' AND date(completed_at) >= date('now', 'localtime', '-7 days') THEN 1 ELSE 0 END) as week_completed
+      FROM todo_tasks 
+      WHERE user_id = ?
+    `;
+    
+    try {
+      const row = await this.getQuery(sql, [userId]);
+      return {
+        total: row.total || 0,
+        pending: row.pending || 0,
+        inProgress: row.in_progress || 0,
+        completed: row.completed || 0,
+        cancelled: row.cancelled || 0,
+        todayCompleted: row.today_completed || 0,
+        weekCompleted: row.week_completed || 0,
+      };
+    } catch (error) {
+      throw new TodoError('TODO統計取得に失敗しました', 'GET_TODO_STATS_ERROR', { error, userId });
+    }
+  }
+
+  /**
+   * 期日があるTODOを取得
+   */
+  async getTodosWithDueDate(userId: string, beforeDate?: string): Promise<Todo[]> {
+    let sql = 'SELECT * FROM todo_tasks WHERE user_id = ? AND due_date IS NOT NULL';
+    const params: any[] = [userId];
+
+    if (beforeDate) {
+      sql += ' AND due_date <= ?';
+      params.push(beforeDate);
+    }
+
+    sql += ' ORDER BY due_date ASC';
+
+    try {
+      const rows = await this.allQuery(sql, params);
+      return rows.map(row => this.mapRowToTodo(row));
+    } catch (error) {
+      throw new TodoError('期日付きTODO取得に失敗しました', 'GET_TODOS_WITH_DUE_DATE_ERROR', { error, userId, beforeDate });
+    }
+  }
+
+  /**
+   * 活動IDに関連するTODOを取得
+   */
+  async getTodosByActivityId(activityId: string): Promise<Todo[]> {
+    const sql = 'SELECT * FROM todo_tasks WHERE related_activity_id = ? ORDER BY created_at DESC';
+    
+    try {
+      const rows = await this.allQuery(sql, [activityId]);
+      return rows.map(row => this.mapRowToTodo(row));
+    } catch (error) {
+      throw new TodoError('活動関連TODO取得に失敗しました', 'GET_TODOS_BY_ACTIVITY_ERROR', { error, activityId });
+    }
+  }
+
+  // ================================================================
+  // メッセージ分類機能の実装
+  // ================================================================
+
+  /**
+   * 分類履歴を記録
+   */
+  async recordClassification(
+    userId: string,
+    messageContent: string,
+    aiClassification: MessageClassification,
+    aiConfidence: number,
+    userClassification?: MessageClassification,
+    feedback?: string
+  ): Promise<MessageClassificationHistory> {
+    const record: MessageClassificationHistory = {
+      id: uuidv4(),
+      userId,
+      messageContent,
+      aiClassification,
+      aiConfidence,
+      userClassification,
+      classifiedAt: new Date().toISOString(),
+      feedback,
+      isCorrect: userClassification ? aiClassification === userClassification : undefined,
+    };
+
+    const sql = `
+      INSERT INTO message_classifications (
+        id, user_id, message_content, ai_classification, ai_confidence,
+        user_classification, classified_at, feedback, is_correct
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `;
+
+    try {
+      await this.runQuery(sql, [
+        record.id,
+        record.userId,
+        record.messageContent,
+        record.aiClassification,
+        record.aiConfidence,
+        record.userClassification,
+        record.classifiedAt,
+        record.feedback,
+        record.isCorrect,
+      ]);
+      return record;
+    } catch (error) {
+      throw new TodoError('分類履歴記録に失敗しました', 'RECORD_CLASSIFICATION_ERROR', { error, userId });
+    }
+  }
+
+  /**
+   * 分類フィードバックを更新
+   */
+  async updateClassificationFeedback(
+    id: string,
+    userClassification: MessageClassification,
+    feedback?: string
+  ): Promise<void> {
+    const sql = `
+      UPDATE message_classifications 
+      SET user_classification = ?, feedback = ?, is_correct = (ai_classification = ?)
+      WHERE id = ?
+    `;
+
+    try {
+      await this.runQuery(sql, [userClassification, feedback, userClassification, id]);
+    } catch (error) {
+      throw new TodoError('分類フィードバック更新に失敗しました', 'UPDATE_CLASSIFICATION_FEEDBACK_ERROR', { error, id });
+    }
+  }
+
+  /**
+   * 分類精度統計を取得
+   */
+  async getClassificationAccuracy(userId?: string): Promise<{
+    classification: MessageClassification;
+    totalCount: number;
+    correctCount: number;
+    accuracy: number;
+    avgConfidence: number;
+  }[]> {
+    let sql = `
+      SELECT 
+        ai_classification as classification,
+        COUNT(*) as total_count,
+        SUM(CASE WHEN is_correct = 1 THEN 1 ELSE 0 END) as correct_count,
+        CAST(SUM(CASE WHEN is_correct = 1 THEN 1 ELSE 0 END) AS REAL) / COUNT(*) as accuracy,
+        AVG(ai_confidence) as avg_confidence
+      FROM message_classifications
+      WHERE user_classification IS NOT NULL
+    `;
+    const params: any[] = [];
+
+    if (userId) {
+      sql += ' AND user_id = ?';
+      params.push(userId);
+    }
+
+    sql += ' GROUP BY ai_classification';
+
+    try {
+      const rows = await this.allQuery(sql, params);
+      return rows.map(row => ({
+        classification: row.classification as MessageClassification,
+        totalCount: row.total_count,
+        correctCount: row.correct_count,
+        accuracy: row.accuracy,
+        avgConfidence: row.avg_confidence,
+      }));
+    } catch (error) {
+      throw new TodoError('分類精度統計取得に失敗しました', 'GET_CLASSIFICATION_ACCURACY_ERROR', { error, userId });
+    }
+  }
+
+  /**
+   * 分類履歴を取得
+   */
+  async getClassificationHistory(userId: string, limit?: number): Promise<MessageClassificationHistory[]> {
+    let sql = 'SELECT * FROM message_classifications WHERE user_id = ? ORDER BY classified_at DESC';
+    const params: any[] = [userId];
+
+    if (limit) {
+      sql += ' LIMIT ?';
+      params.push(limit);
+    }
+
+    try {
+      const rows = await this.allQuery(sql, params);
+      return rows.map(row => this.mapRowToClassificationHistory(row));
+    } catch (error) {
+      throw new TodoError('分類履歴取得に失敗しました', 'GET_CLASSIFICATION_HISTORY_ERROR', { error, userId });
+    }
+  }
+
+  // ================================================================
+  // ヘルパーメソッド
+  // ================================================================
+
+  /**
+   * データベース行をTodoオブジェクトにマッピング
+   */
+  private mapRowToTodo(row: any): Todo {
+    return {
+      id: row.id,
+      userId: row.user_id,
+      content: row.content,
+      status: row.status as TodoStatus,
+      priority: row.priority,
+      dueDate: row.due_date,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at,
+      completedAt: row.completed_at,
+      sourceType: row.source_type as any,
+      relatedActivityId: row.related_activity_id,
+      aiConfidence: row.ai_confidence,
+    };
+  }
+
+  /**
+   * データベース行をMessageClassificationHistoryオブジェクトにマッピング
+   */
+  private mapRowToClassificationHistory(row: any): MessageClassificationHistory {
+    return {
+      id: row.id,
+      userId: row.user_id,
+      messageContent: row.message_content,
+      aiClassification: row.ai_classification as MessageClassification,
+      aiConfidence: row.ai_confidence,
+      userClassification: row.user_classification as MessageClassification,
+      classifiedAt: row.classified_at,
+      feedback: row.feedback,
+      isCorrect: row.is_correct === 1 ? true : row.is_correct === 0 ? false : undefined,
+    };
   }
 
   /**

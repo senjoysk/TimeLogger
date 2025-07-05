@@ -1,4 +1,5 @@
 import { ActivityRecord, DailySummary, ActivityAnalysis } from '../types';
+import { Todo, CreateTodoRequest, UpdateTodoRequest, GetTodosOptions, TodoStats, TodoStatus, MessageClassificationHistory, ClassificationResult, MessageClassification } from '../types/todo';
 
 /**
  * データベース操作の抽象化インターフェース
@@ -67,4 +68,61 @@ export interface IAnalysisService {
 
   // コスト警告のチェック
   checkCostAlerts(userId: string, timezone: string): Promise<any>;
+}
+
+/**
+ * TODO管理機能の抽象化インターフェース
+ */
+export interface ITodoRepository {
+  // TODO基本操作
+  createTodo(request: CreateTodoRequest): Promise<Todo>;
+  getTodoById(id: string): Promise<Todo | null>;
+  getTodosByUserId(userId: string, options?: GetTodosOptions): Promise<Todo[]>;
+  updateTodo(id: string, update: UpdateTodoRequest): Promise<void>;
+  updateTodoStatus(id: string, status: TodoStatus): Promise<void>;
+  deleteTodo(id: string): Promise<void>;
+
+  // TODO検索・統計
+  searchTodos(userId: string, keyword: string): Promise<Todo[]>;
+  getTodoStats(userId: string): Promise<TodoStats>;
+
+  // 期日関連
+  getTodosWithDueDate(userId: string, beforeDate?: string): Promise<Todo[]>;
+  
+  // 活動ログ連携
+  getTodosByActivityId(activityId: string): Promise<Todo[]>;
+}
+
+/**
+ * メッセージ分類機能の抽象化インターフェース
+ */
+export interface IMessageClassificationRepository {
+  // 分類履歴の保存・取得
+  recordClassification(
+    userId: string,
+    messageContent: string,
+    aiClassification: MessageClassification,
+    aiConfidence: number,
+    userClassification?: MessageClassification,
+    feedback?: string
+  ): Promise<MessageClassificationHistory>;
+
+  // 分類精度の改善
+  updateClassificationFeedback(
+    id: string,
+    userClassification: MessageClassification,
+    feedback?: string
+  ): Promise<void>;
+
+  // 分類精度統計
+  getClassificationAccuracy(userId?: string): Promise<{
+    classification: MessageClassification;
+    totalCount: number;
+    correctCount: number;
+    accuracy: number;
+    avgConfidence: number;
+  }[]>;
+
+  // 学習用データの取得
+  getClassificationHistory(userId: string, limit?: number): Promise<MessageClassificationHistory[]>;
 }
