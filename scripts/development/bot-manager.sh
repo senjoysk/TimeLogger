@@ -1,12 +1,13 @@
 #!/bin/bash
 
-# Bot プロセス管理スクリプト
-PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-PID_FILE="$PROJECT_DIR/.bot.pid"
+# 開発環境用 Bot プロセス管理スクリプト
+PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+PID_FILE="$PROJECT_DIR/.bot-dev.pid"
+LOG_FILE="$PROJECT_DIR/bot-dev.log"
 
 case "$1" in
   "start")
-    echo "🚀 TimeLogger Bot を起動しています..."
+    echo "🚀 TimeLogger Bot (開発環境) を起動しています..."
     
     # 既存プロセスをチェック・停止
     if [ -f "$PID_FILE" ]; then
@@ -22,22 +23,23 @@ case "$1" in
     # 全関連プロセスを強制停止（念のため）
     echo "🧹 関連プロセスをクリーンアップ中..."
     pkill -f "TimeLogger" 2>/dev/null || true
-    pkill -f "node.*dist/index\.js" 2>/dev/null || true
     pkill -f "ts-node.*src/index" 2>/dev/null || true
+    pkill -f "NODE_ENV=development.*ts-node" 2>/dev/null || true
     sleep 1
     
-    # 新しいプロセスを起動
+    # 新しいプロセスを起動（開発環境）
     cd "$PROJECT_DIR"
-    npm start > bot.log 2>&1 &
+    npm run dev > "$LOG_FILE" 2>&1 &
     NEW_PID=$!
     echo "$NEW_PID" > "$PID_FILE"
     
     echo "✅ Bot起動完了 (PID: $NEW_PID)"
-    echo "📝 ログファイル: $PROJECT_DIR/bot.log"
+    echo "📝 ログファイル: $LOG_FILE"
+    echo "🔧 開発環境で実行中 (NODE_ENV=development)"
     ;;
     
   "stop")
-    echo "🛑 TimeLogger Bot を停止しています..."
+    echo "🛑 TimeLogger Bot (開発環境) を停止しています..."
     
     if [ -f "$PID_FILE" ]; then
       PID=$(cat "$PID_FILE")
@@ -60,21 +62,21 @@ case "$1" in
     # 全関連プロセスを強制停止（念のため）
     echo "🧹 関連プロセスをクリーンアップ中..."
     pkill -f "TimeLogger" 2>/dev/null || true
-    pkill -f "node.*dist/index\.js" 2>/dev/null || true
     pkill -f "ts-node.*src/index" 2>/dev/null || true
+    pkill -f "NODE_ENV=development.*ts-node" 2>/dev/null || true
     
     echo "✅ Bot停止完了"
     ;;
     
   "restart")
-    echo "🔄 TimeLogger Bot を再起動しています..."
+    echo "🔄 TimeLogger Bot (開発環境) を再起動しています..."
     "$0" stop
     sleep 2
     "$0" start
     ;;
     
   "status")
-    echo "📊 TimeLogger Bot ステータス:"
+    echo "📊 TimeLogger Bot (開発環境) ステータス:"
     
     if [ -f "$PID_FILE" ]; then
       PID=$(cat "$PID_FILE")
@@ -91,27 +93,39 @@ case "$1" in
     fi
     
     echo "📋 関連プロセス一覧:"
-    ps aux | grep -E "(node.*TimeLogger|node.*dist/index\.js|ts-node.*src/index\.ts)" | grep -v grep || echo "関連プロセスなし"
+    ps aux | grep -E "(ts-node.*src/index|NODE_ENV=development.*ts-node)" | grep -v grep || echo "関連プロセスなし"
     ;;
     
   "logs")
     echo "📜 Bot ログ (最新20行):"
-    if [ -f "$PROJECT_DIR/bot.log" ]; then
-      tail -20 "$PROJECT_DIR/bot.log"
+    if [ -f "$LOG_FILE" ]; then
+      tail -20 "$LOG_FILE"
     else
-      echo "ログファイルが見つかりません"
+      echo "ログファイルが見つかりません: $LOG_FILE"
+    fi
+    ;;
+    
+  "watch")
+    echo "👀 Bot ログを監視中 (Ctrl+C で終了):"
+    if [ -f "$LOG_FILE" ]; then
+      tail -f "$LOG_FILE"
+    else
+      echo "ログファイルが見つかりません: $LOG_FILE"
     fi
     ;;
     
   *)
-    echo "Usage: $0 {start|stop|restart|status|logs}"
+    echo "Usage: $0 {start|stop|restart|status|logs|watch}"
+    echo ""
+    echo "開発環境用 Bot 管理スクリプト"
     echo ""
     echo "Commands:"
-    echo "  start   - Botを起動"
+    echo "  start   - Botを開発モードで起動"
     echo "  stop    - Botを停止"
     echo "  restart - Botを再起動"
     echo "  status  - 実行状況を確認"
     echo "  logs    - ログを表示"
+    echo "  watch   - ログをリアルタイム監視"
     exit 1
     ;;
 esac

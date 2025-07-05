@@ -7,6 +7,8 @@ yarn-error.log*
 # 環境変数
 .env
 .env.local
+.env.development
+.env.production
 .env.development.local
 .env.test.local
 .env.production.local
@@ -20,10 +22,12 @@ build/
 data/
 *.db
 *.sqlite
+*.db.backup.*
 
 # ログファイル
 logs/
 *.log
+bot.log
 
 # IDEの設定
 .vscode/
@@ -45,3 +49,26 @@ coverage/
 # プロセス管理ファイル
 .bot.pid
 *.pid
+
+# 一時ファイル
+*.tmp
+*.temp
+*.swp
+*.swo
+*~
+
+# macOS特有
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Windows特有
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Claude設定（ユーザー固有）
+.claude/
+
+# 環境固有の設定
+.env.local.*
