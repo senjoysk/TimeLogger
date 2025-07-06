@@ -82,6 +82,19 @@ export class ActivityTodoCorrelationService {
     const activities = await this.repository.getActivityRecords(userId, timezone, businessDate);
     const todos = await this.repository.getTodosByUserId(userId);
 
+    return this.analyzeActivityTodoCorrelationWithData(userId, businessDate, timezone, activities, todos);
+  }
+
+  /**
+   * 活動ログとTODOの相関を分析（データ重複排除最適化版）
+   */
+  async analyzeActivityTodoCorrelationWithData(
+    userId: string,
+    businessDate: string,
+    timezone: string,
+    activities: ActivityLog[],
+    todos: Todo[]
+  ): Promise<ActivityTodoCorrelationResult> {
     const correlations: ActivityTodoCorrelation[] = [];
 
     // 各活動ログと各TODOの相関を計算
@@ -128,6 +141,19 @@ export class ActivityTodoCorrelationService {
     const activities = await this.repository.getActivityRecords(userId, timezone, businessDate);
     const todos = await this.repository.getTodosByUserId(userId);
     
+    return this.suggestTodoCompletionsWithData(userId, businessDate, timezone, activities, todos);
+  }
+
+  /**
+   * TODO完了の提案を生成（データ重複排除最適化版）
+   */
+  async suggestTodoCompletionsWithData(
+    userId: string,
+    businessDate: string,
+    timezone: string,
+    activities: ActivityLog[],
+    todos: Todo[]
+  ): Promise<TodoCompletionSuggestion[]> {
     const suggestions: TodoCompletionSuggestion[] = [];
 
     for (const todo of todos) {
