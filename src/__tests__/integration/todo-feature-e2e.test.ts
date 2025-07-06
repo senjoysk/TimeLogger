@@ -10,6 +10,7 @@ import { ActivityLoggingIntegration, ActivityLoggingConfig } from '../../integra
 import { Message, ButtonInteraction, User, TextChannel } from 'discord.js';
 import { ActivityLog } from '../../types/activityLog';
 import { Todo } from '../../types/todo';
+import { MockGeminiService } from '../mocks/mockGeminiService';
 import fs from 'fs';
 import path from 'path';
 
@@ -113,6 +114,38 @@ describe('TODO機能 End-to-End テスト', () => {
     integration = new ActivityLoggingIntegration(config);
     try {
       await integration.initialize();
+      
+      // テスト環境用にGeminiServiceをモックに置き換え
+      const mockGeminiService = new MockGeminiService();
+      (integration as any).geminiService = mockGeminiService;
+      
+      // MessageClassificationServiceも更新（正しいプロパティを使用）
+      if ((integration as any).messageClassificationService) {
+        (integration as any).messageClassificationService.geminiService = mockGeminiService;
+      }
+      
+      // TodoCommandHandlerも更新（classificationServiceも確認）
+      if ((integration as any).todoHandler) {
+        (integration as any).todoHandler.geminiService = mockGeminiService;
+        if ((integration as any).todoHandler.classificationService) {
+          (integration as any).todoHandler.classificationService.geminiService = mockGeminiService;
+        }
+      }
+      
+      // UnifiedAnalysisServiceもモックを使用
+      if ((integration as any).unifiedAnalysisService) {
+        (integration as any).unifiedAnalysisService.geminiService = mockGeminiService;
+      }
+      
+      // IntegratedSummaryServiceのUnifiedAnalysisServiceもモック適用
+      if ((integration as any).integratedSummaryService) {
+        const integratedSummaryService = (integration as any).integratedSummaryService;
+        if (integratedSummaryService.unifiedAnalysisService) {
+          integratedSummaryService.unifiedAnalysisService.geminiService = mockGeminiService;
+        }
+      }
+
+      console.log('🔧 テスト用MockGeminiServiceを全サービスに適用完了');
     } catch (error) {
       console.error('初期化エラーの詳細:', error);
       throw error;
@@ -148,22 +181,40 @@ describe('TODO機能 End-to-End テスト', () => {
     });
 
     test('TODO作成コマンドから完了までの完全フロー', async () => {
+      console.log('🚀 テスト開始: TODO作成コマンドから完了までの完全フロー');
+      
+      // データベース接続状態を確認
+      const testRepository = integration.getRepository();
+      const isConnected = await testRepository.isConnected();
+      console.log('🔗 データベース接続状態:', isConnected);
+      
       // 1. TODO作成コマンド
+      console.log('📝 TODO作成コマンド実行開始');
       const createMessage = new MockDiscordMessage('!todo add プレゼン資料を作成する');
       await integration.handleMessage(createMessage as any);
+      console.log('📝 TODO作成コマンド実行完了');
       
       expect(createMessage.replySent.length).toBeGreaterThan(0);
-      expect(createMessage.replySent[0]).toContain('作成しました');
+      console.log('📝 TODO作成レスポンス:', createMessage.replySent[0]);
+      expect(createMessage.replySent[0]).toContain('追加しました');
 
       // 2. TODO一覧表示
       const listMessage = new MockDiscordMessage('!todo list');
       await integration.handleMessage(listMessage as any);
       
       expect(listMessage.replySent.length).toBeGreaterThan(0);
-      expect(listMessage.replySent[0]).toContain('プレゼン資料');
+      // Embedオブジェクトなので、embeds配列内の内容を確認
+      const embedData = listMessage.replySent[0] as any;
+      expect(embedData).toHaveProperty('embeds');
+      expect(embedData.embeds[0].description).toContain('プレゼン資料');
+
+      // 作成されたTODO IDを取得（リアルIDを使用）
+      const todos = await testRepository.getTodosByUserId('test-user-123');
+      expect(todos.length).toBeGreaterThan(0);
+      const todoId = todos[0].id;
 
       // 3. TODO完了マーク
-      const completeMessage = new MockDiscordMessage('!todo done 1');
+      const completeMessage = new MockDiscordMessage(`!todo done ${todoId}`);
       await integration.handleMessage(completeMessage as any);
       
       expect(completeMessage.replySent.length).toBeGreaterThan(0);

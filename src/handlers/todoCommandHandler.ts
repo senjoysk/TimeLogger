@@ -162,9 +162,19 @@ export class TodoCommandHandler implements ITodoCommandHandler {
     } catch (error) {
       console.error('❌ TODOコマンド処理エラー:', error);
       
+      if (error instanceof Error) {
+        console.error('❌ エラーの詳細:', {
+          name: error.name,
+          message: error.message,
+          stack: error.stack
+        });
+      }
+      
       const errorMessage = error instanceof ActivityLogError 
         ? `❌ ${error.message}`
-        : '❌ TODOコマンドの処理中にエラーが発生しました。';
+        : error instanceof Error 
+          ? `❌ TODOコマンドの処理中にエラーが発生しました。詳細: ${error.message}`
+          : '❌ TODOコマンドの処理中にエラーが発生しました。';
         
       await message.reply(errorMessage);
     }
@@ -639,6 +649,11 @@ export class TodoCommandHandler implements ITodoCommandHandler {
     const command = args[0].toLowerCase();
 
     switch (command) {
+      case 'list':
+      case 'ls':
+      case '一覧':
+        return { type: 'list' };
+
       case 'add':
       case 'create':
       case '追加':

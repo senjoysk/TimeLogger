@@ -719,51 +719,36 @@ export class SqliteActivityLogRepository implements IActivityLogRepository, IApi
    */
   private splitSqlStatements(schema: string): string[] {
     const statements: string[] = [];
-    let current = '';
-    let inTrigger = false;
-    let inView = false;
     
-    const lines = schema.split('\n');
+    // セミコロンで分割してから、TRIGGERとVIEWの特別処理
+    const rawStatements = schema.split(';');
+    let i = 0;
     
-    for (const line of lines) {
-      const trimmedLine = line.trim();
+    while (i < rawStatements.length) {
+      let statement = rawStatements[i].trim();
       
-      // コメント行は無視
-      if (trimmedLine.startsWith('--') || trimmedLine === '') {
+      // 空文またはコメントのみの文はスキップ
+      if (!statement || statement.split('\n').every(line => 
+        line.trim() === '' || line.trim().startsWith('--')
+      )) {
+        i++;
         continue;
       }
       
-      current += line + '\n';
-      
-      // TRIGGER開始検知
-      if (trimmedLine.toUpperCase().includes('CREATE TRIGGER')) {
-        inTrigger = true;
+      // TRIGGERの特別処理
+      if (statement.toUpperCase().includes('CREATE TRIGGER')) {
+        // TRIGGERの場合は次の文（END;）まで結合
+        if (i + 1 < rawStatements.length) {
+          const nextStatement = rawStatements[i + 1].trim();
+          if (nextStatement.toUpperCase().includes('END')) {
+            statement = statement + ';\n' + nextStatement;
+            i++; // 次の文もスキップ
+          }
+        }
       }
       
-      // VIEW開始検知
-      if (trimmedLine.toUpperCase().includes('CREATE VIEW')) {
-        inView = true;
-      }
-      
-      // TRIGGER終了検知（ENDで終わる）
-      if (inTrigger && trimmedLine.toUpperCase() === 'END;') {
-        statements.push(current.trim());
-        current = '';
-        inTrigger = false;
-        continue;
-      }
-      
-      // 通常の文終了（TRIGGERやVIEW以外）
-      if (!inTrigger && !inView && trimmedLine.endsWith(';')) {
-        statements.push(current.trim());
-        current = '';
-        inView = false; // VIEW終了
-      }
-    }
-    
-    // 最後の文があれば追加
-    if (current.trim()) {
-      statements.push(current.trim());
+      statements.push(statement);
+      i++;
     }
     
     return statements.filter(stmt => stmt.length > 0);
@@ -1300,8 +1285,8 @@ export class SqliteActivityLogRepository implements IActivityLogRepository, IApi
     const sql = `
       INSERT INTO todo_tasks (
         id, user_id, content, status, priority, due_date, 
-        created_at, updated_at, source_type, related_activity_id, ai_confidence
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        created_at, updated_at, source_type, related_activity_id, ai_confidence, is_deleted
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `;
 
     try {
@@ -1317,6 +1302,7 @@ export class SqliteActivityLogRepository implements IActivityLogRepository, IApi
         todo.sourceType,
         todo.relatedActivityId,
         todo.aiConfidence,
+        false,  // is_deleted
       ]);
       return todo;
     } catch (error) {
@@ -1342,7 +1328,7 @@ export class SqliteActivityLogRepository implements IActivityLogRepository, IApi
    * ユーザーIDでTODO一覧を取得
    */
   async getTodosByUserId(userId: string, options?: GetTodosOptions): Promise<Todo[]> {
-    let sql = 'SELECT * FROM todo_tasks WHERE user_id = ?';
+    let sql = 'SELECT * FROM todo_tasks WHERE user_id = ? AND is_deleted = 0';
     const params: any[] = [userId];
 
     if (options?.status) {

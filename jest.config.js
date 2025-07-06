@@ -37,6 +37,9 @@ module.exports = {
   // タイムアウト設定
   testTimeout: 10000,
   
+  // 詳細ログ表示
+  verbose: true,
+  
   // セットアップファイル
   setupFilesAfterEnv: ['<rootDir>/src/__tests__/setup.ts'],
 };
