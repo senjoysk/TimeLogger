@@ -94,6 +94,15 @@ class MockActivityTodoCorrelationService {
       }
     ];
   }
+
+  // 最適化メソッド追加（WithData variants）
+  async analyzeActivityTodoCorrelationWithData(userId: string, businessDate: string, timezone: string, activities: any[], todos: any[]) {
+    return this.analyzeActivityTodoCorrelation(userId, businessDate, timezone);
+  }
+
+  async suggestTodoCompletionsWithData(userId: string, businessDate: string, timezone: string, activities: any[], todos: any[]) {
+    return this.suggestTodoCompletions(userId, businessDate, timezone);
+  }
 }
 
 class MockUnifiedAnalysisService {

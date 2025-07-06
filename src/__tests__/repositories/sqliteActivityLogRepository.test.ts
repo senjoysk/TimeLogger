@@ -158,47 +158,87 @@ describe('SqliteActivityLogRepository', () => {
 
   describe('APIコスト監視機能', () => {
     test('API呼び出しが記録される', async () => {
-      // Act
-      await repository.recordApiCall('analyzeActivity', 100, 50);
+      try {
+        // Act
+        console.log('🔍 テスト開始: API呼び出し記録');
+        await repository.recordApiCall('analyzeActivity', 100, 50);
+        
+        // 少し待ってから統計取得（非同期処理考慮）
+        await new Promise(resolve => setTimeout(resolve, 100));
+        
+        // デバッグ: 直接データベースからapi_costsテーブルの内容を確認
+        const allRecords = await (repository as any).allQuery('SELECT * FROM api_costs ORDER BY timestamp DESC LIMIT 10');
+        console.log('🔍 api_costsテーブル全レコード:', JSON.stringify(allRecords, null, 2));
 
-      // Assert
-      const stats = await repository.getTodayStats(mockTimezone);
-      expect(stats.totalCalls).toBe(1);
-      expect(stats.totalInputTokens).toBe(100);
-      expect(stats.totalOutputTokens).toBe(50);
-      expect(stats.estimatedCost).toBeGreaterThan(0);
-      expect(stats.operationBreakdown).toHaveProperty('analyzeActivity');
+        // Assert
+        const stats = await repository.getTodayStats(mockTimezone);
+        
+        // デバッグ情報
+        console.log('🔍 APIコスト統計:', JSON.stringify(stats, null, 2));
+        
+        expect(stats.totalCalls).toBe(1);
+        expect(stats.totalInputTokens).toBe(100);
+        expect(stats.totalOutputTokens).toBe(50);
+        expect(stats.estimatedCost).toBeGreaterThan(0);
+        expect(stats.operationBreakdown).toHaveProperty('analyzeActivity');
+      } catch (error) {
+        console.error('🔍 テストエラー:', error);
+        throw error;
+      }
     });
 
     test('複数のAPI呼び出しが集計される', async () => {
-      // Act
-      await repository.recordApiCall('analyzeActivity', 100, 50);
-      await repository.recordApiCall('generateSummary', 200, 100);
-      await repository.recordApiCall('analyzeActivity', 150, 75);
+      try {
+        // Act
+        await repository.recordApiCall('analyzeActivity', 100, 50);
+        await repository.recordApiCall('generateSummary', 200, 100);
+        await repository.recordApiCall('analyzeActivity', 150, 75);
+        
+        // 少し待ってから統計取得
+        await new Promise(resolve => setTimeout(resolve, 100));
 
-      // Assert
-      const stats = await repository.getTodayStats(mockTimezone);
-      expect(stats.totalCalls).toBe(3);
-      expect(stats.totalInputTokens).toBe(450);
-      expect(stats.totalOutputTokens).toBe(225);
-      expect(stats.operationBreakdown.analyzeActivity.calls).toBe(2);
-      expect(stats.operationBreakdown.generateSummary.calls).toBe(1);
+        // Assert
+        const stats = await repository.getTodayStats(mockTimezone);
+        
+        // デバッグ情報
+        console.log('🔍 複数APIコスト統計:', JSON.stringify(stats, null, 2));
+        
+        expect(stats.totalCalls).toBe(3);
+        expect(stats.totalInputTokens).toBe(450);
+        expect(stats.totalOutputTokens).toBe(225);
+        expect(stats.operationBreakdown.analyzeActivity.calls).toBe(2);
+        expect(stats.operationBreakdown.generateSummary.calls).toBe(1);
+      } catch (error) {
+        console.error('🔍 複数APIテストエラー:', error);
+        throw error;
+      }
     });
 
     test('日次レポートが生成される', async () => {
-      // Arrange
-      await repository.recordApiCall('analyzeActivity', 100, 50);
-      await repository.recordApiCall('generateSummary', 200, 100);
+      try {
+        // Arrange
+        await repository.recordApiCall('analyzeActivity', 100, 50);
+        await repository.recordApiCall('generateSummary', 200, 100);
+        
+        // 少し待ってからレポート生成
+        await new Promise(resolve => setTimeout(resolve, 100));
 
-      // Act
-      const report = await repository.generateDailyReport(mockTimezone);
+        // Act
+        const report = await repository.generateDailyReport(mockTimezone);
+        
+        // デバッグ情報
+        console.log('🔍 日次レポート:', report);
 
-      // Assert
-      expect(report).toContain('API使用量レポート');
-      expect(report).toContain('本日の合計');
-      expect(report).toContain('呼び出し回数: 2回');
-      expect(report).toContain('analyzeActivity');
-      expect(report).toContain('generateSummary');
+        // Assert
+        expect(report).toContain('API使用量レポート');
+        expect(report).toContain('本日の合計');
+        expect(report).toContain('呼び出し回数: 2回');
+        expect(report).toContain('analyzeActivity');
+        expect(report).toContain('generateSummary');
+      } catch (error) {
+        console.error('🔍 日次レポートテストエラー:', error);
+        throw error;
+      }
     });
 
     test('コスト警告が適切に動作する', async () => {

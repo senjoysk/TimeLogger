@@ -27,21 +27,22 @@ describe('SqliteActivityLogRepository TODO機能', () => {
     // 直接スキーマを実行（initializeDatabaseの代わり）
     const runQuery = (repository as any).runQuery.bind(repository);
     
-    // 最小限のTODOテーブル作成
+    // 完全なTODOテーブル作成（本番スキーマと同じ）
     await runQuery(`
       CREATE TABLE IF NOT EXISTS todo_tasks (
           id TEXT PRIMARY KEY,
           user_id TEXT NOT NULL,
           content TEXT NOT NULL,
-          status TEXT DEFAULT 'pending',
+          status TEXT DEFAULT 'pending' CHECK (status IN ('pending', 'in_progress', 'completed', 'cancelled')),
           priority INTEGER DEFAULT 0,
           due_date TEXT,
           created_at TEXT NOT NULL DEFAULT (datetime('now', 'utc')),
           updated_at TEXT NOT NULL DEFAULT (datetime('now', 'utc')),
           completed_at TEXT,
-          source_type TEXT DEFAULT 'manual',
+          source_type TEXT DEFAULT 'manual' CHECK (source_type IN ('manual', 'ai_suggested', 'activity_derived', 'ai_classified')),
           related_activity_id TEXT,
-          ai_confidence REAL
+          ai_confidence REAL,
+          is_deleted BOOLEAN DEFAULT FALSE
       )
     `);
   });

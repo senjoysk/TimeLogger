@@ -778,8 +778,8 @@ export class SqliteActivityLogRepository implements IActivityLogRepository, IApi
       const sql = `
         INSERT INTO api_costs (
           id, operation, input_tokens, output_tokens, 
-          total_cost, timestamp, created_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?)
+          estimated_cost, timestamp
+        ) VALUES (?, ?, ?, ?, ?, ?)
       `;
 
       await this.runQuery(sql, [
@@ -788,11 +788,12 @@ export class SqliteActivityLogRepository implements IActivityLogRepository, IApi
         inputTokens,
         outputTokens,
         totalCost,
-        now,
         now
       ]);
 
-      console.log(`📊 API呼び出しを記録: ${operation} (入力: ${inputTokens}, 出力: ${outputTokens}, コスト: $${totalCost.toFixed(4)})`);
+      if (process.env.NODE_ENV === 'test') {
+        console.log(`📊 API呼び出しを記録: ${operation} (入力: ${inputTokens}, 出力: ${outputTokens}, コスト: $${totalCost.toFixed(4)}), timestamp: ${now}`);
+      }
     } catch (error) {
       console.error('❌ API呼び出し記録エラー:', error);
       // エラー時も処理を継続（コスト記録失敗で本来の機能を止めない）
@@ -826,7 +827,7 @@ export class SqliteActivityLogRepository implements IActivityLogRepository, IApi
           COUNT(*) as calls,
           SUM(input_tokens) as total_input_tokens,
           SUM(output_tokens) as total_output_tokens,
-          SUM(total_cost) as total_cost
+          SUM(estimated_cost) as total_cost
         FROM api_costs 
         WHERE timestamp >= ? AND timestamp <= ?
         GROUP BY operation
@@ -836,6 +837,11 @@ export class SqliteActivityLogRepository implements IActivityLogRepository, IApi
         startOfDay.toISOString(),
         endOfDay.toISOString()
       ]) as any[];
+      
+      // デバッグ情報（テスト時のみ）
+      if (process.env.NODE_ENV === 'test') {
+        console.log(`🔍 getTodayStats デバッグ: timezone=${timezone}, start=${startOfDay.toISOString()}, end=${endOfDay.toISOString()}, rows=${rows.length}`);
+      }
 
       let totalCalls = 0;
       let totalInputTokens = 0;
@@ -961,11 +967,12 @@ export class SqliteActivityLogRepository implements IActivityLogRepository, IApi
         CREATE TABLE IF NOT EXISTS api_costs (
           id TEXT PRIMARY KEY,
           operation TEXT NOT NULL,
-          input_tokens INTEGER NOT NULL,
-          output_tokens INTEGER NOT NULL,
-          total_cost REAL NOT NULL,
-          timestamp TEXT NOT NULL,
-          created_at TEXT NOT NULL
+          input_tokens INTEGER DEFAULT 0,
+          output_tokens INTEGER DEFAULT 0,
+          estimated_cost REAL DEFAULT 0.0,
+          timestamp TEXT NOT NULL DEFAULT (datetime('now', 'utc')),
+          user_id TEXT,
+          business_date TEXT
         )
       `;
       

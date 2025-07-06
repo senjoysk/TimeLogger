@@ -223,7 +223,7 @@ describe('SummaryHandler', () => {
       expect(mockMessage.replies.length).toBeGreaterThan(0);
       expect(mockMessage.replies[0]).toContain('サマリーコマンド');
       expect(mockMessage.replies[0]).toContain('refresh');
-      expect(mockMessage.replies[0]).toContain('強制再分析');
+      expect(mockMessage.replies[0]).toContain('キャッシュを無視して再分析');
     });
   });
 

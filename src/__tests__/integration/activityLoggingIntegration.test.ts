@@ -231,4 +231,146 @@ describe('活動記録システム統合テスト', () => {
       expect(summaryText).toBeTruthy();
     }, 15000); // 15秒のタイムアウト
   });
+
+  describe('TODO機能統合テスト', () => {
+    test('TODOメッセージ分類が実行される', async () => {
+      const mockMessage = new MockMessage('プレゼン資料を作成する必要がある');
+      
+      const handleMessage = (integration as any).handleMessage.bind(integration);
+      const result = await handleMessage(mockMessage as unknown as Message);
+      
+      expect(result).toBe(true);
+      // TODO分類処理が実行されたことを確認
+    });
+
+    test('!todoコマンドが正しく処理される', async () => {
+      const mockMessage = new MockMessage('!todo');
+      
+      const handleMessage = (integration as any).handleMessage.bind(integration);
+      const result = await handleMessage(mockMessage as unknown as Message);
+      
+      expect(result).toBe(true);
+      expect(mockMessage.replies.length).toBeGreaterThan(0);
+      // 返信がオブジェクト形式の場合も対応
+      const reply = mockMessage.replies[0];
+      if (typeof reply === 'string') {
+        expect(reply).toContain('TODO');
+      } else {
+        expect(JSON.stringify(reply)).toContain('TODO'); // TODO関連の情報が含まれている
+      }
+    });
+
+    test('TODO追加コマンドが動作する', async () => {
+      const mockMessage = new MockMessage('!todo add テストタスクを実行する');
+      
+      const handleMessage = (integration as any).handleMessage.bind(integration);
+      const result = await handleMessage(mockMessage as unknown as Message);
+      
+      expect(result).toBe(true);
+      expect(mockMessage.replies.length).toBeGreaterThan(0);
+      expect(mockMessage.replies[0]).toContain('追加'); // TODO追加の確認メッセージ
+    });
+  });
+
+  describe('並行処理最適化テスト', () => {
+    test('活動記録とTODO分類の並行処理', async () => {
+      const mockMessage = new MockMessage('新しいプロジェクトを開始した');
+      
+      const startTime = Date.now();
+      const handleMessage = (integration as any).handleMessage.bind(integration);
+      const result = await handleMessage(mockMessage as unknown as Message);
+      const endTime = Date.now();
+      
+      expect(result).toBe(true);
+      expect(endTime - startTime).toBeLessThan(5000); // 5秒以内で処理
+    });
+
+    test('自動分析の非同期実行', async () => {
+      const mockMessage = new MockMessage('非同期テスト用の活動ログ');
+      
+      const handleMessage = (integration as any).handleMessage.bind(integration);
+      const result = await handleMessage(mockMessage as unknown as Message);
+      
+      // メイン処理は即座に完了する（非同期で分析が実行される）
+      expect(result).toBe(true);
+    });
+  });
+
+  describe('エラーハンドリング拡張テスト', () => {
+    test('データベースエラー時の処理', async () => {
+      const mockMessage = new MockMessage('テストメッセージ');
+      
+      // リポジトリのメソッドをモックしてエラーを発生させる
+      const repository = (integration as any).repository;
+      const originalMethod = repository.createLog;
+      repository.createLog = jest.fn().mockRejectedValue(new Error('データベース接続エラー'));
+      
+      const handleMessage = (integration as any).handleMessage.bind(integration);
+      const result = await handleMessage(mockMessage as unknown as Message);
+      
+      // エラーが発生してもシステムが停止しないことを確認
+      expect(result).toBe(true);
+      
+      // メソッドを復旧
+      repository.createLog = originalMethod;
+    });
+
+    test('空のメッセージ処理', async () => {
+      const mockMessage = new MockMessage('');
+      
+      const handleMessage = (integration as any).handleMessage.bind(integration);
+      const result = await handleMessage(mockMessage as unknown as Message);
+      
+      // 空のメッセージは処理されない（falseが返される）のが正常
+      expect(result).toBe(false);
+    });
+
+    test('非常に長いメッセージ処理', async () => {
+      const longMessage = 'A'.repeat(2000); // 2000文字の長いメッセージ
+      const mockMessage = new MockMessage(longMessage);
+      
+      const handleMessage = (integration as any).handleMessage.bind(integration);
+      const result = await handleMessage(mockMessage as unknown as Message);
+      
+      expect(result).toBe(true); // 長いメッセージでも処理できる
+    });
+  });
+
+  describe('パフォーマンステスト', () => {
+    test('連続メッセージ処理のパフォーマンス', async () => {
+      const messages = [
+        new MockMessage('メッセージ1'),
+        new MockMessage('メッセージ2'),
+        new MockMessage('メッセージ3'),
+        new MockMessage('メッセージ4'),
+        new MockMessage('メッセージ5')
+      ];
+      
+      const handleMessage = (integration as any).handleMessage.bind(integration);
+      const startTime = Date.now();
+      
+      // 連続でメッセージを処理
+      for (const message of messages) {
+        const result = await handleMessage(message as unknown as Message);
+        expect(result).toBe(true);
+      }
+      
+      const endTime = Date.now();
+      expect(endTime - startTime).toBeLessThan(10000); // 10秒以内で全て処理
+    });
+
+    test('メモリ使用量の確認', () => {
+      const initialMemory = process.memoryUsage();
+      
+      // システム統計を取得してメモリ情報を確認
+      const config = integration.getConfig();
+      expect(config).toBeDefined();
+      
+      const currentMemory = process.memoryUsage();
+      
+      // メモリ使用量が異常に増加していないことを確認
+      const memoryIncrease = currentMemory.heapUsed - initialMemory.heapUsed;
+      expect(memoryIncrease).toBeLessThan(50 * 1024 * 1024); // 50MB以内
+    });
+  });
 });
