@@ -134,6 +134,22 @@ SELECT
 FROM daily_analysis_cache
 ORDER BY business_date DESC, user_id;
 
+-- API Cost monitoring テーブル
+CREATE TABLE IF NOT EXISTS api_costs (
+    id TEXT PRIMARY KEY,
+    operation TEXT NOT NULL,
+    input_tokens INTEGER DEFAULT 0,
+    output_tokens INTEGER DEFAULT 0,
+    estimated_cost REAL DEFAULT 0.0,
+    timestamp TEXT NOT NULL DEFAULT (datetime('now', 'utc')),
+    user_id TEXT,
+    business_date TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_api_costs_timestamp ON api_costs(timestamp);
+CREATE INDEX IF NOT EXISTS idx_api_costs_business_date ON api_costs(business_date);
+CREATE INDEX IF NOT EXISTS idx_api_costs_operation ON api_costs(operation);
+
 -- ================================================================
 -- TODO管理機能用テーブル（TimeLoggerBot機能拡張）
 -- ================================================================
@@ -149,9 +165,10 @@ CREATE TABLE IF NOT EXISTS todo_tasks (
     created_at TEXT NOT NULL DEFAULT (datetime('now', 'utc')),
     updated_at TEXT NOT NULL DEFAULT (datetime('now', 'utc')),
     completed_at TEXT,                      -- 完了日時
-    source_type TEXT DEFAULT 'manual' CHECK (source_type IN ('manual', 'ai_suggested', 'activity_derived')),
+    source_type TEXT DEFAULT 'manual' CHECK (source_type IN ('manual', 'ai_suggested', 'activity_derived', 'ai_classified')),
     related_activity_id TEXT,               -- 関連する活動ログID
     ai_confidence REAL,                     -- AI判定の信頼度 (0.0-1.0)
+    is_deleted BOOLEAN DEFAULT FALSE,       -- 論理削除フラグ
     FOREIGN KEY (related_activity_id) REFERENCES activity_logs(id)
 );
 
@@ -191,16 +208,6 @@ BEGIN
     WHERE id = NEW.id;
 END;
 
--- トリガー: ステータスがcompletedに変更されたときにcompleted_atを設定
-CREATE TRIGGER IF NOT EXISTS set_todo_tasks_completed_at
-    AFTER UPDATE ON todo_tasks
-    FOR EACH ROW
-    WHEN NEW.status = 'completed' AND OLD.status != 'completed'
-BEGIN
-    UPDATE todo_tasks 
-    SET completed_at = datetime('now', 'utc')
-    WHERE id = NEW.id;
-END;
 
 -- ビュー: アクティブなTODO（デバッグ用）
 CREATE VIEW IF NOT EXISTS v_active_todos AS

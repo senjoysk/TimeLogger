@@ -207,7 +207,7 @@ export class ActivityLoggingIntegration {
    * メッセージを処理（既存システムとの互換性を保持）
    * @returns 活動記録システムで処理された場合true、そうでなければfalse
    */
-  private async handleMessage(message: Message): Promise<boolean> {
+  async handleMessage(message: Message): Promise<boolean> {
     try {
       console.log('🔍 [活動記録] メッセージ受信:', {
         authorId: message.author?.id,
@@ -355,7 +355,7 @@ export class ActivityLoggingIntegration {
   /**
    * ボタンインタラクションを処理（TODO機能）
    */
-  private async handleButtonInteraction(interaction: ButtonInteraction): Promise<void> {
+  async handleButtonInteraction(interaction: ButtonInteraction): Promise<void> {
     try {
       // ユーザー確認
       const userId = interaction.user.id;

@@ -1076,6 +1076,63 @@ export class SqliteActivityLogRepository implements IActivityLogRepository, IApi
     }
   }
 
+  // === 統合サービス対応メソッド ===
+
+  /**
+   * 活動レコードを取得（相関分析用）
+   */
+  async getActivityRecords(userId: string, timezone: string, businessDate?: string): Promise<ActivityLog[]> {
+    try {
+      let sql = `
+        SELECT * FROM activity_logs 
+        WHERE user_id = ? AND is_deleted = 0
+      `;
+      const params: any[] = [userId];
+
+      if (businessDate) {
+        sql += ` AND business_date = ?`;
+        params.push(businessDate);
+      }
+
+      sql += ` ORDER BY input_timestamp DESC`;
+
+      const rows = await this.allQuery(sql, params);
+      return rows.map(this.mapRowToActivityLog);
+    } catch (error) {
+      console.error('❌ 活動レコード取得エラー:', error);
+      throw new ActivityLogError('活動レコードの取得に失敗しました', 'GET_ACTIVITY_RECORDS_ERROR', { error, userId, businessDate });
+    }
+  }
+
+  /**
+   * 日付範囲でTODOを取得（統合サマリー用）
+   */
+  async getTodosByDateRange(userId: string, startDate: string, endDate: string): Promise<Todo[]> {
+    try {
+      const sql = `
+        SELECT * FROM todo_tasks 
+        WHERE user_id = ? AND is_deleted = 0
+        AND (
+          (created_at >= ? AND created_at <= ?)
+          OR (completed_at >= ? AND completed_at <= ?)
+        )
+        ORDER BY created_at DESC
+      `;
+      
+      const startDateTime = startDate + 'T00:00:00Z';
+      const endDateTime = endDate + 'T23:59:59Z';
+      
+      const rows = await this.allQuery(sql, [
+        userId, startDateTime, endDateTime, startDateTime, endDateTime
+      ]);
+      
+      return rows.map(this.mapRowToTodo);
+    } catch (error) {
+      console.error('❌ 日付範囲TODO取得エラー:', error);
+      throw new TodoError('日付範囲でのTODO取得に失敗しました', 'GET_TODOS_BY_DATE_RANGE_ERROR', { error, userId, startDate, endDate });
+    }
+  }
+
   // === 開始・終了ログマッチング関連メソッド ===
 
   /**
