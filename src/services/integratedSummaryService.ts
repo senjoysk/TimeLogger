@@ -143,12 +143,8 @@ export class IntegratedSummaryService implements IIntegratedSummaryService {
     timezone: string
   ): Promise<TodoSummary> {
     // 当日関連のTODOを取得（作成日または完了日が対象日）
-    const allTodos = await this.repository.getTodosByUserId(userId);
-    const relevantTodos = allTodos.filter(todo => {
-      const createdDate = todo.createdAt.split('T')[0];
-      const completedDate = todo.completedAt ? todo.completedAt.split('T')[0] : null;
-      return createdDate === businessDate || completedDate === businessDate;
-    });
+    // パフォーマンス最適化: メモリ内フィルタリングをDB直接クエリに変更
+    const relevantTodos = await this.repository.getTodosByDateRange(userId, businessDate, businessDate);
 
     const totalTodos = relevantTodos.length;
     const completedTodos = relevantTodos.filter(todo => todo.status === 'completed').length;

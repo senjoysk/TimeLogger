@@ -250,3 +250,39 @@ SELECT
 FROM message_classifications
 WHERE user_classification IS NOT NULL
 GROUP BY ai_classification;
+
+-- ================================================================
+-- パフォーマンス最適化インデックス
+-- ================================================================
+
+-- 日付範囲クエリ最適化（TODO分析用）
+CREATE INDEX IF NOT EXISTS idx_todo_tasks_user_date_range 
+ON todo_tasks(user_id, created_at, completed_at) 
+WHERE is_deleted = 0;
+
+-- 複合条件最適化（ステータス＆優先度）
+CREATE INDEX IF NOT EXISTS idx_todo_tasks_user_status_priority 
+ON todo_tasks(user_id, status, priority DESC) 
+WHERE is_deleted = 0;
+
+-- 活動ログ分析最適化（統合分析用）
+CREATE INDEX IF NOT EXISTS idx_activity_logs_user_business_input 
+ON activity_logs(user_id, business_date, input_timestamp) 
+WHERE is_deleted = 0;
+
+-- TODO期日検索最適化
+CREATE INDEX IF NOT EXISTS idx_todo_tasks_due_date 
+ON todo_tasks(user_id, due_date, status) 
+WHERE is_deleted = 0 AND due_date IS NOT NULL;
+
+-- メッセージ分類履歴最適化
+CREATE INDEX IF NOT EXISTS idx_message_classifications_user_date 
+ON message_classifications(user_id, classified_at DESC);
+
+-- APIコスト監視最適化
+CREATE INDEX IF NOT EXISTS idx_api_costs_timestamp_operation 
+ON api_costs(timestamp DESC, operation);
+
+-- 分析キャッシュ最適化
+CREATE INDEX IF NOT EXISTS idx_daily_analysis_cache_user_date 
+ON daily_analysis_cache(user_id, business_date, log_count DESC);

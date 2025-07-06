@@ -411,8 +411,8 @@ export class TodoCommandHandler implements ITodoCommandHandler {
    * TODO一覧を表示
    */
   private async showTodoList(message: Message, userId: string): Promise<void> {
-    const todos = await this.todoRepository.getTodosByUserId(userId);
-    const activeTodos = todos.filter(todo => todo.status !== 'completed' && todo.status !== 'cancelled');
+    // パフォーマンス最適化: メモリ内フィルタリングをDB直接クエリに変更
+    const activeTodos = await this.todoRepository.getTodosByStatusOptimized(userId, ['pending', 'in_progress']);
 
     const embed = createTodoListEmbed(activeTodos.map(todo => ({
       id: todo.id,

@@ -179,8 +179,8 @@ export class SqliteActivityLogRepository implements IActivityLogRepository, IApi
 
       console.log(`✅ 活動ログを保存しました: ${log.id}`);
       
-      // キャッシュ無効化
-      await this.deleteAnalysisCache(request.userId, request.businessDate);
+      // キャッシュ無効化（バッチ処理）
+      this.scheduleAnalysisCacheInvalidation(request.userId, request.businessDate);
       
       return log;
     } catch (error) {
@@ -259,8 +259,8 @@ export class SqliteActivityLogRepository implements IActivityLogRepository, IApi
       
       await this.runQuery(sql, [newContent, now, logId]);
 
-      // キャッシュ無効化
-      await this.deleteAnalysisCache(existingLog.userId, existingLog.businessDate);
+      // キャッシュ無効化（バッチ処理）
+      this.scheduleAnalysisCacheInvalidation(existingLog.userId, existingLog.businessDate);
 
       console.log(`✅ ログを更新しました: ${logId}`);
       
@@ -288,8 +288,8 @@ export class SqliteActivityLogRepository implements IActivityLogRepository, IApi
       
       await this.runQuery(sql, [now, logId]);
 
-      // キャッシュ無効化
-      await this.deleteAnalysisCache(existingLog.userId, existingLog.businessDate);
+      // キャッシュ無効化（バッチ処理）
+      this.scheduleAnalysisCacheInvalidation(existingLog.userId, existingLog.businessDate);
 
       console.log(`✅ ログを削除しました: ${logId}`);
       
@@ -1089,34 +1089,6 @@ export class SqliteActivityLogRepository implements IActivityLogRepository, IApi
     }
   }
 
-  /**
-   * 日付範囲でTODOを取得（統合サマリー用）
-   */
-  async getTodosByDateRange(userId: string, startDate: string, endDate: string): Promise<Todo[]> {
-    try {
-      const sql = `
-        SELECT * FROM todo_tasks 
-        WHERE user_id = ? AND is_deleted = 0
-        AND (
-          (created_at >= ? AND created_at <= ?)
-          OR (completed_at >= ? AND completed_at <= ?)
-        )
-        ORDER BY created_at DESC
-      `;
-      
-      const startDateTime = startDate + 'T00:00:00Z';
-      const endDateTime = endDate + 'T23:59:59Z';
-      
-      const rows = await this.allQuery(sql, [
-        userId, startDateTime, endDateTime, startDateTime, endDateTime
-      ]);
-      
-      return rows.map(this.mapRowToTodo);
-    } catch (error) {
-      console.error('❌ 日付範囲TODO取得エラー:', error);
-      throw new TodoError('日付範囲でのTODO取得に失敗しました', 'GET_TODOS_BY_DATE_RANGE_ERROR', { error, userId, startDate, endDate });
-    }
-  }
 
   // === 開始・終了ログマッチング関連メソッド ===
 
@@ -1699,10 +1671,119 @@ export class SqliteActivityLogRepository implements IActivityLogRepository, IApi
     };
   }
 
+  // ================================================================
+  // パフォーマンス最適化メソッド
+  // ================================================================
+
+  /**
+   * 日付範囲でTODOを取得（メモリ内フィルタリングの代替）
+   */
+  async getTodosByDateRange(userId: string, startDate: string, endDate: string): Promise<Todo[]> {
+    const sql = `
+      SELECT * FROM todo_tasks 
+      WHERE user_id = ? AND is_deleted = 0
+      AND (
+        (created_at >= ? AND created_at <= ?) OR 
+        (completed_at >= ? AND completed_at <= ?)
+      )
+      ORDER BY created_at DESC
+    `;
+
+    try {
+      const rows = await this.allQuery(sql, [
+        userId,
+        startDate + 'T00:00:00Z',
+        endDate + 'T23:59:59Z',
+        startDate + 'T00:00:00Z',
+        endDate + 'T23:59:59Z'
+      ]);
+      return rows.map(row => this.mapRowToTodo(row));
+    } catch (error) {
+      console.error('❌ 日付範囲TODO取得エラー:', error);
+      throw new TodoError('日付範囲TODO取得に失敗しました', 'GET_TODOS_BY_DATE_RANGE_ERROR', { error, userId, startDate, endDate });
+    }
+  }
+
+  /**
+   * ステータス指定でTODOを最適化取得（メモリ内フィルタリングの代替）
+   */
+  async getTodosByStatusOptimized(userId: string, statuses: TodoStatus[]): Promise<Todo[]> {
+    if (statuses.length === 0) {
+      return [];
+    }
+
+    const placeholders = statuses.map(() => '?').join(',');
+    const sql = `
+      SELECT * FROM todo_tasks 
+      WHERE user_id = ? AND is_deleted = 0 AND status IN (${placeholders})
+      ORDER BY priority DESC, created_at ASC
+    `;
+
+    try {
+      const rows = await this.allQuery(sql, [userId, ...statuses]);
+      return rows.map(row => this.mapRowToTodo(row));
+    } catch (error) {
+      console.error('❌ ステータス最適化TODO取得エラー:', error);
+      throw new TodoError('ステータス最適化TODO取得に失敗しました', 'GET_TODOS_BY_STATUS_OPTIMIZED_ERROR', { error, userId, statuses });
+    }
+  }
+
+  // ================================================================
+  // バッチキャッシュ無効化システム
+  // ================================================================
+
+  private cacheInvalidationBatch = new Set<string>();
+  private cacheInvalidationTimer?: NodeJS.Timeout;
+
+  /**
+   * 分析キャッシュの無効化をバッチで実行するようスケジューリング
+   */
+  private scheduleAnalysisCacheInvalidation(userId: string, businessDate: string): void {
+    const cacheKey = `${userId}:${businessDate}`;
+    this.cacheInvalidationBatch.add(cacheKey);
+    
+    if (this.cacheInvalidationTimer) {
+      clearTimeout(this.cacheInvalidationTimer);
+    }
+    
+    this.cacheInvalidationTimer = setTimeout(async () => {
+      await this.flushCacheInvalidationBatch();
+    }, 100); // 100ms遅延でバッチ処理
+  }
+
+  /**
+   * 蓄積されたキャッシュ無効化を一括実行
+   */
+  private async flushCacheInvalidationBatch(): Promise<void> {
+    if (this.cacheInvalidationBatch.size === 0) return;
+    
+    console.log(`🧹 バッチキャッシュ無効化: ${this.cacheInvalidationBatch.size}件`);
+    
+    const deletions = Array.from(this.cacheInvalidationBatch).map(cacheKey => {
+      const [userId, businessDate] = cacheKey.split(':');
+      return this.deleteAnalysisCache(userId, businessDate);
+    });
+    
+    try {
+      await Promise.all(deletions);
+      console.log(`✅ バッチキャッシュ無効化完了: ${this.cacheInvalidationBatch.size}件`);
+    } catch (error) {
+      console.error('❌ バッチキャッシュ無効化エラー:', error);
+    } finally {
+      this.cacheInvalidationBatch.clear();
+    }
+  }
+
   /**
    * データベース接続を閉じる
    */
   async close(): Promise<void> {
+    // バッチキャッシュ無効化タイマーをクリア
+    if (this.cacheInvalidationTimer) {
+      clearTimeout(this.cacheInvalidationTimer);
+      this.cacheInvalidationTimer = undefined;
+    }
+
     return new Promise((resolve, reject) => {
       this.db.close((err) => {
         if (err) {

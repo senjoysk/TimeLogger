@@ -91,6 +91,10 @@ export interface ITodoRepository {
   
   // 活動ログ連携
   getTodosByActivityId(activityId: string): Promise<Todo[]>;
+  
+  // パフォーマンス最適化メソッド
+  getTodosByDateRange(userId: string, startDate: string, endDate: string): Promise<Todo[]>;
+  getTodosByStatusOptimized(userId: string, statuses: TodoStatus[]): Promise<Todo[]>;
 }
 
 /**
