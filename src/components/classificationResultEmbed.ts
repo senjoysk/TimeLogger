@@ -360,9 +360,14 @@ function getStatusIcon(status: string): string {
 
 /**
  * セッションIDを生成
+ * 注意: セッションIDには区切り文字（_）を含めないようにする
  */
 export function generateSessionId(userId: string, timestamp: Date = new Date()): string {
-  const timeStr = timestamp.getTime().toString();
+  // タイムスタンプとランダム文字列を組み合わせた一意のIDを生成
+  // 区切り文字を使わずに連結する
+  const timeStr = timestamp.getTime().toString(36); // 36進数で短縮
   const randomStr = Math.random().toString(36).substring(2, 8);
-  return `${userId}_${timeStr}_${randomStr}`;
+  // userIdのハッシュ値を取得（簡易実装）
+  const userHash = userId.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0).toString(36);
+  return `${userHash}${timeStr}${randomStr}`;
 }

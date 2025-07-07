@@ -27,6 +27,7 @@ import {
   generateSessionId
 } from '../components/classificationResultEmbed';
 import { ActivityLogError } from '../types/activityLog';
+import { ActivityLogService } from '../services/activityLogService';
 
 /**
  * TODOコマンドの種類
@@ -97,7 +98,8 @@ export class TodoCommandHandler implements ITodoCommandHandler {
     private todoRepository: ITodoRepository,
     private classificationRepository: IMessageClassificationRepository,
     private geminiService: GeminiService,
-    private classificationService: MessageClassificationService
+    private classificationService: MessageClassificationService,
+    private activityLogService?: ActivityLogService // 活動ログサービスの注入
   ) {
     // セッションタイムアウトのクリーンアップ
     this.cleanupInterval = setInterval(() => this.cleanupExpiredSessions(), 60 * 1000); // 1分間隔でクリーンアップ
@@ -201,6 +203,7 @@ export class TodoCommandHandler implements ITodoCommandHandler {
       };
       
       this.activeSessions.set(sessionId, session);
+      console.log(`📝 セッション作成: sessionId=${sessionId}, userId=${userId}`);
 
       // 判定結果を表示
       const embed = createClassificationResultEmbed({
@@ -243,14 +246,29 @@ export class TodoCommandHandler implements ITodoCommandHandler {
       // カスタムIDを解析
       const idParts = interaction.customId.split('_');
       const action = idParts[0];
-      const type = idParts[1];
-      const sessionId = idParts[2];
+      
+      let type: string;
+      let sessionId: string;
+      
+      // activity_logの特別処理
+      if (idParts[1] === 'activity' && idParts[2] === 'log') {
+        type = 'activity_log';
+        sessionId = idParts.slice(3).join('_');
+      } else {
+        type = idParts[1];
+        sessionId = idParts.slice(2).join('_');
+      }
+
+      console.log(`🔍 カスタムID解析: action=${action}, type=${type}, sessionId=${sessionId}`);
+      console.log(`🔍 idParts詳細: [${idParts.join(', ')}]`);
 
       // セッション確認
       if (action === 'confirm' || action === 'classify' || action === 'ignore') {
         await this.handleClassificationButton(interaction, action, type, sessionId, userId, timezone);
       } else if (action === 'todo') {
-        await this.handleTodoActionButton(interaction, type, idParts[2], userId, timezone);
+        // TODOアクションの場合、todoIdは第3要素以降のすべて
+        const todoId = idParts.slice(2).join('_');
+        await this.handleTodoActionButton(interaction, type, todoId, userId, timezone);
       } else {
         await interaction.reply({ content: '❌ 未知のボタン操作です。', ephemeral: true });
       }
@@ -278,17 +296,30 @@ export class TodoCommandHandler implements ITodoCommandHandler {
     userId: string, 
     timezone: string
   ): Promise<void> {
+    console.log(`🔍 セッション確認: sessionId=${sessionId}, userId=${userId}`);
+    
     const session = this.activeSessions.get(sessionId);
     
-    if (!session || session.userId !== userId) {
+    if (!session) {
+      console.error(`❌ セッションが見つからない: sessionId=${sessionId}`);
+      console.log(`🔍 現在のアクティブセッション: ${Array.from(this.activeSessions.keys()).join(', ')}`);
       await interaction.reply({ content: '❌ セッションが見つからないか、権限がありません。', ephemeral: true });
       return;
     }
-
-    // セッション削除
-    this.activeSessions.delete(sessionId);
+    
+    if (session.userId !== userId) {
+      console.error(`❌ ユーザーIDが不一致: session.userId=${session.userId}, userId=${userId}`);
+      await interaction.reply({ content: '❌ セッションが見つからないか、権限がありません。', ephemeral: true });
+      return;
+    }
+    
+    console.log(`✅ セッション確認成功: sessionId=${sessionId}, userId=${userId}`);
+    const sessionAge = Date.now() - session.timestamp.getTime();
+    console.log(`🕐 セッション経過時間: ${Math.round(sessionAge / 1000)}秒`);
 
     if (action === 'ignore') {
+      // セッション削除
+      this.activeSessions.delete(sessionId);
       await interaction.update({
         content: '❌ メッセージを無視しました。',
         embeds: [],
@@ -303,8 +334,15 @@ export class TodoCommandHandler implements ITodoCommandHandler {
     if (action === 'confirm') {
       finalClassification = session.result.classification;
     } else if (action === 'classify') {
-      finalClassification = type.toUpperCase() as MessageClassification;
+      // activity_logを正しくマッピング
+      if (type === 'activity_log') {
+        finalClassification = 'ACTIVITY_LOG';
+      } else {
+        finalClassification = type.toUpperCase() as MessageClassification;
+      }
     } else {
+      // セッション削除
+      this.activeSessions.delete(sessionId);
       await interaction.reply({ content: '❌ 無効な操作です。', ephemeral: true });
       return;
     }
@@ -318,6 +356,9 @@ export class TodoCommandHandler implements ITodoCommandHandler {
       userId, 
       timezone
     );
+    
+    // 処理完了後にセッション削除
+    this.activeSessions.delete(sessionId);
   }
 
   /**
@@ -337,12 +378,7 @@ export class TodoCommandHandler implements ITodoCommandHandler {
         break;
         
       case 'ACTIVITY_LOG':
-        // 活動ログとして処理（将来実装）
-        await interaction.update({
-          content: '📝 活動ログとして記録されました。',
-          embeds: [],
-          components: []
-        });
+        await this.createActivityLogFromMessage(interaction, originalMessage, userId, timezone);
         break;
         
       case 'MEMO':
@@ -405,6 +441,45 @@ export class TodoCommandHandler implements ITodoCommandHandler {
     });
 
     console.log(`✅ TODO作成: ${userId} "${todo.content}"`);
+  }
+
+  /**
+   * メッセージから活動ログを作成
+   */
+  private async createActivityLogFromMessage(
+    interaction: ButtonInteraction,
+    message: string,
+    userId: string,
+    timezone: string
+  ): Promise<void> {
+    try {
+      // 活動ログサービスが利用可能な場合は記録
+      if (this.activityLogService) {
+        await this.activityLogService.recordActivity(userId, message, timezone);
+        console.log(`📝 活動ログ作成: ${userId} "${message}"`);
+      }
+
+      const successEmbed = new EmbedBuilder()
+        .setTitle('📝 活動ログ作成完了')
+        .setDescription(`**内容**: ${message}`)
+        .setColor(0x0099ff)
+        .setTimestamp();
+
+      await interaction.update({
+        content: '',
+        embeds: [successEmbed],
+        components: []
+      });
+
+    } catch (error) {
+      console.error('❌ 活動ログ作成エラー:', error);
+      
+      await interaction.update({
+        content: '❌ 活動ログの作成中にエラーが発生しました。',
+        embeds: [],
+        components: []
+      });
+    }
   }
 
   /**

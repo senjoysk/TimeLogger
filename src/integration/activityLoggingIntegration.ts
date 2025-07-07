@@ -141,7 +141,8 @@ export class ActivityLoggingIntegration {
         this.repository, // ITodoRepository
         this.repository, // IMessageClassificationRepository  
         this.geminiService,
-        this.messageClassificationService
+        this.messageClassificationService,
+        this.activityLogService // 活動ログサービスを注入
       );
       
       console.log('✅ ハンドラー層初期化完了（TODO機能統合済み）');
