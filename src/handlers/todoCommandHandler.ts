@@ -250,8 +250,13 @@ export class TodoCommandHandler implements ITodoCommandHandler {
       let type: string;
       let sessionId: string;
       
+      // ignoreボタンの特別処理（typeがない）
+      if (action === 'ignore') {
+        type = '';
+        sessionId = idParts.slice(1).join('_');
+      }
       // activity_logの特別処理
-      if (idParts[1] === 'activity' && idParts[2] === 'log') {
+      else if (idParts[1] === 'activity' && idParts[2] === 'log') {
         type = 'activity_log';
         sessionId = idParts.slice(3).join('_');
       } else {

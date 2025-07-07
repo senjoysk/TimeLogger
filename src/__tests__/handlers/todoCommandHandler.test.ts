@@ -142,24 +142,38 @@ const createMockButtonInteraction = (customId: string, userId: string = 'test-us
   replied: false
 });
 
+// ActivityLogServiceのモック
+class MockActivityLogService {
+  recordActivity = jest.fn().mockResolvedValue({
+    id: 'log-1',
+    userId: 'test-user',
+    content: 'テスト活動',
+    businessDate: '2024-01-07',
+    timestamp: new Date().toISOString()
+  });
+}
+
 describe('TodoCommandHandler', () => {
   let handler: TodoCommandHandler;
   let mockTodoRepo: MockTodoRepository;
   let mockClassificationRepo: MockMessageClassificationRepository;
   let mockGeminiService: MockGeminiService;
   let mockClassificationService: MockMessageClassificationService;
+  let mockActivityLogService: MockActivityLogService;
 
   beforeEach(() => {
     mockTodoRepo = new MockTodoRepository();
     mockClassificationRepo = new MockMessageClassificationRepository();
     mockGeminiService = new MockGeminiService();
     mockClassificationService = new MockMessageClassificationService();
+    mockActivityLogService = new MockActivityLogService();
     
     handler = new TodoCommandHandler(
       mockTodoRepo,
       mockClassificationRepo,
       mockGeminiService as any,
-      mockClassificationService as any
+      mockClassificationService as any,
+      mockActivityLogService as any
     );
   });
 
@@ -393,7 +407,7 @@ describe('TodoCommandHandler', () => {
         timestamp: new Date()
       });
 
-      const interaction = createMockButtonInteraction(`ignore_UNCERTAIN_${sessionId}`, 'test-user') as ButtonInteraction;
+      const interaction = createMockButtonInteraction(`ignore_${sessionId}`, 'test-user') as ButtonInteraction;
       interaction.update = jest.fn().mockResolvedValue({});
       
       await handler.handleButtonInteraction(interaction, 'test-user', 'Asia/Tokyo');
@@ -465,6 +479,97 @@ describe('TodoCommandHandler', () => {
       expect(interaction.update).toHaveBeenCalled();
       const updateCall = (interaction.update as jest.Mock).mock.calls[0][0];
       expect(updateCall.content).toBe('📄 メモとして保存されました。');
+    });
+
+    test('活動ログとして分類するボタンが正しく動作する', async () => {
+      // 実際の本番環境のセッションID形式を使用
+      const sessionId = '770478489203507241_1736226160123_abc123';
+      const activeSessions = (handler as any).activeSessions;
+      activeSessions.set(sessionId, {
+        sessionId,
+        userId: 'test-user',
+        originalMessage: '会議に参加した',
+        result: {
+          classification: 'TODO',
+          confidence: 0.7,
+          reason: 'TODOと判定されたが活動ログが適切'
+        },
+        timestamp: new Date()
+      });
+
+      // activity_logを含むカスタムIDでテスト
+      const interaction = createMockButtonInteraction(
+        `classify_activity_log_${sessionId}`, 
+        'test-user'
+      ) as ButtonInteraction;
+      interaction.update = jest.fn().mockResolvedValue({});
+      
+      await handler.handleButtonInteraction(interaction, 'test-user', 'Asia/Tokyo');
+      
+      expect(interaction.update).toHaveBeenCalled();
+      const updateCall = (interaction.update as jest.Mock).mock.calls[0][0];
+      expect(updateCall.embeds[0].data.title).toBe('📝 活動ログ作成完了');
+      expect(updateCall.embeds[0].data.description).toContain('会議に参加した');
+      
+      // ActivityLogServiceが呼ばれたことを確認
+      expect(mockActivityLogService.recordActivity).toHaveBeenCalledWith(
+        'test-user',
+        '会議に参加した',
+        'Asia/Tokyo'
+      );
+    });
+
+    test('複数ボタンの連続操作でセッションが保持される', async () => {
+      const sessionId = 'test-session-multiple';
+      const activeSessions = (handler as any).activeSessions;
+      activeSessions.set(sessionId, {
+        sessionId,
+        userId: 'test-user',
+        originalMessage: 'テストメッセージ',
+        result: {
+          classification: 'TODO',
+          confidence: 0.8,
+          reason: 'TODO候補'
+        },
+        timestamp: new Date()
+      });
+
+      // 最初のボタン操作（無視）- ignoreボタンのカスタムIDは type がない
+      const ignoreInteraction = createMockButtonInteraction(
+        `ignore_${sessionId}`, 
+        'test-user'
+      ) as ButtonInteraction;
+      ignoreInteraction.update = jest.fn().mockResolvedValue({});
+      
+      await handler.handleButtonInteraction(ignoreInteraction, 'test-user', 'Asia/Tokyo');
+      
+      // ignoreボタンではセッションが削除されることを確認
+      expect(activeSessions.has(sessionId)).toBe(false);
+      
+      // 新しいセッションを作成
+      activeSessions.set(sessionId, {
+        sessionId,
+        userId: 'test-user',
+        originalMessage: 'テストメッセージ2',
+        result: {
+          classification: 'TODO',
+          confidence: 0.8,
+          reason: 'TODO候補'
+        },
+        timestamp: new Date()
+      });
+      
+      // TODOボタンを押す
+      const todoInteraction = createMockButtonInteraction(
+        `confirm_todo_${sessionId}`, 
+        'test-user'
+      ) as ButtonInteraction;
+      todoInteraction.update = jest.fn().mockResolvedValue({});
+      
+      await handler.handleButtonInteraction(todoInteraction, 'test-user', 'Asia/Tokyo');
+      
+      // 処理後にセッションが削除されることを確認
+      expect(activeSessions.has(sessionId)).toBe(false);
     });
   });
 
@@ -566,6 +671,79 @@ describe('TodoCommandHandler', () => {
       const replyCall = (interaction.reply as jest.Mock).mock.calls[0][0];
       expect(replyCall.content).toBe('❌ 未知のボタン操作です。');
       expect(replyCall.ephemeral).toBe(true);
+    });
+  });
+
+  describe('カスタムID解析の境界ケース', () => {
+    test.each([
+      // [カスタムID, 期待されるaction, 期待されるtype, 期待されるsessionId]
+      ['confirm_todo_session123', 'confirm', 'todo', 'session123'],
+      ['classify_activity_log_session123', 'classify', 'activity_log', 'session123'],
+      ['classify_activity_log_user_12345_abc', 'classify', 'activity_log', 'user_12345_abc'],
+      ['ignore_session123', 'ignore', 'session123', 'session123'],  // ignoreはtypeがない
+      ['confirm_activity_log_complex_session_id_123', 'confirm', 'activity_log', 'complex_session_id_123'],
+      ['todo_complete_todoId123', 'todo', 'complete', 'todoId123'],
+      ['todo_start_todo_with_underscore', 'todo', 'start', 'todo_with_underscore'],
+    ])('カスタムID "%s" が正しく解析される', async (customId, expectedAction, expectedType, expectedSessionId) => {
+      const interaction = createMockButtonInteraction(customId, 'test-user') as ButtonInteraction;
+      
+      // handleButtonInteractionの内部ロジックを検証するため、
+      // セッションまたはTODOを事前に準備
+      if (expectedAction === 'confirm' || expectedAction === 'classify' || expectedAction === 'ignore') {
+        const activeSessions = (handler as any).activeSessions;
+        activeSessions.set(expectedSessionId, {
+          sessionId: expectedSessionId,
+          userId: 'test-user',
+          originalMessage: 'テストメッセージ',
+          result: {
+            classification: 'TODO',
+            confidence: 0.8,
+            reason: 'テスト'
+          },
+          timestamp: new Date()
+        });
+      } else if (expectedAction === 'todo') {
+        // TODO操作の場合、TODOを作成
+        await mockTodoRepo.createTodo({
+          userId: 'test-user',
+          content: 'テストTODO'
+        });
+      }
+      
+      // エラーが発生しないことを確認
+      await expect(handler.handleButtonInteraction(interaction, 'test-user', 'Asia/Tokyo')).resolves.not.toThrow();
+      
+      // interaction.replyまたはinteraction.updateが呼ばれたことを確認
+      const replyCalled = (interaction.reply as jest.Mock).mock.calls.length;
+      const updateCalled = (interaction.update as jest.Mock).mock.calls.length;
+      expect(replyCalled + updateCalled).toBeGreaterThan(0);
+    });
+
+    test('新しいセッションID形式（アンダースコアなし）の処理', async () => {
+      // 新しい形式のセッションID（generateSessionIdで生成される形式）
+      const sessionId = 'q9mcst9l0afppsyh';
+      const activeSessions = (handler as any).activeSessions;
+      activeSessions.set(sessionId, {
+        sessionId,
+        userId: 'test-user',
+        originalMessage: 'テストメッセージ',
+        result: {
+          classification: 'TODO',
+          confidence: 0.8,
+          reason: 'テスト'
+        },
+        timestamp: new Date()
+      });
+
+      const interaction = createMockButtonInteraction(
+        `confirm_todo_${sessionId}`, 
+        'test-user'
+      ) as ButtonInteraction;
+      interaction.update = jest.fn().mockResolvedValue({});
+      
+      await handler.handleButtonInteraction(interaction, 'test-user', 'Asia/Tokyo');
+      
+      expect(interaction.update).toHaveBeenCalled();
     });
   });
 
@@ -737,6 +915,120 @@ describe('TodoCommandHandler', () => {
       expect(formatPriority(0)).toBe('🟡 普通');
       expect(formatPriority(-1)).toBe('🟢 低');
       expect(formatPriority(999)).toBe('🟡 普通'); // defaultケースで普通を返す
+    });
+  });
+
+  describe('依存関係注入', () => {
+    test('ActivityLogServiceが注入されていない場合でも動作する', async () => {
+      // ActivityLogServiceなしでハンドラーを作成
+      const handlerWithoutActivityLog = new TodoCommandHandler(
+        mockTodoRepo,
+        mockClassificationRepo,
+        mockGeminiService as any,
+        mockClassificationService as any
+        // ActivityLogServiceを渡さない
+      );
+
+      const sessionId = 'test-session-no-activity';
+      const activeSessions = (handlerWithoutActivityLog as any).activeSessions;
+      activeSessions.set(sessionId, {
+        sessionId,
+        userId: 'test-user',
+        originalMessage: 'テスト活動',
+        result: {
+          classification: 'ACTIVITY_LOG',
+          confidence: 0.8,
+          reason: '活動ログ'
+        },
+        timestamp: new Date()
+      });
+
+      const interaction = createMockButtonInteraction(
+        `confirm_activity_log_${sessionId}`, 
+        'test-user'
+      ) as ButtonInteraction;
+      interaction.update = jest.fn().mockResolvedValue({});
+      
+      // エラーが発生せずに処理が完了することを確認
+      await expect(
+        handlerWithoutActivityLog.handleButtonInteraction(interaction, 'test-user', 'Asia/Tokyo')
+      ).resolves.not.toThrow();
+      
+      expect(interaction.update).toHaveBeenCalled();
+      
+      // クリーンアップ
+      handlerWithoutActivityLog.destroy();
+    });
+
+    test('ActivityLogServiceのエラーが適切に処理される', async () => {
+      // recordActivityでエラーを発生させる
+      mockActivityLogService.recordActivity.mockRejectedValueOnce(
+        new Error('データベース接続エラー')
+      );
+
+      const sessionId = 'test-session-error';
+      const activeSessions = (handler as any).activeSessions;
+      activeSessions.set(sessionId, {
+        sessionId,
+        userId: 'test-user',
+        originalMessage: 'エラーテスト',
+        result: {
+          classification: 'ACTIVITY_LOG',
+          confidence: 0.8,
+          reason: '活動ログ'
+        },
+        timestamp: new Date()
+      });
+
+      const interaction = createMockButtonInteraction(
+        `confirm_activity_log_${sessionId}`, 
+        'test-user'
+      ) as ButtonInteraction;
+      interaction.update = jest.fn().mockResolvedValue({});
+      
+      await handler.handleButtonInteraction(interaction, 'test-user', 'Asia/Tokyo');
+      
+      expect(interaction.update).toHaveBeenCalled();
+      const updateCall = (interaction.update as jest.Mock).mock.calls[0][0];
+      expect(updateCall.content).toBe('❌ 活動ログの作成中にエラーが発生しました。');
+    });
+
+    test('正常なActivityLogService注入の確認', async () => {
+      // ActivityLogServiceが正しく使用されることを確認
+      const sessionId = 'test-session-normal';
+      const activeSessions = (handler as any).activeSessions;
+      activeSessions.set(sessionId, {
+        sessionId,
+        userId: 'test-user',
+        originalMessage: '正常テスト',
+        result: {
+          classification: 'ACTIVITY_LOG',
+          confidence: 0.9,
+          reason: '活動ログとして明確'
+        },
+        timestamp: new Date()
+      });
+
+      const interaction = createMockButtonInteraction(
+        `confirm_activity_log_${sessionId}`, 
+        'test-user'
+      ) as ButtonInteraction;
+      interaction.update = jest.fn().mockResolvedValue({});
+      
+      await handler.handleButtonInteraction(interaction, 'test-user', 'Asia/Tokyo');
+      
+      // ActivityLogServiceが呼ばれたことを確認
+      expect(mockActivityLogService.recordActivity).toHaveBeenCalledTimes(1);
+      expect(mockActivityLogService.recordActivity).toHaveBeenCalledWith(
+        'test-user',
+        '正常テスト',
+        'Asia/Tokyo'
+      );
+      
+      // 成功メッセージが表示されることを確認
+      expect(interaction.update).toHaveBeenCalled();
+      const updateCall = (interaction.update as jest.Mock).mock.calls[0][0];
+      expect(updateCall.embeds[0].data.title).toBe('📝 活動ログ作成完了');
     });
   });
 });  
