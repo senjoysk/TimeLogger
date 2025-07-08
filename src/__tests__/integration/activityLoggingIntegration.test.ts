@@ -48,7 +48,19 @@ describe('活動記録システム統合テスト', () => {
 
   afterAll(async () => {
     console.log('🔄 テスト終了処理開始...');
-    await integration.shutdown();
+    
+    try {
+      // 統合システムのシャットダウン
+      if (integration) {
+        await integration.shutdown();
+      }
+    } catch (error) {
+      console.error('❌ 統合システムシャットダウンエラー:', error);
+    }
+    
+    // 未完了の非同期処理を待つ
+    await new Promise(resolve => setImmediate(resolve));
+    
     console.log('✅ テスト終了処理完了');
   });
 

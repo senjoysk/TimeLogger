@@ -155,9 +155,16 @@ describe('TODO機能 End-to-End テスト', () => {
   });
 
   afterEach(async () => {
-    if (integration) {
-      await integration.destroy();
+    try {
+      if (integration) {
+        await integration.shutdown();
+      }
+    } catch (error) {
+      console.error('❌ E2Eテストクリーンアップエラー:', error);
     }
+    
+    // 非同期処理の完了を待つ
+    await new Promise(resolve => setImmediate(resolve));
   });
 
   afterAll(() => {

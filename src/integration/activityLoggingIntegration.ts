@@ -70,6 +70,10 @@ export class ActivityLoggingIntegration {
   // 設定
   private config: ActivityLoggingConfig;
   private isInitialized: boolean = false;
+  
+  // 非同期処理の管理
+  private pendingAnalysisTasks: Set<NodeJS.Immediate> = new Set();
+  private isShuttingDown: boolean = false;
 
   constructor(config: ActivityLoggingConfig) {
     this.config = config;
@@ -429,9 +433,19 @@ export class ActivityLoggingIntegration {
    * 自動分析をトリガー（バックグラウンド処理）
    */
   private async triggerAutoAnalysis(userId: string, businessDate: string, timezone: string): Promise<void> {
+    // シャットダウン中は新しい分析を開始しない
+    if (this.isShuttingDown) {
+      return;
+    }
+
     // 完全非同期化：メインスレッドをブロックしない
-    setImmediate(async () => {
+    const immediateHandle = setImmediate(async () => {
       try {
+        // シャットダウン中はスキップ
+        if (this.isShuttingDown) {
+          return;
+        }
+
         // 今日のログ数をチェック
         const logs = await this.activityLogService.getLogsForDate(userId, businessDate, timezone);
         
@@ -453,8 +467,14 @@ export class ActivityLoggingIntegration {
         }
       } catch (error) {
         console.warn('⚠️ 自動分析トリガー失敗:', error);
+      } finally {
+        // 完了したタスクを管理セットから除去
+        this.pendingAnalysisTasks.delete(immediateHandle);
       }
     });
+    
+    // タスクを管理セットに追加
+    this.pendingAnalysisTasks.add(immediateHandle);
     
     // メインスレッドは即座に制御を返す
   }
@@ -586,6 +606,22 @@ export class ActivityLoggingIntegration {
   async shutdown(): Promise<void> {
     try {
       console.log('🔄 活動記録システムのシャットダウンを開始...');
+
+      // シャットダウンフラグを設定
+      this.isShuttingDown = true;
+
+      // 実行中の非同期分析タスクをキャンセル
+      for (const handle of this.pendingAnalysisTasks) {
+        clearImmediate(handle);
+      }
+      this.pendingAnalysisTasks.clear();
+      console.log('✅ 非同期分析タスクをクリーンアップしました');
+
+      // TODOハンドラーのクリーンアップ
+      if (this.todoHandler && typeof this.todoHandler.destroy === 'function') {
+        this.todoHandler.destroy();
+        console.log('✅ TODOハンドラーをクリーンアップしました');
+      }
 
       if (this.repository) {
         await this.repository.close();

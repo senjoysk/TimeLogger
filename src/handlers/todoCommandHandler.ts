@@ -103,6 +103,11 @@ export class TodoCommandHandler implements ITodoCommandHandler {
   ) {
     // セッションタイムアウトのクリーンアップ
     this.cleanupInterval = setInterval(() => this.cleanupExpiredSessions(), 60 * 1000); // 1分間隔でクリーンアップ
+    
+    // テスト環境でプロセス終了を妨げないようにする
+    if (this.cleanupInterval && typeof this.cleanupInterval.unref === 'function') {
+      this.cleanupInterval.unref();
+    }
   }
 
   /**

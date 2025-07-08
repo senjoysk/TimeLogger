@@ -57,13 +57,17 @@ describe('ActivityLoggingIntegration TODO機能統合', () => {
   });
 
   afterEach(async () => {
-    if (integration && integration.destroy) {
-      try {
-        await integration.destroy();
-      } catch (error) {
-        // テスト環境ではエラーを無視
+    try {
+      if (integration && integration.shutdown) {
+        await integration.shutdown();
       }
+    } catch (error) {
+      // テスト環境ではエラーを無視
+      console.warn('テスト終了時のクリーンアップエラー:', error);
     }
+    
+    // 非同期処理の完了を待つ
+    await new Promise(resolve => setImmediate(resolve));
   });
 
   describe('初期化', () => {
