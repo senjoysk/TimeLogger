@@ -48,9 +48,15 @@ class MockActivityLogService implements IActivityLogService {
   }
 
   formatLogsForEdit(logs: any[], timezone: string): string {
-    return `📝 **今日の活動ログ一覧**\n\n${logs.map((log, index) => 
-      `**${index + 1}.** ${log.content}`
-    ).join('\n\n')}\n\n編集: \`!edit <番号> <新しい内容>\`\n削除: \`!edit delete <番号>\``;
+    if (logs.length === 0) {
+      return '📝 今日の活動ログはまだありません。';
+    }
+
+    const formatted = logs.map((log, index) => {
+      return `${index + 1}. [09:00] ${log.content}`;
+    }).join('\n');
+
+    return `📝 **今日の活動ログ一覧:**\n\n${formatted}\n\n**使用方法:**\n\`!edit <番号> <新しい内容>\` - ログを編集\n\`!edit delete <番号>\` - ログを削除`;
   }
 
   async editLog(request: any) {
@@ -225,7 +231,7 @@ describe('EditCommandHandler', () => {
       await handler.handle(mockMessage, 'user123', [], 'Asia/Tokyo');
 
       expect(mockMessage.reply).toHaveBeenCalledWith(
-        '❌ 編集コマンドの処理中にエラーが発生しました。'
+        '❌ ログ一覧の表示に失敗しました'
       );
     });
   });
@@ -342,7 +348,7 @@ describe('EditCommandHandler', () => {
       const result = handler['parseEditCommand'](['1', '', '  ', 'content']);
       
       expect(result.type).toBe('edit');
-      expect(result.newContent).toBe('  content');
+      expect(result.newContent).toBe('content'); // trimされるので空白は除去される
     });
   });
 
