@@ -51,7 +51,7 @@ class MockTodoRepository implements ITodoRepository {
     const todo = this.todos.find(t => t.id === id);
     if (todo) {
       // 少し時間を置いて更新時刻を変更
-      await new Promise(resolve => setTimeout(resolve, 1));
+      await new Promise(resolve => setTimeout(resolve, 10));
       Object.assign(todo, update);
       todo.updatedAt = new Date().toISOString();
     }
@@ -101,6 +101,21 @@ class MockTodoRepository implements ITodoRepository {
   
   async getTodosByActivityId(activityId: string): Promise<Todo[]> {
     return this.todos.filter(todo => todo.relatedActivityId === activityId);
+  }
+  
+  // パフォーマンス最適化メソッド
+  async getTodosByDateRange(userId: string, startDate: string, endDate: string): Promise<Todo[]> {
+    return this.todos.filter(todo => {
+      if (todo.userId !== userId) return false;
+      if (!todo.dueDate) return false;
+      return todo.dueDate >= startDate && todo.dueDate <= endDate;
+    });
+  }
+  
+  async getTodosByStatusOptimized(userId: string, statuses: TodoStatus[]): Promise<Todo[]> {
+    return this.todos.filter(todo => 
+      todo.userId === userId && statuses.includes(todo.status)
+    );
   }
 }
 

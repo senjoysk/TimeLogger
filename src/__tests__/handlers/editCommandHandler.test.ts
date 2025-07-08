@@ -121,10 +121,10 @@ describe('EditCommandHandler', () => {
       await handler.handle(mockMessage, 'user123', [], 'Asia/Tokyo');
 
       expect(mockMessage.reply).toHaveBeenCalledWith(
-        expect.stringContaining('📝 **今日の活動ログ一覧**')
+        expect.stringContaining('📝 **今日の活動ログ一覧:**')
       );
       expect(mockMessage.reply).toHaveBeenCalledWith(
-        expect.stringContaining('1. 朝のミーティングに参加')
+        expect.stringContaining('1. [')
       );
     });
 

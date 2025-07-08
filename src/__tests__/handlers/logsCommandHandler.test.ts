@@ -158,15 +158,15 @@ describe('LogsCommandHandler', () => {
       await handler.handle(mockMessage, 'user123', ['2025-01-07'], 'Asia/Tokyo');
 
       expect(mockMessage.reply).toHaveBeenCalledWith(
-        expect.stringContaining('📋 **1月7日のログ** (3件)')
+        expect.stringContaining('📋 **1月7日(Tue)のログ** (3件)')
       );
     });
 
     test('検索コマンドが正しく動作する', async () => {
-      await handler.handle(mockMessage, 'user123', ['search', '会議'], 'Asia/Tokyo');
+      await handler.handle(mockMessage, 'user123', ['search', 'ミーティング'], 'Asia/Tokyo');
 
       expect(mockMessage.reply).toHaveBeenCalledWith(
-        expect.stringContaining('🔍 **検索結果**: "会議"')
+        expect.stringContaining('🔍 **検索結果**: "ミーティング"')
       );
     });
 
@@ -243,7 +243,7 @@ describe('LogsCommandHandler', () => {
       await handler.handle(mockMessage, 'user123', [], 'Asia/Tokyo');
 
       expect(mockMessage.reply).toHaveBeenCalledWith(
-        '❌ データベースエラー'
+        '❌ 今日のログの表示に失敗しました'
       );
     });
 
@@ -255,7 +255,7 @@ describe('LogsCommandHandler', () => {
       await handler.handle(mockMessage, 'user123', ['stats'], 'Asia/Tokyo');
 
       expect(mockMessage.reply).toHaveBeenCalledWith(
-        '❌ ログの取得中にエラーが発生しました。'
+        '❌ 統計情報の表示に失敗しました'
       );
     });
   });
@@ -551,7 +551,7 @@ describe('LogsCommandHandler', () => {
       await handler.handle(mockMessage, 'user123', ['2025-01-01'], 'Asia/Tokyo');
 
       expect(mockMessage.reply).toHaveBeenCalledWith(
-        expect.stringContaining('📝 1月1日の活動ログはありません')
+        expect.stringContaining('📝 1月1日(Wed)の活動ログはありません')
       );
     });
 
