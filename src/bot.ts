@@ -20,6 +20,7 @@ export class TaskLoggerBot {
         GatewayIntentBits.Guilds,
         GatewayIntentBits.GuildMessages,
         GatewayIntentBits.DirectMessages,
+        GatewayIntentBits.DirectMessageReactions,
         GatewayIntentBits.MessageContent,
       ],
       partials: [
