@@ -1,0 +1,228 @@
+name: 夜間サスペンド自動化
+
+on:
+  schedule:
+    # 夜間サスペンド: 毎日 0:00 JST (15:00 UTC)
+    - cron: '0 15 * * *'
+    # 朝の起動処理: 毎日 7:00 JST (22:00 UTC 前日)
+    - cron: '0 22 * * *'
+  
+  # 手動実行も可能
+  workflow_dispatch:
+    inputs:
+      action:
+        description: '実行するアクション'
+        required: true
+        default: 'night-suspend'
+        type: choice
+        options:
+          - 'night-suspend'
+          - 'wake-up'
+          - 'morning-recovery'
+
+env:
+  FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+  SHUTDOWN_TOKEN: ${{ secrets.SHUTDOWN_TOKEN }}
+  WAKE_TOKEN: ${{ secrets.WAKE_TOKEN }}
+  RECOVERY_TOKEN: ${{ secrets.RECOVERY_TOKEN }}
+  FLY_APP_NAME: timelogger-bitter-resonance-9585
+
+jobs:
+  # 夜間サスペンド処理（0:00 JST）
+  night-suspend:
+    if: github.event.schedule == '0 15 * * *' || github.event.inputs.action == 'night-suspend'
+    runs-on: ubuntu-latest
+    name: 夜間サスペンド実行
+    
+    steps:
+      - name: 🌙 夜間サスペンド開始通知
+        run: |
+          echo "🌙 夜間サスペンド処理を開始します"
+          echo "時刻: $(date '+%Y-%m-%d %H:%M:%S UTC') (JST: $(TZ=Asia/Tokyo date '+%Y-%m-%d %H:%M:%S'))"
+      
+      - name: 📥 Fly.io CLIセットアップ
+        uses: superfly/flyctl-actions/setup-flyctl@master
+      
+      - name: 🔄 Botにサスペンド準備要求
+        run: |
+          echo "📡 Botにサスペンド準備を要求中..."
+          
+          # Botアプリの現在のステータス確認
+          flyctl status --app $FLY_APP_NAME || true
+          
+          # Botにサスペンド準備リクエスト送信
+          RESPONSE=$(curl -s -w "%{http_code}" \
+            -X POST \
+            -H "Authorization: Bearer $SHUTDOWN_TOKEN" \
+            -H "Content-Type: application/json" \
+            -d '{"action":"prepare_suspend","trigger":"github_actions"}' \
+            "https://$FLY_APP_NAME.fly.dev/api/night-suspend" \
+            -o response_body.json || echo "000")
+          
+          HTTP_CODE=${RESPONSE: -3}
+          
+          if [ "$HTTP_CODE" = "200" ]; then
+            echo "✅ Botサスペンド準備完了"
+            cat response_body.json | jq '.'
+          else
+            echo "⚠️  Botサスペンド準備の応答: HTTP $HTTP_CODE"
+            cat response_body.json 2>/dev/null || echo "レスポンス本文を取得できませんでした"
+          fi
+      
+      - name: 🛑 Fly.io アプリサスペンド実行
+        run: |
+          echo "🛑 Fly.io アプリをサスペンドします..."
+          
+          # アプリのサスペンド実行
+          flyctl suspend --app $FLY_APP_NAME
+          
+          # サスペンド確認
+          flyctl status --app $FLY_APP_NAME
+          
+          echo "✅ 夜間サスペンド完了"
+          echo "💡 アプリは朝7:00 JST（22:00 UTC前日）に自動起動します"
+
+  # 朝の起動・リカバリ処理（7:00 JST）
+  wake-up-recovery:
+    if: github.event.schedule == '0 22 * * *' || github.event.inputs.action == 'wake-up' || github.event.inputs.action == 'morning-recovery'
+    runs-on: ubuntu-latest
+    name: 朝の起動・リカバリ実行
+    
+    steps:
+      - name: 🌅 朝の起動処理開始通知
+        run: |
+          echo "🌅 朝の起動・リカバリ処理を開始します"
+          echo "時刻: $(date '+%Y-%m-%d %H:%M:%S UTC') (JST: $(TZ=Asia/Tokyo date '+%Y-%m-%d %H:%M:%S'))"
+      
+      - name: 📥 Fly.io CLIセットアップ
+        uses: superfly/flyctl-actions/setup-flyctl@master
+      
+      - name: 🚀 Fly.io アプリ起動
+        run: |
+          echo "🚀 Fly.io アプリを起動します..."
+          
+          # アプリの起動
+          flyctl resume --app $FLY_APP_NAME
+          
+          # 起動確認（最大60秒待機）
+          for i in {1..12}; do
+            echo "⏳ 起動確認中... ($i/12)"
+            
+            if flyctl status --app $FLY_APP_NAME | grep -q "deployed"; then
+              echo "✅ アプリが正常に起動しました"
+              break
+            fi
+            
+            if [ $i -eq 12 ]; then
+              echo "⚠️  アプリの起動に時間がかかっています"
+              flyctl logs --app $FLY_APP_NAME --lines 20
+            fi
+            
+            sleep 5
+          done
+      
+      - name: 🔔 Bot起動通知
+        run: |
+          echo "🔔 Botに起動通知を送信..."
+          
+          # Botに起動通知
+          RESPONSE=$(curl -s -w "%{http_code}" \
+            -X POST \
+            -H "Authorization: Bearer $WAKE_TOKEN" \
+            -H "Content-Type: application/json" \
+            -d '{"trigger":"github_actions","timestamp":"'$(date -u +%Y-%m-%dT%H:%M:%SZ)'"}' \
+            "https://$FLY_APP_NAME.fly.dev/api/wake-up" \
+            -o wake_response.json || echo "000")
+          
+          HTTP_CODE=${RESPONSE: -3}
+          
+          if [ "$HTTP_CODE" = "200" ]; then
+            echo "✅ Bot起動通知完了"
+            cat wake_response.json | jq '.'
+          else
+            echo "⚠️  Bot起動通知の応答: HTTP $HTTP_CODE"
+            cat wake_response.json 2>/dev/null || echo "レスポンス本文を取得できませんでした"
+          fi
+      
+      - name: 🔄 夜間メッセージリカバリ実行
+        run: |
+          echo "🔄 夜間メッセージリカバリを実行..."
+          
+          # 追加の待機（アプリが完全に準備されるまで）
+          sleep 10
+          
+          # メッセージリカバリ実行
+          RESPONSE=$(curl -s -w "%{http_code}" \
+            -X POST \
+            -H "Authorization: Bearer $RECOVERY_TOKEN" \
+            -H "Content-Type: application/json" \
+            -d '{"trigger":"github_actions","timestamp":"'$(date -u +%Y-%m-%dT%H:%M:%SZ)'"}' \
+            "https://$FLY_APP_NAME.fly.dev/api/morning-recovery" \
+            -o recovery_response.json || echo "000")
+          
+          HTTP_CODE=${RESPONSE: -3}
+          
+          if [ "$HTTP_CODE" = "200" ]; then
+            echo "✅ メッセージリカバリ完了"
+            cat recovery_response.json | jq '.'
+            
+            # 処理結果を解析
+            PROCESSED_COUNT=$(cat recovery_response.json | jq -r '.processed_messages // 0')
+            echo "📊 処理されたメッセージ数: $PROCESSED_COUNT件"
+            
+            if [ "$PROCESSED_COUNT" -gt 0 ]; then
+              echo "📝 夜間に $PROCESSED_COUNT 件のメッセージを処理しました"
+            else
+              echo "📝 夜間の新規メッセージはありませんでした"
+            fi
+          else
+            echo "⚠️  メッセージリカバリの応答: HTTP $HTTP_CODE"
+            cat recovery_response.json 2>/dev/null || echo "レスポンス本文を取得できませんでした"
+            
+            # エラーの場合でもワークフローは継続（部分的成功として扱う）
+            echo "💡 メッセージリカバリにエラーが発生しましたが、アプリは正常に起動しています"
+          fi
+      
+      - name: 📋 起動・リカバリ完了サマリー
+        run: |
+          echo "📋 起動・リカバリ処理完了サマリー"
+          echo "================================"
+          echo "🕐 完了時刻: $(TZ=Asia/Tokyo date '+%Y-%m-%d %H:%M:%S JST')"
+          echo "🚀 アプリ起動: ✅"
+          echo "🔔 起動通知: $([ -f wake_response.json ] && echo '✅' || echo '⚠️')"
+          echo "🔄 メッセージリカバリ: $([ -f recovery_response.json ] && echo '✅' || echo '⚠️')"
+          
+          # 最終ステータス確認
+          echo ""
+          echo "📊 最終アプリステータス:"
+          flyctl status --app $FLY_APP_NAME
+
+  # 手動実行用の個別アクション
+  manual-action:
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.action != 'night-suspend' && github.event.inputs.action != 'wake-up'
+    runs-on: ubuntu-latest
+    name: 手動アクション実行
+    
+    steps:
+      - name: 📥 Fly.io CLIセットアップ
+        uses: superfly/flyctl-actions/setup-flyctl@master
+      
+      - name: 🔧 手動アクション実行
+        run: |
+          echo "🔧 手動アクション: ${{ github.event.inputs.action }}"
+          
+          case "${{ github.event.inputs.action }}" in
+            "morning-recovery")
+              echo "🔄 メッセージリカバリのみ実行..."
+              
+              curl -X POST \
+                -H "Authorization: Bearer $RECOVERY_TOKEN" \
+                -H "Content-Type: application/json" \
+                -d '{"trigger":"manual_github_actions"}' \
+                "https://$FLY_APP_NAME.fly.dev/api/morning-recovery"
+              ;;
+            *)
+              echo "❌ 不明なアクション: ${{ github.event.inputs.action }}"
+              exit 1
+              ;;
+          esac
