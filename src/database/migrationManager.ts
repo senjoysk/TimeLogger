@@ -18,7 +18,13 @@ export class MigrationManager {
     this.db = db;
     this.migrationsPath = path.join(__dirname, 'migrations');
     this.dbPath = dbPath || '/app/data/timelogger.db';
-    this.backupManager = new BackupManager(db, '/app/data/backups', this.dbPath);
+    
+    // 開発環境と本番環境でバックアップディレクトリを切り替え
+    const backupDir = process.env.NODE_ENV === 'development' 
+      ? './data/backups' 
+      : '/app/data/backups';
+    
+    this.backupManager = new BackupManager(db, backupDir, this.dbPath);
   }
 
   /**
