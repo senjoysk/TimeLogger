@@ -1,6 +1,9 @@
 import { validateConfig } from './config';
 import { TaskLoggerBot } from './bot';
 import { Scheduler } from './scheduler';
+import { NightSuspendServer } from './api/nightSuspendServer';
+import { MorningMessageRecovery } from './services/morningMessageRecovery';
+import { SqliteNightSuspendRepository } from './repositories/sqliteNightSuspendRepository';
 
 /**
  * アプリケーションのメインエントリーポイント
@@ -9,6 +12,7 @@ import { Scheduler } from './scheduler';
 class Application {
   private bot: TaskLoggerBot;
   private scheduler: Scheduler;
+  private nightSuspendServer: NightSuspendServer | null = null;
 
   constructor() {
     this.bot = new TaskLoggerBot();
@@ -47,6 +51,11 @@ class Application {
       await this.scheduler.start();
       console.log('');
       
+      // 夜間サスペンドサーバーの起動
+      console.log('🌙 夜間サスペンドサーバーを起動中...');
+      await this.setupNightSuspendServer();
+      console.log('');
+      
       console.log('🎉 Discord Task Logger が正常に起動しました！');
       console.log('📝 タスクの記録を開始します...\n');
       
@@ -68,6 +77,11 @@ class Application {
       
       // スケジューラーの停止
       this.scheduler.stop();
+      
+      // 夜間サスペンドサーバーの停止
+      if (this.nightSuspendServer) {
+        await this.nightSuspendServer.stop();
+      }
       
       // Discord Bot の停止
       await this.bot.stop();
@@ -107,6 +121,59 @@ class Application {
         process.exit(1);
       });
     });
+  }
+
+  /**
+   * 夜間サスペンドサーバーの設定
+   */
+  private async setupNightSuspendServer(): Promise<void> {
+    try {
+      // データベースとリポジトリの取得
+      const repository = this.bot.getRepository();
+      if (!repository) {
+        console.warn('⚠️ リポジトリが取得できないため、夜間サスペンドサーバーはメッセージリカバリなしで起動します');
+      }
+
+      // 夜間サスペンド機能の設定
+      let morningRecovery: MorningMessageRecovery | undefined;
+      
+      if (repository) {
+        // SqliteNightSuspendRepositoryの作成（既存のリポジトリのDatabaseを使用）
+        const nightSuspendRepo = new SqliteNightSuspendRepository((repository as any).db);
+        
+        // Discord Clientの取得
+        const discordClient = this.bot.getClient();
+        
+        // 環境変数からターゲットユーザーIDを取得
+        const targetUserId = process.env.DISCORD_TARGET_USER_ID;
+        
+        if (discordClient && targetUserId) {
+          morningRecovery = new MorningMessageRecovery(discordClient, nightSuspendRepo, {
+            targetUserId: targetUserId,
+            timezone: 'Asia/Tokyo'
+          });
+          console.log('✅ メッセージリカバリサービスが設定されました');
+        } else {
+          console.warn('⚠️ Discord ClientまたはターゲットユーザーIDが設定されていません');
+        }
+      }
+
+      // 夜間サスペンドサーバーの起動
+      this.nightSuspendServer = new NightSuspendServer(morningRecovery);
+      await this.nightSuspendServer.start();
+      
+      console.log('🌙 夜間サスペンドサーバーが正常に起動しました');
+      console.log('📡 API エンドポイント:');
+      console.log('  - POST /api/night-suspend (認証必要)');
+      console.log('  - POST /api/wake-up (認証必要)');
+      console.log('  - POST /api/morning-recovery (認証必要)');
+      console.log('  - GET /health (認証不要)');
+      console.log('  - GET /api/suspend-status (認証不要)');
+      
+    } catch (error) {
+      console.error('❌ 夜間サスペンドサーバーの起動に失敗しました:', error);
+      console.warn('⚠️ 夜間サスペンド機能なしで続行します');
+    }
   }
 }
 
