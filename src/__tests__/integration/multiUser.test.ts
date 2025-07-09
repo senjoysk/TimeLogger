@@ -10,104 +10,8 @@ import { config } from '../../config';
 import * as fs from 'fs';
 import * as path from 'path';
 
-// テスト用のGeminiサービスをモック化
-jest.mock('../../services/geminiService', () => {
-  return {
-    GeminiService: jest.fn().mockImplementation(() => ({
-      analyzeActivityLog: jest.fn().mockResolvedValue({
-        startTime: null,
-        endTime: null,
-        totalMinutes: 0,
-        confidence: 0.5,
-        analysisMethod: 'mock',
-        categories: [],
-        warnings: []
-      }),
-      classifyMessageWithAI: jest.fn().mockResolvedValue({
-        classification: 'ACTIVITY_LOG',
-        confidence: 0.8,
-        reasoning: 'テスト用モック分類',
-        priority: 'medium',
-        dueDate: null
-      }),
-      initialize: jest.fn().mockResolvedValue(undefined),
-      close: jest.fn().mockResolvedValue(undefined),
-      getDailyCostReport: jest.fn().mockResolvedValue('モックコストレポート')
-    }))
-  };
-});
-
-// MessageClassificationServiceをモック化
-jest.mock('../../services/messageClassificationService', () => {
-  return {
-    MessageClassificationService: jest.fn().mockImplementation(() => ({
-      classifyMessage: jest.fn().mockResolvedValue({
-        classification: 'ACTIVITY_LOG',
-        confidence: 0.8,
-        reasoning: 'テスト用モック分類',
-        priority: 'medium',
-        dueDate: null
-      })
-    }))
-  };
-});
-
-// TodoCommandHandlerをモック化
-jest.mock('../../handlers/todoCommandHandler', () => {
-  return {
-    TodoCommandHandler: jest.fn().mockImplementation(() => ({
-      handleMessageClassification: jest.fn().mockResolvedValue(undefined),
-      handleCommand: jest.fn().mockResolvedValue(undefined),
-      handleButtonInteraction: jest.fn().mockResolvedValue(undefined),
-      destroy: jest.fn().mockResolvedValue(undefined)
-    }))
-  };
-});
-
-// ActivityLogServiceをモック化
-jest.mock('../../services/activityLogService', () => {
-  return {
-    ActivityLogService: jest.fn().mockImplementation(() => ({
-      recordActivity: jest.fn().mockResolvedValue({
-        id: 'test-log-id',
-        userId: 'test-user',
-        content: 'test-content',
-        businessDate: '2023-01-01',
-        timestamp: new Date().toISOString(),
-        timezone: 'Asia/Tokyo'
-      }),
-      getLogsForDate: jest.fn().mockResolvedValue([]),
-      getStatistics: jest.fn().mockResolvedValue({
-        totalLogs: 0,
-        todayLogs: 0,
-        weekLogs: 0
-      })
-    }))
-  };
-});
-
-// UnifiedAnalysisServiceをモック化
-jest.mock('../../services/unifiedAnalysisService', () => {
-  return {
-    UnifiedAnalysisService: jest.fn().mockImplementation(() => ({
-      analyzeDaily: jest.fn().mockResolvedValue({
-        summary: 'テストサマリー',
-        categories: [],
-        timeline: [],
-        statistics: {}
-      })
-    }))
-  };
-});
-
-// AnalysisCacheServiceをモック化
-jest.mock('../../services/analysisCacheService', () => {
-  return {
-    AnalysisCacheService: jest.fn().mockImplementation(() => ({
-      invalidateCache: jest.fn().mockResolvedValue(undefined)
-    }))
-  };
-});
+// モックを全面削除し、実際のサービスでテストする
+// これにより、マルチユーザー機能が実際の環境で正常に動作することを確認
 
 describe('マルチユーザー対応統合テスト', () => {
   let repository: SqliteActivityLogRepository;
@@ -131,7 +35,7 @@ describe('マルチユーザー対応統合テスト', () => {
 
     const integrationConfig = {
       databasePath: testDbPath,
-      geminiApiKey: process.env.GOOGLE_API_KEY || 'test-key',
+      geminiApiKey: process.env.GOOGLE_API_KEY || 'test-key', // 実際のAPIキーを使用
       debugMode: true,
       defaultTimezone: 'Asia/Tokyo',
       enableAutoAnalysis: false, // テストでは自動分析を無効化
@@ -184,12 +88,52 @@ describe('マルチユーザー対応統合テスト', () => {
       } as unknown as Message;
 
       // マルチユーザー対応により、全てのユーザーが処理される
-      const result1 = await integration.handleMessage(mockMessage1);
-      const result2 = await integration.handleMessage(mockMessage2);
+      console.log('=== 処理開始 ===');
+      
+      // エラーログを捕捉
+      const originalConsoleError = console.error;
+      const errorLogs: string[] = [];
+      console.error = (...args: any[]) => {
+        errorLogs.push(args.join(' '));
+        originalConsoleError(...args);
+      };
 
-      // デバッグ情報
-      console.log('Result1:', result1);
-      console.log('Result2:', result2);
+      let result1: boolean, result2: boolean;
+      try {
+        console.log('メッセージ1処理開始...');
+        result1 = await integration.handleMessage(mockMessage1);
+        console.log('メッセージ1処理完了:', result1);
+        
+        console.log('メッセージ2処理開始...');
+        result2 = await integration.handleMessage(mockMessage2);
+        console.log('メッセージ2処理完了:', result2);
+
+        // デバッグ情報
+        console.log('最終結果 - Result1:', result1, 'Result2:', result2);
+        
+        // エラーログ確認
+        if (errorLogs.length > 0) {
+          console.log('=== 発生したエラー ===');
+          errorLogs.forEach((log, index) => {
+            console.log(`Error ${index + 1}:`, log);
+          });
+        }
+        
+        // ユーザー登録状態確認
+        const user1Exists = await repository.userExists(user1Id);
+        const user2Exists = await repository.userExists(user2Id);
+        console.log('ユーザー1存在:', user1Exists);
+        console.log('ユーザー2存在:', user2Exists);
+        
+        // reply呼び出し確認
+        const reply1Calls = (mockMessage1.reply as jest.Mock).mock.calls.length;
+        const reply2Calls = (mockMessage2.reply as jest.Mock).mock.calls.length;
+        console.log('Reply1呼び出し回数:', reply1Calls);
+        console.log('Reply2呼び出し回数:', reply2Calls);
+        
+      } finally {
+        console.error = originalConsoleError;
+      }
       
       // 全てのユーザーが成功
       expect(result1).toBe(true);
