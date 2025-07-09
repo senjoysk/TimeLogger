@@ -265,6 +265,13 @@ export class TaskLoggerBot {
   }
 
   /**
+   * Discord Clientを取得
+   */
+  public getClient(): Client {
+    return this.client;
+  }
+
+  /**
    * システム初期化が完了しているかチェック
    */
   public isSystemInitialized(): boolean {

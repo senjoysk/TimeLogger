@@ -14,10 +14,29 @@ kill_timeout = '5s'
   DATABASE_PATH = '/app/data/activity_logs.db'
   NODE_ENV = 'production'
   TZ = 'Asia/Tokyo'
+  PORT = '3000'
 
 [[mounts]]
   source = 'timelogger_data'
   destination = '/app/data'
+
+# HTTPサーバー設定
+[http_service]
+  internal_port = 3000
+  force_https = true
+  auto_stop_machines = false
+  auto_start_machines = true
+  min_machines_running = 0
+  processes = ["app"]
+
+[[http_service.checks]]
+  interval = "30s"
+  timeout = "10s"
+  grace_period = "5s"
+  method = "GET"
+  path = "/health"
+  protocol = "http"
+  tls_skip_verify = false
 
 # 常時稼働設定
 [[vm]]

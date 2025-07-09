@@ -24,7 +24,11 @@ CREATE TABLE IF NOT EXISTS activity_logs (
     match_status TEXT DEFAULT 'unmatched' CHECK (match_status IN ('unmatched', 'matched', 'ignored')),
     matched_log_id TEXT,            -- マッチング相手のログID
     activity_key TEXT,              -- 活動内容の分類キー
-    similarity_score REAL           -- マッチング時の類似度スコア
+    similarity_score REAL,          -- マッチング時の類似度スコア
+    -- 夜間サスペンド・リカバリ機能カラム（Phase 3）
+    discord_message_id TEXT,        -- DiscordメッセージID（重複防止）
+    recovery_processed BOOLEAN DEFAULT FALSE, -- リカバリ処理済みフラグ
+    recovery_timestamp TEXT         -- リカバリ実行時刻（UTC、ISO 8601形式）
 );
 
 -- 分析結果キャッシュテーブル
@@ -286,3 +290,26 @@ ON api_costs(timestamp DESC, operation);
 -- 分析キャッシュ最適化
 CREATE INDEX IF NOT EXISTS idx_daily_analysis_cache_user_date 
 ON daily_analysis_cache(user_id, business_date, log_count DESC);
+
+-- ================================================================
+-- 夜間サスペンド・リカバリ機能テーブル
+-- ================================================================
+
+-- サスペンド状態管理テーブル
+CREATE TABLE IF NOT EXISTS suspend_states (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    suspend_time TEXT NOT NULL,           -- サスペンド実行時刻（UTC、ISO 8601形式）
+    expected_recovery_time TEXT NOT NULL, -- 予定復旧時刻（UTC、ISO 8601形式）
+    actual_recovery_time TEXT,            -- 実際の復旧時刻（UTC、ISO 8601形式）
+    created_at TEXT NOT NULL DEFAULT (datetime('now', 'utc'))
+);
+
+-- 夜間サスペンド機能用インデックス
+CREATE INDEX IF NOT EXISTS idx_suspend_states_user_id ON suspend_states(user_id);
+CREATE INDEX IF NOT EXISTS idx_suspend_states_suspend_time ON suspend_states(suspend_time);
+
+-- 夜間サスペンド・リカバリ機能用インデックス
+CREATE INDEX IF NOT EXISTS idx_discord_message_id ON activity_logs(discord_message_id);
+CREATE INDEX IF NOT EXISTS idx_recovery_processed ON activity_logs(recovery_processed);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_unique_discord_message_id ON activity_logs(discord_message_id) WHERE discord_message_id IS NOT NULL;
