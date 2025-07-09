@@ -3,7 +3,7 @@
  * TDD: Green Phase - テストを通すための最小限の実装
  */
 
-import express, { Application, Request, Response } from 'express';
+import express, { Application, Request, Response, NextFunction } from 'express';
 import { Server } from 'http';
 import { nightSuspendAuthMiddleware } from '../middleware/nightSuspendAuth';
 import { MorningMessageRecovery } from '../services/morningMessageRecovery';
@@ -41,7 +41,7 @@ export class NightSuspendServer {
     this.app.use(express.json());
     
     // CORS設定（必要に応じて）
-    this.app.use((req, res, next) => {
+    this.app.use((req: Request, res: Response, next: NextFunction) => {
       res.header('Access-Control-Allow-Origin', '*');
       res.header('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,OPTIONS');
       res.header('Access-Control-Allow-Headers', 'Origin,X-Requested-With,Content-Type,Accept,Authorization');
@@ -255,7 +255,7 @@ export class NightSuspendServer {
         resolve();
       });
       
-      this.server.on('error', (error) => {
+      this.server?.on('error', (error) => {
         console.error('❌ HTTPサーバー起動エラー:', error);
         reject(error);
       });
