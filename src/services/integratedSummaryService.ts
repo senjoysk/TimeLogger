@@ -490,7 +490,10 @@ export class IntegratedSummaryService implements IIntegratedSummaryService {
       const dateStr = date.toISOString().split('T')[0];
       
       return this.generateIntegratedSummary(userId, dateStr, timezone)
-        .then(summary => ({ summary, dateStr, index: i }))
+        .then(summary => {
+          console.log(`📅 日別サマリー成功: ${dateStr} - 活動ログ${summary.activitySummary.totalLogCount}件`);
+          return { summary, dateStr, index: i };
+        })
         .catch(error => {
           console.warn(`日別サマリー生成スキップ: ${dateStr}`, error);
           return { summary: null, dateStr, index: i };

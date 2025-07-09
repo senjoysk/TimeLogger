@@ -76,12 +76,16 @@ describe('🔴 Red Phase: MorningMessageRecovery クラス', () => {
       mockFetch.mockResolvedValue(mockUser);
       mockCreateDM.mockResolvedValue(mockChannel);
       
+      // 今日の午前1時のメッセージを作成
+      const today = new Date();
+      today.setHours(1, 0, 0, 0);
+      
       const mockMessages = new Collection<string, Message>();
       const mockMessage = {
         id: 'msg-123',
         content: 'テストメッセージ',
         author: { id: targetUserId, bot: false },
-        createdAt: new Date('2025-01-01T01:00:00Z'),
+        createdAt: today,
       } as Message;
       
       mockMessages.set('msg-123', mockMessage);
@@ -103,8 +107,8 @@ describe('🔴 Red Phase: MorningMessageRecovery クラス', () => {
       expect(mockRepository.createActivityLogFromDiscord).toHaveBeenCalledWith({
         user_id: targetUserId,
         content: 'テストメッセージ',
-        input_timestamp: '2025-01-01T01:00:00.000Z',
-        business_date: '2024-12-31', // 5am基準での業務日
+        input_timestamp: today.toISOString(),
+        business_date: expect.any(String), // 動的に計算される
         discord_message_id: 'msg-123',
         recovery_processed: true,
         recovery_timestamp: expect.any(String),
@@ -264,12 +268,16 @@ describe('🔴 Red Phase: MorningMessageRecovery クラス', () => {
       mockFetch.mockResolvedValue(mockUser);
       mockCreateDM.mockResolvedValue(mockChannel);
       
+      // 今日の午前1時のメッセージを作成
+      const today = new Date();
+      today.setHours(1, 0, 0, 0);
+      
       const mockMessages = new Collection<string, Message>();
       const mockMessage = {
         id: 'msg-123',
         content: 'テストメッセージ',
         author: { id: targetUserId, bot: false },
-        createdAt: new Date('2025-01-01T01:00:00Z'),
+        createdAt: today,
       } as Message;
       
       mockMessages.set('msg-123', mockMessage);

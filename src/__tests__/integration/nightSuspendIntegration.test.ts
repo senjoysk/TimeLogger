@@ -67,8 +67,12 @@ describe('🔴 Red Phase: 夜間サスペンド機能統合テスト', () => {
     }
     
     // データベース接続終了
-    if (database) {
-      database.close();
+    try {
+      if (database) {
+        database.close();
+      }
+    } catch (error) {
+      // データベースが既に閉じられている場合はエラーを無視
     }
   });
 
@@ -408,11 +412,15 @@ function setupDiscordMocks(mockClient: jest.Mocked<Client>, messageId: string): 
   } as unknown as jest.Mocked<DMChannel>;
 
   const mockMessages = new Collection<string, Message>();
+  // 今日の午前1時（夜間時間帯）のメッセージを作成
+  const today = new Date();
+  today.setHours(1, 0, 0, 0);
+  
   const mockMessage = {
     id: messageId,
     content: 'テスト夜間メッセージ',
     author: { id: 'test-user-123', bot: false },
-    createdAt: new Date('2025-01-01T01:00:00Z'),
+    createdAt: today,
   } as Message;
 
   mockMessages.set(messageId, mockMessage);

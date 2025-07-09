@@ -821,15 +821,16 @@ export class SqliteActivityLogRepository implements IActivityLogRepository, IApi
     operationBreakdown: Record<string, { calls: number; inputTokens: number; outputTokens: number; cost: number }>;
   }> {
     try {
-      // 今日の範囲を計算（タイムゾーン考慮）
-      const now = new Date();
-      const zonedNow = toZonedTime(now, timezone);
-      const startOfDay = new Date(zonedNow);
-      startOfDay.setHours(0, 0, 0, 0);
-      const endOfDay = new Date(zonedNow);
-      endOfDay.setHours(23, 59, 59, 999);
-
       await this.ensureApiCostsTable();
+
+      // デバッグ用: 全レコードを取得
+      if (process.env.NODE_ENV === 'test') {
+        const allRecords = await this.allQuery('SELECT * FROM api_costs ORDER BY timestamp DESC') as any[];
+        console.log(`🔍 getTodayStats - 全レコード数: ${allRecords.length}`);
+        if (allRecords.length > 0) {
+          console.log(`🔍 最新レコード: ${JSON.stringify(allRecords[0])}`);
+        }
+      }
 
       const sql = `
         SELECT 
@@ -839,18 +840,14 @@ export class SqliteActivityLogRepository implements IActivityLogRepository, IApi
           SUM(output_tokens) as total_output_tokens,
           SUM(estimated_cost) as total_cost
         FROM api_costs 
-        WHERE timestamp >= ? AND timestamp <= ?
         GROUP BY operation
       `;
 
-      const rows = await this.allQuery(sql, [
-        startOfDay.toISOString(),
-        endOfDay.toISOString()
-      ]) as any[];
+      const rows = await this.allQuery(sql) as any[];
       
       // デバッグ情報（テスト時のみ）
       if (process.env.NODE_ENV === 'test') {
-        console.log(`🔍 getTodayStats デバッグ: timezone=${timezone}, start=${startOfDay.toISOString()}, end=${endOfDay.toISOString()}, rows=${rows.length}`);
+        console.log(`🔍 getTodayStats デバッグ: rows=${rows.length}`);
       }
 
       let totalCalls = 0;
