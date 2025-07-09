@@ -58,6 +58,9 @@ export class SqliteActivityLogRepository implements IActivityLogRepository, IApi
    */
   public async initializeDatabase(): Promise<void> {
     try {
+      // データベース移行処理を先に実行
+      await this.migrateDatabase();
+      
       // 新スキーマファイルから読み込み（柔軟なパス解決）
       let schemaPath = path.join(__dirname, '../database/newSchema.sql');
       
@@ -106,6 +109,45 @@ export class SqliteActivityLogRepository implements IActivityLogRepository, IApi
       console.error('スキーマ作成エラー:', error);
       console.error('❌ データベース初期化エラー:', error);
       throw new ActivityLogError('データベースの初期化に失敗しました', 'DB_INIT_ERROR', { error });
+    }
+  }
+
+  /**
+   * データベースの移行処理
+   */
+  private async migrateDatabase(): Promise<void> {
+    try {
+      console.log('🔄 データベース移行処理を開始します...');
+      
+      // api_costs テーブルの business_date カラムを確認・追加
+      const tableInfo = await this.getTableInfo('api_costs');
+      const hasBusinessDate = tableInfo.some(column => column.name === 'business_date');
+      
+      if (!hasBusinessDate) {
+        console.log('📝 api_costs テーブルに business_date カラムを追加します...');
+        await this.runQuery('ALTER TABLE api_costs ADD COLUMN business_date TEXT');
+        console.log('✅ business_date カラムを追加しました');
+      } else {
+        console.log('✅ business_date カラムは既に存在します');
+      }
+      
+      console.log('✅ データベース移行処理が完了しました');
+    } catch (error) {
+      console.error('❌ データベース移行エラー:', error);
+      throw new ActivityLogError('データベースの移行に失敗しました', 'DB_MIGRATION_ERROR', { error });
+    }
+  }
+
+  /**
+   * テーブル情報を取得
+   */
+  private async getTableInfo(tableName: string): Promise<any[]> {
+    try {
+      const result = await this.runQuery(`PRAGMA table_info(${tableName})`);
+      return result as any[];
+    } catch (error) {
+      console.log(`⚠️ テーブル ${tableName} が存在しません`);
+      return [];
     }
   }
 
