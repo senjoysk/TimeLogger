@@ -52,7 +52,7 @@ export class SqliteActivityLogRepository implements IActivityLogRepository, IApi
     }
 
     this.db = new Database(databasePath);
-    this.migrationManager = new MigrationManager(this.db);
+    this.migrationManager = new MigrationManager(this.db, databasePath);
     // 初期化は非同期で行うため、ここでは実行しない
   }
 

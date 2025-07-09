@@ -12,11 +12,13 @@ export class MigrationManager {
   private db: Database;
   private migrationsPath: string;
   private backupManager: BackupManager;
+  private dbPath: string;
 
-  constructor(db: Database) {
+  constructor(db: Database, dbPath?: string) {
     this.db = db;
     this.migrationsPath = path.join(__dirname, 'migrations');
-    this.backupManager = new BackupManager(db);
+    this.dbPath = dbPath || '/app/data/timelogger.db';
+    this.backupManager = new BackupManager(db, '/app/data/backups', this.dbPath);
   }
 
   /**

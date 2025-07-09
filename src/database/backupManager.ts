@@ -11,10 +11,12 @@ export class BackupManager {
   private db: Database;
   private backupDir: string;
   private maxBackups: number = 10;
+  private dbPath: string;
 
-  constructor(db: Database, backupDir: string = '/app/data/backups') {
+  constructor(db: Database, backupDir: string = '/app/data/backups', dbPath?: string) {
     this.db = db;
     this.backupDir = backupDir;
+    this.dbPath = dbPath || '/app/data/timelogger.db';
     this.ensureBackupDirectory();
   }
 
@@ -22,9 +24,14 @@ export class BackupManager {
    * バックアップディレクトリの作成
    */
   private ensureBackupDirectory(): void {
-    if (!fs.existsSync(this.backupDir)) {
-      fs.mkdirSync(this.backupDir, { recursive: true });
-      console.log(`📁 バックアップディレクトリを作成しました: ${this.backupDir}`);
+    try {
+      if (!fs.existsSync(this.backupDir)) {
+        fs.mkdirSync(this.backupDir, { recursive: true });
+        console.log(`📁 バックアップディレクトリを作成しました: ${this.backupDir}`);
+      }
+    } catch (error) {
+      console.warn(`⚠️ バックアップディレクトリの作成に失敗しました: ${this.backupDir}`, error);
+      // テスト環境などでディレクトリ作成権限がない場合はスキップ
     }
   }
 
@@ -33,6 +40,9 @@ export class BackupManager {
    */
   async createBackup(reason: string = 'manual'): Promise<string> {
     try {
+      // バックアップディレクトリが存在しない場合は再作成を試みる
+      this.ensureBackupDirectory();
+      
       const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
       const backupFileName = `timelogger_backup_${timestamp}_${reason}.db`;
       const backupPath = path.join(this.backupDir, backupFileName);
@@ -59,16 +69,34 @@ export class BackupManager {
    */
   private executeBackupCommand(backupPath: string): Promise<void> {
     return new Promise((resolve, reject) => {
-      // SQLiteの.backupコマンドを実行
-      this.db.exec(`.backup ${backupPath}`, (err) => {
-        if (err) {
-          // .backupコマンドが利用できない場合は代替手段を使用
-          this.copyDatabaseFile(backupPath)
-            .then(() => resolve())
-            .catch(reject);
-        } else {
-          resolve();
-        }
+      // SQLite3 の serialize を使用して安全にバックアップを実行
+      this.db.serialize(() => {
+        this.db.run('BEGIN IMMEDIATE;', (err) => {
+          if (err) {
+            reject(err);
+            return;
+          }
+          
+          // VACUUMを使用してバックアップを作成
+          this.db.run(`VACUUM INTO '${backupPath}'`, (err) => {
+            if (err) {
+              // VACUUMが失敗した場合はファイルコピーを試す
+              this.db.run('ROLLBACK;', () => {
+                this.copyDatabaseFile(backupPath)
+                  .then(() => resolve())
+                  .catch(reject);
+              });
+            } else {
+              this.db.run('COMMIT;', (err) => {
+                if (err) {
+                  reject(err);
+                } else {
+                  resolve();
+                }
+              });
+            }
+          });
+        });
       });
     });
   }
@@ -97,8 +125,7 @@ export class BackupManager {
    */
   private getDatabasePath(): string | null {
     try {
-      // SQLiteのdata source nameを取得（利用可能な場合）
-      return '/app/data/timelogger.db'; // 固定パス（本番環境想定）
+      return this.dbPath;
     } catch (error) {
       console.warn('⚠️ データベースパスの取得に失敗しました');
       return null;
