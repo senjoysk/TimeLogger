@@ -1,5 +1,20 @@
-// 現在、このファイルにはアクティブなインターフェースは含まれていません
-// すべてのインターフェースは削除されたCommandManagerと関連する機能で使用されていました
-// 新システムではActivityLoggingIntegrationが直接コマンド処理を行います
+import { Message } from 'discord.js';
 
-// TODO: このファイル自体を削除するか、新システム用のインターフェースで置き換えることを検討してください
+/**
+ * コマンドハンドラーの基本インターフェース
+ */
+export interface ICommandHandler {
+  /**
+   * コマンドを処理する
+   * @param message - Discordメッセージ
+   * @param userId - ユーザーID
+   * @param args - コマンド引数
+   * @param timezone - タイムゾーン
+   */
+  handle(message: Message, userId: string, args: string[], timezone: string): Promise<void>;
+
+  /**
+   * ヘルプメッセージを取得する
+   */
+  getHelp?(): string;
+}

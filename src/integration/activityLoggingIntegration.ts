@@ -15,6 +15,7 @@ import { LogsCommandHandler } from '../handlers/logsCommandHandler';
 import { TimezoneHandler } from '../handlers/timezoneHandler';
 import { UnmatchedCommandHandler } from '../handlers/unmatchedCommandHandler';
 import { TodoCommandHandler } from '../handlers/todoCommandHandler';
+import { ProfileCommandHandler } from '../handlers/profileCommandHandler';
 import { GeminiService } from '../services/geminiService';
 import { MessageClassificationService } from '../services/messageClassificationService';
 import { IntegratedSummaryService } from '../services/integratedSummaryService';
@@ -66,6 +67,7 @@ export class ActivityLoggingIntegration {
   private gapHandler!: GapHandler;
   private unmatchedHandler!: UnmatchedCommandHandler;
   private todoHandler!: TodoCommandHandler;
+  private profileHandler!: ProfileCommandHandler;
 
   // 設定
   private config: ActivityLoggingConfig;
@@ -149,7 +151,12 @@ export class ActivityLoggingIntegration {
         this.activityLogService // 活動ログサービスを注入
       );
       
-      console.log('✅ ハンドラー層初期化完了（TODO機能統合済み）');
+      // プロファイル機能ハンドラーの初期化
+      this.profileHandler = new ProfileCommandHandler(
+        this.repository
+      );
+      
+      console.log('✅ ハンドラー層初期化完了（TODO・プロファイル機能統合済み）');
 
       this.isInitialized = true;
       console.log('🎉 活動記録システム初期化完了！');
@@ -239,11 +246,14 @@ export class ActivityLoggingIntegration {
       const content = message.content.trim();
       const timezone = await this.getUserTimezone(userId);
 
-      // 対象ユーザーのみ処理
-      if (userId !== this.config.targetUserId) {
-        console.log(`  ↳ [活動記録] 対象外ユーザー (受信: ${userId}, 期待: ${this.config.targetUserId})`);
-        return false;
+      // マルチユーザー対応: 新規ユーザーの自動登録
+      const userExists = await this.repository.userExists(userId);
+      if (!userExists) {
+        await this.repository.registerUser(userId, message.author.username);
+        await message.reply(this.getWelcomeMessage());
+        console.log(`🎉 [活動記録] 新規ユーザー登録完了: ${userId} (${message.author.username})`);
       }
+      console.log(`✅ [活動記録] 処理対象ユーザー: ${userId}`);
 
       console.log(`✅ [活動記録] 処理対象メッセージ: "${content}"`)
 
@@ -351,6 +361,13 @@ export class ActivityLoggingIntegration {
       case 'タスク':
         console.log(`📋 todoコマンド実行: ユーザー=${userId}, タイムゾーン=${timezone}`);
         await this.todoHandler.handleCommand(message, userId, args, timezone);
+        break;
+
+      case 'profile':
+      case 'プロファイル':
+      case 'p':
+        console.log(`👤 profileコマンド実行: ユーザー=${userId}, タイムゾーン=${timezone}`);
+        await this.profileHandler.handle(message, userId, args, timezone);
         break;
 
       default:
@@ -496,6 +513,7 @@ export class ActivityLoggingIntegration {
 \`!gap\` - 未記録時間の検出・記録
 \`!cost\` - API使用コスト確認
 \`!timezone\` - タイムゾーン表示・検索・設定
+\`!profile\` - プロファイル・統計情報表示
 \`!status\` - システム状態確認
 
 **📊 分析機能**
@@ -805,6 +823,28 @@ export class ActivityLoggingIntegration {
         { error }
       );
     }
+  }
+
+  /**
+   * 新規ユーザー向けウェルカムメッセージを生成
+   */
+  private getWelcomeMessage(): string {
+    return `🎉 **TimeLoggerへようこそ！**
+
+アカウントを自動作成しました。
+
+📊 **アカウント情報**
+• タイムゾーン: Asia/Tokyo
+• 登録日: ${new Date().toLocaleDateString('ja-JP')}
+
+📝 **使い方**
+• 活動記録: そのままメッセージを送信
+• 今日のサマリー: \`!summary\`
+• タイムゾーン設定: \`!timezone\`
+• プロファイル表示: \`!profile\`
+• コマンド一覧: \`!help\`
+
+さっそく今日の活動を記録してみましょう！`;
   }
 }
 

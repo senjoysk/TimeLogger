@@ -633,6 +633,57 @@ export class SqliteActivityLogRepository implements IActivityLogRepository, IApi
     });
   }
 
+  // === マルチユーザー対応メソッド ===
+
+  /**
+   * ユーザーが存在するかチェック
+   */
+  async userExists(userId: string): Promise<boolean> {
+    const sql = 'SELECT user_id FROM user_settings WHERE user_id = ?';
+    const row = await this.getQuery(sql, [userId]);
+    return row !== undefined;
+  }
+
+  /**
+   * 新規ユーザーを登録
+   */
+  async registerUser(userId: string, username: string): Promise<void> {
+    const sql = `
+      INSERT INTO user_settings (user_id, timezone, created_at, updated_at)
+      VALUES (?, ?, datetime('now', 'utc'), datetime('now', 'utc'))
+    `;
+    await this.runQuery(sql, [userId, 'Asia/Tokyo']);
+  }
+
+  /**
+   * ユーザー情報を取得
+   */
+  async getUserInfo(userId: string): Promise<{
+    user_id: string;
+    timezone: string;
+    created_at: string;
+    updated_at: string;
+  } | null> {
+    const sql = 'SELECT user_id, timezone, created_at, updated_at FROM user_settings WHERE user_id = ?';
+    const row = await this.getQuery(sql, [userId]);
+    return row || null;
+  }
+
+  /**
+   * クエリ実行（公開メソッド）
+   */
+  async getQuery(sql: string, params: any[] = []): Promise<any> {
+    return new Promise((resolve, reject) => {
+      this.db.get(sql, params, (err, row) => {
+        if (err) {
+          reject(err);
+        } else {
+          resolve(row);
+        }
+      });
+    });
+  }
+
   // === 内部ヘルパーメソッド ===
 
   /**
@@ -650,20 +701,6 @@ export class SqliteActivityLogRepository implements IActivityLogRepository, IApi
     });
   }
 
-  /**
-   * SQLクエリ実行（単一行取得）
-   */
-  private getQuery(sql: string, params: any[] = []): Promise<any> {
-    return new Promise((resolve, reject) => {
-      this.db.get(sql, params, (err, row) => {
-        if (err) {
-          reject(err);
-        } else {
-          resolve(row);
-        }
-      });
-    });
-  }
 
   /**
    * SQLクエリ実行（複数行取得）
