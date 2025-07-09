@@ -451,7 +451,10 @@ export class SqliteActivityLogRepository implements IActivityLogRepository, IApi
     try {
       const sql = 'DELETE FROM daily_analysis_cache WHERE user_id = ? AND business_date = ?';
       await this.runQuery(sql, [userId, businessDate]);
-      console.log(`🗑️ キャッシュを無効化しました: ${businessDate}`);
+      // テスト環境以外でのみログ出力
+      if (process.env.NODE_ENV !== 'test') {
+        console.log(`🗑️ キャッシュを無効化しました: ${businessDate}`);
+      }
       return true;
     } catch (error) {
       console.error('❌ キャッシュ削除エラー:', error);
@@ -1771,7 +1774,10 @@ export class SqliteActivityLogRepository implements IActivityLogRepository, IApi
   private async flushCacheInvalidationBatch(): Promise<void> {
     if (this.cacheInvalidationBatch.size === 0) return;
     
-    console.log(`🧹 バッチキャッシュ無効化: ${this.cacheInvalidationBatch.size}件`);
+    // テスト環境以外でのみログ出力
+    if (process.env.NODE_ENV !== 'test') {
+      console.log(`🧹 バッチキャッシュ無効化: ${this.cacheInvalidationBatch.size}件`);
+    }
     
     const deletions = Array.from(this.cacheInvalidationBatch).map(cacheKey => {
       const [userId, businessDate] = cacheKey.split(':');
@@ -1780,7 +1786,9 @@ export class SqliteActivityLogRepository implements IActivityLogRepository, IApi
     
     try {
       await Promise.all(deletions);
-      console.log(`✅ バッチキャッシュ無効化完了: ${this.cacheInvalidationBatch.size}件`);
+      if (process.env.NODE_ENV !== 'test') {
+        console.log(`✅ バッチキャッシュ無効化完了: ${this.cacheInvalidationBatch.size}件`);
+      }
     } catch (error) {
       console.error('❌ バッチキャッシュ無効化エラー:', error);
     } finally {
