@@ -117,9 +117,14 @@ export class MigrationManager {
 
       console.log(`📋 実行予定のマイグレーション: ${pendingMigrations.length}件`);
       
-      // マイグレーション実行前にバックアップを作成
-      console.log('💾 マイグレーション前バックアップを作成中...');
-      await this.backupManager.createBackup('pre_migration');
+      // マイグレーション実行前にバックアップを作成（一時的に無効化）
+      const ENABLE_BACKUP = process.env.ENABLE_BACKUP === 'true';
+      if (ENABLE_BACKUP) {
+        console.log('💾 マイグレーション前バックアップを作成中...');
+        await this.backupManager.createBackup('pre_migration');
+      } else {
+        console.log('⚠️ バックアップ機能は無効化されています (ENABLE_BACKUP=false)');
+      }
       
       for (const migrationFile of pendingMigrations) {
         await this.executeMigration(migrationFile);
