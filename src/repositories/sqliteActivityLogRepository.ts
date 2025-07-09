@@ -6,6 +6,7 @@
 import { Database } from 'sqlite3';
 import { v4 as uuidv4 } from 'uuid';
 import { toZonedTime, format } from 'date-fns-tz';
+import { MigrationManager } from '../database/migrationManager';
 import {
   IActivityLogRepository,
   LogSearchCriteria
@@ -41,6 +42,7 @@ import * as path from 'path';
 export class SqliteActivityLogRepository implements IActivityLogRepository, IApiCostRepository, ITodoRepository, IMessageClassificationRepository {
   private db: Database;
   private connected: boolean = false;
+  private migrationManager: MigrationManager;
 
   constructor(databasePath: string) {
     // データベースディレクトリの作成
@@ -50,6 +52,7 @@ export class SqliteActivityLogRepository implements IActivityLogRepository, IApi
     }
 
     this.db = new Database(databasePath);
+    this.migrationManager = new MigrationManager(this.db);
     // 初期化は非同期で行うため、ここでは実行しない
   }
 
@@ -58,8 +61,11 @@ export class SqliteActivityLogRepository implements IActivityLogRepository, IApi
    */
   public async initializeDatabase(): Promise<void> {
     try {
-      // データベース移行処理を先に実行
-      await this.migrateDatabase();
+      // マイグレーションシステムを初期化
+      await this.migrationManager.initialize();
+      
+      // 未実行のマイグレーションを実行
+      await this.migrationManager.runMigrations();
       
       // 新スキーマファイルから読み込み（柔軟なパス解決）
       let schemaPath = path.join(__dirname, '../database/newSchema.sql');
@@ -112,44 +118,6 @@ export class SqliteActivityLogRepository implements IActivityLogRepository, IApi
     }
   }
 
-  /**
-   * データベースの移行処理
-   */
-  private async migrateDatabase(): Promise<void> {
-    try {
-      console.log('🔄 データベース移行処理を開始します...');
-      
-      // api_costs テーブルの business_date カラムを確認・追加
-      const tableInfo = await this.getTableInfo('api_costs');
-      const hasBusinessDate = tableInfo.some(column => column.name === 'business_date');
-      
-      if (!hasBusinessDate) {
-        console.log('📝 api_costs テーブルに business_date カラムを追加します...');
-        await this.runQuery('ALTER TABLE api_costs ADD COLUMN business_date TEXT');
-        console.log('✅ business_date カラムを追加しました');
-      } else {
-        console.log('✅ business_date カラムは既に存在します');
-      }
-      
-      console.log('✅ データベース移行処理が完了しました');
-    } catch (error) {
-      console.error('❌ データベース移行エラー:', error);
-      throw new ActivityLogError('データベースの移行に失敗しました', 'DB_MIGRATION_ERROR', { error });
-    }
-  }
-
-  /**
-   * テーブル情報を取得
-   */
-  private async getTableInfo(tableName: string): Promise<any[]> {
-    try {
-      const result = await this.runQuery(`PRAGMA table_info(${tableName})`);
-      return result as any[];
-    } catch (error) {
-      console.log(`⚠️ テーブル ${tableName} が存在しません`);
-      return [];
-    }
-  }
 
   // === 活動ログ管理 ===
 
