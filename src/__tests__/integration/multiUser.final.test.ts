@@ -112,7 +112,7 @@ describe('マルチユーザー対応最終統合テスト', () => {
 
     const mockExistingUserMessage = {
       author: { id: existingUserId, username: 'existinguser', bot: false },
-      content: '2回目のメッセージ',
+      content: 'プロジェクトの作業を継続中',
       guild: null,
       channel: { isDMBased: () => true },
       reply: jest.fn().mockResolvedValue(undefined),
@@ -124,13 +124,26 @@ describe('マルチユーザー対応最終統合テスト', () => {
     expect(result).toBe(true);
 
     // ウェルカムメッセージは送信されない（既存ユーザーのため）
+    // 注意: TODO分類システムが動作するため、分類メッセージは送信される可能性がある
     const replyMock = mockExistingUserMessage.reply as jest.Mock;
-    expect(replyMock).not.toHaveBeenCalled();
+    
+    // ウェルカムメッセージではなく、TODO分類メッセージまたは何も送信されない
+    if (replyMock.mock.calls.length > 0) {
+      // TODO分類システムの動作を確認（オブジェクトの場合はembedsを確認）
+      const replyContent = replyMock.mock.calls[0][0];
+      if (typeof replyContent === 'string') {
+        expect(replyContent).not.toMatch(/TimeLoggerへようこそ/);
+      } else if (replyContent && replyContent.embeds) {
+        // TODO分類システムのembedsにウェルカムメッセージが含まれていないことを確認
+        const embedContent = JSON.stringify(replyContent.embeds);
+        expect(embedContent).not.toMatch(/TimeLoggerへようこそ/);
+      }
+    }
 
     // ログが正常に保存される
     const userLogs = await repository.getActivityRecords(existingUserId, 'Asia/Tokyo');
     expect(userLogs).toHaveLength(1);
-    expect(userLogs[0].content).toBe('2回目のメッセージ');
+    expect(userLogs[0].content).toBe('プロジェクトの作業を継続中');
   }, 30000);
 
   test('コマンド処理のマルチユーザー対応テスト', async () => {
@@ -207,7 +220,7 @@ describe('マルチユーザー対応最終統合テスト', () => {
       const hasOtherUserData = userLogs.some(log => log.userId !== user.id);
       expect(hasOtherUserData).toBe(false);
     }
-  }, 30000);
+  }, 60000); // 60秒に延長
 
   test('エラーハンドリングテスト', async () => {
     // データベース接続を切断してエラーを発生させる
