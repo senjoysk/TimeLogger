@@ -6,7 +6,7 @@
 import { Database } from 'sqlite3';
 import { v4 as uuidv4 } from 'uuid';
 import { INightSuspendRepository, SuspendState, DiscordActivityLogData } from './interfaces';
-import { withErrorHandling } from '../utils/errorHandler';
+import { withErrorHandling, ErrorType } from '../utils/errorHandler';
 
 /**
  * SQLite実装クラス
@@ -39,7 +39,7 @@ export class SqliteNightSuspendRepository implements INightSuspendRepository {
           }
         });
       });
-    });
+    }, ErrorType.DATABASE, { operation: 'existsByDiscordMessageId', messageId });
   }
 
   /**
@@ -62,7 +62,7 @@ export class SqliteNightSuspendRepository implements INightSuspendRepository {
           }
         });
       });
-    });
+    }, ErrorType.DATABASE, { operation: 'getByDiscordMessageId', messageId });
   }
 
   /**
@@ -97,7 +97,7 @@ export class SqliteNightSuspendRepository implements INightSuspendRepository {
           }
         });
       });
-    });
+    }, ErrorType.DATABASE);
   }
 
   /**
@@ -120,7 +120,7 @@ export class SqliteNightSuspendRepository implements INightSuspendRepository {
           }
         });
       });
-    });
+    }, ErrorType.DATABASE);
   }
 
   /**
@@ -151,7 +151,7 @@ export class SqliteNightSuspendRepository implements INightSuspendRepository {
           }
         });
       });
-    });
+    }, ErrorType.DATABASE);
   }
 
   /**
@@ -176,7 +176,7 @@ export class SqliteNightSuspendRepository implements INightSuspendRepository {
           }
         });
       });
-    });
+    }, ErrorType.DATABASE);
   }
 
   /**
@@ -228,6 +228,6 @@ export class SqliteNightSuspendRepository implements INightSuspendRepository {
           }
         });
       });
-    });
+    }, ErrorType.DATABASE);
   }
 }

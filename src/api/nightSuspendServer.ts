@@ -6,6 +6,9 @@
 import express, { Application, Request, Response } from 'express';
 import { Server } from 'http';
 import { nightSuspendAuthMiddleware } from '../middleware/nightSuspendAuth';
+import { MorningMessageRecovery } from '../services/morningMessageRecovery';
+import { SqliteNightSuspendRepository } from '../repositories/sqliteNightSuspendRepository';
+import { Client } from 'discord.js';
 
 /**
  * 夜間サスペンド機能用HTTPサーバー
@@ -20,10 +23,12 @@ export class NightSuspendServer {
   private app: Application;
   private server: Server | null = null;
   private port: number;
+  private recoveryService?: MorningMessageRecovery;
 
-  constructor() {
+  constructor(recoveryService?: MorningMessageRecovery) {
     this.app = express();
     this.port = parseInt(process.env.PORT || '3000');
+    this.recoveryService = recoveryService;
     this.setupMiddleware();
     this.setupRoutes();
   }
@@ -189,13 +194,22 @@ export class NightSuspendServer {
       
       console.log('🔄 夜間メッセージリカバリを開始');
       
-      // リカバリ処理（最小限の実装）
       const recoveryTime = new Date().toISOString();
-      const processedMessages = 0; // TODO: 実際のメッセージ処理数
+      let processedMessages = 0;
       
-      // TODO: 実際のメッセージリカバリ
-      // const recoveryService = new MorningMessageRecovery();
-      // const results = await recoveryService.recoverNightMessages();
+      // 実際のメッセージリカバリ実行
+      if (this.recoveryService) {
+        try {
+          const results = await this.recoveryService.recoverNightMessages();
+          processedMessages = results.length;
+          console.log(`✅ メッセージリカバリ完了: ${processedMessages}件処理`);
+        } catch (recoveryError) {
+          console.error('❌ リカバリサービスエラー:', recoveryError);
+          // エラーが発生してもAPIは継続（部分的成功）
+        }
+      } else {
+        console.log('⚠️  メッセージリカバリサービスが設定されていません');
+      }
       
       res.json({
         status: 'recovery_complete',
