@@ -40,6 +40,7 @@ COPY src/database/newSchema.sql ./dist/database/
 # マイグレーションスクリプトをコピー
 COPY scripts/production/migration-entrypoint.js ./scripts/production/
 COPY scripts/production/unified-db-migration.js ./scripts/production/
+COPY scripts/production/safe-unified-migration.js ./scripts/production/
 COPY scripts/debug-todos.js ./scripts/
 
 # データディレクトリを作成
@@ -55,5 +56,5 @@ USER node
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
   CMD node -e "require('child_process').execSync('ps aux | grep -v grep | grep node || exit 1')"
 
-# 統一データベースマイグレーションを実行してからアプリケーション起動
-CMD ["node", "scripts/production/unified-db-migration.js"]
+# 安全な統一データベースマイグレーションを実行してからアプリケーション起動
+CMD ["node", "scripts/production/safe-unified-migration.js"]

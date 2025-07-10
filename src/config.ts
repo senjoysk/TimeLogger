@@ -1,4 +1,5 @@
 import dotenv from 'dotenv';
+import { DATABASE_PATHS } from './database/simplePathConfig';
 
 // 環境判定と環境別設定ファイルの読み込み
 const NODE_ENV = process.env.NODE_ENV || 'development';
@@ -34,15 +35,16 @@ export const config = {
     apiKey: process.env.GOOGLE_API_KEY || '',
   },
   
-  // データベース設定
+  // データベース設定（統一パス管理）
   database: {
-    // 統一データベースパス
-    path: process.env.DATABASE_PATH || (isDevelopment ? './data/app.db' : '/app/data/app.db'),
+    // 統一データベースパス（表記ゆれ防止）
+    path: DATABASE_PATHS.getMainDatabasePath(),
     // レガシーパス（マイグレーション時に参照）
-    legacyPaths: {
-      tasks: isDevelopment ? './data/tasks.db' : '/app/data/tasks.db',
-      activityLogs: isDevelopment ? './data/activity_logs.db' : '/app/data/activity_logs.db',
-    },
+    legacyPath: DATABASE_PATHS.getLegacyDatabasePath(),
+    // バックアップディレクトリ
+    backupDirectory: DATABASE_PATHS.getBackupDirectory(),
+    // 環境情報
+    environment: DATABASE_PATHS.getEnvironment(),
   },
   
   // アプリケーション設定
