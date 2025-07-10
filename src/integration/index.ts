@@ -25,6 +25,7 @@ import {
   createDefaultConfig 
 } from './activityLoggingIntegration';
 import { config } from '../config';
+import { DATABASE_PATHS } from '../database/simplePathConfig';
 
 /**
  * 既存BotClientに活動記録システムを統合する便利関数
@@ -36,9 +37,9 @@ export async function integrateActivityLogging(
   try {
     console.log('🚀 活動記録システム統合を開始...');
 
-    // デフォルト設定を生成
+    // デフォルト設定を生成（統一DBパスを使用）
     const defaultConfig = createDefaultConfig(
-      config.database?.path || './data/tasks.db',
+      config.database?.path || DATABASE_PATHS.getMainDatabasePath(),
       config.gemini?.apiKey || process.env.GEMINI_API_KEY || ''
     );
 
@@ -88,7 +89,7 @@ export async function createTestIntegration(
   geminiApiKey?: string
 ): Promise<ActivityLoggingIntegration> {
   const testConfig = createDefaultConfig(
-    databasePath || './test-database.db',
+    databasePath || DATABASE_PATHS.getMainDatabasePath(),
     geminiApiKey || process.env.GEMINI_API_KEY || 'test-key'
   );
 
@@ -107,7 +108,7 @@ export async function createTestIntegration(
  */
 export function loadConfigFromEnv(): ActivityLoggingConfig {
   return {
-    databasePath: process.env.DATABASE_PATH || './data/tasks.db',
+    databasePath: process.env.DATABASE_PATH || DATABASE_PATHS.getMainDatabasePath(),
     geminiApiKey: process.env.GEMINI_API_KEY || '',
     debugMode: process.env.NODE_ENV !== 'production',
     defaultTimezone: process.env.DEFAULT_TIMEZONE || 'Asia/Tokyo',
