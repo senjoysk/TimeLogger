@@ -37,9 +37,7 @@ COPY --from=builder /app/dist ./dist
 # スキーマファイルをコピー
 COPY src/database/newSchema.sql ./dist/database/
 
-# マイグレーションスクリプトをコピー
-COPY scripts/production/migration-entrypoint.js ./scripts/production/
-COPY scripts/production/unified-db-migration.js ./scripts/production/
+# マイグレーションスクリプトをコピー（現在必要なファイルのみ）
 COPY scripts/production/safe-unified-migration.js ./scripts/production/
 COPY scripts/debug-todos.js ./scripts/
 
@@ -47,7 +45,7 @@ COPY scripts/debug-todos.js ./scripts/
 RUN mkdir -p /app/data
 
 # スクリプトに実行権限を付与
-RUN chmod +x scripts/production/migration-entrypoint.js
+RUN chmod +x scripts/production/safe-unified-migration.js
 
 # 非rootユーザーで実行
 USER node
