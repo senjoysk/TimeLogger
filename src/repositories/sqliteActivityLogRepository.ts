@@ -101,7 +101,32 @@ export class SqliteActivityLogRepository implements IActivityLogRepository, IApi
             console.log(`🔧 SQL文 ${i + 1}/${statements.length} 実行中: ${statement.substring(0, 100)}...`);
             await this.runQuery(statement);
             console.log(`✅ SQL文 ${i + 1} 実行完了`);
-          } catch (error) {
+          } catch (error: any) {
+            // カラムが既に存在する場合のエラーを無視
+            if (error.message?.includes('duplicate column name') || 
+                error.message?.includes('already exists')) {
+              console.log(`⏩ SQL文 ${i + 1} スキップ（既に存在）`);
+              continue;
+            }
+            // discord_message_idカラムが存在しない場合は作成を試みる
+            if (error.message?.includes('no such column: discord_message_id') &&
+                statement.includes('CREATE INDEX') && statement.includes('discord_message_id')) {
+              console.log('🔧 discord_message_idカラムを追加中...');
+              try {
+                await this.runQuery('ALTER TABLE activity_logs ADD COLUMN discord_message_id TEXT');
+                await this.runQuery('ALTER TABLE activity_logs ADD COLUMN recovery_processed BOOLEAN DEFAULT FALSE');
+                await this.runQuery('ALTER TABLE activity_logs ADD COLUMN recovery_timestamp TEXT');
+                console.log('✅ カラム追加完了、インデックス再作成...');
+                await this.runQuery(statement);
+                console.log(`✅ SQL文 ${i + 1} 実行完了（リトライ後）`);
+                continue;
+              } catch (retryError: any) {
+                if (retryError.message?.includes('duplicate column name')) {
+                  console.log('⏩ カラムは既に存在、インデックスのみ作成');
+                  continue;
+                }
+              }
+            }
             console.error(`❌ SQL文 ${i + 1} 実行エラー:`, error);
             console.error(`問題のSQL文:`, statement);
             throw error;

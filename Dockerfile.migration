@@ -1,0 +1,17 @@
+# マイグレーション専用Dockerfile
+FROM node:20-slim
+
+WORKDIR /app
+
+# 必要なファイルのみコピー
+COPY package*.json ./
+COPY scripts/production/emergency-migration.js ./scripts/production/
+
+# 依存関係インストール（sqlite3のみ必要）
+RUN npm install sqlite3
+
+# データディレクトリ作成
+RUN mkdir -p /app/data
+
+# マイグレーションスクリプトを実行
+CMD ["node", "scripts/production/emergency-migration.js"]
