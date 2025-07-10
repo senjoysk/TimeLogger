@@ -3,6 +3,7 @@ import * as path from 'path';
 import { Database } from 'sqlite3';
 import { ActivityLogError } from '../types/activityLog';
 import { BackupManager } from './backupManager';
+import { DATABASE_PATHS } from './simplePathConfig';
 
 /**
  * データベースマイグレーション管理システム
@@ -17,14 +18,10 @@ export class MigrationManager {
   constructor(db: Database, dbPath?: string) {
     this.db = db;
     this.migrationsPath = path.join(__dirname, 'migrations');
-    this.dbPath = dbPath || '/app/data/timelogger.db';
+    this.dbPath = dbPath || DATABASE_PATHS.getMainDatabasePath();
     
-    // 開発環境と本番環境でバックアップディレクトリを切り替え
-    const backupDir = process.env.NODE_ENV === 'development' 
-      ? './data/backups' 
-      : '/app/data/backups';
-    
-    this.backupManager = new BackupManager(db, backupDir, this.dbPath);
+    // 統一DBパス設定を使用
+    this.backupManager = new BackupManager(db, undefined, this.dbPath);
   }
 
   /**
