@@ -2,6 +2,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { Database } from 'sqlite3';
 import { ActivityLogError } from '../types/activityLog';
+import { DATABASE_PATHS } from './simplePathConfig';
 
 /**
  * データベースバックアップ管理システム
@@ -13,10 +14,10 @@ export class BackupManager {
   private maxBackups: number = 10;
   private dbPath: string;
 
-  constructor(db: Database, backupDir: string = '/app/data/backups', dbPath?: string) {
+  constructor(db: Database, backupDir?: string, dbPath?: string) {
     this.db = db;
-    this.backupDir = backupDir;
-    this.dbPath = dbPath || '/app/data/timelogger.db';
+    this.backupDir = backupDir || DATABASE_PATHS.getBackupDirectory();
+    this.dbPath = dbPath || DATABASE_PATHS.getMainDatabasePath();
     this.ensureBackupDirectory();
   }
 
