@@ -39,7 +39,7 @@ export interface ActivityLoggingConfig {
   enableAutoAnalysis: boolean;
   /** キャッシュ有効期間（分） */
   cacheValidityMinutes: number;
-  /** 対象ユーザーID */
+  /** 対象ユーザーID（レガシー設定・将来削除予定） */
   targetUserId: string;
 }
 
@@ -239,12 +239,8 @@ export class ActivityLoggingIntegration {
       const content = message.content.trim();
       const timezone = await this.getUserTimezone(userId);
 
-      // 対象ユーザーのみ処理
-      if (userId !== this.config.targetUserId) {
-        console.log(`  ↳ [活動記録] 対象外ユーザー (受信: ${userId}, 期待: ${this.config.targetUserId})`);
-        return false;
-      }
-
+      // マルチユーザー対応: ユーザー制限を削除
+      console.log(`✅ [活動記録] 処理対象ユーザー: ${userId}`);
       console.log(`✅ [活動記録] 処理対象メッセージ: "${content}"`)
 
       // コマンド処理
@@ -365,16 +361,8 @@ export class ActivityLoggingIntegration {
    */
   async handleButtonInteraction(interaction: ButtonInteraction): Promise<void> {
     try {
-      // ユーザー確認
+      // マルチユーザー対応: 全ユーザーがボタンを使用可能
       const userId = interaction.user.id;
-      if (userId !== this.config.targetUserId) {
-        await interaction.reply({ 
-          content: '❌ このボタンは使用できません。', 
-          ephemeral: true 
-        });
-        return;
-      }
-
       const timezone = await this.getUserTimezone(userId);
       
       console.log(`🔘 ボタンインタラクション処理: ${userId} - ${interaction.customId}`);
@@ -764,10 +752,7 @@ export class ActivityLoggingIntegration {
         }
       }
 
-      // フォールバック: 環境変数またはデフォルト値を使用
-      if (userId === this.config.targetUserId) {
-        return process.env.USER_TIMEZONE || 'Asia/Tokyo';
-      }
+      // フォールバック: デフォルト値を使用
       return this.config.defaultTimezone;
     } catch (error) {
       console.error('❌ タイムゾーン取得エラー:', error);
@@ -819,7 +804,7 @@ export function createDefaultConfig(databasePath: string, geminiApiKey: string):
     defaultTimezone: 'Asia/Tokyo',
     enableAutoAnalysis: true,
     cacheValidityMinutes: 60,
-    targetUserId: process.env.TARGET_USER_ID || '770478489203507241' // 設定ファイルから取得
+    targetUserId: process.env.TARGET_USER_ID || '770478489203507241' // レガシー設定（マルチユーザー対応により不要）
   };
 }
 

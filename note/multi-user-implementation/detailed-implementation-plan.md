@@ -5,7 +5,7 @@
 ### featureブランチ作成
 ```bash
 git checkout develop
-git checkout -b feature/multi-user-support
+git checkout -b feature/multi-user-implementation
 ```
 
 ### コミット戦略

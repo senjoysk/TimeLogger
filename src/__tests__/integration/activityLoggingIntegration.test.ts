@@ -197,14 +197,14 @@ describe('活動記録システム統合テスト', () => {
       expect(mockMessage.replies.length).toBe(0);
     });
 
-    test('対象外ユーザーは無視される', async () => {
-      const mockMessage = new MockMessage('!cost', 'wrong-user-id');
+    test('マルチユーザー対応により全ユーザーが処理される', async () => {
+      const mockMessage = new MockMessage('!cost', 'different-user-id');
       
       const handleMessage = (integration as any).handleMessage.bind(integration);
       const result = await handleMessage(mockMessage as unknown as Message);
       
-      expect(result).toBe(false); // 対象外ユーザー無視
-      expect(mockMessage.replies.length).toBe(0);
+      expect(result).toBe(true); // マルチユーザー対応により処理される
+      expect(mockMessage.replies.length).toBeGreaterThan(0); // コストレポートが返される
     });
   });
 
