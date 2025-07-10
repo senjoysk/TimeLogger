@@ -34,8 +34,14 @@ RUN npm ci --production
 # ビルド済みのファイルをコピー
 COPY --from=builder /app/dist ./dist
 
+# マイグレーションスクリプトをコピー
+COPY scripts/production/migration-entrypoint.js ./scripts/production/
+
 # データディレクトリを作成
 RUN mkdir -p /app/data
+
+# スクリプトに実行権限を付与
+RUN chmod +x scripts/production/migration-entrypoint.js
 
 # 非rootユーザーで実行
 USER node
@@ -44,5 +50,5 @@ USER node
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
   CMD node -e "require('child_process').execSync('ps aux | grep -v grep | grep node || exit 1')"
 
-# アプリケーションの起動
-CMD ["node", "dist/index.js"]
+# マイグレーションを実行してからアプリケーション起動
+CMD ["node", "scripts/production/migration-entrypoint.js"]
