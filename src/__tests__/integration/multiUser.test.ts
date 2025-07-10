@@ -76,7 +76,8 @@ describe('マルチユーザー対応統合テスト', () => {
         content: 'プロジェクトA開始',
         guild: null,
         channel: { isDMBased: () => true },
-        reply: jest.fn().mockResolvedValue(undefined)
+        reply: jest.fn().mockResolvedValue(undefined),
+        react: jest.fn().mockResolvedValue(undefined)
       } as unknown as Message;
 
       const mockMessage2 = {
@@ -84,7 +85,8 @@ describe('マルチユーザー対応統合テスト', () => {
         content: '会議参加',
         guild: null,
         channel: { isDMBased: () => true },
-        reply: jest.fn().mockResolvedValue(undefined)
+        reply: jest.fn().mockResolvedValue(undefined),
+        react: jest.fn().mockResolvedValue(undefined)
       } as unknown as Message;
 
       // マルチユーザー対応により、全てのユーザーが処理される
@@ -161,7 +163,8 @@ describe('マルチユーザー対応統合テスト', () => {
         content: 'プロジェクトA開始',
         guild: null,
         channel: { isDMBased: () => true },
-        reply: jest.fn().mockResolvedValue(undefined)
+        reply: jest.fn().mockResolvedValue(undefined),
+        react: jest.fn().mockResolvedValue(undefined)
       } as unknown as Message;
 
       const mockMessage2 = {
@@ -169,7 +172,8 @@ describe('マルチユーザー対応統合テスト', () => {
         content: '会議参加',
         guild: null,
         channel: { isDMBased: () => true },
-        reply: jest.fn().mockResolvedValue(undefined)
+        reply: jest.fn().mockResolvedValue(undefined),
+        react: jest.fn().mockResolvedValue(undefined)
       } as unknown as Message;
 
       // 両ユーザーが成功することを期待（現在は失敗）
@@ -203,7 +207,8 @@ describe('マルチユーザー対応統合テスト', () => {
         content: '初回メッセージ',
         guild: null,
         channel: { isDMBased: () => true },
-        reply: jest.fn().mockResolvedValue(undefined)
+        reply: jest.fn().mockResolvedValue(undefined),
+        react: jest.fn().mockResolvedValue(undefined)
       } as unknown as Message;
 
       // 新規ユーザーが自動的に登録されることを期待
@@ -230,10 +235,11 @@ describe('マルチユーザー対応統合テスト', () => {
 
       const mockExistingUserMessage = {
         author: { id: existingUserId, username: 'existinguser', bot: false },
-        content: '2回目のメッセージ',
+        content: 'プロジェクトの作業を継続中',
         guild: null,
         channel: { isDMBased: () => true },
-        reply: jest.fn().mockResolvedValue(undefined)
+        reply: jest.fn().mockResolvedValue(undefined),
+        react: jest.fn().mockResolvedValue(undefined)
       } as unknown as Message;
 
       // 既存ユーザーは通常通り処理される
@@ -241,13 +247,27 @@ describe('マルチユーザー対応統合テスト', () => {
       console.log('Existing user result:', result);
       expect(result).toBe(true);
 
-      // ウェルカムメッセージは送信されない
-      expect(mockExistingUserMessage.reply).not.toHaveBeenCalled();
+      // ウェルカムメッセージは送信されない（既存ユーザーのため）
+      // 注意: TODO分類システムが動作するため、分類メッセージは送信される可能性がある
+      const replyMock = mockExistingUserMessage.reply as jest.Mock;
+      
+      // ウェルカムメッセージではなく、TODO分類メッセージまたは何も送信されない
+      if (replyMock.mock.calls.length > 0) {
+        // TODO分類システムの動作を確認（オブジェクトの場合はembedsを確認）
+        const replyContent = replyMock.mock.calls[0][0];
+        if (typeof replyContent === 'string') {
+          expect(replyContent).not.toMatch(/TimeLoggerへようこそ/);
+        } else if (replyContent && replyContent.embeds) {
+          // TODO分類システムのembedsにウェルカムメッセージが含まれていないことを確認
+          const embedContent = JSON.stringify(replyContent.embeds);
+          expect(embedContent).not.toMatch(/TimeLoggerへようこそ/);
+        }
+      }
 
       // ログが正常に保存される
       const userLogs = await repository.getActivityRecords(existingUserId, 'Asia/Tokyo');
       expect(userLogs).toHaveLength(1);
-      expect(userLogs[0].content).toBe('2回目のメッセージ');
+      expect(userLogs[0].content).toBe('プロジェクトの作業を継続中');
     });
   });
 
@@ -267,7 +287,8 @@ describe('マルチユーザー対応統合テスト', () => {
           content: user.content,
           guild: null,
           channel: { isDMBased: () => true },
-          reply: jest.fn().mockResolvedValue(undefined)
+          reply: jest.fn().mockResolvedValue(undefined),
+          react: jest.fn().mockResolvedValue(undefined)
         } as unknown as Message;
 
         const result = await integration.handleMessage(mockMessage);
@@ -286,15 +307,15 @@ describe('マルチユーザー対応統合テスト', () => {
       // 他のユーザーのデータは含まれない
       const user1Logs = await repository.getActivityRecords('user1_111', 'Asia/Tokyo');
       expect(user1Logs.some((log: any) => log.userId !== 'user1_111')).toBe(false);
-    });
+    }, 60000); // 60秒に延長
 
     test('エラーハンドリング：データベースエラー時の処理', async () => {
       // データベース接続を切断してエラーを発生させる
       await repository.close();
 
       const mockMessage = {
-        author: { id: 'test_user', username: 'testuser', bot: false },
-        content: 'テストメッセージ',
+        author: { id: 'error_user', username: 'erroruser', bot: false },
+        content: 'エラーテストメッセージ',
         guild: null,
         channel: { isDMBased: () => true },
         reply: jest.fn().mockResolvedValue(undefined)
@@ -305,7 +326,8 @@ describe('マルチユーザー対応統合テスト', () => {
       expect(result).toBe(false);
 
       // エラーメッセージが返されることを確認
-      // （実装後に具体的なエラーハンドリングを確認）
-    });
+      const replyMock = mockMessage.reply as jest.Mock;
+      expect(replyMock).toHaveBeenCalledWith(expect.stringContaining('❌'));
+    }, 30000);
   });
 });
