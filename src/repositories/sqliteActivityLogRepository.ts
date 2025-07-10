@@ -61,6 +61,17 @@ export class SqliteActivityLogRepository implements IActivityLogRepository, IApi
    */
   public async initializeDatabase(): Promise<void> {
     try {
+      // 統一データベースが既に作成済みかチェック
+      const isUnifiedDbReady = await this.checkUnifiedDatabaseReady();
+      
+      if (isUnifiedDbReady) {
+        console.log('✅ 統一データベースが既に存在、マイグレーション処理をスキップ');
+        this.connected = true;
+        return;
+      }
+      
+      console.log('🔧 統一データベースが未作成、通常の初期化処理を実行');
+      
       // マイグレーションシステムを初期化
       await this.migrationManager.initialize();
       
@@ -1818,6 +1829,34 @@ export class SqliteActivityLogRepository implements IActivityLogRepository, IApi
       console.error('❌ バッチキャッシュ無効化エラー:', error);
     } finally {
       this.cacheInvalidationBatch.clear();
+    }
+  }
+
+  /**
+   * 統一データベースが既に準備済みかチェック
+   * 必要なテーブルが存在するかを確認
+   */
+  private async checkUnifiedDatabaseReady(): Promise<boolean> {
+    try {
+      const requiredTables = ['activity_logs', 'user_settings', 'api_costs', 'todo_tasks'];
+      
+      for (const tableName of requiredTables) {
+        const rows = await this.allQuery(
+          "SELECT name FROM sqlite_master WHERE type='table' AND name=?", 
+          [tableName]
+        ) as any[];
+        
+        if (rows.length === 0) {
+          console.log(`🔍 テーブル ${tableName} が存在しません - 統一DBは未準備`);
+          return false;
+        }
+      }
+      
+      console.log('✅ 全ての必要テーブルが存在 - 統一DBは準備済み');
+      return true;
+    } catch (error) {
+      console.error('❌ 統一DB状態チェックエラー:', error);
+      return false;
     }
   }
 

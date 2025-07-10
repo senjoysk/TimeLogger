@@ -36,7 +36,13 @@ export const config = {
   
   // データベース設定
   database: {
-    path: process.env.DATABASE_PATH || (isDevelopment ? './data/tasks.db' : './data/activity_logs.db'),
+    // 統一データベースパス
+    path: process.env.DATABASE_PATH || (isDevelopment ? './data/app.db' : '/app/data/app.db'),
+    // レガシーパス（マイグレーション時に参照）
+    legacyPaths: {
+      tasks: isDevelopment ? './data/tasks.db' : '/app/data/tasks.db',
+      activityLogs: isDevelopment ? './data/activity_logs.db' : '/app/data/activity_logs.db',
+    },
   },
   
   // アプリケーション設定
