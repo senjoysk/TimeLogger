@@ -5,6 +5,7 @@
 
 import { ActivityLoggingIntegration, createDefaultConfig } from '../../integration';
 import { Message } from 'discord.js';
+import { DATABASE_PATHS } from '../../database/simplePathConfig';
 
 // Discordメッセージのモック
 class MockMessage {
@@ -37,7 +38,7 @@ describe('活動記録システム統合テスト', () => {
     process.env.USER_TIMEZONE = 'Asia/Tokyo';
     
     const config = createDefaultConfig(
-      ':memory:',
+      ':memory:', // テスト用インメモリDB
       'test-api-key'
     );
     config.debugMode = true;
