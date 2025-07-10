@@ -5,6 +5,9 @@
 
 import { ActivityLoggingIntegration, createDefaultConfig } from '../../integration';
 import { Message } from 'discord.js';
+import { DATABASE_PATHS } from '../../database/simplePathConfig';
+import * as fs from 'fs';
+import * as path from 'path';
 
 // Discordメッセージのモック
 class MockMessage {
@@ -36,8 +39,18 @@ describe('活動記録システム統合テスト', () => {
     process.env.TARGET_USER_ID = '770478489203507241';
     process.env.USER_TIMEZONE = 'Asia/Tokyo';
     
+    // テストデータディレクトリ作成とDBファイル削除
+    const testDbPath = './test-data/integration-test.db';
+    const testDir = path.dirname(testDbPath);
+    if (!fs.existsSync(testDir)) {
+      fs.mkdirSync(testDir, { recursive: true });
+    }
+    if (fs.existsSync(testDbPath)) {
+      fs.unlinkSync(testDbPath);
+    }
+    
     const config = createDefaultConfig(
-      ':memory:',
+      testDbPath, // テスト用一時ファイルDB
       'test-api-key'
     );
     config.debugMode = true;
