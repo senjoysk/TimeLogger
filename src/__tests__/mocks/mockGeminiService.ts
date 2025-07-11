@@ -12,9 +12,9 @@ export class MockGeminiService {
    */
   async classifyMessageWithAI(message: string): Promise<ClassificationResult> {
     // 簡単なキーワードマッチングでTODO分類
-    const todoKeywords = ['タスク', '作業', '実装', '修正', '作成', '確認', '対応', 'TODO', 'todo', '必要'];
-    const activityKeywords = ['した', 'しました', '実施', '完了', '終了', '開始'];
-    const memoKeywords = ['メモ', 'ノート', '備忘', '記録'];
+    const todoKeywords = ['タスク', '作業', '実装', '修正', '作成', '確認', '対応', 'TODO', 'todo', '必要', '資料', '提出', 'プレゼン', 'レポート'];
+    const activityKeywords = ['した', 'しました', '実施', '完了', '終了', '開始', '参加', 'ミーティング', '会議'];
+    const memoKeywords = ['メモ', 'ノート', '備忘', '記録', '雑談'];
 
     let classification: MessageClassification = 'UNCERTAIN';
     let confidence = 0.3;

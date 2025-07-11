@@ -269,17 +269,14 @@ export class ActivityLoggingIntegration {
         return true;
       }
 
-      // 通常のメッセージを活動ログとして記録 + TODO分類処理（並行実行で30-40%性能向上）
+      // 通常のメッセージはAI分類を優先し、分類結果に基づいて適切に記録
       if (content.length > 0 && content.length <= 2000) {
-        console.log(`🚀 活動記録・TODO分類並行処理開始: ${userId}`);
+        console.log(`🤖 メッセージ分類処理開始: ${userId}`);
         
-        // 並行処理で活動記録とTODO分類を同時実行
-        const [recordResult] = await Promise.all([
-          this.recordActivity(message, userId, content, timezone),
-          this.todoHandler.handleMessageClassification(message, userId, timezone)
-        ]);
+        // AI分類を実行（分類結果に基づいてTODO/活動ログ/メモに振り分け）
+        await this.todoHandler.handleMessageClassification(message, userId, timezone);
         
-        console.log(`✅ 活動記録・TODO分類並行処理完了: ${userId}`);
+        console.log(`✅ メッセージ分類処理完了: ${userId}`);
         return true;
       }
 
