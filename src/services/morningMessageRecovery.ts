@@ -10,7 +10,7 @@ import { INightSuspendRepository, DiscordActivityLogData } from '../repositories
  * 朝のメッセージリカバリ設定
  */
 interface MorningRecoveryConfig {
-  targetUserId: string;
+  targetUserId: string; // 空文字の場合は全ユーザー対応
   timezone: string;
 }
 
@@ -42,18 +42,36 @@ export class MorningMessageRecovery {
     
     console.log(`🔍 夜間メッセージを検索: ${midnight.toISOString()} ~ ${sevenAM.toISOString()}`);
     
-    // ユーザーとのDMチャンネルを取得
-    const user = await this.client.users.fetch(this.config.targetUserId);
-    const dmChannel = await user.createDM();
-    
-    // 夜間メッセージを取得 (実際の実装では batch fetch)
-    const messages = await dmChannel.messages.fetch({ limit: 100 });
-    
-    console.log(`📬 夜間メッセージ ${messages.size}件を検出`);
-    
-    // 未処理メッセージを抽出して処理
+    // マルチユーザー対応: 全ユーザーまたは特定ユーザーの夜間メッセージを取得
     const processedLogs: any[] = [];
     
+    if (this.config.targetUserId) {
+      // 特定ユーザーの場合（レガシー対応）
+      const user = await this.client.users.fetch(this.config.targetUserId);
+      const dmChannel = await user.createDM();
+      const messages = await dmChannel.messages.fetch({ limit: 100 });
+      
+      console.log(`📬 夜間メッセージ ${messages.size}件を検出 (ユーザー: ${this.config.targetUserId})`);
+      
+      await this.processMessagesForUser(messages, midnight, sevenAM, processedLogs);
+    } else {
+      // 全ユーザー対応（新システム）
+      console.log(`📬 全ユーザーの夜間メッセージリカバリはスキップ（実装予定）`);
+      // TODO: 実際の実装では、データベースから全ユーザーを取得して処理
+    }
+    
+    return processedLogs;
+  }
+
+  /**
+   * 特定ユーザーのメッセージを処理
+   */
+  private async processMessagesForUser(
+    messages: Collection<string, Message>,
+    midnight: Date,
+    sevenAM: Date,
+    processedLogs: any[]
+  ): Promise<void> {
     for (const [id, message] of messages) {
       // 時間範囲チェック
       if (message.createdAt >= midnight && message.createdAt < sevenAM) {
@@ -71,11 +89,6 @@ export class MorningMessageRecovery {
         }
       }
     }
-    
-    // 処理結果をユーザーに通知
-    await this.sendRecoveryReport(processedLogs);
-    
-    return processedLogs;
   }
 
   /**

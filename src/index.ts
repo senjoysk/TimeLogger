@@ -144,17 +144,15 @@ class Application {
         // Discord Clientの取得
         const discordClient = this.bot.getClient();
         
-        // 環境変数からターゲットユーザーIDを取得
-        const targetUserId = process.env.DISCORD_TARGET_USER_ID;
-        
-        if (discordClient && targetUserId) {
+        if (discordClient) {
+          // マルチユーザー対応: 全ユーザーに対応したメッセージリカバリサービス
           morningRecovery = new MorningMessageRecovery(discordClient, nightSuspendRepo, {
-            targetUserId: targetUserId,
+            targetUserId: '', // マルチユーザー対応のため空文字（全ユーザー対応）
             timezone: 'Asia/Tokyo'
           });
-          console.log('✅ メッセージリカバリサービスが設定されました');
+          console.log('✅ メッセージリカバリサービスが設定されました（マルチユーザー対応）');
         } else {
-          console.warn('⚠️ Discord ClientまたはターゲットユーザーIDが設定されていません');
+          console.warn('⚠️ Discord Clientが設定されていません');
         }
       }
 

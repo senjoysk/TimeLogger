@@ -114,7 +114,7 @@ export function loadConfigFromEnv(): ActivityLoggingConfig {
     defaultTimezone: process.env.DEFAULT_TIMEZONE || 'Asia/Tokyo',
     enableAutoAnalysis: process.env.ENABLE_AUTO_ANALYSIS !== 'false',
     cacheValidityMinutes: parseInt(process.env.CACHE_VALIDITY_MINUTES || '60'),
-    targetUserId: process.env.TARGET_USER_ID || '770478489203507241'
+    targetUserId: '' // マルチユーザー対応により削除（レガシー設定）
   };
 }
 
