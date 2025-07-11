@@ -15,6 +15,7 @@ import { LogsCommandHandler } from '../handlers/logsCommandHandler';
 import { TimezoneHandler } from '../handlers/timezoneHandler';
 import { UnmatchedCommandHandler } from '../handlers/unmatchedCommandHandler';
 import { TodoCommandHandler } from '../handlers/todoCommandHandler';
+import { ProfileCommandHandler } from '../handlers/profileCommandHandler';
 import { GeminiService } from '../services/geminiService';
 import { MessageClassificationService } from '../services/messageClassificationService';
 import { IntegratedSummaryService } from '../services/integratedSummaryService';
@@ -66,6 +67,7 @@ export class ActivityLoggingIntegration {
   private gapHandler!: GapHandler;
   private unmatchedHandler!: UnmatchedCommandHandler;
   private todoHandler!: TodoCommandHandler;
+  private profileHandler!: ProfileCommandHandler;
 
   // 設定
   private config: ActivityLoggingConfig;
@@ -148,6 +150,9 @@ export class ActivityLoggingIntegration {
         this.messageClassificationService,
         this.activityLogService // 活動ログサービスを注入
       );
+      
+      // プロファイル機能ハンドラーの初期化
+      this.profileHandler = new ProfileCommandHandler(this.repository);
       
       console.log('✅ ハンドラー層初期化完了（TODO機能統合済み）');
 
@@ -363,6 +368,12 @@ export class ActivityLoggingIntegration {
         await this.todoHandler.handleCommand(message, userId, args, timezone);
         break;
 
+      case 'profile':
+      case 'プロファイル':
+        console.log(`📊 profileコマンド実行: ユーザー=${userId}, タイムゾーン=${timezone}`);
+        await this.profileHandler.handle(message, userId, args, timezone);
+        break;
+
       default:
         // 他のコマンドは既存システムに委譲または無視
         console.log(`📝 未対応コマンド: ${command}`);
@@ -493,6 +504,7 @@ export class ActivityLoggingIntegration {
 
 **⚡ 主要コマンド**
 \`!summary\` - 今日の活動サマリー表示
+\`!profile\` - ユーザープロファイル表示
 \`!edit\` - ログの編集・削除
 \`!logs\` - 生ログの表示・検索
 \`!gap\` - 未記録時間の検出・記録

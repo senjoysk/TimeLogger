@@ -1972,7 +1972,8 @@ export class SqliteActivityLogRepository implements IActivityLogRepository, IApi
         todayLogs,
         avgLogs,
         mostActiveHour,
-        totalMinutes
+        totalMinutes,
+        longestActiveDay
       ] = await Promise.all([
         this.getTotalLogsCount(userId),
         this.getLogsCountByPeriod(userId, 'month'),
@@ -1980,7 +1981,8 @@ export class SqliteActivityLogRepository implements IActivityLogRepository, IApi
         this.getLogsCountByPeriod(userId, 'today'),
         this.getAverageLogsPerDay(userId),
         this.getMostActiveHour(userId),
-        this.getTotalMinutesLogged(userId)
+        this.getTotalMinutesLogged(userId),
+        this.getLongestActiveDay(userId)
       ]);
       
       return {
@@ -1991,7 +1993,8 @@ export class SqliteActivityLogRepository implements IActivityLogRepository, IApi
         todayLogs,
         avgLogsPerDay: avgLogs,
         mostActiveHour,
-        totalMinutesLogged: totalMinutes
+        totalMinutesLogged: totalMinutes,
+        longestActiveDay
       };
     } catch (error) {
       console.error('❌ ユーザー統計取得エラー:', error);
@@ -2135,5 +2138,23 @@ export class SqliteActivityLogRepository implements IActivityLogRepository, IApi
     `, [userId]);
     
     return result[0]?.total || 0;
+  }
+
+  private async getLongestActiveDay(userId: string): Promise<{ date: string; logCount: number }> {
+    const result = await this.allQuery(`
+      SELECT 
+        business_date as date,
+        COUNT(*) as logCount
+      FROM activity_logs 
+      WHERE user_id = ? AND is_deleted = 0
+      GROUP BY business_date
+      ORDER BY logCount DESC
+      LIMIT 1
+    `, [userId]);
+    
+    return result[0] ? {
+      date: result[0].date,
+      logCount: result[0].logCount
+    } : { date: '', logCount: 0 };
   }
 }

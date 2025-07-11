@@ -27,6 +27,10 @@ export interface UserStats {
   avgLogsPerDay: number;
   mostActiveHour: number;
   totalMinutesLogged: number;
+  longestActiveDay?: {
+    date: string;
+    logCount: number;
+  };
 }
 
 /**
