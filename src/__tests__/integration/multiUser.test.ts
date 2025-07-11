@@ -184,9 +184,12 @@ describe('Multi-user Support Integration Tests', () => {
       const existsAfter = await repository.userExists(newUserId);
       expect(existsAfter).toBe(true); // ❌ registerUser メソッドが存在しない
       
-      // ウェルカムメッセージが送信されている
-      expect(mockMessage.replies).toHaveLength(1);
-      expect(mockMessage.replies[0]).toContain('TimeLoggerへようこそ'); // ❌ 実装されていない
+      // ウェルカムメッセージとTODO分類の両方が送信される
+      expect(mockMessage.replies).toHaveLength(2);
+      
+      // どちらかの返信にウェルカムメッセージが含まれることを確認
+      const allReplies = mockMessage.replies.map(r => typeof r === 'string' ? r : JSON.stringify(r)).join(' ');
+      expect(allReplies).toContain('TimeLoggerへようこそ');
     });
 
     test('既存ユーザーには重複登録されない', async () => {
@@ -205,8 +208,18 @@ describe('Multi-user Support Integration Tests', () => {
       const result = await handleMessage(mockMessage as unknown as Message);
       expect(result).toBe(true);
       
-      // ウェルカムメッセージは送信されない
-      expect(mockMessage.replies).toHaveLength(0); // 既存ユーザーなのでウェルカムメッセージなし
+      // ウェルカムメッセージは送信されず、通常のTODO分類処理が実行される
+      // 既存ユーザーの場合、通常の活動ログ処理（TODO分類含む）が実行される
+      expect(mockMessage.replies).toHaveLength(1); // TODO分類機能による返信があることが正常
+      
+      // ウェルカムメッセージでないことを確認
+      const reply = mockMessage.replies[0];
+      if (typeof reply === 'string') {
+        expect(reply).not.toContain('TimeLoggerへようこそ');
+      } else {
+        // オブジェクト形式の返信（TODO分類結果）の場合
+        expect(JSON.stringify(reply)).not.toContain('TimeLoggerへようこそ');
+      }
     });
 
     test('ユーザー情報が正しく保存される', async () => {

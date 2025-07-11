@@ -239,7 +239,21 @@ export class ActivityLoggingIntegration {
       const content = message.content.trim();
       const timezone = await this.getUserTimezone(userId);
 
-      // マルチユーザー対応: ユーザー制限を削除
+      // マルチユーザー対応: 新規ユーザーの自動登録
+      const isNewUser = await this.ensureUserRegistered(userId, message.author.username);
+      
+      // 新規ユーザーの場合、まずウェルカムメッセージを送信
+      if (isNewUser && !content.startsWith('!')) {
+        const welcomeMessage = this.getWelcomeMessage();
+        try {
+          await message.reply(welcomeMessage);
+          console.log(`🎉 ウェルカムメッセージ送信完了: ${userId}`);
+          // ウェルカムメッセージ送信後、通常の処理も継続
+        } catch (error) {
+          console.error('❌ ウェルカムメッセージ送信エラー:', error);
+        }
+      }
+      
       console.log(`✅ [活動記録] 処理対象ユーザー: ${userId}`);
       console.log(`✅ [活動記録] 処理対象メッセージ: "${content}"`)
 
@@ -758,6 +772,54 @@ export class ActivityLoggingIntegration {
       console.error('❌ タイムゾーン取得エラー:', error);
       return this.config.defaultTimezone;
     }
+  }
+
+  /**
+   * ユーザーの登録状態を確認し、未登録の場合は自動登録
+   * @returns 新規ユーザーの場合true、既存ユーザーの場合false
+   */
+  private async ensureUserRegistered(userId: string, username: string): Promise<boolean> {
+    try {
+      // IUserRepositoryメソッドを使用
+      const userExists = await (this.repository as any).userExists(userId);
+      
+      if (!userExists) {
+        await (this.repository as any).registerUser(userId, username);
+        console.log(`🎉 新規ユーザー自動登録: ${userId} (${username})`);
+        return true; // 新規ユーザー
+      } else {
+        // 最終利用日時を更新
+        await (this.repository as any).updateLastSeen(userId);
+        return false; // 既存ユーザー
+      }
+    } catch (error) {
+      console.error('❌ ユーザー登録確認エラー:', error);
+      // 登録エラーは処理を止めない（ログ記録は継続）
+      return false;
+    }
+  }
+
+  /**
+   * ウェルカムメッセージの生成
+   */
+  private getWelcomeMessage(): string {
+    return `
+🎉 **TimeLoggerへようこそ！**
+
+アカウントを自動作成しました。
+
+📊 **アカウント情報**
+タイムゾーン: Asia/Tokyo
+登録日: ${new Date().toLocaleDateString('ja-JP')}
+
+📝 **使い方**
+- 活動記録: そのままメッセージを送信
+- 今日のサマリー: \`!summary\`
+- プロファイル確認: \`!profile\`
+- コマンド一覧: \`!help\`
+
+さっそく今日の活動を記録してみましょう！
+    `.trim();
   }
 
   /**

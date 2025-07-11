@@ -2,6 +2,34 @@ import { ActivityRecord, DailySummary, ActivityAnalysis } from '../types';
 import { Todo, CreateTodoRequest, UpdateTodoRequest, GetTodosOptions, TodoStats, TodoStatus, MessageClassificationHistory, ClassificationResult, MessageClassification } from '../types/todo';
 
 /**
+ * ユーザー情報
+ */
+export interface UserInfo {
+  userId: string;
+  username?: string;
+  timezone: string;
+  firstSeen: string;
+  lastSeen: string;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/**
+ * ユーザー統計情報
+ */
+export interface UserStats {
+  userId: string;
+  totalLogs: number;
+  thisMonthLogs: number;
+  thisWeekLogs: number;
+  todayLogs: number;
+  avgLogsPerDay: number;
+  mostActiveHour: number;
+  totalMinutesLogged: number;
+}
+
+/**
  * データベース操作の抽象化インターフェース
  * 依存性逆転の原則に従い、具体的な実装に依存しない設計を実現
  */
@@ -175,4 +203,24 @@ export interface DiscordActivityLogData {
   discord_message_id: string;
   recovery_processed: boolean;
   recovery_timestamp?: string;
+}
+
+/**
+ * ユーザー管理機能の抽象化インターフェース
+ */
+export interface IUserRepository {
+  // ユーザー存在確認
+  userExists(userId: string): Promise<boolean>;
+  
+  // ユーザー登録
+  registerUser(userId: string, username: string): Promise<void>;
+  
+  // ユーザー情報取得
+  getUserInfo(userId: string): Promise<UserInfo | null>;
+  
+  // ユーザー統計取得
+  getUserStats(userId: string): Promise<UserStats>;
+  
+  // 最終利用日時更新
+  updateLastSeen(userId: string): Promise<void>;
 }

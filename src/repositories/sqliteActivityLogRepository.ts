@@ -11,7 +11,7 @@ import {
   IActivityLogRepository,
   LogSearchCriteria
 } from './activityLogRepository';
-import { IApiCostRepository, ITodoRepository, IMessageClassificationRepository } from './interfaces';
+import { IApiCostRepository, ITodoRepository, IMessageClassificationRepository, IUserRepository, UserInfo, UserStats } from './interfaces';
 import {
   ActivityLog,
   CreateActivityLogRequest,
@@ -39,7 +39,7 @@ import * as path from 'path';
  * SQLite実装クラス
  * 活動ログ、APIコストモニタリング、TODO管理、メッセージ分類の統合実装
  */
-export class SqliteActivityLogRepository implements IActivityLogRepository, IApiCostRepository, ITodoRepository, IMessageClassificationRepository {
+export class SqliteActivityLogRepository implements IActivityLogRepository, IApiCostRepository, ITodoRepository, IMessageClassificationRepository, IUserRepository {
   private db: Database;
   private connected: boolean = false;
   private migrationManager: MigrationManager;
@@ -1886,5 +1886,254 @@ export class SqliteActivityLogRepository implements IActivityLogRepository, IApi
         }
       });
     });
+  }
+
+  // ================================================================
+  // IUserRepository Implementation (マルチユーザー対応)
+  // ================================================================
+
+  /**
+   * ユーザーが存在するかチェック
+   */
+  async userExists(userId: string): Promise<boolean> {
+    try {
+      const result = await this.allQuery(
+        'SELECT user_id FROM user_settings WHERE user_id = ?',
+        [userId]
+      );
+      return result.length > 0;
+    } catch (error) {
+      console.error('❌ ユーザー存在確認エラー:', error);
+      return false;
+    }
+  }
+
+  /**
+   * 新規ユーザーを登録
+   */
+  async registerUser(userId: string, username: string): Promise<void> {
+    try {
+      const now = new Date().toISOString();
+      
+      // user_settingsテーブルの確認・作成
+      await this.ensureUserSettingsTable();
+      
+      // user_settingsに登録
+      await this.runQuery(`
+        INSERT INTO user_settings (user_id, username, timezone, first_seen, last_seen, is_active, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      `, [userId, username, 'Asia/Tokyo', now, now, true, now, now]);
+      
+      console.log(`✅ 新規ユーザー登録完了: ${userId} (${username})`);
+    } catch (error) {
+      console.error('❌ ユーザー登録エラー:', error);
+      throw new ActivityLogError('ユーザー登録に失敗しました', 'USER_REGISTRATION_ERROR', { userId, username, error });
+    }
+  }
+
+  /**
+   * ユーザー情報を取得
+   */
+  async getUserInfo(userId: string): Promise<UserInfo | null> {
+    try {
+      const row = await this.getQuery(
+        'SELECT * FROM user_settings WHERE user_id = ?',
+        [userId]
+      );
+      
+      if (!row) {
+        return null;
+      }
+      return {
+        userId: row.user_id,
+        username: row.username,
+        timezone: row.timezone,
+        firstSeen: row.first_seen,
+        lastSeen: row.last_seen,
+        isActive: Boolean(row.is_active),
+        createdAt: row.created_at,
+        updatedAt: row.updated_at
+      };
+    } catch (error) {
+      console.error('❌ ユーザー情報取得エラー:', error);
+      throw new ActivityLogError('ユーザー情報の取得に失敗しました', 'USER_INFO_ERROR', { userId, error });
+    }
+  }
+
+  /**
+   * ユーザー統計を取得
+   */
+  async getUserStats(userId: string): Promise<UserStats> {
+    try {
+      const [
+        totalLogs,
+        thisMonthLogs,
+        thisWeekLogs,
+        todayLogs,
+        avgLogs,
+        mostActiveHour,
+        totalMinutes
+      ] = await Promise.all([
+        this.getTotalLogsCount(userId),
+        this.getLogsCountByPeriod(userId, 'month'),
+        this.getLogsCountByPeriod(userId, 'week'),
+        this.getLogsCountByPeriod(userId, 'today'),
+        this.getAverageLogsPerDay(userId),
+        this.getMostActiveHour(userId),
+        this.getTotalMinutesLogged(userId)
+      ]);
+      
+      return {
+        userId,
+        totalLogs,
+        thisMonthLogs,
+        thisWeekLogs,
+        todayLogs,
+        avgLogsPerDay: avgLogs,
+        mostActiveHour,
+        totalMinutesLogged: totalMinutes
+      };
+    } catch (error) {
+      console.error('❌ ユーザー統計取得エラー:', error);
+      throw new ActivityLogError('ユーザー統計の取得に失敗しました', 'USER_STATS_ERROR', { userId, error });
+    }
+  }
+
+  /**
+   * 最終利用日時を更新
+   */
+  async updateLastSeen(userId: string): Promise<void> {
+    try {
+      const now = new Date().toISOString();
+      await this.runQuery(
+        'UPDATE user_settings SET last_seen = ?, updated_at = ? WHERE user_id = ?',
+        [now, now, userId]
+      );
+    } catch (error) {
+      console.error('❌ 最終利用日時更新エラー:', error);
+      // このエラーは致命的でないため、例外を投げない
+    }
+  }
+
+  /**
+   * user_settingsテーブルにマルチユーザー対応カラムを追加
+   */
+  private async ensureUserSettingsTable(): Promise<void> {
+    try {
+      // 拡張されたuser_settingsテーブルを作成/更新
+      await this.runQuery(`
+        CREATE TABLE IF NOT EXISTS user_settings (
+          user_id TEXT PRIMARY KEY,
+          username TEXT,
+          timezone TEXT NOT NULL DEFAULT 'Asia/Tokyo',
+          first_seen TEXT,
+          last_seen TEXT,
+          is_active BOOLEAN DEFAULT TRUE,
+          created_at TEXT NOT NULL DEFAULT (datetime('now', 'utc')),
+          updated_at TEXT NOT NULL DEFAULT (datetime('now', 'utc'))
+        )
+      `);
+      
+      // 既存テーブルにカラムが存在しない場合は追加
+      const alterCommands = [
+        "ALTER TABLE user_settings ADD COLUMN username TEXT",
+        "ALTER TABLE user_settings ADD COLUMN first_seen TEXT",
+        "ALTER TABLE user_settings ADD COLUMN last_seen TEXT", 
+        "ALTER TABLE user_settings ADD COLUMN is_active BOOLEAN DEFAULT TRUE"
+      ];
+      
+      for (const command of alterCommands) {
+        try {
+          await this.runQuery(command);
+        } catch (error) {
+          // カラムが既に存在する場合はエラーを無視
+          if (!String(error).includes('duplicate column name')) {
+            console.warn('user_settingsテーブル更新警告:', error);
+          }
+        }
+      }
+      
+      console.log('✅ user_settingsテーブルのマルチユーザー対応完了');
+    } catch (error) {
+      console.error('❌ user_settingsテーブル更新エラー:', error);
+      throw error;
+    }
+  }
+
+  // ユーザー統計のヘルパーメソッド
+
+  private async getTotalLogsCount(userId: string): Promise<number> {
+    const result = await this.allQuery(
+      'SELECT COUNT(*) as count FROM activity_logs WHERE user_id = ? AND is_deleted = 0',
+      [userId]
+    );
+    return result[0]?.count || 0;
+  }
+
+  private async getLogsCountByPeriod(userId: string, period: 'month' | 'week' | 'today'): Promise<number> {
+    let dateCondition = '';
+    const now = new Date();
+    
+    switch (period) {
+      case 'today':
+        const today = format(now, 'yyyy-MM-dd', { timeZone: 'Asia/Tokyo' });
+        dateCondition = `AND business_date = '${today}'`;
+        break;
+      case 'week':
+        const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+        const weekAgoStr = format(weekAgo, 'yyyy-MM-dd', { timeZone: 'Asia/Tokyo' });
+        dateCondition = `AND business_date >= '${weekAgoStr}'`;
+        break;
+      case 'month':
+        const monthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+        const monthAgoStr = format(monthAgo, 'yyyy-MM-dd', { timeZone: 'Asia/Tokyo' });
+        dateCondition = `AND business_date >= '${monthAgoStr}'`;
+        break;
+    }
+
+    const result = await this.allQuery(
+      `SELECT COUNT(*) as count FROM activity_logs WHERE user_id = ? AND is_deleted = 0 ${dateCondition}`,
+      [userId]
+    );
+    return result[0]?.count || 0;
+  }
+
+  private async getAverageLogsPerDay(userId: string): Promise<number> {
+    const result = await this.allQuery(`
+      SELECT 
+        COUNT(DISTINCT business_date) as days,
+        COUNT(*) as logs
+      FROM activity_logs 
+      WHERE user_id = ? AND is_deleted = 0
+    `, [userId]);
+    
+    const row = result[0];
+    if (!row || row.days === 0) return 0;
+    return row.logs / row.days;
+  }
+
+  private async getMostActiveHour(userId: string): Promise<number> {
+    const result = await this.allQuery(`
+      SELECT 
+        CAST(strftime('%H', input_timestamp) AS INTEGER) as hour,
+        COUNT(*) as count
+      FROM activity_logs 
+      WHERE user_id = ? AND is_deleted = 0
+      GROUP BY hour
+      ORDER BY count DESC
+      LIMIT 1
+    `, [userId]);
+    
+    return result[0]?.hour || 12; // デフォルトは12時
+  }
+
+  private async getTotalMinutesLogged(userId: string): Promise<number> {
+    const result = await this.allQuery(`
+      SELECT COALESCE(SUM(total_minutes), 0) as total
+      FROM activity_logs 
+      WHERE user_id = ? AND is_deleted = 0 AND total_minutes IS NOT NULL
+    `, [userId]);
+    
+    return result[0]?.total || 0;
   }
 }
