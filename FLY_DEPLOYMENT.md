@@ -5,13 +5,13 @@
 ## 開発・本番環境の分離
 
 ### 開発環境（ローカル）
-- **データベース**: `./data/tasks.db`
+- **データベース**: `app.db`（統一パス）
 - **実行コマンド**: `npm run dev`
 - **設定ファイル**: `.env.development`
 - **NODE_ENV**: `development`
 
 ### 本番環境（Fly.io）
-- **データベース**: `/app/data/activity_logs.db`
+- **データベース**: `/app/data/app.db`（統一パス）
 - **実行コマンド**: `fly deploy`
 - **設定**: Fly.io secrets
 - **NODE_ENV**: `production`
@@ -63,14 +63,11 @@ fly secrets set DISCORD_BOT_TOKEN="your-discord-bot-token"
 # Google Gemini API Key
 fly secrets set GOOGLE_GEMINI_API_KEY="your-gemini-api-key"
 
-# Target User ID（Discord User ID）
-fly secrets set TARGET_USER_ID="your-discord-user-id"
-
 # Discord Client ID（オプション）
 fly secrets set DISCORD_CLIENT_ID="your-discord-client-id"
 
-# データベースパス（オプション、デフォルト: /app/data/activity_logs.db）
-fly secrets set DATABASE_PATH="/app/data/activity_logs.db"
+# 注意: TARGET_USER_IDは削除済み（マルチユーザー対応）
+# 注意: DATABASE_PATHは統一パス(/app/data/app.db)を使用、設定不要
 ```
 
 ### 5. 永続ストレージの作成

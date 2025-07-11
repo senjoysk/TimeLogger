@@ -86,13 +86,12 @@ DISCORD_CLIENT_ID=your_discord_client_id_here
 # Google Gemini API設定
 GOOGLE_API_KEY=your_google_gemini_api_key_here
 
-# 対象ユーザーID（DMを送信するユーザー）
-TARGET_USER_ID=your_discord_user_id_here
+# 対象ユーザーIDは削除済み（マルチユーザー対応）
+# TARGET_USER_ID=your_discord_user_id_here
 
-# データベース設定（オプション）
-# 開発環境: ./data/tasks.db
-# 本番環境: ./data/activity_logs.db
-# DATABASE_PATH=./data/tasks.db
+# データベース設定（統一パス使用、設定不要）
+# 統一パス: app.db
+# DATABASE_PATH設定は不要
 
 # 環境設定
 NODE_ENV=development
@@ -129,10 +128,10 @@ NODE_ENV=development
    - URLをブラウザで開き、Botを招待したいサーバーを選択
    - 管理者権限を持つアカウントで承認
 
-4. **ユーザーIDの取得**
-   - Discordで開発者モードを有効化：設定 → 詳細設定 → 開発者モード
-   - 自分のユーザー名を右クリック →「ユーザーIDをコピー」
-   - コピーしたIDを `.env` ファイルの `TARGET_USER_ID` に設定
+4. **マルチユーザー対応について**
+   - 従来のTARGET_USER_ID設定は不要
+   - 任意のユーザーが初回利用時に自動登録される
+   - 複数ユーザーが同時利用可能
 
 ### 6. Google Gemini API の設定
 

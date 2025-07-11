@@ -28,7 +28,8 @@ export class Scheduler {
     // ユーザーのタイムゾーンを取得
     await this.loadUserTimezones();
     
-    this.startActivityPromptSchedule();
+    // 活動促し機能は削除
+    // this.startActivityPromptSchedule();
     this.startDailySummarySchedule();
     this.startApiCostReportSchedule();
     
@@ -52,47 +53,16 @@ export class Scheduler {
   }
 
   /**
-   * 30分間隔の活動問いかけスケジュールを開始
-   * 毎時0分と30分に実行（全タイムゾーンをカバー）
+   * 活動促し機能は削除済み（新システムでは自然言語でいつでも記録可能）
    */
   private startActivityPromptSchedule(): void {
-    // 毎時0分と30分に実行し、各ユーザーのタイムゾーンで勤務時間かどうかチェック
-    const cronPattern = '0,30 * * * *'; // 毎時0分と30分
-    
-    const job = cron.schedule(cronPattern, async () => {
-      try {
-        const now = new Date();
-        console.log(`⏰ 30分間隔の問いかけチェック (UTC: ${now.toISOString()})`);
-        
-        // 各ユーザーについてタイムゾーンをチェック
-        for (const [userId, timezone] of this.userTimezones) {
-          const localTime = toZonedTime(now, timezone);
-          const hours = localTime.getHours();
-          const day = localTime.getDay();
-          
-          // 平日（月-金）の勤務時間内かチェック
-          if (day >= 1 && day <= 5 && hours >= config.app.workingHours.start && hours < config.app.workingHours.end) {
-            console.log(`  → ${userId} (${timezone}): 勤務時間内です`);
-            // 現在の実装では単一ユーザー向けのためbot.sendActivityPrompt()を使用
-            // マルチユーザー対応時はユーザー別メソッドを実装
-            // 旧システムの30分問いかけは削除済み（新システムでは自然言語でいつでも記録可能）
-            console.log('⏰ 30分問いかけ機能は新システムでは不要のため無効化されています');
-          }
-        }
-      } catch (error) {
-        console.error('❌ 問いかけスケジュール実行エラー:', error);
-      }
-    }, {
-      scheduled: true,
-    });
-
-    this.jobs.set('activityPrompt', job);
-    console.log(`  ✅ 30分間隔問いかけスケジュール (${cronPattern}) を開始しました`);
+    // 活動促し機能は削除（マルチユーザー対応のため）
+    console.log('  ✅ 活動促し機能は削除済み（自然言語でいつでも記録可能）');
   }
 
   /**
    * 日次サマリースケジュールを開始
-   * 毎時0分に実行し、各ユーザーのタイムゾーンで18:00かチェック
+   * 毎時0分に実行し、全ユーザーのタイムゾーンでサマリー時刻かチェック
    */
   private startDailySummarySchedule(): void {
     // 毎時0分に実行
@@ -103,21 +73,9 @@ export class Scheduler {
         const now = new Date();
         console.log(`📊 日次サマリーチェック (UTC: ${now.toISOString()})`);
         
-        // 各ユーザーについてタイムゾーンをチェック
-        for (const [userId, timezone] of this.userTimezones) {
-          const localTime = toZonedTime(now, timezone);
-          const hours = localTime.getHours();
-          
-          // 該当タイムゾーンで18:00かチェック
-          console.log(`  → ${userId} (${timezone}): 現在時刻 ${hours}:${localTime.getMinutes().toString().padStart(2, '0')}, サマリー設定時刻 ${config.app.summaryTime.hour}:00`);
-          
-          if (hours === config.app.summaryTime.hour) {
-            console.log(`  → ${userId} (${timezone}): サマリー時刻です - 送信開始`);
-            // 現在の実装では単一ユーザー向けのためbot.sendDailySummary()を使用
-            // マルチユーザー対応時はユーザー別メソッドを実装
-            await this.bot.sendDailySummary();
-          }
-        }
+        // 全ユーザーに対してサマリーを送信
+        await this.bot.sendDailySummaryForAllUsers();
+        
       } catch (error) {
         console.error('❌ 日次サマリースケジュール実行エラー:', error);
       }
@@ -130,7 +88,7 @@ export class Scheduler {
   }
 
   private startApiCostReportSchedule(): void {
-    // 毎時5分に実行し、各ユーザーのタイムゾーンで18:05かチェック
+    // 毎時5分に実行し、全ユーザーに対してコストレポートを送信
     const cronPattern = '5 * * * *';
 
     const job = cron.schedule(cronPattern, async () => {
@@ -138,20 +96,9 @@ export class Scheduler {
         const now = new Date();
         console.log(`💰 APIコストレポートチェック (UTC: ${now.toISOString()})`);
         
-        // 各ユーザーについてタイムゾーンをチェック
-        for (const [userId, timezone] of this.userTimezones) {
-          const localTime = toZonedTime(now, timezone);
-          const hours = localTime.getHours();
-          const minutes = localTime.getMinutes();
-          
-          // 該当タイムゾーンで18:05かチェック
-          if (hours === config.app.summaryTime.hour && minutes === 5) {
-            console.log(`  → ${userId} (${timezone}): APIコストレポート時刻です`);
-            // 現在の実装では単一ユーザー向けのためbot.sendApiCostReport()を使用
-            // マルチユーザー対応時はユーザー別メソッドを実装
-            await this.bot.sendApiCostReport();
-          }
-        }
+        // 全ユーザーに対してコストレポートを送信
+        await this.bot.sendApiCostReportForAllUsers();
+        
       } catch (error) {
         console.error('❌ APIコストレポートスケジュール実行エラー:', error);
       }
@@ -168,7 +115,7 @@ export class Scheduler {
    */
   private logScheduleInfo(): void {
     console.log('\n📅 スケジュール情報:');
-    console.log(`  🔔 問いかけ時間: 平日 ${config.app.workingHours.start}:00-${config.app.workingHours.end}:00 (毎時0分・30分)`);
+    console.log(`  🔔 活動促し機能: 削除済み（マルチユーザー対応）`);
     console.log(`  📊 サマリー時間: 毎日 ${config.app.summaryTime.hour}:00`);
     console.log(`  🌍 対応ユーザー数: ${this.userTimezones.size}`);
     
@@ -178,6 +125,10 @@ export class Scheduler {
       const localTime = toZonedTime(now, timezone);
       console.log(`  👤 ${userId}: ${timezone} (現在時刻: ${localTime.toLocaleString()})`);
     }
+    
+    if (this.userTimezones.size === 0) {
+      console.log('  👤 登録済みユーザーはいません。サマリー送信時に動的に取得します。');
+    }
   }
 
   /**
@@ -185,15 +136,22 @@ export class Scheduler {
    */
   private async loadUserTimezones(): Promise<void> {
     try {
-      // 新システムでは環境変数ベースのタイムゾーンを使用
-      const userId = config.discord.targetUserId;
-      const timezone = process.env.USER_TIMEZONE || 'Asia/Tokyo';
-      this.userTimezones.set(userId, timezone);
-      console.log(`  → ユーザー ${userId} のタイムゾーン: ${timezone}`);
+      // マルチユーザー対応: データベースから全ユーザーのタイムゾーンを取得
+      const repository = this.bot.getRepository();
+      if (repository && repository.getAllUsers) {
+        const users = await repository.getAllUsers();
+        for (const user of users) {
+          this.userTimezones.set(user.userId, user.timezone);
+          console.log(`  → ユーザー ${user.userId} のタイムゾーン: ${user.timezone}`);
+        }
+      }
+      
+      // ユーザーがいない場合は空でもOK（サマリー送信時に動的に取得）
+      console.log(`  → 読み込み完了: ${this.userTimezones.size}人のユーザー`);
     } catch (error) {
       console.error('❌ タイムゾーン情報の読み込みエラー:', error);
-      // エラー時はデフォルトのタイムゾーンを使用
-      this.userTimezones.set(config.discord.targetUserId, 'Asia/Tokyo');
+      // エラー時は空のマップで続行
+      this.userTimezones.clear();
     }
   }
   
@@ -227,10 +185,10 @@ export class Scheduler {
     try {
       switch (scheduleName) {
         case 'activityPrompt':
-          console.log('⏰ 30分問いかけ機能は新システムでは不要のため無効化されています');
+          console.log('⏰ 活動促し機能は削除済み（マルチユーザー対応）');
           break;
         case 'dailySummary':
-          await this.bot.sendDailySummary();
+          await this.bot.sendDailySummaryForAllUsers();
           break;
         default:
           throw new Error(`未知のスケジュール名: ${scheduleName}`);

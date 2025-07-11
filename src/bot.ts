@@ -130,7 +130,7 @@ export class TaskLoggerBot {
     this.client.once('ready', async () => {
       console.log(`✅ ${this.client.user?.tag} としてログインしました`);
       console.log(`🔧 [DEBUG] Bot ID: ${this.client.user?.id}`);
-      console.log(`🔧 [DEBUG] 設定されたTARGET_USER_ID: ${config.discord.targetUserId}`);
+      console.log(`🔧 [DEBUG] マルチユーザー対応で起動中`);
       console.log(`🔧 [DEBUG] Intents: Guilds, DirectMessages, MessageContent`);
       
       // 活動記録システムを統合
@@ -148,25 +148,63 @@ export class TaskLoggerBot {
 
 
   /**
-   * 日次サマリーを自動送信
+   * 日次サマリーを全ユーザーに送信
    */
-  public async sendDailySummary(): Promise<void> {
+  public async sendDailySummaryForAllUsers(): Promise<void> {
     try {
-      // 対象ユーザーを取得
-      const user = await this.client.users.fetch(config.discord.targetUserId);
-      if (!user) {
-        console.error('❌ 対象ユーザーが見つかりません');
+      if (!this.activityLoggingIntegration) {
+        console.warn('⚠️ 活動記録システムが初期化されていません');
         return;
       }
 
-      // DMチャンネルを作成/取得
+      // データベースから全ユーザーを取得
+      const repository = this.activityLoggingIntegration.getRepository();
+      if (!repository || !repository.getAllUsers) {
+        console.warn('⚠️ ユーザー情報を取得できません');
+        return;
+      }
+
+      const users = await repository.getAllUsers();
+      console.log(`📊 全ユーザーへの日次サマリー送信開始: ${users.length}人`);
+
+      for (const user of users) {
+        await this.sendDailySummaryToUser(user.userId, user.timezone);
+      }
+
+      console.log('✅ 全ユーザーへの日次サマリー送信完了');
+    } catch (error) {
+      console.error('❌ 全ユーザーへの日次サマリー送信エラー:', error);
+    }
+  }
+
+  /**
+   * 特定ユーザーに日次サマリーを送信
+   */
+  private async sendDailySummaryToUser(userId: string, timezone: string): Promise<void> {
+    try {
+      const user = await this.client.users.fetch(userId);
+      if (!user) {
+        console.error(`❌ ユーザーが見つかりません: ${userId}`);
+        return;
+      }
+
+      // サマリー時刻かチェック
+      const now = new Date();
+      const { toZonedTime } = require('date-fns-tz');
+      const localTime = toZonedTime(now, timezone);
+      const hours = localTime.getHours();
+      
+      // サマリー時刻かチェック
+      if (hours !== 18) { // config.app.summaryTime.hour
+        console.log(`⏰ ${userId} (${timezone}): サマリー時刻ではありません (現在: ${hours}:00)`);
+        return;
+      }
+      
+      console.log(`⏰ ${userId} (${timezone}): サマリー時刻です - 送信開始`);
+
       const dmChannel = await user.createDM();
       
-      // 新システムから適切なタイムゾーンを取得
-      const userTimezone = process.env.USER_TIMEZONE || 'Asia/Tokyo';
-      
       if (!this.activityLoggingIntegration) {
-        console.warn('⚠️ 活動記録システムが初期化されていません - プレースホルダーメッセージを送信');
         const briefSummary = '🌅 今日一日お疲れさまでした！\n\n活動記録システムでのサマリー機能は開発中です。';
         await dmChannel.send(briefSummary);
         return;
@@ -174,11 +212,11 @@ export class TaskLoggerBot {
 
       // 活動記録システムを使って実際のサマリーを生成
       try {
-        const summaryText = await this.activityLoggingIntegration.generateDailySummaryText(user.id, userTimezone);
+        const summaryText = await this.activityLoggingIntegration.generateDailySummaryText(userId, timezone);
         await dmChannel.send(summaryText);
-        console.log('✅ 活動記録システム経由で日次サマリーを送信しました');
+        console.log(`✅ ${userId} に日次サマリーを送信しました`);
       } catch (summaryError) {
-        console.error('❌ 活動記録システムでのサマリー生成エラー:', summaryError);
+        console.error(`❌ ${userId} のサマリー生成エラー:`, summaryError);
         
         // フォールバック: シンプルなメッセージ
         const fallbackMessage = '🌅 今日一日お疲れさまでした！\n\n' +
@@ -189,34 +227,75 @@ export class TaskLoggerBot {
       this.status.lastSummaryTime = new Date();
       
     } catch (error) {
-      console.error('❌ 日次サマリー送信エラー:', error);
-      
-      // エラー時も簡単なメッセージを送信
-      try {
-        const user = await this.client.users.fetch(config.discord.targetUserId);
-        const dmChannel = await user.createDM();
-        await dmChannel.send(
-          '🌅 今日一日お疲れさまでした！\n\n' +
-          'サマリーの生成中にエラーが発生しましたが、\n' +
-          '今日も素晴らしい一日だったことでしょう。\n\n' +
-          '明日も頑張りましょう！'
-        );
-      } catch (fallbackError) {
-        console.error('❌ フォールバックメッセージ送信もエラー:', fallbackError);
-      }
+      console.error(`❌ ${userId} への日次サマリー送信エラー:`, error);
     }
   }
 
-  public async sendApiCostReport(): Promise<void> {
+  /**
+   * 日次サマリーを自動送信（レガシーメソッド）
+   */
+  public async sendDailySummary(): Promise<void> {
+    console.log('⚠️ sendDailySummary は非推奨です。sendDailySummaryForAllUsers を使用してください。');
+    await this.sendDailySummaryForAllUsers();
+  }
+
+  /**
+   * APIコストレポートを全ユーザーに送信
+   */
+  public async sendApiCostReportForAllUsers(): Promise<void> {
     try {
-      const user = await this.client.users.fetch(config.discord.targetUserId);
-      if (!user) {
-        console.error('❌ 対象ユーザーが見つかりません');
+      if (!this.activityLoggingIntegration) {
+        console.warn('⚠️ 活動記録システムが初期化されていません');
         return;
       }
-      const dmChannel = await user.createDM();
 
-      const userTimezone = process.env.USER_TIMEZONE || 'Asia/Tokyo';
+      // データベースから全ユーザーを取得
+      const repository = this.activityLoggingIntegration.getRepository();
+      if (!repository || !repository.getAllUsers) {
+        console.warn('⚠️ ユーザー情報を取得できません');
+        return;
+      }
+
+      const users = await repository.getAllUsers();
+      console.log(`💰 全ユーザーへのAPIコストレポート送信開始: ${users.length}人`);
+
+      for (const user of users) {
+        await this.sendApiCostReportToUser(user.userId, user.timezone);
+      }
+
+      console.log('✅ 全ユーザーへのAPIコストレポート送信完了');
+    } catch (error) {
+      console.error('❌ 全ユーザーへのAPIコストレポート送信エラー:', error);
+    }
+  }
+
+  /**
+   * 特定ユーザーにAPIコストレポートを送信
+   */
+  private async sendApiCostReportToUser(userId: string, timezone: string): Promise<void> {
+    try {
+      const user = await this.client.users.fetch(userId);
+      if (!user) {
+        console.error(`❌ ユーザーが見つかりません: ${userId}`);
+        return;
+      }
+
+      // コストレポート時刻かチェック
+      const now = new Date();
+      const { toZonedTime } = require('date-fns-tz');
+      const localTime = toZonedTime(now, timezone);
+      const hours = localTime.getHours();
+      const minutes = localTime.getMinutes();
+      
+      // コストレポート時刻かチェック（18:05）
+      if (hours !== 18 || minutes !== 5) { // config.app.summaryTime.hour
+        console.log(`⏰ ${userId} (${timezone}): コストレポート時刻ではありません (現在: ${hours}:${minutes.toString().padStart(2, '0')})`);
+        return;
+      }
+      
+      console.log(`⏰ ${userId} (${timezone}): コストレポート時刻です - 送信開始`);
+
+      const dmChannel = await user.createDM();
       
       if (!this.activityLoggingIntegration) {
         console.warn('⚠️ 活動記録システムが初期化されていません - コストレポートをスキップ');
@@ -224,27 +303,58 @@ export class TaskLoggerBot {
       }
       
       // 活動記録システム経由でコストレポートを取得
-      const report = await this.activityLoggingIntegration.getCostReport(user.id, userTimezone);
+      const report = await this.activityLoggingIntegration.getCostReport(userId, timezone);
       await dmChannel.send(report);
-      console.log('✅ APIコストレポートを送信しました');
+      console.log(`✅ ${userId} にAPIコストレポートを送信しました`);
     } catch (error) {
-      console.error('❌ APIコストレポート送信エラー:', error);
+      console.error(`❌ ${userId} へのAPIコストレポート送信エラー:`, error);
     }
   }
 
+  /**
+   * APIコストレポートを送信（レガシーメソッド）
+   */
+  public async sendApiCostReport(): Promise<void> {
+    console.log('⚠️ sendApiCostReport は非推奨です。sendApiCostReportForAllUsers を使用してください。');
+    await this.sendApiCostReportForAllUsers();
+  }
+
+  /**
+   * コスト警告を全ユーザーに送信
+   */
   public async sendCostAlert(message: string): Promise<void> {
     try {
-      const user = await this.client.users.fetch(config.discord.targetUserId);
-      if (!user) {
-        console.error('❌ 対象ユーザーが見つかりません');
+      if (!this.activityLoggingIntegration) {
+        console.warn('⚠️ 活動記録システムが初期化されていません');
         return;
       }
-      const dmChannel = await user.createDM();
 
-      await dmChannel.send(`🚨 **コスト警告** 🚨\n${message}`);
-      console.log('✅ コスト警告を送信しました');
+      // データベースから全ユーザーを取得
+      const repository = this.activityLoggingIntegration.getRepository();
+      if (!repository || !repository.getAllUsers) {
+        console.warn('⚠️ ユーザー情報を取得できません');
+        return;
+      }
+
+      const users = await repository.getAllUsers();
+      console.log(`🚨 全ユーザーへのコスト警告送信開始: ${users.length}人`);
+
+      for (const user of users) {
+        try {
+          const discordUser = await this.client.users.fetch(user.userId);
+          if (!discordUser) continue;
+          
+          const dmChannel = await discordUser.createDM();
+          await dmChannel.send(`🚨 **コスト警告** 🚨\n${message}`);
+          console.log(`✅ ${user.userId} にコスト警告を送信しました`);
+        } catch (error) {
+          console.error(`❌ ${user.userId} へのコスト警告送信エラー:`, error);
+        }
+      }
+
+      console.log('✅ 全ユーザーへのコスト警告送信完了');
     } catch (error) {
-      console.error('❌ コスト警告送信エラー:', error);
+      console.error('❌ 全ユーザーへのコスト警告送信エラー:', error);
     }
   }
 

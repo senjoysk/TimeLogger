@@ -26,7 +26,7 @@ export const config = {
   discord: {
     token: process.env.DISCORD_TOKEN || '',
     clientId: process.env.DISCORD_CLIENT_ID || '',
-    targetUserId: process.env.TARGET_USER_ID || '',
+    // targetUserId: マルチユーザー対応のため削除
     commandPrefix: process.env.COMMAND_PREFIX || '!',
   },
   
@@ -89,7 +89,7 @@ export function validateConfig(): void {
   const requiredFields = [
     { key: 'DISCORD_TOKEN', value: config.discord.token },
     { key: 'DISCORD_CLIENT_ID', value: config.discord.clientId },
-    { key: 'TARGET_USER_ID', value: config.discord.targetUserId },
+    // TARGET_USER_ID: マルチユーザー対応のため削除
     { key: 'GOOGLE_API_KEY', value: config.gemini.apiKey },
   ];
 

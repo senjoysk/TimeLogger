@@ -29,6 +29,9 @@ flyctl secrets set SHUTDOWN_TOKEN="$(openssl rand -base64 32)"
 flyctl secrets set WAKE_TOKEN="$(openssl rand -base64 32)"
 flyctl secrets set RECOVERY_TOKEN="$(openssl rand -base64 32)"
 
+# 注意: TARGET_USER_IDは削除済み（マルチユーザー対応）
+# 注意: DATABASE_PATHは統一パス使用、設定不要
+
 # 設定確認
 flyctl secrets list
 ```
