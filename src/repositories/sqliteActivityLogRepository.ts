@@ -57,6 +57,43 @@ export class SqliteActivityLogRepository implements IActivityLogRepository, IApi
   }
 
   /**
+   * テスト環境でuser_settingsテーブルにPhase 3の拡張カラムを追加
+   */
+  private async ensureUserSettingsColumns(): Promise<void> {
+    try {
+      // user_settingsテーブルが存在するか確認
+      const tableExists = await this.runQuery(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name='user_settings'"
+      );
+      
+      if (!tableExists) {
+        console.log('⚠️ user_settingsテーブルが存在しません');
+        return;
+      }
+      
+      // 各カラムを安全に追加（既に存在する場合はエラーを無視）
+      const columnsToAdd = [
+        'ALTER TABLE user_settings ADD COLUMN username TEXT',
+        'ALTER TABLE user_settings ADD COLUMN first_seen TEXT',
+        'ALTER TABLE user_settings ADD COLUMN last_seen TEXT',
+        'ALTER TABLE user_settings ADD COLUMN is_active BOOLEAN DEFAULT TRUE'
+      ];
+      
+      for (const sql of columnsToAdd) {
+        try {
+          await this.runQuery(sql);
+          console.log(`✅ テスト環境: ${sql}`);
+        } catch (error) {
+          // カラムが既に存在する場合のエラーは無視
+          console.log(`⚠️ テスト環境: ${sql} - スキップ (既に存在)`);
+        }
+      }
+    } catch (error) {
+      console.error('❌ テスト環境でのuser_settingsカラム追加エラー:', error);
+    }
+  }
+
+  /**
    * データベースの初期化（テーブル作成）
    */
   public async initializeDatabase(): Promise<void> {
@@ -81,6 +118,8 @@ export class SqliteActivityLogRepository implements IActivityLogRepository, IApi
         await this.migrationManager.runMigrations();
       } else {
         console.log('⚠️ テスト環境のためマイグレーション処理をスキップ');
+        // テスト環境では手動でuser_settingsテーブルにカラムを追加
+        await this.ensureUserSettingsColumns();
       }
       
       // 新スキーマファイルから読み込み（柔軟なパス解決）
@@ -1948,8 +1987,8 @@ export class SqliteActivityLogRepository implements IActivityLogRepository, IApi
         userId: row.user_id,
         username: row.username,
         timezone: row.timezone,
-        firstSeen: row.first_seen,
-        lastSeen: row.last_seen,
+        registrationDate: row.first_seen || row.created_at,
+        lastSeenAt: row.last_seen || row.updated_at,
         isActive: Boolean(row.is_active),
         createdAt: row.created_at,
         updatedAt: row.updated_at
@@ -1961,10 +2000,77 @@ export class SqliteActivityLogRepository implements IActivityLogRepository, IApi
   }
 
   /**
+   * 全ユーザー取得
+   */
+  async getAllUsers(): Promise<UserInfo[]> {
+    try {
+      const rows = await this.allQuery('SELECT * FROM user_settings ORDER BY COALESCE(first_seen, created_at) DESC');
+      
+      if (!rows || rows.length === 0) {
+        return [];
+      }
+      
+      return rows.map(row => ({
+        userId: row.user_id,
+        username: row.username || 'Unknown User',
+        timezone: row.timezone,
+        registrationDate: row.first_seen || row.created_at,
+        lastSeenAt: row.last_seen || row.updated_at,
+        isActive: Boolean(row.is_active),
+        createdAt: row.created_at,
+        updatedAt: row.updated_at
+      }));
+    } catch (error) {
+      console.error('❌ 全ユーザー取得エラー:', error);
+      throw new ActivityLogError('全ユーザーの取得に失敗しました', 'GET_ALL_USERS_ERROR', { error });
+    }
+  }
+
+  /**
+   * 基本統計を単一クエリで取得（パフォーマンス最適化）
+   */
+  private async getBasicUserStats(userId: string): Promise<{
+    totalLogs: number;
+    thisMonthLogs: number;
+    thisWeekLogs: number;
+    todayLogs: number;
+    avgLogsPerDay: number;
+    totalMinutesLogged: number;
+  }> {
+    const sql = `
+      SELECT 
+        COUNT(*) as total_logs,
+        COUNT(CASE WHEN date(input_timestamp) >= date('now', 'start of month') THEN 1 END) as this_month_logs,
+        COUNT(CASE WHEN date(input_timestamp) >= date('now', 'weekday 1', '-7 days') THEN 1 END) as this_week_logs,
+        COUNT(CASE WHEN date(input_timestamp) = date('now') THEN 1 END) as today_logs,
+        SUM(COALESCE(total_minutes, 0)) as total_minutes,
+        CASE 
+          WHEN COUNT(*) = 0 THEN 0
+          WHEN MIN(date(input_timestamp)) = MAX(date(input_timestamp)) THEN COUNT(*)
+          ELSE CAST(COUNT(*) AS REAL) / (julianday(MAX(date(input_timestamp))) - julianday(MIN(date(input_timestamp))) + 1)
+        END as avg_logs_per_day
+      FROM activity_logs 
+      WHERE user_id = ? AND is_deleted = 0
+    `;
+    
+    const result = await this.runQuery(sql, [userId]);
+    
+    return {
+      totalLogs: result.total_logs || 0,
+      thisMonthLogs: result.this_month_logs || 0,
+      thisWeekLogs: result.this_week_logs || 0,
+      todayLogs: result.today_logs || 0,
+      avgLogsPerDay: result.avg_logs_per_day || 0,
+      totalMinutesLogged: result.total_minutes || 0
+    };
+  }
+
+  /**
    * ユーザー統計を取得
    */
   async getUserStats(userId: string): Promise<UserStats> {
     try {
+      // 元の実装を使用して、テストが通ることを確認
       const [
         totalLogs,
         thisMonthLogs,
@@ -2115,7 +2221,7 @@ export class SqliteActivityLogRepository implements IActivityLogRepository, IApi
     return row.logs / row.days;
   }
 
-  private async getMostActiveHour(userId: string): Promise<number> {
+  private async getMostActiveHour(userId: string): Promise<number | null> {
     const result = await this.allQuery(`
       SELECT 
         CAST(strftime('%H', input_timestamp) AS INTEGER) as hour,
@@ -2127,7 +2233,7 @@ export class SqliteActivityLogRepository implements IActivityLogRepository, IApi
       LIMIT 1
     `, [userId]);
     
-    return result[0]?.hour || 12; // デフォルトは12時
+    return result[0]?.hour || null;
   }
 
   private async getTotalMinutesLogged(userId: string): Promise<number> {
@@ -2140,7 +2246,7 @@ export class SqliteActivityLogRepository implements IActivityLogRepository, IApi
     return result[0]?.total || 0;
   }
 
-  private async getLongestActiveDay(userId: string): Promise<{ date: string; logCount: number }> {
+  private async getLongestActiveDay(userId: string): Promise<{ date: string; logCount: number } | null> {
     const result = await this.allQuery(`
       SELECT 
         business_date as date,
@@ -2155,6 +2261,6 @@ export class SqliteActivityLogRepository implements IActivityLogRepository, IApi
     return result[0] ? {
       date: result[0].date,
       logCount: result[0].logCount
-    } : { date: '', logCount: 0 };
+    } : null;
   }
 }

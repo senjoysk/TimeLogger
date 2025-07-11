@@ -36,10 +36,19 @@ export class ProfileCommandHandler {
         userId: userInfo.userId,
         username: userInfo.username,
         timezone: userInfo.timezone,
-        registrationDate: userInfo.createdAt,
-        lastSeenAt: userInfo.lastSeen,
+        registrationDate: userInfo.registrationDate,
+        lastSeenAt: userInfo.lastSeenAt,
         isActive: userInfo.isActive,
-        stats
+        stats: {
+          totalLogs: stats.totalLogs,
+          thisMonthLogs: stats.thisMonthLogs,
+          thisWeekLogs: stats.thisWeekLogs,
+          todayLogs: stats.todayLogs,
+          avgLogsPerDay: stats.avgLogsPerDay,
+          mostActiveHour: stats.mostActiveHour,
+          totalMinutesLogged: stats.totalMinutesLogged,
+          longestActiveDay: stats.longestActiveDay
+        }
       };
       
       // プロファイル表示
@@ -113,7 +122,7 @@ export class ProfileCommandHandler {
     
     if (!compact) {
       sections.push(`1日平均: ${stats.avgLogsPerDay.toFixed(1)}件`);
-      sections.push(`最も活発な時間: ${stats.mostActiveHour}時台`);
+      sections.push(`最も活発な時間: ${stats.mostActiveHour !== null ? stats.mostActiveHour + '時台' : '未分析'}`);
       sections.push(`総記録時間: ${Math.round(stats.totalMinutesLogged / 60)}時間`);
       
       if (stats.longestActiveDay && stats.longestActiveDay.logCount > 0) {

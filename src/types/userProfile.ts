@@ -18,12 +18,12 @@ export interface UserActivityStats {
   thisWeekLogs: number;
   todayLogs: number;
   avgLogsPerDay: number;
-  mostActiveHour: number;
+  mostActiveHour: number | null;
   totalMinutesLogged: number;
   longestActiveDay?: {
     date: string;
     logCount: number;
-  };
+  } | null;
 }
 
 export interface ProfileDisplayOptions {

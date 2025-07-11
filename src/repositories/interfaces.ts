@@ -8,8 +8,8 @@ export interface UserInfo {
   userId: string;
   username?: string;
   timezone: string;
-  firstSeen: string;
-  lastSeen: string;
+  registrationDate: string;  // first_seen のエイリアス
+  lastSeenAt: string;        // last_seen のエイリアス
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
@@ -25,12 +25,12 @@ export interface UserStats {
   thisWeekLogs: number;
   todayLogs: number;
   avgLogsPerDay: number;
-  mostActiveHour: number;
+  mostActiveHour: number | null;
   totalMinutesLogged: number;
   longestActiveDay?: {
     date: string;
     logCount: number;
-  };
+  } | null;
 }
 
 /**
@@ -221,6 +221,9 @@ export interface IUserRepository {
   
   // ユーザー情報取得
   getUserInfo(userId: string): Promise<UserInfo | null>;
+  
+  // 全ユーザー取得
+  getAllUsers(): Promise<UserInfo[]>;
   
   // ユーザー統計取得
   getUserStats(userId: string): Promise<UserStats>;
