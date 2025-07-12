@@ -1,5 +1,17 @@
-// 現在、このファイルにはアクティブなインターフェースは含まれていません
-// すべてのインターフェースは削除されたCommandManagerと関連する機能で使用されていました
-// 新システムではActivityLoggingIntegrationが直接コマンド処理を行います
+/**
+ * コマンドハンドラー共通インターフェース
+ */
 
-// TODO: このファイル自体を削除するか、新システム用のインターフェースで置き換えることを検討してください
+import { Message } from 'discord.js';
+
+/**
+ * コマンドハンドラーインターフェース
+ */
+export interface ICommandHandler {
+  /**
+   * コマンドを処理
+   * @param message Discordメッセージ
+   * @param args コマンド引数
+   */
+  handleCommand(message: Message, args: string[]): Promise<void>;
+}

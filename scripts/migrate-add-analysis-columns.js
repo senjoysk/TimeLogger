@@ -15,7 +15,7 @@ config();
 async function runMigration() {
   console.log('🔧 データベースマイグレーション開始: 分析結果カラムの追加\n');
   
-  const dbPath = process.env.DATABASE_PATH || './data/activity_logs.db';
+  const dbPath = process.env.DATABASE_PATH || './data/app.db';
   console.log(`📁 データベースパス: ${dbPath}`);
   
   const db = new Database(dbPath);

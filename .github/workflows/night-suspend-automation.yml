@@ -2,10 +2,8 @@ name: 夜間サスペンド自動化
 
 on:
   schedule:
-    # 夜間サスペンド: 毎日 0:00 JST (15:00 UTC)
-    - cron: '0 15 * * *'
-    # 朝の起動処理: 毎日 7:00 JST (22:00 UTC 前日)
-    - cron: '0 22 * * *'
+    # 動的スケジューリング: 30分間隔で実行（ユーザー別タイムゾーン対応）
+    - cron: '0,30 * * * *'
   
   # 手動実行も可能
   workflow_dispatch:
@@ -28,22 +26,73 @@ env:
   FLY_APP_NAME: timelogger-bitter-resonance-9585
 
 jobs:
-  # 夜間サスペンド処理（0:00 JST）
-  night-suspend:
-    if: github.event.schedule == '0 15 * * *' || github.event.inputs.action == 'night-suspend'
+  # 動的スケジューリング処理（ユーザー別タイムゾーン対応）
+  dynamic-schedule-check:
+    if: github.event_name == 'schedule' || github.event.inputs.action == 'night-suspend' || github.event.inputs.action == 'wake-up'
     runs-on: ubuntu-latest
-    name: 夜間サスペンド実行
+    name: 動的スケジュール実行
     
     steps:
-      - name: 🌙 夜間サスペンド開始通知
+      - name: ⏰ 動的スケジュール処理開始
         run: |
-          echo "🌙 夜間サスペンド処理を開始します"
-          echo "時刻: $(date '+%Y-%m-%d %H:%M:%S UTC') (JST: $(TZ=Asia/Tokyo date '+%Y-%m-%d %H:%M:%S'))"
+          echo "⏰ ユーザー別タイムゾーン対応スケジュール処理を開始します"
+          echo "現在時刻: $(date '+%Y-%m-%d %H:%M:%S UTC')"
+          echo "JST: $(TZ=Asia/Tokyo date '+%Y-%m-%d %H:%M:%S')"
+          echo "IST: $(TZ=Asia/Kolkata date '+%Y-%m-%d %H:%M:%S')"
+          echo "EST: $(TZ=America/New_York date '+%Y-%m-%d %H:%M:%S')"
       
       - name: 📥 Fly.io CLIセットアップ
         uses: superfly/flyctl-actions/setup-flyctl@master
       
+      - name: 🔍 スケジュール判定
+        id: schedule-check
+        run: |
+          echo "🔍 現在時刻でのスケジュール判定を実行中..."
+          
+          # 手動実行の場合
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            if [ "${{ github.event.inputs.action }}" = "night-suspend" ]; then
+              echo "SHOULD_SUSPEND=true" >> $GITHUB_OUTPUT
+              echo "SHOULD_WAKE=false" >> $GITHUB_OUTPUT
+              echo "MANUAL_ACTION=suspend" >> $GITHUB_OUTPUT
+            elif [ "${{ github.event.inputs.action }}" = "wake-up" ]; then
+              echo "SHOULD_SUSPEND=false" >> $GITHUB_OUTPUT
+              echo "SHOULD_WAKE=true" >> $GITHUB_OUTPUT
+              echo "MANUAL_ACTION=wake" >> $GITHUB_OUTPUT
+            fi
+          else
+            # 自動実行の場合はBotに問い合わせ
+            echo "📡 Botにスケジュール判定を要求中..."
+            
+            RESPONSE=$(curl -s -w "%{http_code}" \
+              -X GET \
+              -H "Content-Type: application/json" \
+              "https://$FLY_APP_NAME.fly.dev/api/schedule-check" \
+              -o schedule_response.json || echo "000")
+            
+            HTTP_CODE=${RESPONSE: -3}
+            
+            if [ "$HTTP_CODE" = "200" ]; then
+              echo "✅ スケジュール判定完了"
+              cat schedule_response.json | jq '.'
+              
+              SHOULD_SUSPEND=$(cat schedule_response.json | jq -r '.shouldSuspend // false')
+              SHOULD_WAKE=$(cat schedule_response.json | jq -r '.shouldWake // false')
+              
+              echo "SHOULD_SUSPEND=$SHOULD_SUSPEND" >> $GITHUB_OUTPUT
+              echo "SHOULD_WAKE=$SHOULD_WAKE" >> $GITHUB_OUTPUT
+              echo "MANUAL_ACTION=auto" >> $GITHUB_OUTPUT
+            else
+              echo "⚠️  スケジュール判定の応答: HTTP $HTTP_CODE"
+              echo "デフォルトで処理をスキップします"
+              echo "SHOULD_SUSPEND=false" >> $GITHUB_OUTPUT
+              echo "SHOULD_WAKE=false" >> $GITHUB_OUTPUT
+              echo "MANUAL_ACTION=skip" >> $GITHUB_OUTPUT
+            fi
+          fi
+      
       - name: 🔄 Botにサスペンド準備要求
+        if: steps.schedule-check.outputs.SHOULD_SUSPEND == 'true'
         run: |
           echo "📡 Botにサスペンド準備を要求中..."
           
@@ -70,6 +119,7 @@ jobs:
           fi
       
       - name: 🛑 Fly.io アプリサスペンド実行
+        if: steps.schedule-check.outputs.SHOULD_SUSPEND == 'true'
         run: |
           echo "🛑 Fly.io アプリをサスペンドします..."
           
@@ -82,22 +132,8 @@ jobs:
           echo "✅ 夜間サスペンド完了"
           echo "💡 アプリは朝7:00 JST（22:00 UTC前日）に自動起動します"
 
-  # 朝の起動・リカバリ処理（7:00 JST）
-  wake-up-recovery:
-    if: github.event.schedule == '0 22 * * *' || github.event.inputs.action == 'wake-up' || github.event.inputs.action == 'morning-recovery'
-    runs-on: ubuntu-latest
-    name: 朝の起動・リカバリ実行
-    
-    steps:
-      - name: 🌅 朝の起動処理開始通知
-        run: |
-          echo "🌅 朝の起動・リカバリ処理を開始します"
-          echo "時刻: $(date '+%Y-%m-%d %H:%M:%S UTC') (JST: $(TZ=Asia/Tokyo date '+%Y-%m-%d %H:%M:%S'))"
-      
-      - name: 📥 Fly.io CLIセットアップ
-        uses: superfly/flyctl-actions/setup-flyctl@master
-      
       - name: 🚀 Fly.io アプリ起動
+        if: steps.schedule-check.outputs.SHOULD_WAKE == 'true'
         run: |
           echo "🚀 Fly.io アプリを起動します..."
           
@@ -122,6 +158,7 @@ jobs:
           done
       
       - name: 🔔 Bot起動通知
+        if: steps.schedule-check.outputs.SHOULD_WAKE == 'true'
         run: |
           echo "🔔 Botに起動通知を送信..."
           
@@ -145,6 +182,7 @@ jobs:
           fi
       
       - name: 🔄 夜間メッセージリカバリ実行
+        if: steps.schedule-check.outputs.SHOULD_WAKE == 'true'
         run: |
           echo "🔄 夜間メッセージリカバリを実行..."
           
@@ -183,14 +221,25 @@ jobs:
             echo "💡 メッセージリカバリにエラーが発生しましたが、アプリは正常に起動しています"
           fi
       
-      - name: 📋 起動・リカバリ完了サマリー
+      - name: 📋 動的スケジュール処理完了サマリー
         run: |
-          echo "📋 起動・リカバリ処理完了サマリー"
-          echo "================================"
+          echo "📋 動的スケジュール処理完了サマリー"
+          echo "=================================="
           echo "🕐 完了時刻: $(TZ=Asia/Tokyo date '+%Y-%m-%d %H:%M:%S JST')"
-          echo "🚀 アプリ起動: ✅"
-          echo "🔔 起動通知: $([ -f wake_response.json ] && echo '✅' || echo '⚠️')"
-          echo "🔄 メッセージリカバリ: $([ -f recovery_response.json ] && echo '✅' || echo '⚠️')"
+          echo "⏰ 実行判定:"
+          echo "  - サスペンド: ${{ steps.schedule-check.outputs.SHOULD_SUSPEND }}"
+          echo "  - 起床: ${{ steps.schedule-check.outputs.SHOULD_WAKE }}"
+          echo "  - モード: ${{ steps.schedule-check.outputs.MANUAL_ACTION }}"
+          
+          if [ "${{ steps.schedule-check.outputs.SHOULD_SUSPEND }}" = "true" ]; then
+            echo "🛑 サスペンド実行: ✅"
+          fi
+          
+          if [ "${{ steps.schedule-check.outputs.SHOULD_WAKE }}" = "true" ]; then
+            echo "🚀 アプリ起動: ✅"
+            echo "🔔 起動通知: $([ -f wake_response.json ] && echo '✅' || echo '⚠️')"
+            echo "🔄 メッセージリカバリ: $([ -f recovery_response.json ] && echo '✅' || echo '⚠️')"
+          fi
           
           # 最終ステータス確認
           echo ""

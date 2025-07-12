@@ -45,6 +45,11 @@ export interface IDatabaseRepository {
   // ユーザー関連操作
   getUserTimezone(userId: string): Promise<string>;
   setUserTimezone(userId: string, timezone: string): Promise<void>;
+  
+  // サスペンドスケジュール関連操作
+  saveUserSuspendSchedule(userId: string, suspendHour: number, wakeHour: number): Promise<void>;
+  getUserSuspendSchedule(userId: string): Promise<{ suspendHour: number; wakeHour: number; timezone: string } | null>;
+  getAllUserSuspendSchedules(): Promise<{ [userId: string]: { suspendHour: number; wakeHour: number; timezone: string } }>;
 
   // 活動記録関連操作
   saveActivityRecord(record: ActivityRecord, timezone: string): Promise<void>;

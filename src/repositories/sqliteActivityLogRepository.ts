@@ -1158,6 +1158,91 @@ export class SqliteActivityLogRepository implements IActivityLogRepository, IApi
     }
   }
 
+  /**
+   * ユーザーのサスペンド時刻設定を保存
+   * @param userId ユーザーID
+   * @param suspendHour サスペンド時刻（0-23）
+   * @param wakeHour 起床時刻（0-23）
+   */
+  async saveUserSuspendSchedule(userId: string, suspendHour: number, wakeHour: number): Promise<void> {
+    try {
+      // 時刻の妥当性をチェック
+      if (suspendHour < 0 || suspendHour > 23 || wakeHour < 0 || wakeHour > 23) {
+        throw new Error('サスペンド時刻は0-23の範囲で指定してください');
+      }
+
+      const sql = `
+        INSERT OR REPLACE INTO user_settings (user_id, timezone, suspend_hour, wake_hour, updated_at)
+        VALUES (?, COALESCE((SELECT timezone FROM user_settings WHERE user_id = ?), 'Asia/Tokyo'), ?, ?, datetime('now', 'utc'))
+      `;
+      
+      await this.runQuery(sql, [userId, userId, suspendHour, wakeHour]);
+      console.log(`⏰ ユーザーサスペンド時刻設定保存: ${userId} (${suspendHour}:00-${wakeHour}:00)`);
+    } catch (error) {
+      console.error('❌ ユーザーサスペンド時刻設定保存エラー:', error);
+      throw new ActivityLogError('ユーザーサスペンド時刻設定の保存に失敗しました', 'SAVE_USER_SUSPEND_SCHEDULE_ERROR', { error, userId, suspendHour, wakeHour });
+    }
+  }
+
+  /**
+   * ユーザーのサスペンド時刻設定を取得
+   * @param userId ユーザーID
+   * @returns サスペンド・起床時刻の設定、未設定の場合はnull
+   */
+  async getUserSuspendSchedule(userId: string): Promise<{ suspendHour: number; wakeHour: number; timezone: string } | null> {
+    try {
+      const sql = `
+        SELECT suspend_hour, wake_hour, timezone
+        FROM user_settings 
+        WHERE user_id = ?
+      `;
+      
+      const row = await this.getQuery(sql, [userId]);
+      if (!row) {
+        return null;
+      }
+
+      return {
+        suspendHour: row.suspend_hour,
+        wakeHour: row.wake_hour,
+        timezone: row.timezone
+      };
+    } catch (error) {
+      console.error('❌ ユーザーサスペンド時刻設定取得エラー:', error);
+      throw new ActivityLogError('ユーザーサスペンド時刻設定の取得に失敗しました', 'GET_USER_SUSPEND_SCHEDULE_ERROR', { error, userId });
+    }
+  }
+
+  /**
+   * 全ユーザーのサスペンド時刻設定を取得
+   * @returns ユーザーID別のサスペンド設定マップ
+   */
+  async getAllUserSuspendSchedules(): Promise<{ [userId: string]: { suspendHour: number; wakeHour: number; timezone: string } }> {
+    try {
+      const sql = `
+        SELECT user_id, suspend_hour, wake_hour, timezone
+        FROM user_settings
+      `;
+      
+      const rows = await this.allQuery(sql);
+      const schedules: { [userId: string]: { suspendHour: number; wakeHour: number; timezone: string } } = {};
+      
+      for (const row of rows) {
+        schedules[row.user_id] = {
+          suspendHour: row.suspend_hour,
+          wakeHour: row.wake_hour,
+          timezone: row.timezone
+        };
+      }
+      
+      console.log(`⏰ 全ユーザーサスペンド設定取得: ${Object.keys(schedules).length}件`);
+      return schedules;
+    } catch (error) {
+      console.error('❌ 全ユーザーサスペンド設定取得エラー:', error);
+      throw new ActivityLogError('全ユーザーサスペンド設定の取得に失敗しました', 'GET_ALL_USER_SUSPEND_SCHEDULES_ERROR', { error });
+    }
+  }
+
   // === 統合サービス対応メソッド ===
 
   /**

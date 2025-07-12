@@ -22,6 +22,8 @@
     "test:realtime:watch": "jest --testPathPattern=realTimeAnalysis --watch",
     "validate:realtime": "npm run build && node scripts/test/realtime-analysis-validation.js",
     "benchmark:realtime": "npm run build && node --expose-gc scripts/test/performance-benchmark.js",
+    "check:database-paths": "node scripts/utils/check-database-paths.js",
+    "validate:database-paths": "grep -r 'activity_logs\\.db' --include='*.js' --include='*.ts' scripts/ src/ || echo 'No forbidden database paths found ✅'",
     "dev:start": "./scripts/development/bot-manager.sh start",
     "dev:stop": "./scripts/development/bot-manager.sh stop",
     "dev:restart": "./scripts/development/restart.sh",

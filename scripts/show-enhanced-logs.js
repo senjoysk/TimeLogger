@@ -19,7 +19,7 @@ async function showEnhancedLogs(date = null, userId = 'test-user') {
   
   try {
     // サービス初期化
-    const dbPath = process.env.DATABASE_PATH || './data/activity_logs.db';
+    const dbPath = process.env.DATABASE_PATH || './data/app.db';
     const repository = new SqliteActivityLogRepository(dbPath);
     const geminiService = new GeminiService(repository);
     const activityLogService = new ActivityLogService(repository, geminiService);

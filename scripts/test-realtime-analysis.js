@@ -18,7 +18,7 @@ async function testRealTimeAnalysis() {
   
   try {
     // サービス初期化
-    const dbPath = process.env.DATABASE_PATH || './data/tasks.db';
+    const dbPath = process.env.DATABASE_PATH || './data/app.db';
     const repository = new SqliteActivityLogRepository(dbPath);
     const geminiService = new GeminiService(repository);
     const analyzer = new RealTimeActivityAnalyzer(geminiService);

@@ -8,7 +8,7 @@ const path = require('path');
 const { Database } = require('sqlite3');
 
 // データベースパス
-const DATABASE_PATH = process.env.DATABASE_PATH || path.join(__dirname, '..', 'data', 'activity_logs.db');
+const DATABASE_PATH = process.env.DATABASE_PATH || path.join(__dirname, '..', 'data', 'app.db');
 
 /**
  * マイグレーション実行

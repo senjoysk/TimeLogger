@@ -17,7 +17,7 @@ async function inspectAnalysisData() {
   
   try {
     // リポジトリ初期化
-    const dbPath = process.env.DATABASE_PATH || './data/activity_logs.db';
+    const dbPath = process.env.DATABASE_PATH || './data/app.db';
     const repository = new SqliteActivityLogRepository(dbPath);
     
     console.log(`📁 データベースパス: ${dbPath}`);

@@ -23,6 +23,8 @@ import { ActivityTodoCorrelationService } from '../services/activityTodoCorrelat
 import { GapDetectionService } from '../services/gapDetectionService';
 import { ActivityLogError } from '../types/activityLog';
 import { GapHandler } from '../handlers/gapHandler';
+import { SuspendScheduleCommandHandler } from '../handlers/suspendScheduleCommandHandler';
+import { DynamicSchedulerService } from '../services/dynamicSchedulerService';
 
 /**
  * 活動記録システム統合設定インターフェース
@@ -58,6 +60,7 @@ export class ActivityLoggingIntegration {
   private gapDetectionService!: GapDetectionService;
   private correlationService!: ActivityTodoCorrelationService;
   private integratedSummaryService!: IntegratedSummaryService;
+  private dynamicSchedulerService!: DynamicSchedulerService;
 
   // ハンドラー層
   private editHandler!: EditCommandHandler;
@@ -68,6 +71,7 @@ export class ActivityLoggingIntegration {
   private unmatchedHandler!: UnmatchedCommandHandler;
   private todoHandler!: TodoCommandHandler;
   private profileHandler!: ProfileCommandHandler;
+  private suspendScheduleHandler!: SuspendScheduleCommandHandler;
 
   // 設定
   private config: ActivityLoggingConfig;
@@ -115,6 +119,9 @@ export class ActivityLoggingIntegration {
       
       this.gapDetectionService = new GapDetectionService(this.repository);
       
+      // 動的スケジューラーサービスの初期化
+      this.dynamicSchedulerService = new DynamicSchedulerService(this.repository);
+      
       // TODO機能サービスの初期化
       this.messageClassificationService = new MessageClassificationService(this.geminiService);
       this.correlationService = new ActivityTodoCorrelationService(this.repository);
@@ -153,6 +160,9 @@ export class ActivityLoggingIntegration {
       
       // プロファイル機能ハンドラーの初期化
       this.profileHandler = new ProfileCommandHandler(this.repository);
+      
+      // サスペンドスケジュール機能ハンドラーの初期化
+      this.suspendScheduleHandler = new SuspendScheduleCommandHandler(this.repository);
       
       console.log('✅ ハンドラー層初期化完了（TODO機能統合済み）');
 
@@ -369,6 +379,13 @@ export class ActivityLoggingIntegration {
       case 'プロファイル':
         console.log(`📊 profileコマンド実行: ユーザー=${userId}, タイムゾーン=${timezone}`);
         await this.profileHandler.handle(message, userId, args, timezone);
+        break;
+
+      case 'suspend-schedule':
+      case 'suspend':
+      case 'サスペンド設定':
+        console.log(`⏰ suspend-scheduleコマンド実行: ユーザー=${userId}, タイムゾーン=${timezone}`);
+        await this.suspendScheduleHandler.handleCommand(message, args);
         break;
 
       default:
@@ -829,6 +846,60 @@ export class ActivityLoggingIntegration {
 
 さっそく今日の活動を記録してみましょう！
     `.trim();
+  }
+
+  // === 動的スケジューラー機能 ===
+
+  /**
+   * 現在時刻でサスペンド・起床スケジュールをチェック
+   * @param toleranceMinutes 実行許容時間（分）
+   */
+  async checkSuspendSchedule(toleranceMinutes: number = 30) {
+    if (!this.isInitialized) {
+      throw new ActivityLogError('システムが初期化されていません', 'SYSTEM_NOT_INITIALIZED');
+    }
+
+    return await this.dynamicSchedulerService.checkSchedule(toleranceMinutes);
+  }
+
+  /**
+   * 全ユーザーのサスペンドスケジュール取得
+   */
+  async getAllUserSuspendSchedules() {
+    if (!this.isInitialized) {
+      throw new ActivityLogError('システムが初期化されていません', 'SYSTEM_NOT_INITIALIZED');
+    }
+
+    return await this.dynamicSchedulerService.getAllUserSchedules();
+  }
+
+  /**
+   * 次回実行予定時刻を取得
+   */
+  async getNextExecutionTimes() {
+    if (!this.isInitialized) {
+      throw new ActivityLogError('システムが初期化されていません', 'SYSTEM_NOT_INITIALIZED');
+    }
+
+    return await this.dynamicSchedulerService.getNextExecutionTimes();
+  }
+
+  /**
+   * スケジュール設定の統計情報を取得
+   */
+  async getScheduleStatistics() {
+    if (!this.isInitialized) {
+      throw new ActivityLogError('システムが初期化されていません', 'SYSTEM_NOT_INITIALIZED');
+    }
+
+    return await this.dynamicSchedulerService.getScheduleStatistics();
+  }
+
+  /**
+   * GitHub Actions用のCron式を生成
+   */
+  generateCronExpression(): string {
+    return this.dynamicSchedulerService.generateCronExpression();
   }
 
   /**

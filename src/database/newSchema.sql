@@ -46,6 +46,8 @@ CREATE TABLE IF NOT EXISTS daily_analysis_cache (
 CREATE TABLE IF NOT EXISTS user_settings (
     user_id TEXT PRIMARY KEY,
     timezone TEXT NOT NULL DEFAULT 'Asia/Tokyo', -- IANA タイムゾーン名
+    suspend_hour INTEGER DEFAULT 0,              -- 夜間サスペンド時刻（ローカル時間の時）
+    wake_hour INTEGER DEFAULT 7,                 -- 朝の起動時刻（ローカル時間の時）
     created_at TEXT NOT NULL DEFAULT (datetime('now', 'utc')),
     updated_at TEXT NOT NULL DEFAULT (datetime('now', 'utc'))
 );
@@ -68,6 +70,9 @@ ON daily_analysis_cache(generated_at);
 
 CREATE INDEX IF NOT EXISTS idx_user_settings_timezone 
 ON user_settings(timezone);
+
+CREATE INDEX IF NOT EXISTS idx_user_settings_suspend_schedule 
+ON user_settings(suspend_hour, wake_hour);
 
 -- 開始・終了ログマッチング機能用インデックス（Phase 2）
 CREATE INDEX IF NOT EXISTS idx_activity_logs_log_type 
