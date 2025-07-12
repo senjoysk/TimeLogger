@@ -5,6 +5,8 @@ on:
   push:
     branches:
       - main
+  # 手動実行を可能にする
+  workflow_dispatch:
 jobs:
   deploy:
     name: Deploy app
