@@ -170,6 +170,7 @@ class Application {
       console.log('  - POST /api/morning-recovery (認証必要)');
       console.log('  - GET /health (認証不要)');
       console.log('  - GET /api/suspend-status (認証不要)');
+      console.log('  - GET /api/schedule-check (認証不要)');
       
     } catch (error) {
       console.error('❌ 夜間サスペンドサーバーの起動に失敗しました:', error);
