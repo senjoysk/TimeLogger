@@ -9,6 +9,7 @@ import { nightSuspendAuthMiddleware } from '../middleware/nightSuspendAuth';
 import { MorningMessageRecovery } from '../services/morningMessageRecovery';
 import { SqliteNightSuspendRepository } from '../repositories/sqliteNightSuspendRepository';
 import { Client } from 'discord.js';
+import { ActivityLoggingIntegration } from '../integration/activityLoggingIntegration';
 
 /**
  * 夜間サスペンド機能用HTTPサーバー
@@ -24,11 +25,13 @@ export class NightSuspendServer {
   private server: Server | null = null;
   private port: number;
   private recoveryService?: MorningMessageRecovery;
+  private activityLoggingIntegration?: ActivityLoggingIntegration;
 
-  constructor(recoveryService?: MorningMessageRecovery) {
+  constructor(recoveryService?: MorningMessageRecovery, activityLoggingIntegration?: ActivityLoggingIntegration) {
     this.app = express();
     this.port = parseInt(process.env.PORT || '3000');
     this.recoveryService = recoveryService;
+    this.activityLoggingIntegration = activityLoggingIntegration;
     this.setupMiddleware();
     this.setupRoutes();
   }
@@ -64,6 +67,9 @@ export class NightSuspendServer {
     
     // サスペンド状態確認（認証不要）
     this.app.get('/api/suspend-status', this.getSuspendStatus);
+    
+    // スケジュールチェック（認証不要）
+    this.app.get('/api/schedule-check', this.scheduleCheck);
     
     // 夜間サスペンド準備（認証必要）
     this.app.post('/api/night-suspend', nightSuspendAuthMiddleware, this.nightSuspend);
@@ -223,6 +229,49 @@ export class NightSuspendServer {
       res.status(500).json({
         error: 'Internal server error',
         message: 'メッセージリカバリに失敗しました'
+      });
+    }
+  };
+
+  /**
+   * スケジュールチェックエンドポイント
+   */
+  private scheduleCheck = async (req: Request, res: Response): Promise<void> => {
+    try {
+      console.log('📡 GitHub Actionsからスケジュールチェック要求受信');
+      
+      if (!this.activityLoggingIntegration) {
+        res.status(503).json({
+          error: 'Service unavailable',
+          message: 'システムが初期化されていません'
+        });
+        return;
+      }
+
+      // 動的スケジューラーサービスでスケジュールチェック（30分許容）
+      const scheduleResult = await this.activityLoggingIntegration.checkSuspendSchedule(30);
+      
+      console.log('⏰ スケジュール判定結果:', {
+        shouldSuspend: scheduleResult.shouldSuspend,
+        shouldWake: scheduleResult.shouldWake,
+        suspendUsers: scheduleResult.suspendUsers,
+        wakeUsers: scheduleResult.wakeUsers
+      });
+
+      res.json({
+        shouldSuspend: scheduleResult.shouldSuspend,
+        shouldWake: scheduleResult.shouldWake,
+        suspendUsers: scheduleResult.suspendUsers,
+        wakeUsers: scheduleResult.wakeUsers,
+        currentUtc: scheduleResult.currentUtc,
+        timestamp: new Date().toISOString()
+      });
+      
+    } catch (error) {
+      console.error('❌ スケジュールチェックエラー:', error);
+      res.status(500).json({
+        error: 'Internal server error',
+        message: 'スケジュール判定に失敗しました'
       });
     }
   };

@@ -156,8 +156,11 @@ class Application {
         }
       }
 
+      // ActivityLoggingIntegrationの取得
+      const activityIntegration = this.bot.getActivityLoggingIntegration();
+      
       // 夜間サスペンドサーバーの起動
-      this.nightSuspendServer = new NightSuspendServer(morningRecovery);
+      this.nightSuspendServer = new NightSuspendServer(morningRecovery, activityIntegration);
       await this.nightSuspendServer.start();
       
       console.log('🌙 夜間サスペンドサーバーが正常に起動しました');

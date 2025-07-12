@@ -382,6 +382,13 @@ export class TaskLoggerBot {
   }
 
   /**
+   * ActivityLoggingIntegrationインスタンスを取得
+   */
+  public getActivityLoggingIntegration(): any {
+    return this.activityLoggingIntegration;
+  }
+
+  /**
    * システム初期化が完了しているかチェック
    */
   public isSystemInitialized(): boolean {
