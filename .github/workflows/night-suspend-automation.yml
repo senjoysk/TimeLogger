@@ -48,7 +48,7 @@ jobs:
           echo "📡 Botにサスペンド準備を要求中..."
           
           # Botアプリの現在のステータス確認
-          flyctl status --app $FLY_APP_NAME || true
+          flyctl status -a $FLY_APP_NAME || true
           
           # Botにサスペンド準備リクエスト送信
           RESPONSE=$(curl -s -w "%{http_code}" \
@@ -73,11 +73,11 @@ jobs:
         run: |
           echo "🛑 Fly.io アプリをサスペンドします..."
           
-          # アプリのサスペンド実行
-          flyctl suspend --app $FLY_APP_NAME
+          # アプリのサスペンド実行（新コマンド）
+          flyctl scale count 0 -a $FLY_APP_NAME
           
           # サスペンド確認
-          flyctl status --app $FLY_APP_NAME
+          flyctl status -a $FLY_APP_NAME
           
           echo "✅ 夜間サスペンド完了"
           echo "💡 アプリは朝7:00 JST（22:00 UTC前日）に自動起動します"
@@ -101,21 +101,21 @@ jobs:
         run: |
           echo "🚀 Fly.io アプリを起動します..."
           
-          # アプリの起動
-          flyctl resume --app $FLY_APP_NAME
+          # アプリの起動（新コマンド）
+          flyctl scale count 1 -a $FLY_APP_NAME
           
           # 起動確認（最大60秒待機）
           for i in {1..12}; do
             echo "⏳ 起動確認中... ($i/12)"
             
-            if flyctl status --app $FLY_APP_NAME | grep -q "deployed"; then
+            if flyctl status -a $FLY_APP_NAME | grep -q "deployed"; then
               echo "✅ アプリが正常に起動しました"
               break
             fi
             
             if [ $i -eq 12 ]; then
               echo "⚠️  アプリの起動に時間がかかっています"
-              flyctl logs --app $FLY_APP_NAME --lines 20
+              flyctl logs -a $FLY_APP_NAME --lines 20
             fi
             
             sleep 5
@@ -195,7 +195,7 @@ jobs:
           # 最終ステータス確認
           echo ""
           echo "📊 最終アプリステータス:"
-          flyctl status --app $FLY_APP_NAME
+          flyctl status -a $FLY_APP_NAME
 
   # 手動実行用の個別アクション
   manual-action:
