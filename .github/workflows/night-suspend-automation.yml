@@ -108,14 +108,14 @@ jobs:
           for i in {1..12}; do
             echo "⏳ 起動確認中... ($i/12)"
             
-            if flyctl status -a $FLY_APP_NAME | grep -q "deployed"; then
+            if flyctl status -a $FLY_APP_NAME | grep -q "started"; then
               echo "✅ アプリが正常に起動しました"
               break
             fi
             
             if [ $i -eq 12 ]; then
               echo "⚠️  アプリの起動に時間がかかっています"
-              flyctl logs -a $FLY_APP_NAME --lines 20
+              flyctl logs -a $FLY_APP_NAME -n
             fi
             
             sleep 5
