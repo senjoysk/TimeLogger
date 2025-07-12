@@ -74,7 +74,7 @@ jobs:
           echo "🛑 Fly.io アプリをサスペンドします..."
           
           # アプリのサスペンド実行（新コマンド）
-          flyctl scale count 0 -a $FLY_APP_NAME
+          flyctl scale count 0 -a $FLY_APP_NAME --yes
           
           # サスペンド確認
           flyctl status -a $FLY_APP_NAME
@@ -102,7 +102,7 @@ jobs:
           echo "🚀 Fly.io アプリを起動します..."
           
           # アプリの起動（新コマンド）
-          flyctl scale count 1 -a $FLY_APP_NAME
+          flyctl scale count 1 -a $FLY_APP_NAME --yes
           
           # 起動確認（最大60秒待機）
           for i in {1..12}; do
