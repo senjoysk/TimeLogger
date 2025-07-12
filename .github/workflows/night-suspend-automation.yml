@@ -123,22 +123,30 @@ jobs:
         run: |
           echo "🛑 Fly.io アプリをサスペンドします..."
           
-          # アプリのサスペンド実行（新コマンド）
-          flyctl scale count 0 -a $FLY_APP_NAME --yes
+          # マシンIDを動的に取得
+          MACHINE_ID=$(flyctl machines list -a $FLY_APP_NAME --json | jq -r '.[0].id')
+          echo "🔍 対象マシンID: $MACHINE_ID"
+          
+          # アプリのサスペンド実行（正しいコマンド）
+          flyctl machine suspend $MACHINE_ID -a $FLY_APP_NAME
           
           # サスペンド確認
           flyctl status -a $FLY_APP_NAME
           
           echo "✅ 夜間サスペンド完了"
-          echo "💡 アプリは朝7:00 JST（22:00 UTC前日）に自動起動します"
+          echo "💡 アプリは設定された時刻に自動起動します"
 
       - name: 🚀 Fly.io アプリ起動
         if: steps.schedule-check.outputs.SHOULD_WAKE == 'true'
         run: |
           echo "🚀 Fly.io アプリを起動します..."
           
-          # アプリの起動（新コマンド）
-          flyctl scale count 1 -a $FLY_APP_NAME --yes
+          # マシンIDを動的に取得
+          MACHINE_ID=$(flyctl machines list -a $FLY_APP_NAME --json | jq -r '.[0].id')
+          echo "🔍 対象マシンID: $MACHINE_ID"
+          
+          # アプリの起動（正しいコマンド）
+          flyctl machine start $MACHINE_ID -a $FLY_APP_NAME
           
           # 起動確認（最大60秒待機）
           for i in {1..12}; do
