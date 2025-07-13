@@ -2,6 +2,9 @@
 
 # worktree セットアップスクリプト
 # 新しいworktreeを作成し、メインリポジトリから環境変数ファイルをコピーする
+# 
+# 注意: Git フックが設定されている場合、環境変数ファイルのコピーは自動で行われます
+# Git フックの設定: ./scripts/setup-git-hooks.sh install
 
 set -e  # エラー時に停止
 
@@ -60,6 +63,16 @@ fi
 BRANCH_NAME="$1"
 WORKTREE_PATH="${2:-../$BRANCH_NAME}"
 
+# Gitフックが設定されているかチェック
+check_git_hooks() {
+    local hooks_path=$(git config core.hooksPath 2>/dev/null || echo "")
+    if [ -n "$hooks_path" ] && [ -f "$hooks_path/post-checkout" ] && [ -x "$hooks_path/post-checkout" ]; then
+        return 0  # フックが設定されている
+    else
+        return 1  # フックが設定されていない
+    fi
+}
+
 # 現在の作業ディレクトリがGitリポジトリかチェック
 if ! git rev-parse --git-dir > /dev/null 2>&1; then
     log_error "現在のディレクトリはGitリポジトリではありません"
@@ -99,8 +112,38 @@ fi
 
 log_success "worktree作成完了: $WORKTREE_PATH"
 
-# 環境変数ファイルをコピー
+# Gitフックによる自動セットアップをチェック
+if check_git_hooks; then
+    log_info "Git フックが設定されています。環境変数ファイルは自動でコピーされます。"
+    echo ""
+    echo "🎉 worktreeセットアップ完了!"
+    echo ""
+    echo "📁 作業ディレクトリ: $WORKTREE_PATH"
+    echo "🌿 ブランチ: $BRANCH_NAME"
+    echo ""
+    echo "Git フックにより以下が自動実行されました:"
+    echo "  ✅ 環境変数ファイルのコピー"
+    echo "  ✅ 依存関係のインストール"
+    echo "  ✅ テンプレート変数の置換"
+    echo ""
+    echo "次のステップ:"
+    echo "  1. cd $WORKTREE_PATH"
+    echo "  2. 環境変数ファイルの内容を確認・編集"
+    echo "  3. 開発開始: npm run dev"
+    echo ""
+    echo "Git フック設定を変更したい場合:"
+    echo "  $MAIN_REPO_PATH/.githooks/config を編集してください"
+    echo ""
+    echo "worktreeの削除方法:"
+    echo "  git worktree remove $WORKTREE_PATH"
+    echo "  git branch -D $BRANCH_NAME  # ブランチも削除する場合"
+    exit 0
+fi
+
+# 環境変数ファイルをコピー（フックが無効な場合の従来処理）
 log_info "環境変数ファイルをコピー中..."
+log_warning "Git フックが設定されていません。手動でセットアップします。"
+log_info "自動セットアップを有効にするには: ./scripts/setup-git-hooks.sh install"
 
 COPIED_FILES=()
 for env_file in "${ENV_FILES[@]}"; do

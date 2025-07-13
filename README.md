@@ -619,6 +619,122 @@ src/__tests__/
 
 ## 開発
 
+### 🌿 Git Worktree開発環境
+
+複数のブランチで並行開発を行う場合は、Git Worktreeを活用できます。
+
+#### 🪝 Gitフック自動セットアップ（推奨）
+
+**ワンタイム設定（初回のみ）**
+```bash
+# Git フックを有効化（一度だけ実行）
+./scripts/setup-git-hooks.sh install
+
+# 設定状況を確認
+./scripts/setup-git-hooks.sh status
+```
+
+**worktree作成（Gitフック有効時）**
+```bash
+# 通常のGitコマンドでworktreeを作成するだけで自動セットアップ
+git worktree add ../feature-branch feature/new-feature
+
+# 自動で以下が実行されます:
+#   ✅ 環境変数ファイルのコピー
+#   ✅ テンプレート変数の置換（ブランチ名など）
+#   ✅ 依存関係のインストール（npm install）
+```
+
+#### 📋 手動セットアップスクリプト（Gitフック未使用時）
+
+**Bashスクリプト**
+```bash
+# 新しいworktreeを作成（環境変数ファイルも自動コピー）
+./scripts/setup-worktree.sh feature/new-feature
+
+# カスタムパスを指定
+./scripts/setup-worktree.sh hotfix/urgent-fix ../hotfix-workspace
+```
+
+**Python版（高機能）**
+```bash
+# 基本的な使用
+python3 ./scripts/setup-worktree.py feature/new-feature
+
+# テンプレート変数を使用
+python3 ./scripts/setup-worktree.py feature/test \
+  --template-vars BRANCH_NAME=test,DB_NAME=test_db
+
+# 依存関係インストールをスキップ
+python3 ./scripts/setup-worktree.py feature/quick --skip-install
+```
+
+#### ⚙️ Gitフック設定管理
+
+```bash
+# Git フックの状態確認
+./scripts/setup-git-hooks.sh status
+
+# Git フックの有効化
+./scripts/setup-git-hooks.sh install
+
+# Git フックの無効化
+./scripts/setup-git-hooks.sh uninstall
+
+# Git フックの動作テスト
+./scripts/setup-git-hooks.sh test
+
+# グローバル設定（全リポジトリに適用）
+./scripts/setup-git-hooks.sh install --global
+```
+
+**フック設定のカスタマイズ**
+```bash
+# 設定ファイルを編集
+vim .githooks/config
+
+# 設定例:
+# AUTO_ENV_COPY=true          # 環境変数ファイルの自動コピー
+# AUTO_NPM_INSTALL=true       # npm install の自動実行
+# AUTO_TEMPLATE_VARS=true     # テンプレート変数の自動置換
+# VERBOSE_LOGGING=false       # 詳細ログの表示
+```
+
+#### 環境変数ファイル管理
+
+```bash
+# メインリポジトリから環境変数ファイルを同期
+./scripts/manage-env.sh sync-from-main
+
+# 現在の環境変数ファイルをメインリポジトリに反映
+./scripts/manage-env.sh sync-to-main
+
+# バックアップ作成
+./scripts/manage-env.sh backup
+
+# 差分確認
+./scripts/manage-env.sh diff
+
+# 環境変数ファイルの一覧表示
+./scripts/manage-env.sh list
+
+# 環境変数ファイルの内容検証
+./scripts/manage-env.sh validate
+```
+
+#### worktreeの手動管理
+
+```bash
+# worktree一覧表示
+git worktree list
+
+# worktree削除
+git worktree remove path/to/worktree
+
+# ブランチ削除
+git branch -D feature/branch-name
+```
+
 ### 🛠️ 開発ガイドライン
 
 #### TDD開発フロー（必須）
