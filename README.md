@@ -645,29 +645,6 @@ git worktree add ../feature-branch feature/new-feature
 #   ✅ 依存関係のインストール（npm install）
 ```
 
-#### 📋 手動セットアップスクリプト（Gitフック未使用時）
-
-**Bashスクリプト**
-```bash
-# 新しいworktreeを作成（環境変数ファイルも自動コピー）
-./scripts/setup-worktree.sh feature/new-feature
-
-# カスタムパスを指定
-./scripts/setup-worktree.sh hotfix/urgent-fix ../hotfix-workspace
-```
-
-**Python版（高機能）**
-```bash
-# 基本的な使用
-python3 ./scripts/setup-worktree.py feature/new-feature
-
-# テンプレート変数を使用
-python3 ./scripts/setup-worktree.py feature/test \
-  --template-vars BRANCH_NAME=test,DB_NAME=test_db
-
-# 依存関係インストールをスキップ
-python3 ./scripts/setup-worktree.py feature/quick --skip-install
-```
 
 #### ⚙️ Gitフック設定管理
 
@@ -700,27 +677,6 @@ vim .githooks/config
 # VERBOSE_LOGGING=false       # 詳細ログの表示
 ```
 
-#### 環境変数ファイル管理
-
-```bash
-# メインリポジトリから環境変数ファイルを同期
-./scripts/manage-env.sh sync-from-main
-
-# 現在の環境変数ファイルをメインリポジトリに反映
-./scripts/manage-env.sh sync-to-main
-
-# バックアップ作成
-./scripts/manage-env.sh backup
-
-# 差分確認
-./scripts/manage-env.sh diff
-
-# 環境変数ファイルの一覧表示
-./scripts/manage-env.sh list
-
-# 環境変数ファイルの内容検証
-./scripts/manage-env.sh validate
-```
 
 #### worktreeの手動管理
 
