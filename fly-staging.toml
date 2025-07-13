@@ -56,8 +56,7 @@ kill_timeout = '5s'
   count = 1                              # マシン1台
 
 # 🔍 デバッグ用設定（staging環境のみ）
-[console_command]
-  command = "/bin/bash"
+console_command = "/bin/bash"
 
 # 📊 メトリクス・ログ設定
 [metrics]
