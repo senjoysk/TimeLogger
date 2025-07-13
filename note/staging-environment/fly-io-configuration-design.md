@@ -34,7 +34,7 @@ kill_timeout = '5s'
 
 [env]
   NODE_ENV = 'staging'
-  TZ = 'Asia/Tokyo'
+  TZ = 'Asia/Kolkata'
   PORT = '3000'
   
   # Staging環境固有の設定
@@ -164,7 +164,7 @@ kill_timeout = '5s'
 # 基本設定
 # ===============================
 NODE_ENV=staging
-TZ=Asia/Tokyo
+TZ=Asia/Kolkata
 PORT=3000
 
 # ===============================
@@ -277,6 +277,7 @@ PRODUCTION_BACKUP_URL=your_production_backup_url_here
 |------|--------|---------|------------|
 | **アプリ名** | - | timelogger-staging | timelogger-bitter-resonance-9585 |
 | **NODE_ENV** | development | staging | production |
+| **タイムゾーン** | Asia/Tokyo | Asia/Kolkata | Asia/Tokyo |
 | **データベース** | ローカルファイル | staging_data volume | production_data volume |
 | **ログレベル** | debug | debug | info |
 | **デバッグAPI** | 有効 | 有効 | 無効 |

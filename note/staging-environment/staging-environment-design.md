@@ -37,6 +37,9 @@ npm run dev:test     # 開発環境テスト
 - パフォーマンステスト
 - 環境変数・設定の動作確認
 
+# タイムゾーン
+- Asia/Kolkata（開発者の現在地に合わせて設定）
+
 # データベース戦略
 - 完全分離DB（timelogger_staging_data volume）
 - テストデータ生成 + 必要時の匿名化本番データクローン
