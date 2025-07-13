@@ -71,4 +71,4 @@ Desktop.ini
 .claude/
 
 # 環境固有の設定
-.env.local.*
+.env.staging
