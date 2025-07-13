@@ -1,0 +1,96 @@
+# Production環境デプロイワークフロー
+# See https://fly.io/docs/app-guides/continuous-deployment-with-github-actions/
+
+name: Production Deploy
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+    inputs:
+      confirm_production:
+        description: '本番環境へのデプロイを確認してください'
+        required: true
+        default: false
+        type: boolean
+      environment:
+        description: 'デプロイ環境'
+        required: true
+        default: 'production'
+        type: choice
+        options:
+          - 'production'
+
+env:
+  FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+  PRODUCTION_APP_NAME: timelogger-bitter-resonance-9585
+
+jobs:
+  deploy:
+    name: Deploy to Production
+    runs-on: ubuntu-latest
+    environment: production
+    concurrency: deploy-group
+    
+    steps:
+      - name: 📊 デプロイ環境確認
+        run: |
+          echo "🌿 ブランチ: ${{ github.ref_name }}"
+          echo "🏭 環境: production"
+          echo "📱 アプリ: ${{ env.PRODUCTION_APP_NAME }}"
+          echo "🌍 タイムゾーン: Asia/Tokyo"
+          echo "🕐 デプロイ時刻: $(date)"
+          
+      - name: ⚠️ 本番デプロイ確認
+        if: github.event.inputs.confirm_production != 'true' && github.event_name == 'workflow_dispatch'
+        run: |
+          echo "❌ 本番デプロイの確認が必要です"
+          echo "confirm_production を true に設定してください"
+          exit 1
+          
+      - name: 📥 リポジトリチェックアウト
+        uses: actions/checkout@v4
+        
+      - name: 🚀 Fly.io CLI セットアップ
+        uses: superfly/flyctl-actions/setup-flyctl@master
+        
+      - name: 📊 デプロイ前ステータス確認
+        run: |
+          echo "📊 Production環境デプロイ前ステータス:"
+          flyctl status --app ${{ env.PRODUCTION_APP_NAME }} || echo "⚠️ アプリがまだ存在しないか、停止しています"
+          
+      - name: 🚀 Production環境デプロイ実行
+        run: |
+          echo "🚀 Production環境にデプロイを開始します..."
+          flyctl deploy --remote-only --app ${{ env.PRODUCTION_APP_NAME }}
+          
+      - name: 🏥 本番ヘルスチェック
+        run: |
+          echo "🏥 本番環境ヘルスチェック実行中..."
+          sleep 30  # デプロイ完了待機
+          
+          for i in {1..10}; do
+            if flyctl status --app ${{ env.PRODUCTION_APP_NAME }} | grep -q "started"; then
+              echo "✅ 本番環境が正常に稼働しています"
+              break
+            fi
+            if [ $i -eq 10 ]; then
+              echo "❌ 本番環境の起動に失敗しました"
+              flyctl logs --app ${{ env.PRODUCTION_APP_NAME }}
+              exit 1
+            fi
+            echo "⏳ 起動確認中... ($i/10)"
+            sleep 15
+          done
+          
+      - name: 📊 デプロイ完了レポート
+        if: always()
+        run: |
+          echo "📊 Production環境デプロイ完了レポート"
+          echo "========================================="
+          echo "🕐 デプロイ時刻: $(date)"
+          echo "🌿 ブランチ: ${{ github.ref_name }}"
+          echo "📝 コミット: ${{ github.sha }}"
+          echo "📊 デプロイ結果: ${{ job.status }}"
+          echo ""
+          flyctl status --app ${{ env.PRODUCTION_APP_NAME }}

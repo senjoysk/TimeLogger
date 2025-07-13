@@ -680,6 +680,108 @@ npm run dev
 
 MIT License
 
+## 🚀 CI/CD・デプロイメント
+
+### ブランチ戦略
+
+#### 3層環境構成
+- **Local環境**: 開発・TDD・単体テスト
+- **Staging環境**: fly.io統合テスト・本番前検証
+- **Production環境**: 本番運用
+
+#### ブランチフロー
+```
+feature/* → develop → staging検証 → main → production
+```
+
+### GitHub Actions ワークフロー
+
+#### Staging Deploy (develop ブランチ)
+```yaml
+name: Staging Deploy
+trigger: develop ブランチへのpush
+environment: staging (Asia/Kolkata)
+app: timelogger-staging
+```
+
+#### Production Deploy (main ブランチ)
+```yaml
+name: Production Deploy  
+trigger: main ブランチへのpush
+environment: production (Asia/Tokyo)
+app: timelogger-bitter-resonance-9585
+```
+
+### 環境別設定
+
+| 項目 | Local | Staging | Production |
+|------|-------|---------|------------|
+| **タイムゾーン** | Asia/Tokyo | Asia/Kolkata | Asia/Tokyo |
+| **ログレベル** | debug | debug | info |
+| **データベース** | ローカルファイル | staging_data volume | production_data volume |
+| **自動停止** | - | 有効 | 手動のみ |
+
+### デプロイフロー
+
+#### 1. 開発・テスト
+```bash
+# TDD開発
+npm run test:watch
+
+# 品質チェック
+npm run build && npm test
+
+# develop ブランチマージ
+git push origin develop  # → staging環境自動デプロイ
+```
+
+#### 2. Staging検証
+```bash
+# staging環境での確認
+https://timelogger-staging.fly.dev
+
+# 重要機能テスト
+- Discord Bot 基本動作
+- !cost, !summary, !timezone コマンド
+- データベース接続・分析機能
+```
+
+#### 3. Production リリース
+```bash
+# main ブランチマージ
+git checkout main
+git merge develop
+git push origin main  # → production環境自動デプロイ
+```
+
+### ローカル開発環境
+
+#### 環境セットアップ
+```bash
+# Node.js 仮想環境
+nvm use
+
+# 依存関係インストール
+npm install
+
+# 環境変数設定
+cp .env.example .env
+# Discord Bot Token, Gemini API Key を設定
+```
+
+#### 開発コマンド
+```bash
+# 開発サーバー起動
+npm run dev
+
+# TDD開発
+npm run test:watch
+
+# 品質チェック
+npm run build
+npm run test:coverage
+```
+
 ## サポート
 
 問題や質問がある場合は、GitHubのIssuesページにお寄せください。

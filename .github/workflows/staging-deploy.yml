@@ -1,0 +1,170 @@
+# Staging環境デプロイワークフロー
+# develop ブランチの変更を staging 環境に自動デプロイ
+
+name: Staging Deploy
+on:
+  push:
+    branches:
+      - develop
+  workflow_dispatch:
+    inputs:
+      skip_tests:
+        description: 'テストをスキップ（緊急時のみ）'
+        required: false
+        default: false
+        type: boolean
+      environment:
+        description: 'デプロイ環境'
+        required: true
+        default: 'staging'
+        type: choice
+        options:
+          - 'staging'
+
+env:
+  FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+  STAGING_APP_NAME: timelogger-staging
+
+jobs:
+  quality-check:
+    runs-on: ubuntu-latest
+    name: 品質チェック
+    outputs:
+      build-success: ${{ steps.build.outputs.success }}
+      test-success: ${{ steps.test.outputs.success }}
+    
+    steps:
+      - name: 📥 リポジトリチェックアウト
+        uses: actions/checkout@v4
+      
+      - name: 🔧 Node.js セットアップ
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      
+      - name: 📦 依存関係インストール
+        run: npm ci
+      
+      - name: 🏗️ TypeScriptビルド
+        id: build
+        run: |
+          npm run build
+          echo "success=true" >> $GITHUB_OUTPUT
+      
+      - name: 🧪 テスト実行
+        id: test
+        if: github.event.inputs.skip_tests != 'true'
+        run: |
+          npm test
+          npm run test:integration
+          echo "success=true" >> $GITHUB_OUTPUT
+      
+      - name: 📊 テストカバレッジ確認
+        if: github.event.inputs.skip_tests != 'true'
+        run: npm run test:coverage
+
+  deploy-staging:
+    needs: quality-check
+    if: needs.quality-check.outputs.build-success == 'true'
+    runs-on: ubuntu-latest
+    environment: staging
+    name: Staging環境デプロイ
+    
+    steps:
+      - name: 📊 デプロイ環境確認
+        run: |
+          echo "🌿 ブランチ: ${{ github.ref_name }}"
+          echo "🧪 環境: staging"
+          echo "📱 アプリ: ${{ env.STAGING_APP_NAME }}"
+          echo "🌍 タイムゾーン: Asia/Kolkata"
+          echo "🕐 デプロイ時刻: $(date)"
+          echo "🧪 テストスキップ: ${{ github.event.inputs.skip_tests || 'false' }}"
+      
+      - name: 📥 リポジトリチェックアウト
+        uses: actions/checkout@v4
+      
+      - name: 🚀 Fly.io CLI セットアップ
+        uses: superfly/flyctl-actions/setup-flyctl@master
+      
+      - name: 🔍 Staging環境ステータス確認
+        run: |
+          echo "📊 デプロイ前ステータス:"
+          flyctl status --app ${{ env.STAGING_APP_NAME }} || echo "⚠️ アプリが見つかりません（初回デプロイの可能性）"
+      
+      - name: 🚀 Staging環境デプロイ実行
+        run: |
+          echo "🚀 Staging環境にデプロイを開始します..."
+          
+          # staging用の設定ファイルが存在する場合はそれを使用
+          if [ -f "fly-staging.toml" ]; then
+            flyctl deploy --config fly-staging.toml --app ${{ env.STAGING_APP_NAME }}
+          else
+            flyctl deploy --app ${{ env.STAGING_APP_NAME }}
+          fi
+      
+      - name: ⏳ デプロイ完了待機
+        run: |
+          echo "⏳ アプリの起動を待機中..."
+          for i in {1..12}; do
+            if flyctl status --app ${{ env.STAGING_APP_NAME }} | grep -q "started"; then
+              echo "✅ アプリが正常に起動しました"
+              break
+            fi
+            if [ $i -eq 12 ]; then
+              echo "⚠️ アプリの起動に時間がかかっています"
+              flyctl logs --app ${{ env.STAGING_APP_NAME }}
+            fi
+            sleep 10
+          done
+      
+      - name: 🏥 ヘルスチェック
+        run: |
+          echo "🏥 Staging環境ヘルスチェック実行中..."
+          STAGING_URL="https://${{ env.STAGING_APP_NAME }}.fly.dev"
+          
+          for i in {1..6}; do
+            if curl -f -s "$STAGING_URL/health" > /dev/null; then
+              echo "✅ ヘルスチェック成功"
+              break
+            fi
+            if [ $i -eq 6 ]; then
+              echo "❌ ヘルスチェック失敗"
+              flyctl logs --app ${{ env.STAGING_APP_NAME }}
+              exit 1
+            fi
+            echo "⏳ ヘルスチェック中... ($i/6)"
+            sleep 10
+          done
+      
+      - name: 📊 デプロイ完了レポート
+        if: always()
+        run: |
+          echo "📊 Staging環境デプロイ完了レポート"
+          echo "======================================"
+          echo "🕐 デプロイ時刻: $(date)"
+          echo "🌿 ブランチ: ${{ github.ref_name }}"
+          echo "📝 コミット: ${{ github.sha }}"
+          echo "🧪 品質チェック: ${{ needs.quality-check.outputs.build-success == 'true' && '✅' || '❌' }}"
+          echo "📊 デプロイ結果: ${{ job.status }}"
+          echo ""
+          echo "🔗 Staging環境URL: https://${{ env.STAGING_APP_NAME }}.fly.dev"
+          echo "📊 ステータス:"
+          flyctl status --app ${{ env.STAGING_APP_NAME }}
+          
+      - name: 💡 次のステップ案内
+        if: success()
+        run: |
+          echo ""
+          echo "🎉 Staging環境デプロイが完了しました！"
+          echo ""
+          echo "📖 次のステップ:"
+          echo "1. 🧪 Staging環境での動作確認"
+          echo "   https://${{ env.STAGING_APP_NAME }}.fly.dev"
+          echo ""
+          echo "2. 🔍 重要機能の手動テスト"
+          echo "   - Discord Bot の基本動作"
+          echo "   - !cost, !summary, !timezone コマンド"
+          echo ""
+          echo "3. ✅ 問題なければ main ブランチにマージ"
+          echo "   → Production環境への自動デプロイ"
