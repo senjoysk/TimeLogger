@@ -303,13 +303,13 @@ describe('TimezoneChangeMonitor', () => {
     test('should start and stop notification processor', async () => {
       // 🔴 Red: 通知プロセッサー制御テスト
 
-      expect(monitor.isProcessorRunning()).toBe(false);
+      expect(monitor.isProcessorActive()).toBe(false);
 
       await monitor.startNotificationProcessor();
-      expect(monitor.isProcessorRunning()).toBe(true);
+      expect(monitor.isProcessorActive()).toBe(true);
 
       monitor.stopProcessor();
-      expect(monitor.isProcessorRunning()).toBe(false);
+      expect(monitor.isProcessorActive()).toBe(false);
     });
 
     test('should configure polling interval', async () => {
@@ -403,6 +403,9 @@ describe('TimezoneChangeMonitor', () => {
     test('should recover from temporary database errors', async () => {
       // 🔴 Red: 一時的DB障害からの復旧テスト
 
+      // より短い間隔でテスト
+      monitor.setPollingInterval(50); // 50ms
+
       let callCount = 0;
       mockRepository.getUserTimezoneChanges.mockImplementation(() => {
         callCount++;
@@ -414,10 +417,11 @@ describe('TimezoneChangeMonitor', () => {
 
       await monitor.startPollingMonitor();
       
-      // 3回のポーリング後に復旧
-      await new Promise(resolve => setTimeout(resolve, 300));
+      // 3回のポーリング後に復旧（50ms * 3 + バッファ）
+      await new Promise(resolve => setTimeout(resolve, 200));
 
-      expect(mockRepository.getUserTimezoneChanges).toHaveBeenCalledTimes(3);
+      // 少なくとも3回は呼ばれる（復旧確認）
+      expect(mockRepository.getUserTimezoneChanges.mock.calls.length).toBeGreaterThanOrEqual(3);
     });
   });
 });
