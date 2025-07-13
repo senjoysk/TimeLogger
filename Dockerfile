@@ -40,6 +40,7 @@ COPY src/database/newSchema.sql ./dist/database/
 # マイグレーションスクリプトをコピー（現在必要なファイルのみ）
 COPY scripts/production/safe-unified-migration.js ./scripts/production/
 COPY scripts/debug-todos.js ./scripts/
+COPY scripts/migration/ ./scripts/migration/
 
 # データディレクトリを作成
 RUN mkdir -p /app/data
