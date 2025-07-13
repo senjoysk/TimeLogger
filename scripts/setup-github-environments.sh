@@ -59,28 +59,21 @@ get_repo_info() {
 create_staging_environment() {
     log_info "staging環境を作成中..."
     
-    # staging環境の作成
+    # staging環境の作成（基本的な設定のみ）
     if gh api repos/$REPO_OWNER/$REPO_NAME/environments/staging -q '.name' &> /dev/null; then
         log_warning "staging環境は既に存在します"
     else
         log_info "新しいstaging環境を作成中..."
-        gh api repos/$REPO_OWNER/$REPO_NAME/environments/staging -X PUT \
-            --field name="staging" \
-            --field wait_timer=0 \
-            --field prevent_self_review=false \
-            --field reviewers='[]' \
-            --field deployment_branch_policy='{"protected_branches":false,"custom_branch_policies":true}' \
-            > /dev/null
         
-        log_success "staging環境を作成しました"
+        # 基本的な環境作成（最小限のフィールドのみ）
+        if gh api repos/$REPO_OWNER/$REPO_NAME/environments/staging -X PUT > /dev/null 2>&1; then
+            log_success "staging環境を作成しました"
+        else
+            log_error "staging環境の作成に失敗しました"
+            log_info "手動でGitHub WebUIから作成してください: Settings → Environments"
+            return 1
+        fi
     fi
-    
-    # staging環境のブランチポリシー設定
-    log_info "staging環境のデプロイブランチを設定中..."
-    gh api repos/$REPO_OWNER/$REPO_NAME/environments/staging/deployment-branch-policies -X POST \
-        --field name="develop" \
-        --field type="branch" \
-        > /dev/null 2>&1 || log_warning "ブランチポリシー設定に失敗しました（既に存在する可能性）"
     
     log_success "staging環境の基本設定が完了しました"
 }
@@ -89,34 +82,24 @@ create_staging_environment() {
 create_production_environment() {
     log_info "production環境を作成中..."
     
-    # production環境の作成（保護ルール付き）
+    # production環境の作成（基本的な設定のみ）
     if gh api repos/$REPO_OWNER/$REPO_NAME/environments/production -q '.name' &> /dev/null; then
         log_warning "production環境は既に存在します"
     else
         log_info "新しいproduction環境を作成中..."
         
-        # 現在のユーザー情報を取得
-        CURRENT_USER=$(gh api user --jq '.login')
-        
-        gh api repos/$REPO_OWNER/$REPO_NAME/environments/production -X PUT \
-            --field name="production" \
-            --field wait_timer=60 \
-            --field prevent_self_review=false \
-            --field reviewers="[{\"type\":\"User\",\"id\":$(gh api users/$CURRENT_USER --jq '.id')}]" \
-            --field deployment_branch_policy='{"protected_branches":false,"custom_branch_policies":true}' \
-            > /dev/null
-        
-        log_success "production環境を作成しました（1分待機 + レビュー必須）"
+        # 基本的な環境作成（最小限のフィールドのみ）
+        if gh api repos/$REPO_OWNER/$REPO_NAME/environments/production -X PUT > /dev/null 2>&1; then
+            log_success "production環境を作成しました"
+            log_info "保護ルールは手動でGitHub WebUIから設定してください"
+        else
+            log_error "production環境の作成に失敗しました"
+            log_info "手動でGitHub WebUIから作成してください: Settings → Environments"
+            return 1
+        fi
     fi
     
-    # production環境のブランチポリシー設定
-    log_info "production環境のデプロイブランチを設定中..."
-    gh api repos/$REPO_OWNER/$REPO_NAME/environments/production/deployment-branch-policies -X POST \
-        --field name="main" \
-        --field type="branch" \
-        > /dev/null 2>&1 || log_warning "ブランチポリシー設定に失敗しました（既に存在する可能性）"
-    
-    log_success "production環境の保護設定が完了しました"
+    log_success "production環境の基本設定が完了しました"
 }
 
 # 環境変数・シークレットの設定ガイド

@@ -74,7 +74,7 @@ create_staging_app() {
     fi
     
     # アプリ作成
-    flyctl apps create "$app_name" --region nrt
+    flyctl apps create "$app_name" --org personal
     log_success "Staging アプリケーション '$app_name' を作成しました"
 }
 
@@ -92,7 +92,7 @@ create_volume() {
     fi
     
     # ボリューム作成
-    flyctl volumes create "$volume_name" --region nrt --size 1 --app "$app_name"
+    flyctl volumes create "$volume_name" --size 1 --app "$app_name" --region nrt --yes
     log_success "データボリューム '$volume_name' を作成しました"
 }
 
