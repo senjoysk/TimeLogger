@@ -1,0 +1,69 @@
+# Staging環境用 Fly.io設定ファイル
+# アプリケーション: timelogger-staging
+# 環境: Asia/Kolkata（開発者対応）
+
+app = 'timelogger-staging'
+primary_region = 'nrt'
+kill_signal = 'SIGINT'
+kill_timeout = '5s'
+
+[build]
+  # Dockerfileを使用（本番環境と同一）
+
+[env]
+  NODE_ENV = 'staging'
+  TZ = 'Asia/Kolkata'
+  PORT = '3000'
+  
+  # Staging環境固有設定
+  LOG_LEVEL = 'debug'                    # デバッグレベルログ
+  ENABLE_DEBUG_ROUTES = 'true'           # デバッグ用API有効化
+  API_RATE_LIMIT = 'false'               # レート制限無効化（テスト用）
+  CACHE_TTL = '60'                       # キャッシュTTL短縮（テスト用）
+
+# データベースボリューム（本番と分離）
+[[mounts]]
+  source = 'timelogger_staging_data'
+  destination = '/app/data'
+
+# HTTPサーバー設定（コスト最適化）
+[http_service]
+  internal_port = 3000
+  force_https = true
+  
+  # 💰 コスト最適化設定
+  auto_stop_machines = true              # 未使用時自動停止
+  auto_start_machines = true             # リクエスト時自動起動
+  min_machines_running = 0               # 最小稼働台数0（開発時間外は完全停止）
+  
+  processes = ["app"]
+
+# ヘルスチェック設定
+[[http_service.checks]]
+  interval = "30s"
+  timeout = "10s"
+  grace_period = "5s"
+  method = "GET"
+  path = "/health"
+  protocol = "http"
+  tls_skip_verify = false
+
+# 🖥️ VM設定（本番より小さなリソース）
+[[vm]]
+  cpu_kind = 'shared'                    # 共有CPU
+  cpus = 1                               # 1CPU（本番と同じ）
+  memory_mb = 256                        # 256MB（本番と同じ）
+  count = 1                              # マシン1台
+
+# 🔍 デバッグ用設定（staging環境のみ）
+[console_command]
+  command = "/bin/bash"
+
+# 📊 メトリクス・ログ設定
+[metrics]
+  port = 9091
+  path = "/metrics"
+
+# 🌙 自動サスペンド連携設定
+[experimental]
+  auto_rollback = true                   # 自動ロールバック有効

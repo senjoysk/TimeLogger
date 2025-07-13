@@ -41,7 +41,7 @@
     "ci:install": "npm ci",
     "ci:test": "npm run quality:check && npm run test:coverage",
     "ci:build": "npm run build",
-    "staging:setup": "./scripts/staging/setup-staging.sh",
+    "staging:setup": "./scripts/setup-staging.sh",
     "staging:deploy": "./scripts/staging/deploy-to-staging.sh",
     "staging:logs": "fly logs --app timelogger-staging",
     "staging:status": "fly status --app timelogger-staging",
