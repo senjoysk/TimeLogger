@@ -23,7 +23,7 @@ describe('DynamicReportScheduler', () => {
   beforeEach(() => {
     // cronジョブのモック
     mockCronJob = {
-      destroy: jest.fn(),
+      stop: jest.fn(),
     };
     mockCron.schedule = jest.fn().mockReturnValue(mockCronJob);
     
@@ -51,7 +51,8 @@ describe('DynamicReportScheduler', () => {
       // cronスケジュールが正しく設定される
       expect(mockCron.schedule).toHaveBeenCalledWith(
         '30 9 * * *', // Asia/Tokyo 18:30 = UTC 09:30
-        expect.any(Function)
+        expect.any(Function),
+        { scheduled: true }
       );
     });
 
@@ -83,7 +84,7 @@ describe('DynamicReportScheduler', () => {
       // Asia/Tokyo用が削除、America/New_York用が作成
       expect(scheduler.hasJobForUtcTime(9, 30)).toBe(false);
       expect(scheduler.hasJobForUtcTime(23, 30)).toBe(true);
-      expect(mockCronJob.destroy).toHaveBeenCalledTimes(1);
+      expect(mockCronJob.stop).toHaveBeenCalledTimes(1);
     });
   });
 
