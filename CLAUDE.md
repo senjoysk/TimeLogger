@@ -84,11 +84,52 @@ describe('NewService', () => {
 - **テストフレームワーク**: Jest
 - **スケジューラー**: node-cron
 
+## 🌍 環境戦略とリリースフロー
+
+### 3層環境構成
+```
+Local環境 → Staging環境 → Production環境
+  ↓           ↓            ↓
+TDD開発    fly.io検証    本番運用
+```
+
+#### **Local環境** (開発者端末)
+- **用途**: TDD開発、単体テスト、機能実装
+- **データベース**: ローカルSQLite
+- **実行**: `npm run dev`, `npm run test:watch`
+
+#### **Staging環境** (fly.io: timelogger-staging)
+- **用途**: fly.io環境での統合テスト、本番前検証
+- **データベース**: 分離DB + テストデータ
+- **トリガー**: developブランチpush → 自動デプロイ
+
+#### **Production環境** (fly.io: timelogger-bitter-resonance-9585)
+- **用途**: 実際のDiscord Bot運用
+- **データベース**: 本番データ
+- **トリガー**: mainブランチpush → 自動デプロイ（staging検証完了後）
+
+### リリースフロー
+```
+feature/* → develop → staging検証 → main → production
+```
+
+#### 必須プロセス
+1. **Local開発**: TDDサイクル完了 + 全テスト成功
+2. **develop マージ**: プルリクエスト + staging自動デプロイ
+3. **staging検証**: 重要機能動作確認 + 品質ゲート
+4. **main マージ**: staging検証完了後のみ
+5. **production デプロイ**: 自動デプロイ + ヘルスチェック
+
 ## 開発環境セットアップ
 1. `nvm use` でNode.js仮想環境を使用（.nvmrcファイルでNode.js 20を指定）
 2. `npm install` で依存関係をインストール（仮想環境内）
 3. `.env.example` を参考に `.env` ファイルを作成
 4. Discord Bot Token と Google Gemini API Key を設定
+
+### Staging環境セットアップ
+1. `fly apps create timelogger-staging` でstaging環境作成
+2. `.env.staging` でstaging用環境変数設定
+3. `npm run staging:setup` で初期設定実行
 
 ## プロジェクト構造（現在の実装）
 ```
@@ -162,6 +203,13 @@ npm run test:coverage
 - `npm run watch`: ファイル変更を監視して自動再起動
 - `npm run test:integration`: 統合テストのみ実行
 
+### Staging環境コマンド
+- `npm run staging:deploy`: staging環境へデプロイ
+- `npm run staging:logs`: staging環境ログ確認
+- `npm run staging:status`: staging環境ステータス確認
+- `npm run staging:test`: staging環境動作テスト
+- `npm run staging:smoke`: 重要機能煙幕テスト
+
 ## 🔧 TDD実践時の必須確認
 
 ### Red Phase（テストを書く）
@@ -190,6 +238,23 @@ npm test                   # 全テスト実行（必須）
 npm run test:coverage      # カバレッジ確認（45.5%以上維持）
 ```
 
+### デプロイ前の必須確認
+
+#### develop → staging デプロイ前
+```bash
+npm run quality:check      # 品質チェック統合実行
+npm run test:integration   # 統合テスト実行
+# ✅ 全テスト成功後にdevelopブランチpush
+```
+
+#### main → production デプロイ前
+```bash
+# Staging環境での検証完了確認
+npm run staging:test       # staging環境動作確認
+npm run staging:smoke      # 重要機能煙幕テスト
+# ✅ staging検証完了後にmainブランチマージ
+```
+
 ## クリティカル機能の保護
 
 ### 重要機能の回帰テスト（必須）
@@ -200,12 +265,20 @@ npm run test:coverage      # カバレッジ確認（45.5%以上維持）
 - エラーハンドリングのテスト
 
 ### 手動動作確認（リリース前）
-実際のDiscord環境で以下のコマンドを確認：
+
+#### Staging環境での検証（必須）
+staging環境のDiscord Botで以下のコマンドを確認：
 - `!cost` - API費用レポート表示
 - `!summary` - 今日のサマリー表示
 - `!timezone` - タイムゾーン表示・設定
 - `!edit [ID]` - ログ編集機能
 - `!logs` - ログ一覧表示
+
+#### Production環境での最終確認（デプロイ後）
+本番環境のDiscord Botで重要機能の疎通確認：
+- 基本コマンド応答確認
+- データベース接続確認
+- エラーログ監視（30分間）
 
 ## アーキテクチャ概要
 
@@ -236,6 +309,8 @@ npm run test:coverage      # カバレッジ確認（45.5%以上維持）
 ## 📋 必須: 開発チェックリスト参照
 
 **すべての開発作業は DEVELOPMENT_CHECKLIST.md のTDDサイクルに従って実行してください**
+
+**staging環境構成とリリースフローの詳細は note/staging-environment-design.md を参照してください**
 
 ### 🚨 絶対に守るべきTDDルール
 1. **テストなしでコードを書かない**
