@@ -178,7 +178,26 @@ export class TaskLoggerBot {
   }
 
   /**
-   * 特定ユーザーに日次サマリーを送信
+   * 特定ユーザーに日次サマリーを送信（動的スケジューラー用）
+   */
+  public async sendDailySummaryForUser(userId: string): Promise<void> {
+    try {
+      // デフォルトタイムゾーンを取得
+      const repository = this.activityLoggingIntegration?.getRepository();
+      if (repository && repository.getUserSettings) {
+        const userSettings = await repository.getUserSettings(userId);
+        const timezone = userSettings?.timezone || 'Asia/Tokyo';
+        await this.sendDailySummaryToUser(userId, timezone);
+      } else {
+        await this.sendDailySummaryToUser(userId, 'Asia/Tokyo');
+      }
+    } catch (error) {
+      console.error(`❌ ユーザー ${userId} への日次サマリー送信エラー:`, error);
+    }
+  }
+
+  /**
+   * 特定ユーザーに日次サマリーを送信（内部用）
    */
   private async sendDailySummaryToUser(userId: string, timezone: string): Promise<void> {
     try {
@@ -386,6 +405,17 @@ export class TaskLoggerBot {
    */
   public getActivityLoggingIntegration(): any {
     return this.activityLoggingIntegration;
+  }
+
+  /**
+   * TimezoneHandlerにタイムゾーン変更コールバックを設定（EnhancedScheduler連携用）
+   */
+  public setTimezoneChangeCallback(callback: (userId: string, oldTimezone: string | null, newTimezone: string) => Promise<void>): void {
+    if (this.activityLoggingIntegration) {
+      this.activityLoggingIntegration.setTimezoneChangeCallback(callback);
+    } else {
+      console.warn('⚠️ ActivityLoggingIntegrationが初期化されていません');
+    }
   }
 
   /**

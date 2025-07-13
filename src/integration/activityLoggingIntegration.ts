@@ -592,6 +592,18 @@ export class ActivityLoggingIntegration {
   }
 
   /**
+   * TimezoneHandlerにタイムゾーン変更コールバックを設定（EnhancedScheduler連携用）
+   */
+  setTimezoneChangeCallback(callback: (userId: string, oldTimezone: string | null, newTimezone: string) => Promise<void>): void {
+    if (this.timezoneHandler) {
+      this.timezoneHandler.setTimezoneChangeCallback(callback);
+      console.log('📅 TimezoneHandlerにコールバックを設定しました');
+    } else {
+      console.warn('⚠️ TimezoneHandlerが初期化されていません');
+    }
+  }
+
+  /**
    * 日次サマリーを生成して文字列として取得
    * 自動送信用のメソッド
    */

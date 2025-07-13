@@ -53,9 +53,18 @@ export interface ITimezoneHandler {
  * TimezoneHandlerの実装
  */
 export class TimezoneHandler implements ITimezoneHandler {
+  private onTimezoneChanged?: (userId: string, oldTimezone: string | null, newTimezone: string) => Promise<void>;
+
   constructor(
     private repository: IActivityLogRepository
   ) {}
+
+  /**
+   * タイムゾーン変更時のコールバックを設定（EnhancedScheduler連携用）
+   */
+  public setTimezoneChangeCallback(callback: (userId: string, oldTimezone: string | null, newTimezone: string) => Promise<void>): void {
+    this.onTimezoneChanged = callback;
+  }
 
   /**
    * タイムゾーンコマンドを処理
@@ -200,9 +209,25 @@ export class TimezoneHandler implements ITimezoneHandler {
         return;
       }
 
+      // 古いタイムゾーンを取得
+      let oldTimezone: string | null = null;
+      if ('getUserTimezone' in this.repository) {
+        oldTimezone = await (this.repository as any).getUserTimezone(userId);
+      }
+
       // データベースにユーザーのタイムゾーンを保存
       if ('saveUserTimezone' in this.repository) {
         await (this.repository as any).saveUserTimezone(userId, timezone);
+        
+        // EnhancedSchedulerに変更を通知
+        if (this.onTimezoneChanged) {
+          try {
+            await this.onTimezoneChanged(userId, oldTimezone, timezone);
+            console.log(`📅 動的スケジューラーに通知: ${userId} ${oldTimezone} -> ${timezone}`);
+          } catch (error) {
+            console.warn(`⚠️ 動的スケジューラーへの通知に失敗: ${error}`);
+          }
+        }
         
         // 現在時刻を新しいタイムゾーンで表示
         const now = new Date();
