@@ -38,26 +38,21 @@ export class DynamicSchedulerService {
     const wakeUsers: string[] = [];
 
     try {
-      console.log(`🔍 スケジュールチェック開始: ${currentUtc.toISOString()}, 許容時間: ${toleranceMinutes}分`);
-      
       const userSchedules = await this.getAllUserSchedules();
-      console.log(`📋 取得したユーザースケジュール: ${userSchedules.length}件`);
       
       for (const schedule of userSchedules) {
-        console.log(`👤 ユーザー ${schedule.userId}: サスペンド=${schedule.nextSuspendUtc.toISOString()}, 起床=${schedule.nextWakeUtc.toISOString()}`);
-        
         // サスペンド時刻チェック
         const isSuspendTime = this.isTimeToExecute(currentUtc, schedule.nextSuspendUtc, toleranceMinutes);
         if (isSuspendTime) {
           suspendUsers.push(schedule.userId);
-          console.log(`🌙 サスペンド対象に追加: ${schedule.userId}`);
+          console.log(`🌙 サスペンド対象: ${schedule.userId} (${schedule.nextSuspendUtc.toISOString()})`);
         }
         
         // 起床時刻チェック
         const isWakeTime = this.isTimeToExecute(currentUtc, schedule.nextWakeUtc, toleranceMinutes);
         if (isWakeTime) {
           wakeUsers.push(schedule.userId);
-          console.log(`🌅 起床対象に追加: ${schedule.userId}`);
+          console.log(`🌅 起床対象: ${schedule.userId} (${schedule.nextWakeUtc.toISOString()})`);
         }
       }
 
@@ -84,19 +79,14 @@ export class DynamicSchedulerService {
    */
   async getAllUserSchedules(): Promise<UserSuspendSchedule[]> {
     try {
-      console.log('📡 ユーザーサスペンド設定取得開始');
       const userSettings = await this.repository.getAllUserSuspendSchedules();
-      console.log(`📊 取得したユーザー設定: ${Object.keys(userSettings).length}件`);
-      
       const schedules: UserSuspendSchedule[] = [];
       const currentUtc = new Date();
       
       for (const [userId, settings] of Object.entries(userSettings)) {
-        console.log(`🔧 ユーザー ${userId} 設定処理:`, settings);
-        
         const typedSettings = settings as { suspendHour: number; wakeHour: number; timezone: string };
         
-        // NULL値チェック
+        // NULL値チェック（デフォルト値で補完）
         if (typedSettings.suspendHour === null || typedSettings.suspendHour === undefined) {
           console.warn(`⚠️ ユーザー ${userId}: suspend_hourがNULL, デフォルト値(0)を使用`);
           typedSettings.suspendHour = 0;
@@ -118,10 +108,7 @@ export class DynamicSchedulerService {
           currentUtc
         );
         schedules.push(schedule);
-        console.log(`✅ ユーザー ${userId} スケジュール計算完了`);
       }
-      
-      console.log(`✅ 全ユーザースケジュール計算完了: ${schedules.length}件`);
       return schedules;
     } catch (error) {
       console.error('❌ 全ユーザースケジュール取得詳細エラー:', error);
