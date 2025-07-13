@@ -71,8 +71,8 @@ get_main_repo_path() {
     # .git ファイルから実際のgitディレクトリを取得
     if [ -f ".git" ]; then
         local git_dir=$(cat .git | sed 's/gitdir: //')
-        # worktreeの場合、gitdirは相対パスまたは絶対パス
-        echo "$(dirname "$(dirname "$git_dir")")"
+        # worktreeの場合、.git/worktrees/xxx から ../../.. で親ディレクトリに戻る
+        echo "$(dirname "$(dirname "$(dirname "$git_dir")")")"
     else
         # メインリポジトリの場合
         git rev-parse --show-toplevel
@@ -109,7 +109,8 @@ copy_env_files() {
             
             # テンプレート変数の置換
             if [ "$AUTO_TEMPLATE_VARS" = "true" ]; then
-                content=$(echo "$content" | sed "s/{{ BRANCH_NAME }}/$current_branch/g")
+                # ブランチ名に特殊文字が含まれる場合のためにsed区切り文字を変更
+                content=$(echo "$content" | sed "s|{{ BRANCH_NAME }}|$current_branch|g")
                 
                 # DATABASE_PATHの特別処理
                 if [[ "$current_branch" != "main" && "$current_branch" != "master" && "$current_branch" != "develop" ]]; then
