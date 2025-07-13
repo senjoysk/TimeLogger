@@ -1,6 +1,8 @@
 import { validateConfig } from './config';
 import { TaskLoggerBot } from './bot';
-import { Scheduler } from './scheduler';
+import { EnhancedScheduler } from './enhancedScheduler';
+import { DynamicReportScheduler } from './services/dynamicReportScheduler';
+import { TimezoneChangeMonitor } from './services/timezoneChangeMonitor';
 import { NightSuspendServer } from './api/nightSuspendServer';
 import { MorningMessageRecovery } from './services/morningMessageRecovery';
 import { SqliteNightSuspendRepository } from './repositories/sqliteNightSuspendRepository';
@@ -11,13 +13,17 @@ import { SqliteNightSuspendRepository } from './repositories/sqliteNightSuspendR
  */
 class Application {
   private bot: TaskLoggerBot;
-  private scheduler: Scheduler;
+  private scheduler: EnhancedScheduler;
+  private dynamicScheduler: DynamicReportScheduler;
+  private timezoneMonitor: TimezoneChangeMonitor;
   private nightSuspendServer: NightSuspendServer | null = null;
 
   constructor() {
     this.bot = new TaskLoggerBot();
     // スケジューラーの初期化はBotの初期化後に行う
     this.scheduler = null as any;
+    this.dynamicScheduler = new DynamicReportScheduler();
+    this.timezoneMonitor = new TimezoneChangeMonitor();
   }
 
   /**
@@ -45,7 +51,27 @@ class Application {
       if (!repository) {
         console.warn('⚠️ リポジトリが取得できませんが、活動記録システムで続行します');
       }
-      this.scheduler = new Scheduler(this.bot, repository);
+      this.scheduler = new EnhancedScheduler(this.bot, repository);
+      
+      // 動的スケジューラーの設定
+      this.dynamicScheduler.setRepository(repository);
+      this.timezoneMonitor.setRepository(repository);
+      this.timezoneMonitor.setScheduler(this.dynamicScheduler);
+      
+      // EnhancedSchedulerに動的コンポーネントを統合
+      this.scheduler.setDynamicScheduler(this.dynamicScheduler);
+      this.scheduler.setTimezoneMonitor(this.timezoneMonitor);
+      
+      // 18:30レポート送信機能を設定
+      this.scheduler.setReportSender(async (userId: string, timezone: string) => {
+        console.log(`📊 ${timezone}の18:30になりました - ユーザー ${userId} に日次レポートを送信中...`);
+        await this.bot.sendDailySummaryForUser(userId);
+      });
+      
+      // TimezoneHandlerのコールバック設定（!timezone set 時のEnhancedScheduler連携）
+      this.bot.setTimezoneChangeCallback(async (userId: string, oldTimezone: string | null, newTimezone: string) => {
+        await this.scheduler.onUserTimezoneChanged(userId, oldTimezone, newTimezone);
+      });
       
       // スケジューラーの開始
       await this.scheduler.start();
@@ -57,6 +83,13 @@ class Application {
       console.log('');
       
       console.log('🎉 Discord Task Logger が正常に起動しました！');
+      
+      // 動的スケジューラーの状態を表示
+      const status = this.scheduler.getComprehensiveStatus();
+      console.log('📈 スケジューラー状態:');
+      console.log(`  - 静的スケジュール: ${status.staticSchedules.length}個`);
+      console.log(`  - 動的スケジュール: ${status.dynamicSchedules.activeJobCount}個のcronジョブ`);
+      console.log(`  - タイムゾーン監視: ${status.timezoneMonitoring.isRunning ? '有効' : '無効'}`);
       console.log('📝 タスクの記録を開始します...\n');
       
       // 終了処理の設定
@@ -77,6 +110,13 @@ class Application {
       
       // スケジューラーの停止
       this.scheduler.stop();
+      
+      // 動的スケジューラーの統計を表示
+      const metrics = this.scheduler.getPerformanceMetrics();
+      console.log(`📊 送信統計: ${metrics.totalReportsSent}件のレポートを送信`);
+      if (Object.keys(metrics.timezoneDistribution).length > 0) {
+        console.log('🌍 タイムゾーン分布:', metrics.timezoneDistribution);
+      }
       
       // 夜間サスペンドサーバーの停止
       if (this.nightSuspendServer) {

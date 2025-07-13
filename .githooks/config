@@ -1,0 +1,23 @@
+# Git フック設定ファイル
+# worktree作成時の自動セットアップを制御
+
+# 環境変数ファイルの自動コピー（true/false）
+AUTO_ENV_COPY=true
+
+# npm install の自動実行（true/false）
+AUTO_NPM_INSTALL=true
+
+# テンプレート変数の自動置換（true/false）
+AUTO_TEMPLATE_VARS=true
+
+# 詳細ログの表示（true/false）
+VERBOSE_LOGGING=false
+
+# カスタム環境変数ファイルの追加
+# CUSTOM_ENV_FILES=(".env.custom" ".env.local.template")
+
+# 特定のブランチパターンで自動セットアップを無効化
+# SKIP_BRANCHES=("temp/*" "test/*")
+
+# カスタムセットアップスクリプトのパス（オプション）
+# CUSTOM_SETUP_SCRIPT=""
