@@ -32,6 +32,13 @@
 - テストデータ生成
 - 運用コマンド
 
+### 5. [github-actions-branch-strategy.md](./github-actions-branch-strategy.md)
+**GitHub Actionsブランチ戦略明確化** - ブランチとデプロイ戦略の明確化
+- 現在の問題分析（ブランチ名混乱）
+- ワークフローファイル明確化設計
+- 環境保護ルール設計
+- 新しいリリースフロー定義
+
 ## 🎯 設計の目的
 
 ### 解決する課題
