@@ -46,10 +46,6 @@ export interface IDatabaseRepository {
   getUserTimezone(userId: string): Promise<string>;
   setUserTimezone(userId: string, timezone: string): Promise<void>;
   
-  // サスペンドスケジュール関連操作
-  saveUserSuspendSchedule(userId: string, suspendHour: number, wakeHour: number): Promise<void>;
-  getUserSuspendSchedule(userId: string): Promise<{ suspendHour: number; wakeHour: number; timezone: string } | null>;
-  getAllUserSuspendSchedules(): Promise<{ [userId: string]: { suspendHour: number; wakeHour: number; timezone: string } }>;
 
   // 活動記録関連操作
   saveActivityRecord(record: ActivityRecord, timezone: string): Promise<void>;
@@ -168,51 +164,6 @@ export interface IMessageClassificationRepository {
   getClassificationHistory(userId: string, limit?: number): Promise<MessageClassificationHistory[]>;
 }
 
-/**
- * 夜間サスペンド機能の抽象化インターフェース
- * メッセージリカバリとサスペンド状態管理の責任を分離
- */
-export interface INightSuspendRepository {
-  // Discord メッセージID関連操作
-  existsByDiscordMessageId(messageId: string): Promise<boolean>;
-  getByDiscordMessageId(messageId: string): Promise<any | null>;
-  
-  // リカバリ処理関連操作
-  getUnprocessedMessages(userId: string, timeRange: { start: Date; end: Date }): Promise<any[]>;
-  markAsRecoveryProcessed(logId: string, timestamp: string): Promise<void>;
-  
-  // サスペンド状態管理
-  saveSuspendState(state: SuspendState): Promise<void>;
-  getLastSuspendState(userId: string): Promise<SuspendState | null>;
-  
-  // ActivityLog作成（Discord経由）
-  createActivityLogFromDiscord(data: DiscordActivityLogData): Promise<any>;
-}
-
-/**
- * サスペンド状態を表すインターフェース
- */
-export interface SuspendState {
-  id: string;
-  user_id: string;
-  suspend_time: string;
-  expected_recovery_time: string;
-  actual_recovery_time?: string;
-  created_at: string;
-}
-
-/**
- * Discord経由のActivityLog作成データ
- */
-export interface DiscordActivityLogData {
-  user_id: string;
-  content: string;
-  input_timestamp: string;
-  business_date: string;
-  discord_message_id: string;
-  recovery_processed: boolean;
-  recovery_timestamp?: string;
-}
 
 /**
  * ユーザー管理機能の抽象化インターフェース
