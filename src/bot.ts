@@ -60,8 +60,8 @@ export class TaskLoggerBot {
       this.activityLoggingIntegration = new ActivityLoggingIntegration(integrationConfig);
       await this.activityLoggingIntegration.initialize();
       
-      // Discord Clientに統合
-      this.activityLoggingIntegration.integrateWithBot(this.client);
+      // Discord Clientに統合（自身のBotインスタンスを渡す）
+      this.activityLoggingIntegration.integrateWithBot(this.client, this);
       
       console.log('✅ 活動記録システム統合完了！');
       console.log('💡 機能が利用可能:');
@@ -193,6 +193,26 @@ export class TaskLoggerBot {
       }
     } catch (error) {
       console.error(`❌ ユーザー ${userId} への日次サマリー送信エラー:`, error);
+    }
+  }
+
+  /**
+   * 指定ユーザーにダイレクトメッセージを送信
+   */
+  public async sendDirectMessage(userId: string, message: string): Promise<void> {
+    try {
+      const user = await this.client.users.fetch(userId);
+      if (!user) {
+        console.error(`❌ ユーザーが見つかりません: ${userId}`);
+        return;
+      }
+
+      const dmChannel = await user.createDM();
+      await dmChannel.send(message);
+      console.log(`✅ ${userId} にダイレクトメッセージを送信しました`);
+    } catch (error) {
+      console.error(`❌ ${userId} へのダイレクトメッセージ送信エラー:`, error);
+      throw error;
     }
   }
 

@@ -1165,6 +1165,132 @@ export class SqliteActivityLogRepository implements IActivityLogRepository, IApi
     }
   }
 
+  // ================================================================
+  // TimezoneChangeMonitor用メソッド（日次レポート送信機能）
+  // ================================================================
+
+  /**
+   * 指定時刻以降のタイムゾーン変更を取得
+   */
+  async getUserTimezoneChanges(since?: Date): Promise<Array<{
+    user_id: string;
+    old_timezone: string;
+    new_timezone: string;
+    updated_at: string;
+  }>> {
+    try {
+      let sql = `
+        SELECT user_id, old_timezone, new_timezone, changed_at as updated_at
+        FROM timezone_change_notifications
+        WHERE processed = 0
+      `;
+      
+      const params: any[] = [];
+      if (since) {
+        sql += ` AND changed_at > ?`;
+        params.push(since.toISOString());
+      }
+      
+      sql += ` ORDER BY changed_at ASC`;
+      
+      const rows = await this.allQuery(sql, params);
+      
+      console.log(`📍 タイムゾーン変更取得: ${rows.length}件 (since: ${since?.toISOString() || 'all'})`);
+      return rows.map(row => ({
+        user_id: row.user_id,
+        old_timezone: row.old_timezone || 'Asia/Tokyo',
+        new_timezone: row.new_timezone,
+        updated_at: row.updated_at
+      }));
+    } catch (error) {
+      console.error('❌ タイムゾーン変更取得エラー:', error);
+      throw new ActivityLogError('タイムゾーン変更の取得に失敗しました', 'GET_USER_TIMEZONE_CHANGES_ERROR', { since, error });
+    }
+  }
+
+  /**
+   * 未処理の通知を取得
+   */
+  async getUnprocessedNotifications(): Promise<Array<{
+    id: string;
+    user_id: string;
+    old_timezone: string | null;
+    new_timezone: string;
+    changed_at: string;
+    processed: boolean;
+  }>> {
+    try {
+      const sql = `
+        SELECT id, user_id, old_timezone, new_timezone, changed_at, processed
+        FROM timezone_change_notifications
+        WHERE processed = 0
+        ORDER BY changed_at ASC
+      `;
+      
+      const rows = await this.allQuery(sql);
+      
+      console.log(`📍 未処理通知取得: ${rows.length}件`);
+      return rows.map(row => ({
+        id: row.id,
+        user_id: row.user_id,
+        old_timezone: row.old_timezone,
+        new_timezone: row.new_timezone,
+        changed_at: row.changed_at,
+        processed: Boolean(row.processed)
+      }));
+    } catch (error) {
+      console.error('❌ 未処理通知取得エラー:', error);
+      throw new ActivityLogError('未処理通知の取得に失敗しました', 'GET_UNPROCESSED_NOTIFICATIONS_ERROR', { error });
+    }
+  }
+
+  /**
+   * 通知を処理済みとしてマーク
+   */
+  async markNotificationAsProcessed(notificationId: string): Promise<void> {
+    try {
+      const sql = `
+        UPDATE timezone_change_notifications
+        SET processed = 1, processed_at = datetime('now', 'utc')
+        WHERE id = ?
+      `;
+      
+      await this.runQuery(sql, [notificationId]);
+      
+      console.log(`📍 通知を処理済みマーク: ${notificationId}`);
+    } catch (error) {
+      console.error('❌ 通知処理済みマークエラー:', error);
+      throw new ActivityLogError('通知の処理済みマークに失敗しました', 'MARK_NOTIFICATION_PROCESSED_ERROR', { notificationId, error });
+    }
+  }
+
+  /**
+   * DynamicReportScheduler用の全ユーザータイムゾーン取得
+   */
+  async getAllUserTimezonesForScheduler(): Promise<Array<{
+    user_id: string;
+    timezone: string;
+  }>> {
+    try {
+      const sql = `
+        SELECT user_id, timezone 
+        FROM user_settings
+        WHERE is_active = 1
+      `;
+      
+      const rows = await this.allQuery(sql);
+      
+      console.log(`📍 DynamicReportScheduler用タイムゾーン取得: ${rows.length}件`);
+      return rows.map(row => ({
+        user_id: row.user_id,
+        timezone: row.timezone
+      }));
+    } catch (error) {
+      console.error('❌ DynamicReportScheduler用タイムゾーン取得エラー:', error);
+      throw new ActivityLogError('DynamicReportScheduler用タイムゾーン取得に失敗しました', 'GET_ALL_USER_TIMEZONES_FOR_SCHEDULER_ERROR', { error });
+    }
+  }
+
 
   // === 統合サービス対応メソッド ===
 

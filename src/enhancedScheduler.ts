@@ -133,6 +133,16 @@ export class EnhancedScheduler extends Scheduler {
         }
       }
 
+      // DynamicReportSchedulerの初期化
+      if (this.dynamicScheduler) {
+        try {
+          await this.dynamicScheduler.initialize();
+          console.log('✅ DynamicReportScheduler初期化完了');
+        } catch (error) {
+          console.error('❌ DynamicReportScheduler初期化エラー:', error);
+        }
+      }
+
     } catch (error) {
       this.componentHealth.staticScheduler = 'failed';
       this.lastError = `Static scheduler failed: ${error}`;
