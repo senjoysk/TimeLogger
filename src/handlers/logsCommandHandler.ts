@@ -293,12 +293,14 @@ ${this.getUsageInsight(stats)}
   private formatDateLabel(dateStr: string, timezone: string): string {
     try {
       const date = new Date(dateStr + 'T12:00:00');
-      const today = new Date();
-      const yesterday = new Date(today);
-      yesterday.setDate(yesterday.getDate() - 1);
-
-      const todayStr = format(today, 'yyyy-MM-dd');
-      const yesterdayStr = format(yesterday, 'yyyy-MM-dd');
+      
+      // タイムゾーンを考慮した今日と昨日の日付を取得
+      const nowInTimezone = toZonedTime(new Date(), timezone);
+      const todayStr = format(nowInTimezone, 'yyyy-MM-dd');
+      
+      const yesterdayInTimezone = new Date(nowInTimezone);
+      yesterdayInTimezone.setDate(yesterdayInTimezone.getDate() - 1);
+      const yesterdayStr = format(yesterdayInTimezone, 'yyyy-MM-dd');
 
       if (dateStr === todayStr) {
         return '今日';
