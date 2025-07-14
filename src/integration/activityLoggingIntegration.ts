@@ -149,7 +149,8 @@ export class ActivityLoggingIntegration {
         this.repository, // IMessageClassificationRepository  
         this.geminiService,
         this.messageClassificationService,
-        this.activityLogService // 活動ログサービスを注入
+        this.activityLogService, // 活動ログサービスを注入
+        this.analysisCacheService // キャッシュ無効化のため追加
       );
       
       // プロファイル機能ハンドラーの初期化

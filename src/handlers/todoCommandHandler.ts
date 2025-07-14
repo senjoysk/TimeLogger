@@ -12,6 +12,7 @@ import {
 import { ITodoRepository, IMessageClassificationRepository } from '../repositories/interfaces';
 import { GeminiService } from '../services/geminiService';
 import { MessageClassificationService } from '../services/messageClassificationService';
+import { AnalysisCacheService } from '../services/analysisCacheService';
 import { 
   Todo, 
   TodoStatus, 
@@ -99,7 +100,8 @@ export class TodoCommandHandler implements ITodoCommandHandler {
     private classificationRepository: IMessageClassificationRepository,
     private geminiService: GeminiService,
     private classificationService: MessageClassificationService,
-    private activityLogService?: ActivityLogService // 活動ログサービスの注入
+    private activityLogService?: ActivityLogService, // 活動ログサービスの注入
+    private analysisCacheService?: AnalysisCacheService // キャッシュサービスの注入
   ) {
     // セッションタイムアウトのクリーンアップ
     this.cleanupInterval = setInterval(() => this.cleanupExpiredSessions(), 60 * 1000); // 1分間隔でクリーンアップ
@@ -465,8 +467,14 @@ export class TodoCommandHandler implements ITodoCommandHandler {
     try {
       // 活動ログサービスが利用可能な場合は記録
       if (this.activityLogService) {
-        await this.activityLogService.recordActivity(userId, message, timezone);
+        const log = await this.activityLogService.recordActivity(userId, message, timezone);
         console.log(`📝 活動ログ作成: ${userId} "${message}"`);
+        
+        // キャッシュを無効化（新しいログが追加されたため）
+        if (this.analysisCacheService) {
+          await this.analysisCacheService.invalidateCache(userId, log.businessDate);
+          console.log(`♻️ キャッシュ無効化: ${userId} [${log.businessDate}]`);
+        }
       }
 
       const successEmbed = new EmbedBuilder()
