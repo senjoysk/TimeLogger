@@ -20,8 +20,8 @@ class MockUserRepository implements IUserRepository {
       userId,
       username,
       timezone: 'Asia/Tokyo',
-      firstSeen: now,
-      lastSeen: now,
+      registrationDate: now,
+      lastSeenAt: now,
       isActive: true,
       createdAt: now,
       updatedAt: now
@@ -46,10 +46,14 @@ class MockUserRepository implements IUserRepository {
     };
   }
 
+  async getAllUsers(): Promise<UserInfo[]> {
+    return Array.from(this.users.values());
+  }
+
   async updateLastSeen(userId: string): Promise<void> {
     const user = this.users.get(userId);
     if (user) {
-      user.lastSeen = new Date().toISOString();
+      user.lastSeenAt = new Date().toISOString();
       user.updatedAt = new Date().toISOString();
     }
   }

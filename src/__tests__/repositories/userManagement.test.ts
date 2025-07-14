@@ -113,8 +113,8 @@ describe('Phase 3: ユーザー管理機能テスト', () => {
       expect(stats.totalMinutesLogged).toBe(90);
       expect(stats.todayLogs).toBeGreaterThan(0);
       expect(stats.avgLogsPerDay).toBeGreaterThan(0);
-      expect(stats.mostActiveHour).toBeDefined();
-      expect(stats.longestActiveDay).toBeDefined();
+      expect(stats.mostActiveHour).not.toBeNull();
+      expect(stats.longestActiveDay).not.toBeNull();
     });
 
     test('ログがないユーザーの統計情報は初期値を返す', async () => {
