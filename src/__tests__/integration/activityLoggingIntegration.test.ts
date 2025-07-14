@@ -36,7 +36,6 @@ describe('活動記録システム統合テスト', () => {
 
   beforeAll(async () => {
     // 環境変数を明示的に設定
-    process.env.TARGET_USER_ID = '770478489203507241';
     process.env.USER_TIMEZONE = 'Asia/Tokyo';
     
     // テストデータディレクトリ作成とDBファイル削除
@@ -222,10 +221,6 @@ describe('活動記録システム統合テスト', () => {
   });
 
   describe('システム健全性テスト', () => {
-    test('設定値を確認する', () => {
-      const config = integration.getConfig();
-      expect(config.targetUserId).toBe('770478489203507241');
-    });
 
     test('ヘルスチェックが正常に動作する', async () => {
       const healthCheck = await integration.healthCheck();
