@@ -121,12 +121,13 @@ export class EnhancedScheduler extends Scheduler {
         }
       }
 
-      // タイムゾーン監視の開始を試行
+      // タイムゾーン監視: ポーリングは不要（コマンドベースのイベント駆動のみ使用）
       if (this.timezoneMonitor) {
         try {
-          await this.timezoneMonitor.startPollingMonitor();
+          // NOTE: startPollingMonitor()は呼ばない
+          // タイムゾーン変更はTimezoneHandlerのコールバックで即座に処理される
           this.componentHealth.timezoneMonitor = 'healthy';
-          this.addDebugActivity('timezoneMonitorStarted', { success: true });
+          this.addDebugActivity('timezoneMonitorConfigured', { polling: false, eventDriven: true });
         } catch (error) {
           this.componentHealth.timezoneMonitor = 'failed';
           this.addDebugActivity('timezoneMonitorFailed', { error: String(error) });
@@ -232,12 +233,12 @@ export class EnhancedScheduler extends Scheduler {
       }
     }
 
-    // タイムゾーン監視の復旧
+    // タイムゾーン監視の復旧: イベント駆動のため特別な復旧処理は不要
     if (this.timezoneMonitor && this.componentHealth.timezoneMonitor === 'failed') {
       try {
-        await this.timezoneMonitor.startPollingMonitor();
+        // NOTE: ポーリング監視は使用しないため、復旧処理は設定確認のみ
         this.componentHealth.timezoneMonitor = 'healthy';
-        this.addDebugActivity('timezoneMonitorRecovered', { success: true });
+        this.addDebugActivity('timezoneMonitorRecovered', { eventDriven: true });
       } catch (error) {
         this.addDebugActivity('timezoneMonitorRecoveryFailed', { error: String(error) });
       }
