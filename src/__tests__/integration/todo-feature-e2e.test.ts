@@ -334,8 +334,9 @@ describe('TODO機能 End-to-End テスト', () => {
       const unauthorizedMessage = new MockDiscordMessage('!todo list', 'unauthorized-user');
       await integration.handleMessage(unauthorizedMessage as any);
 
-      // 権限チェックが働くことを確認
-      expect(unauthorizedMessage.replySent.length).toBe(0);
+      // マルチユーザー対応により、新規ユーザーは自動登録されてウェルカムメッセージが送信される
+      // TODO機能は正常に処理される
+      expect(unauthorizedMessage.replySent.length).toBeGreaterThan(0);
     });
   });
 
