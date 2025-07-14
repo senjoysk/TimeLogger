@@ -552,7 +552,7 @@ export class TodoCommandHandler implements ITodoCommandHandler {
    * TODO完了
    */
   private async completeTodo(message: Message, userId: string, todoId: string, timezone: string): Promise<void> {
-    const todo = await this.todoRepository.getTodoById(todoId);
+    const todo = await this.findTodoByIdOrShortId(todoId, userId);
     
     if (!todo) {
       await message.reply('❌ 指定されたTODOが見つかりません。');
@@ -574,7 +574,7 @@ export class TodoCommandHandler implements ITodoCommandHandler {
    * TODO編集
    */
   private async editTodo(message: Message, userId: string, todoId: string, newContent: string, timezone: string): Promise<void> {
-    const todo = await this.todoRepository.getTodoById(todoId);
+    const todo = await this.findTodoByIdOrShortId(todoId, userId);
     
     if (!todo) {
       await message.reply('❌ 指定されたTODOが見つかりません。');
@@ -598,7 +598,7 @@ export class TodoCommandHandler implements ITodoCommandHandler {
    * TODO削除
    */
   private async deleteTodo(message: Message, userId: string, todoId: string, timezone: string): Promise<void> {
-    const todo = await this.todoRepository.getTodoById(todoId);
+    const todo = await this.findTodoByIdOrShortId(todoId, userId);
     
     if (!todo) {
       await message.reply('❌ 指定されたTODOが見つかりません。');
@@ -696,7 +696,7 @@ export class TodoCommandHandler implements ITodoCommandHandler {
     userId: string, 
     timezone: string
   ): Promise<void> {
-    const todo = await this.todoRepository.getTodoById(todoId);
+    const todo = await this.findTodoByIdOrShortId(todoId, userId);
     
     if (!todo) {
       await interaction.reply({ content: '❌ TODOが見つかりません。', ephemeral: true });
@@ -829,6 +829,34 @@ export class TodoCommandHandler implements ITodoCommandHandler {
       case -1: return '🟢 低';
       default: return '🟡 普通';
     }
+  }
+
+  /**
+   * 完全IDまたは短縮IDでTODOを検索
+   */
+  private async findTodoByIdOrShortId(idOrShortId: string, userId: string): Promise<Todo | null> {
+    // まず完全IDで試行
+    let todo = await this.todoRepository.getTodoById(idOrShortId);
+    if (todo && todo.userId === userId) {
+      return todo;
+    }
+
+    // 短縮IDの場合、ユーザーのTODO一覧から検索
+    if (idOrShortId.length >= 6 && idOrShortId.length <= 8) {
+      const userTodos = await this.todoRepository.getTodosByUserId(userId);
+      const matchingTodos = userTodos.filter(todo => 
+        todo.id.startsWith(idOrShortId)
+      );
+
+      if (matchingTodos.length === 1) {
+        return matchingTodos[0];
+      } else if (matchingTodos.length > 1) {
+        // 複数一致の場合は最初の候補を返す（将来的には明確化機能を追加可能）
+        return matchingTodos[0];
+      }
+    }
+
+    return null;
   }
 
   /**

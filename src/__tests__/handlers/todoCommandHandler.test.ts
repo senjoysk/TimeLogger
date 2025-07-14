@@ -333,7 +333,7 @@ describe('TodoCommandHandler', () => {
       
       await handler.handleCommand(message, 'test-user', ['done', todo.id], 'Asia/Tokyo');
       
-      expect(message.reply).toHaveBeenCalledWith('❌ 他のユーザーのTODOは操作できません。');
+      expect(message.reply).toHaveBeenCalledWith('❌ 指定されたTODOが見つかりません。');
     });
   });
 
@@ -663,7 +663,7 @@ describe('TodoCommandHandler', () => {
       
       expect(interaction.reply).toHaveBeenCalled();
       const replyCall = (interaction.reply as jest.Mock).mock.calls[0][0];
-      expect(replyCall.content).toBe('❌ 他のユーザーのTODOは操作できません。');
+      expect(replyCall.content).toBe('❌ TODOが見つかりません。');
       expect(replyCall.ephemeral).toBe(true);
     });
 
@@ -1216,6 +1216,106 @@ describe('TodoCommandHandler', () => {
       
       // フォーマットが正しいことを確認: 番号. `ID` アイコン 優先度 内容
       expect(description).toMatch(new RegExp(`1\\. \`${shortId}\` ⏳ 🔴 ID表示テスト`));
+    });
+  });
+
+  describe('短縮ID検索機能テスト', () => {
+    test('短縮IDでTODO編集ができる', async () => {
+      const testTodo = await mockTodoRepo.createTodo({
+        userId: 'test-user',
+        content: '短縮ID編集テスト',
+        priority: 0,
+      });
+
+      const shortId = testTodo.id.substring(0, 8);
+      const message = createMockMessage(`!todo edit ${shortId} 編集後の内容`, 'test-user') as Message;
+      
+      await handler.handleCommand(message, 'test-user', ['edit', shortId, '編集後の内容'], 'Asia/Tokyo');
+      
+      expect(message.reply).toHaveBeenCalledWith('✏️ TODO「短縮ID編集テスト」を「編集後の内容」に編集しました！');
+      
+      const updatedTodo = await mockTodoRepo.getTodoById(testTodo.id);
+      expect(updatedTodo?.content).toBe('編集後の内容');
+    });
+
+    test('短縮IDでTODO完了ができる', async () => {
+      const testTodo = await mockTodoRepo.createTodo({
+        userId: 'test-user',
+        content: '短縮ID完了テスト',
+        priority: 0,
+      });
+
+      const shortId = testTodo.id.substring(0, 8);
+      const message = createMockMessage(`!todo done ${shortId}`, 'test-user') as Message;
+      
+      await handler.handleCommand(message, 'test-user', ['done', shortId], 'Asia/Tokyo');
+      
+      expect(message.reply).toHaveBeenCalledWith('🎉 TODO「短縮ID完了テスト」を完了しました！');
+      
+      const updatedTodo = await mockTodoRepo.getTodoById(testTodo.id);
+      expect(updatedTodo?.status).toBe('completed');
+    });
+
+    test('短縮IDでTODO削除ができる', async () => {
+      const testTodo = await mockTodoRepo.createTodo({
+        userId: 'test-user',
+        content: '短縮ID削除テスト',
+        priority: 0,
+      });
+
+      const shortId = testTodo.id.substring(0, 8);
+      const message = createMockMessage(`!todo delete ${shortId}`, 'test-user') as Message;
+      
+      await handler.handleCommand(message, 'test-user', ['delete', shortId], 'Asia/Tokyo');
+      
+      expect(message.reply).toHaveBeenCalledWith('🗑️ TODO「短縮ID削除テスト」を削除しました。');
+      
+      const deletedTodo = await mockTodoRepo.getTodoById(testTodo.id);
+      expect(deletedTodo).toBeNull();
+    });
+
+    test('短縮IDのボタン操作ができる', async () => {
+      const testTodo = await mockTodoRepo.createTodo({
+        userId: 'test-user',
+        content: '短縮IDボタンテスト',
+        priority: 0,
+      });
+
+      const shortId = testTodo.id.substring(0, 8);
+      const interaction = createMockButtonInteraction(`todo_complete_${shortId}`, 'test-user') as ButtonInteraction;
+      
+      await handler.handleButtonInteraction(interaction, 'test-user', 'Asia/Tokyo');
+      
+      expect(interaction.reply).toHaveBeenCalled();
+      const replyCall = (interaction.reply as jest.Mock).mock.calls[0][0];
+      expect(replyCall.content).toContain('🎉');
+      expect(replyCall.content).toContain('完了しました');
+      
+      const updatedTodo = await mockTodoRepo.getTodoById(testTodo.id);
+      expect(updatedTodo?.status).toBe('completed');
+    });
+
+    test('存在しない短縮IDでエラーメッセージが表示される', async () => {
+      const message = createMockMessage('!todo edit abc12345 新しい内容', 'test-user') as Message;
+      
+      await handler.handleCommand(message, 'test-user', ['edit', 'abc12345', '新しい内容'], 'Asia/Tokyo');
+      
+      expect(message.reply).toHaveBeenCalledWith('❌ 指定されたTODOが見つかりません。');
+    });
+
+    test('他のユーザーの短縮IDでアクセスが拒否される', async () => {
+      const otherUserTodo = await mockTodoRepo.createTodo({
+        userId: 'other-user',
+        content: '他のユーザーのTODO',
+        priority: 0,
+      });
+
+      const shortId = otherUserTodo.id.substring(0, 8);
+      const message = createMockMessage(`!todo edit ${shortId} 悪意のある編集`, 'test-user') as Message;
+      
+      await handler.handleCommand(message, 'test-user', ['edit', shortId, '悪意のある編集'], 'Asia/Tokyo');
+      
+      expect(message.reply).toHaveBeenCalledWith('❌ 指定されたTODOが見つかりません。');
     });
   });
 });  
