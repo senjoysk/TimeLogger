@@ -7,6 +7,7 @@ import { Message } from 'discord.js';
 import { LogsCommandHandler, ParsedLogsCommand } from '../../handlers/logsCommandHandler';
 import { IActivityLogService } from '../../services/activityLogService';
 import { ActivityLog, ActivityLogError } from '../../types/activityLog';
+import { format, toZonedTime } from 'date-fns-tz';
 
 // モックActivityLogService実装
 class MockActivityLogService implements IActivityLogService {
@@ -397,15 +398,20 @@ describe('LogsCommandHandler', () => {
 
   describe('formatDateLabel - 日付ラベル', () => {
     test('今日の日付が「今日」と表示される', () => {
-      const today = new Date().toISOString().split('T')[0];
+      // タイムゾーンを考慮した今日の日付を取得
+      const nowInTimezone = toZonedTime(new Date(), 'Asia/Tokyo');
+      const today = format(nowInTimezone, 'yyyy-MM-dd');
+      
       const result = handler['formatDateLabel'](today, 'Asia/Tokyo');
       expect(result).toBe('今日');
     });
 
     test('昨日の日付が「昨日」と表示される', () => {
-      const yesterday = new Date();
-      yesterday.setDate(yesterday.getDate() - 1);
-      const yesterdayStr = yesterday.toISOString().split('T')[0];
+      // タイムゾーンを考慮した昨日の日付を取得
+      const nowInTimezone = toZonedTime(new Date(), 'Asia/Tokyo');
+      const yesterdayInTimezone = new Date(nowInTimezone);
+      yesterdayInTimezone.setDate(yesterdayInTimezone.getDate() - 1);
+      const yesterdayStr = format(yesterdayInTimezone, 'yyyy-MM-dd');
       
       const result = handler['formatDateLabel'](yesterdayStr, 'Asia/Tokyo');
       expect(result).toBe('昨日');

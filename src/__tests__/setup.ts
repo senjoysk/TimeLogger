@@ -32,6 +32,14 @@ afterEach(() => {
   jest.clearAllMocks();
 });
 
+afterAll(async () => {
+  // 非同期処理のクリーンアップ
+  await new Promise(resolve => setTimeout(resolve, 100));
+  
+  // プロセス内のタイマーをクリア
+  jest.clearAllTimers();
+});
+
 // Jestがテストファイルとして認識するためのダミーテスト
 describe('Test Setup', () => {
   it('環境設定が正しく行われている', () => {

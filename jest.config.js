@@ -47,7 +47,7 @@ module.exports = {
   forceExit: true,
   
   // 非同期処理の検出
-  detectOpenHandles: false, // 開発時にtrue、CI時にfalse
+  detectOpenHandles: true, // 開発時にtrue、CI時にfalse
   detectLeaks: false,
   
   // 最大ワーカー数制限（メモリ使用量削減）
