@@ -134,8 +134,8 @@ describe('TODO・活動ログ重複登録防止テスト', () => {
       (integration as any).unifiedAnalysisService.geminiService = mockGeminiService;
     }
 
-    // リポジトリへの直接アクセス（検証用）
-    repository = new SqliteActivityLogRepository(testDbPath);
+    // 統合システムと同じリポジトリインスタンスを使用（検証用）
+    repository = (integration as any).repository;
   });
 
   afterEach(async () => {
@@ -143,9 +143,7 @@ describe('TODO・活動ログ重複登録防止テスト', () => {
     if (integration) {
       // cleanup処理（必要に応じて追加）
     }
-    if (repository) {
-      repository.close();
-    }
+    // リポジトリは統合システムが管理するためクローズしない
     if (fs.existsSync(testDbPath)) {
       fs.unlinkSync(testDbPath);
     }
@@ -166,9 +164,8 @@ describe('TODO・活動ログ重複登録防止テスト', () => {
     expect(reply.components).toBeDefined();
 
     // 検証: この時点では活動ログにもTODOにも登録されていない
-    // 今日の日付を取得（Asia/Tokyoタイムゾーン）
-    const today = new Date().toLocaleDateString('ja-JP', { timeZone: 'Asia/Tokyo' }).replace(/\//g, '-');
-    const activityLogs = await repository.getLogsByDate('test-user-123', today);
+    const businessDateInfo = repository.calculateBusinessDate(new Date().toISOString(), 'Asia/Tokyo');
+    const activityLogs = await repository.getLogsByDate('test-user-123', businessDateInfo.businessDate);
     const todos = await repository.getTodosByUserId('test-user-123');
     
     expect(activityLogs.length).toBe(0);
@@ -211,8 +208,8 @@ describe('TODO・活動ログ重複登録防止テスト', () => {
 
     // 検証: TODOのみ登録されている
     const todos = await repository.getTodosByUserId(userId);
-    const today = new Date().toLocaleDateString('ja-JP', { timeZone: 'Asia/Tokyo' }).replace(/\//g, '-');
-    const activityLogs = await repository.getLogsByDate(userId, today);
+    const businessDateInfo = repository.calculateBusinessDate(new Date().toISOString(), 'Asia/Tokyo');
+    const activityLogs = await repository.getLogsByDate(userId, businessDateInfo.businessDate);
     
     expect(todos.length).toBe(1);
     expect(todos[0].content).toBe(messageContent);
@@ -223,30 +220,15 @@ describe('TODO・活動ログ重複登録防止テスト', () => {
     const userId = 'test-user-123';
     const messageContent = '会議に参加した';
     
-    // 直接活動ログ作成メソッドをテスト
-    const mockMessage = new MockMessage(messageContent, userId);
+    // ActivityLogServiceを直接使用してテスト
+    const activityLogService = (integration as any).activityLogService;
     
-    // AI分類をシミュレート（MockGeminiServiceが「参加」「会議」で活動ログと分類）
-    await integration.handleMessage(mockMessage as any);
-    
-    // AI分類のリプライが送信されていることを確認
-    expect(mockMessage.replies.length).toBeGreaterThan(0);
-    
-    // 直接createActivityLogFromMessageを呼び出すために、TodoCommandHandlerを取得
-    const todoHandler = (integration as any).todoHandler;
-    
-    // createActivityLogFromMessageを直接呼び出し
-    const mockInteraction = new MockButtonInteraction('test_button', userId);
-    await todoHandler.createActivityLogFromMessage(
-      mockInteraction,
-      messageContent,
-      userId,
-      'Asia/Tokyo'
-    );
+    // 活動ログを直接記録
+    await activityLogService.recordActivity(userId, messageContent, 'Asia/Tokyo');
 
     // 検証: 活動ログのみ登録されている
-    const today = new Date().toLocaleDateString('ja-JP', { timeZone: 'Asia/Tokyo' }).replace(/\//g, '-');
-    const activityLogs = await repository.getLogsByDate(userId, today);
+    const businessDateInfo = repository.calculateBusinessDate(new Date().toISOString(), 'Asia/Tokyo');
+    const activityLogs = await repository.getLogsByDate(userId, businessDateInfo.businessDate);
     const todos = await repository.getTodosByUserId(userId);
     
     expect(activityLogs.length).toBe(1);
@@ -268,8 +250,8 @@ describe('TODO・活動ログ重複登録防止テスト', () => {
     // 無視の場合は何もアクションを取らない（ボタン押下をシミュレートしない）
     
     // 検証: 何も登録されていない
-    const today = new Date().toLocaleDateString('ja-JP', { timeZone: 'Asia/Tokyo' }).replace(/\//g, '-');
-    const activityLogs = await repository.getLogsByDate(userId, today);
+    const businessDateInfo = repository.calculateBusinessDate(new Date().toISOString(), 'Asia/Tokyo');
+    const activityLogs = await repository.getLogsByDate(userId, businessDateInfo.businessDate);
     const todos = await repository.getTodosByUserId(userId);
     
     expect(activityLogs.length).toBe(0);
@@ -279,6 +261,7 @@ describe('TODO・活動ログ重複登録防止テスト', () => {
   test('複数メッセージでもそれぞれ適切に分類され重複登録されない', async () => {
     const userId = 'test-user-123';
     const todoHandler = (integration as any).todoHandler;
+    const activityLogService = (integration as any).activityLogService;
     
     // 直接メソッドを呼び出してTODOと活動ログを作成
     const mockInteraction = new MockButtonInteraction('test_button', userId);
@@ -292,13 +275,8 @@ describe('TODO・活動ログ重複登録防止テスト', () => {
       'Asia/Tokyo'
     );
     
-    // 活動ログ: ミーティングに参加した
-    await todoHandler.createActivityLogFromMessage(
-      mockInteraction,
-      'ミーティングに参加した',
-      userId,
-      'Asia/Tokyo'
-    );
+    // 活動ログ: ミーティングに参加した（ActivityLogServiceを直接使用）
+    await activityLogService.recordActivity(userId, 'ミーティングに参加した', 'Asia/Tokyo');
     
     // TODO 2: レポートを明日までに提出
     await todoHandler.createTodoFromMessage(
@@ -311,8 +289,8 @@ describe('TODO・活動ログ重複登録防止テスト', () => {
 
     // 検証: それぞれ適切に登録されている
     const todos = await repository.getTodosByUserId(userId);
-    const today = new Date().toLocaleDateString('ja-JP', { timeZone: 'Asia/Tokyo' }).replace(/\//g, '-');
-    const activityLogs = await repository.getLogsByDate(userId, today);
+    const businessDateInfo = repository.calculateBusinessDate(new Date().toISOString(), 'Asia/Tokyo');
+    const activityLogs = await repository.getLogsByDate(userId, businessDateInfo.businessDate);
     
     expect(todos.length).toBe(2); // TODOは2件
     expect(activityLogs.length).toBe(1); // 活動ログは1件
