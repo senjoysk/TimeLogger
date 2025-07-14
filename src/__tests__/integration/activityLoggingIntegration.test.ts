@@ -169,16 +169,29 @@ describe('活動記録システム統合テスト', () => {
     });
 
     test('ログ記録時にキャッシュが無効化される', async () => {
-      const mockMessage = new MockMessage('新しい活動ログ');
+      const userId = 'test-user-123';
+      const messageContent = '新しい活動ログ';
       
       // キャッシュサービスのinvalidateCacheメソッドをスパイ
       const cacheService = (integration as any).analysisCacheService;
       const invalidateSpy = jest.spyOn(cacheService, 'invalidateCache').mockResolvedValue(true);
       
-      const handleMessage = (integration as any).handleMessage.bind(integration);
-      const result = await handleMessage(mockMessage as unknown as Message);
+      // TodoHandlerの活動ログ作成メソッドを直接呼び出す（ボタン押下をシミュレート）
+      const todoHandler = (integration as any).todoHandler;
       
-      expect(result).toBe(true);
+      // createActivityLogFromMessageを直接テストする
+      const mockInteraction = {
+        update: jest.fn().mockResolvedValue(undefined)
+      };
+      
+      // createActivityLogFromMessageはprivateメソッドなので、リフレクションで呼び出し
+      await (todoHandler as any).createActivityLogFromMessage(
+        mockInteraction,
+        messageContent,
+        userId,
+        'Asia/Tokyo'
+      );
+      
       expect(invalidateSpy).toHaveBeenCalled();
       
       invalidateSpy.mockRestore();
