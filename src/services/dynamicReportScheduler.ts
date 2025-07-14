@@ -23,7 +23,11 @@ interface UserTimezone {
 }
 
 interface Repository {
-  getAllUserTimezones(): Promise<UserTimezone[]>;
+  getAllUserTimezonesForScheduler(): Promise<UserTimezone[]>;
+}
+
+interface ReportSender {
+  sendDailyReport(userId: string, timezone: string): Promise<void>;
 }
 
 interface DebugInfo {
@@ -37,12 +41,20 @@ export class DynamicReportScheduler {
   private timezoneUserMap: Map<string, Set<string>> = new Map();
   private utcTimeToTimezones: Map<string, Set<string>> = new Map();
   private repository?: Repository;
+  private reportSender?: ReportSender;
 
   /**
    * リポジトリを設定（テスト用）
    */
   setRepository(repository: Repository): void {
     this.repository = repository;
+  }
+
+  /**
+   * レポート送信者を設定
+   */
+  setReportSender(reportSender: ReportSender): void {
+    this.reportSender = reportSender;
   }
 
   /**
@@ -55,7 +67,7 @@ export class DynamicReportScheduler {
     }
 
     try {
-      const userTimezones = await this.repository.getAllUserTimezones();
+      const userTimezones = await this.repository.getAllUserTimezonesForScheduler();
       
       for (const { user_id, timezone } of userTimezones) {
         await this.onTimezoneChanged(user_id, null, timezone);
@@ -218,7 +230,21 @@ export class DynamicReportScheduler {
           const users = this.timezoneUserMap.get(timezone);
           if (users) {
             console.log(`📨 Sending reports for ${timezone} (${users.size} users)`);
-            // TODO: 実際の送信処理を実装
+            
+            // 実際の送信処理
+            if (this.reportSender) {
+              for (const userId of users) {
+                try {
+                  await this.reportSender.sendDailyReport(userId, timezone);
+                  console.log(`✅ Daily report sent to user ${userId} (${timezone})`);
+                } catch (error) {
+                  console.error(`❌ Failed to send daily report to user ${userId}:`, error);
+                  // 個別のエラーでも他のユーザーへの送信は継続
+                }
+              }
+            } else {
+              console.warn(`⚠️ No report sender configured for ${timezone}`);
+            }
           }
         }
       }

@@ -21,6 +21,8 @@ import { MessageClassificationService } from '../services/messageClassificationS
 import { IntegratedSummaryService } from '../services/integratedSummaryService';
 import { ActivityTodoCorrelationService } from '../services/activityTodoCorrelationService';
 import { GapDetectionService } from '../services/gapDetectionService';
+import { DynamicReportScheduler } from '../services/dynamicReportScheduler';
+import { DailyReportSender } from '../services/dailyReportSender';
 import { ActivityLogError } from '../types/activityLog';
 import { GapHandler } from '../handlers/gapHandler';
 
@@ -58,6 +60,8 @@ export class ActivityLoggingIntegration {
   private gapDetectionService!: GapDetectionService;
   private correlationService!: ActivityTodoCorrelationService;
   private integratedSummaryService!: IntegratedSummaryService;
+  private dynamicReportScheduler!: DynamicReportScheduler;
+  private dailyReportSender!: DailyReportSender;
 
   // ハンドラー層
   private editHandler!: EditCommandHandler;
@@ -125,6 +129,10 @@ export class ActivityLoggingIntegration {
         this.unifiedAnalysisService
       );
       
+      // DynamicReportSchedulerの初期化
+      this.dynamicReportScheduler = new DynamicReportScheduler();
+      this.dynamicReportScheduler.setRepository(this.repository);
+      
       console.log('✅ サービス層初期化完了（TODO統合機能含む）');
 
       // 3. ハンドラー層の初期化
@@ -156,6 +164,15 @@ export class ActivityLoggingIntegration {
       // プロファイル機能ハンドラーの初期化
       this.profileHandler = new ProfileCommandHandler(this.repository);
       
+      // TimezoneHandlerにDynamicReportSchedulerのコールバックを設定
+      this.timezoneHandler.setTimezoneChangeCallback(async (userId: string, oldTimezone: string | null, newTimezone: string) => {
+        try {
+          await this.dynamicReportScheduler.onTimezoneChanged(userId, oldTimezone, newTimezone);
+          console.log(`📅 DynamicReportSchedulerに通知: ${userId} ${oldTimezone} -> ${newTimezone}`);
+        } catch (error) {
+          console.warn(`⚠️ DynamicReportSchedulerへの通知に失敗: ${error}`);
+        }
+      });
       
       console.log('✅ ハンドラー層初期化完了（TODO機能統合済み）');
 
@@ -176,7 +193,7 @@ export class ActivityLoggingIntegration {
    * Discord Botにメッセージハンドラーを統合
    * 既存のハンドラーより優先して処理
    */
-  integrateWithBot(client: Client): void {
+  integrateWithBot(client: Client, bot?: any): void {
     if (!this.isInitialized) {
       throw new ActivityLogError(
         '活動記録システムが初期化されていません', 
@@ -185,6 +202,13 @@ export class ActivityLoggingIntegration {
     }
 
     console.log('🔗 Discord Botへの統合を開始...');
+
+    // DailyReportSenderの初期化（Botが提供された場合）
+    if (bot) {
+      this.dailyReportSender = new DailyReportSender(this, bot);
+      this.dynamicReportScheduler.setReportSender(this.dailyReportSender);
+      console.log('✅ DailyReportSender初期化完了');
+    }
 
     // 既存のmessageCreateリスナーを一時的に無効化
     const existingListeners = client.listeners('messageCreate');
