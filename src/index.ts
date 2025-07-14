@@ -3,9 +3,6 @@ import { TaskLoggerBot } from './bot';
 import { EnhancedScheduler } from './enhancedScheduler';
 import { DynamicReportScheduler } from './services/dynamicReportScheduler';
 import { TimezoneChangeMonitor } from './services/timezoneChangeMonitor';
-import { NightSuspendServer } from './api/nightSuspendServer';
-import { MorningMessageRecovery } from './services/morningMessageRecovery';
-import { SqliteNightSuspendRepository } from './repositories/sqliteNightSuspendRepository';
 
 /**
  * アプリケーションのメインエントリーポイント
@@ -16,7 +13,6 @@ class Application {
   private scheduler: EnhancedScheduler;
   private dynamicScheduler: DynamicReportScheduler;
   private timezoneMonitor: TimezoneChangeMonitor;
-  private nightSuspendServer: NightSuspendServer | null = null;
 
   constructor() {
     this.bot = new TaskLoggerBot();
@@ -77,10 +73,6 @@ class Application {
       await this.scheduler.start();
       console.log('');
       
-      // 夜間サスペンドサーバーの起動
-      console.log('🌙 夜間サスペンドサーバーを起動中...');
-      await this.setupNightSuspendServer();
-      console.log('');
       
       console.log('🎉 Discord Task Logger が正常に起動しました！');
       
@@ -118,10 +110,6 @@ class Application {
         console.log('🌍 タイムゾーン分布:', metrics.timezoneDistribution);
       }
       
-      // 夜間サスペンドサーバーの停止
-      if (this.nightSuspendServer) {
-        await this.nightSuspendServer.stop();
-      }
       
       // Discord Bot の停止
       await this.bot.stop();
@@ -163,60 +151,6 @@ class Application {
     });
   }
 
-  /**
-   * 夜間サスペンドサーバーの設定
-   */
-  private async setupNightSuspendServer(): Promise<void> {
-    try {
-      // データベースとリポジトリの取得
-      const repository = this.bot.getRepository();
-      if (!repository) {
-        console.warn('⚠️ リポジトリが取得できないため、夜間サスペンドサーバーはメッセージリカバリなしで起動します');
-      }
-
-      // 夜間サスペンド機能の設定
-      let morningRecovery: MorningMessageRecovery | undefined;
-      
-      if (repository) {
-        // SqliteNightSuspendRepositoryの作成（既存のリポジトリのDatabaseを使用）
-        const nightSuspendRepo = new SqliteNightSuspendRepository((repository as any).db);
-        
-        // Discord Clientの取得
-        const discordClient = this.bot.getClient();
-        
-        if (discordClient) {
-          // マルチユーザー対応: 全ユーザーに対応したメッセージリカバリサービス
-          morningRecovery = new MorningMessageRecovery(discordClient, nightSuspendRepo, {
-            targetUserId: '', // マルチユーザー対応のため空文字（全ユーザー対応）
-            timezone: 'Asia/Tokyo'
-          });
-          console.log('✅ メッセージリカバリサービスが設定されました（マルチユーザー対応）');
-        } else {
-          console.warn('⚠️ Discord Clientが設定されていません');
-        }
-      }
-
-      // ActivityLoggingIntegrationの取得
-      const activityIntegration = this.bot.getActivityLoggingIntegration();
-      
-      // 夜間サスペンドサーバーの起動
-      this.nightSuspendServer = new NightSuspendServer(morningRecovery, activityIntegration);
-      await this.nightSuspendServer.start();
-      
-      console.log('🌙 夜間サスペンドサーバーが正常に起動しました');
-      console.log('📡 API エンドポイント:');
-      console.log('  - POST /api/night-suspend (認証必要)');
-      console.log('  - POST /api/wake-up (認証必要)');
-      console.log('  - POST /api/morning-recovery (認証必要)');
-      console.log('  - GET /health (認証不要)');
-      console.log('  - GET /api/suspend-status (認証不要)');
-      console.log('  - GET /api/schedule-check (認証不要)');
-      
-    } catch (error) {
-      console.error('❌ 夜間サスペンドサーバーの起動に失敗しました:', error);
-      console.warn('⚠️ 夜間サスペンド機能なしで続行します');
-    }
-  }
 }
 
 // アプリケーションの実行
