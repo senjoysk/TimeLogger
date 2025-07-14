@@ -147,7 +147,7 @@ describe('DynamicReportScheduler', () => {
       
       // モックデータ準備
       const mockRepository = {
-        getAllUserTimezones: jest.fn().mockResolvedValue([
+        getAllUserTimezonesForScheduler: jest.fn().mockResolvedValue([
           { user_id: 'user1', timezone: 'Asia/Tokyo' },
           { user_id: 'user2', timezone: 'Asia/Tokyo' },
           { user_id: 'user3', timezone: 'America/New_York' },
@@ -171,7 +171,7 @@ describe('DynamicReportScheduler', () => {
       // 🔴 Red: ユーザーがいない場合の初期化
       
       const mockRepository = {
-        getAllUserTimezones: jest.fn().mockResolvedValue([])
+        getAllUserTimezonesForScheduler: jest.fn().mockResolvedValue([])
       };
       
       scheduler.setRepository(mockRepository);
