@@ -80,12 +80,13 @@ describe('Phase 3: ユーザー管理機能テスト', () => {
       const userId = 'testuser';
       await repository.registerUser(userId, 'Test User');
       
-      // テスト用のログを作成
+      // テスト用のログを作成（今日の日付を使用）
+      const todayBusinessDate = new Date().toISOString().split('T')[0];
       await repository.saveLog({
         userId,
         content: 'テスト活動1',
         inputTimestamp: new Date().toISOString(),
-        businessDate: '2025-07-11',
+        businessDate: todayBusinessDate,
         startTime: new Date().toISOString(),
         endTime: new Date(Date.now() + 30 * 60 * 1000).toISOString(),
         totalMinutes: 30,
@@ -98,7 +99,7 @@ describe('Phase 3: ユーザー管理機能テスト', () => {
         userId,
         content: 'テスト活動2',
         inputTimestamp: new Date().toISOString(),
-        businessDate: '2025-07-11',
+        businessDate: todayBusinessDate,
         startTime: new Date().toISOString(),
         endTime: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
         totalMinutes: 60,
