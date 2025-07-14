@@ -522,7 +522,7 @@ export class TodoCommandHandler implements ITodoCommandHandler {
     
     for (let i = 0; i < maxTodos; i++) {
       const todo = activeTodos[i];
-      const actionRow = createTodoActionButtons(todo.id, todo.status);
+      const actionRow = createTodoActionButtons(todo.id, todo.status, i);
       components.push(actionRow);
     }
 

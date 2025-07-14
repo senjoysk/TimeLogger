@@ -195,16 +195,20 @@ export function createTodoListEmbed(
  */
 export function createTodoActionButtons(
   todoId: string,
-  status: string
+  status: string,
+  index?: number
 ): ActionRowBuilder<ButtonBuilder> {
   
   const buttons = new ActionRowBuilder<ButtonBuilder>();
+  
+  // 番号プレフィックスを生成（index が指定されている場合）
+  const numberPrefix = index !== undefined ? `${index + 1}.` : '';
   
   if (status === 'pending' || status === 'in_progress') {
     buttons.addComponents(
       new ButtonBuilder()
         .setCustomId(`todo_complete_${todoId}`)
-        .setLabel('✅ 完了')
+        .setLabel(`${numberPrefix}✅ 完了`)
         .setStyle(ButtonStyle.Success)
     );
   }
@@ -213,7 +217,7 @@ export function createTodoActionButtons(
     buttons.addComponents(
       new ButtonBuilder()
         .setCustomId(`todo_start_${todoId}`)
-        .setLabel('🚀 開始')
+        .setLabel(`${numberPrefix}🚀 開始`)
         .setStyle(ButtonStyle.Primary)
     );
   }
@@ -221,11 +225,11 @@ export function createTodoActionButtons(
   buttons.addComponents(
     new ButtonBuilder()
       .setCustomId(`todo_edit_${todoId}`)
-      .setLabel('✏️ 編集')
+      .setLabel(`${numberPrefix}✏️ 編集`)
       .setStyle(ButtonStyle.Secondary),
     new ButtonBuilder()
       .setCustomId(`todo_delete_${todoId}`)
-      .setLabel('🗑️ 削除')
+      .setLabel(`${numberPrefix}🗑️ 削除`)
       .setStyle(ButtonStyle.Danger)
   );
 

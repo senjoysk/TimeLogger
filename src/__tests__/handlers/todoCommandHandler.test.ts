@@ -1153,6 +1153,42 @@ describe('TodoCommandHandler', () => {
       expect(replyCall).toHaveProperty('components');
       expect(replyCall.components.length).toBe(3);
     });
+
+    test('ボタンに番号が表示される', async () => {
+      // 3件のTODOを作成
+      const todos = [];
+      for (let i = 1; i <= 3; i++) {
+        const todo = await mockTodoRepo.createTodo({
+          userId: 'test-user',
+          content: `TODO ${i}`,
+          priority: 0,
+        });
+        todos.push(todo);
+      }
+
+      const message = createMockMessage('!todo', 'test-user') as Message;
+      message.reply = jest.fn().mockResolvedValue({});
+      
+      await handler.handleCommand(message, 'test-user', [], 'Asia/Tokyo');
+      
+      expect(message.reply).toHaveBeenCalled();
+      const replyCall = (message.reply as jest.Mock).mock.calls[0][0];
+      
+      // ボタンに番号が表示されていることを確認
+      expect(replyCall).toHaveProperty('components');
+      const components = replyCall.components;
+      
+      // 各ボタン行のラベルを確認
+      components.forEach((component: any, index: number) => {
+        const buttons = component.components;
+        const expectedNumber = `${index + 1}.`;
+        
+        // 各ボタンのラベルに番号が含まれていることを確認
+        buttons.forEach((button: any) => {
+          expect(button.data.label).toContain(expectedNumber);
+        });
+      });
+    });
   });
 
   describe('TODO ID表示機能テスト', () => {
