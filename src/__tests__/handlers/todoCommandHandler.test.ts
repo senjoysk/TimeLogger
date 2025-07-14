@@ -1037,11 +1037,11 @@ describe('TodoCommandHandler', () => {
     });
   });
 
-  describe('複数行ボタン生成テスト（25件TODO対応）', () => {
-    test('25件のTODOが表示されたときに複数行のボタンが生成される', async () => {
-      // 25件のTODOを作成
+  describe('複数行ボタン生成テスト（Discord制限対応）', () => {
+    test('5件のTODOが表示されたときに5つのボタン行が生成される', async () => {
+      // 5件のTODOを作成
       const todos = [];
-      for (let i = 1; i <= 25; i++) {
+      for (let i = 1; i <= 5; i++) {
         const todo = await mockTodoRepo.createTodo({
           userId: 'test-user',
           content: `TODO ${i}`,
@@ -1062,16 +1062,15 @@ describe('TodoCommandHandler', () => {
       expect(replyCall).toHaveProperty('embeds');
       expect(replyCall.embeds[0].data.title).toBe('📋 TODO一覧');
       
-      // 現在の実装では5つのコンポーネントしか生成されないため、これは失敗する
-      // これがRed Phaseのテスト - 25個のコンポーネント（アクションロー）を期待
+      // 5つのコンポーネント（ActionRow）が生成されることを確認
       expect(replyCall).toHaveProperty('components');
-      expect(replyCall.components.length).toBe(25); // 🔴 Red Phase: 現在の実装では失敗するはず
+      expect(replyCall.components.length).toBe(5);
     });
 
-    test('30件のTODOが表示されたときに最大25件のボタンが生成される', async () => {
-      // 30件のTODOを作成
+    test('10件のTODOが表示されたときに最大5件のボタンが生成される', async () => {
+      // 10件のTODOを作成
       const todos = [];
-      for (let i = 1; i <= 30; i++) {
+      for (let i = 1; i <= 10; i++) {
         const todo = await mockTodoRepo.createTodo({
           userId: 'test-user',
           content: `TODO ${i}`,
@@ -1092,12 +1091,12 @@ describe('TodoCommandHandler', () => {
       expect(replyCall).toHaveProperty('embeds');
       expect(replyCall.embeds[0].data.title).toBe('📋 TODO一覧');
       
-      // 現在の実装では5つのコンポーネントしか生成されないため、これは失敗する
+      // Discord制限により最大5つのコンポーネントが生成される
       expect(replyCall).toHaveProperty('components');
-      expect(replyCall.components.length).toBe(25); // 🔴 Red Phase: 現在の実装では失敗するはず
+      expect(replyCall.components.length).toBe(5);
     });
 
-    test('6番目のTODOのボタンが操作可能である', async () => {
+    test('6番目以降のTODOは短縮IDコマンドで操作可能である', async () => {
       // 10件のTODOを作成
       const todos = [];
       for (let i = 1; i <= 10; i++) {
@@ -1109,19 +1108,17 @@ describe('TodoCommandHandler', () => {
         todos.push(todo);
       }
 
-      // 6番目のTODOを完了操作
+      // 6番目のTODOを短縮IDで完了操作
       const sixthTodo = todos[5]; // 0-indexedなので5番目が6番目
-      const interaction = createMockButtonInteraction(
-        `todo_complete_${sixthTodo.id}`, 
-        'test-user'
-      ) as ButtonInteraction;
+      const shortId = sixthTodo.id.substring(0, 8);
+      const message = createMockMessage(`!todo done ${shortId}`, 'test-user') as Message;
       
-      await handler.handleButtonInteraction(interaction, 'test-user', 'Asia/Tokyo');
+      await handler.handleCommand(message, 'test-user', ['done', shortId], 'Asia/Tokyo');
       
-      expect(interaction.reply).toHaveBeenCalled();
-      const replyCall = (interaction.reply as jest.Mock).mock.calls[0][0];
-      expect(replyCall.content).toContain('🎉');
-      expect(replyCall.content).toContain('完了しました');
+      expect(message.reply).toHaveBeenCalled();
+      const replyCall = (message.reply as jest.Mock).mock.calls[0][0];
+      expect(replyCall).toContain('🎉');
+      expect(replyCall).toContain('完了しました');
       
       // TODOが実際に完了状態になっていることを確認
       const updatedTodo = await mockTodoRepo.getTodoById(sixthTodo.id);

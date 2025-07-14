@@ -516,9 +516,9 @@ export class TodoCommandHandler implements ITodoCommandHandler {
       created_at: todo.createdAt
     })), userId);
 
-    // TODO操作ボタンを作成（複数行対応、最大25件まで）
+    // TODO操作ボタンを作成（Discord制限: 最大5行まで）
     const components = [];
-    const maxTodos = Math.min(activeTodos.length, 25); // Discord制限: 最大25個のアクションロー
+    const maxTodos = Math.min(activeTodos.length, 5); // Discord制限: 最大5個のActionRow
     
     for (let i = 0; i < maxTodos; i++) {
       const todo = activeTodos[i];
