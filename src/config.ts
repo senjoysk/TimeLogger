@@ -65,6 +65,21 @@ export const config = {
     },
   },
   
+  // システム監視設定
+  monitoring: {
+    // 管理者通知設定
+    adminNotification: {
+      userId: process.env.ADMIN_USER_ID || '', // 管理者のDiscord User ID
+      enabled: process.env.ADMIN_NOTIFICATIONS_ENABLED === 'true',
+    },
+    // ヘルスチェック設定
+    healthCheck: {
+      enabled: process.env.HEALTH_CHECK_ENABLED !== 'false', // デフォルト有効
+      interval: parseInt(process.env.HEALTH_CHECK_INTERVAL || '30000'), // 30秒
+      timeout: parseInt(process.env.HEALTH_CHECK_TIMEOUT || '10000'), // 10秒
+    },
+  },
+  
   // 環境判定
   environment: {
     nodeEnv: NODE_ENV,
@@ -92,6 +107,12 @@ export function validateConfig(): void {
     // TARGET_USER_ID: マルチユーザー対応のため削除
     { key: 'GOOGLE_API_KEY', value: config.gemini.apiKey },
   ];
+  
+  // 管理者通知が有効な場合のみ必須チェック
+  if (config.monitoring.adminNotification.enabled && !config.monitoring.adminNotification.userId) {
+    console.error('❌ 管理者通知が有効ですが、ADMIN_USER_IDが設定されていません');
+    process.exit(1);
+  }
 
   const missingFields = requiredFields
     .filter(field => !field.value)

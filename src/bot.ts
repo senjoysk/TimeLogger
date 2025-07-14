@@ -2,6 +2,7 @@ import { Client, GatewayIntentBits, Partials } from 'discord.js';
 import { config } from './config';
 import { BotStatus } from './types';
 import { ActivityLoggingIntegration, createDefaultConfig } from './integration';
+import express from 'express';
 
 /**
  * Discord Bot のメインクラス
@@ -12,6 +13,8 @@ export class TaskLoggerBot {
   private status: BotStatus;
   // 活動記録システム統合
   private activityLoggingIntegration?: ActivityLoggingIntegration;
+  // Fly.ioヘルスチェック用HTTPサーバー
+  private healthServer?: express.Application;
 
   constructor() {
     // Discord クライアントの初期化
@@ -37,6 +40,209 @@ export class TaskLoggerBot {
     // 活動記録システムで統合管理
 
     this.setupEventHandlers();
+    this.setupHealthServer();
+  }
+
+  /**
+   * Fly.ioヘルスチェック用HTTPサーバーを設定
+   */
+  private setupHealthServer(): void {
+    this.healthServer = express();
+    
+    // ヘルスチェックエンドポイント
+    this.healthServer.get('/health', async (req, res) => {
+      const healthStatus = await this.checkSystemHealth();
+      
+      if (healthStatus.status === 'error') {
+        // 異常検知時の処理
+        await this.handleSystemError(healthStatus);
+        res.status(503).json(healthStatus);
+      } else {
+        res.json(healthStatus);
+      }
+    });
+    
+    // システム状態詳細エンドポイント
+    this.healthServer.get('/status', async (req, res) => {
+      const detailedStatus = await this.getDetailedSystemStatus();
+      res.json(detailedStatus);
+    });
+    
+    // 管理者通知テスト用エンドポイント
+    this.healthServer.post('/test-notification', async (req, res) => {
+      try {
+        await this.sendAdminNotification('🧪 **テスト通知**', 'ヘルスチェックシステムの通知テストです。');
+        res.json({ success: true, message: '通知テストを送信しました' });
+      } catch (error) {
+        res.status(500).json({ success: false, error: String(error) });
+      }
+    });
+    
+    // 基本的なルート
+    this.healthServer.get('/', (req, res) => {
+      res.json({
+        name: 'TimeLogger Discord Bot',
+        version: '1.0.0',
+        status: 'running',
+        endpoints: {
+          health: '/health',
+          status: '/status',
+          testNotification: '/test-notification'
+        }
+      });
+    });
+    
+    // サーバー起動
+    const port = process.env.PORT || 3000;
+    this.healthServer.listen(port, () => {
+      console.log(`🏥 ヘルスチェックサーバーがポート${port}で起動しました`);
+    });
+  }
+
+  /**
+   * システムヘルスチェック
+   */
+  private async checkSystemHealth(): Promise<any> {
+    const issues = [];
+    
+    // Discord接続チェック
+    const discordReady = this.client.readyAt !== null;
+    if (!discordReady) {
+      issues.push('Discord接続が確立されていません');
+    }
+    
+    // 活動記録システムチェック
+    const activityLoggingInitialized = this.activityLoggingIntegration !== undefined;
+    if (!activityLoggingInitialized) {
+      issues.push('活動記録システムが初期化されていません');
+    }
+    
+    // データベース接続チェック
+    let databaseConnected = false;
+    try {
+      const repository = this.activityLoggingIntegration?.getRepository();
+      if (repository) {
+        // 簡単なクエリでデータベース接続を確認
+        await repository.getUserSettings('health-check');
+        databaseConnected = true;
+      }
+    } catch (error) {
+      issues.push(`データベース接続エラー: ${String(error)}`);
+    }
+    
+    const status = issues.length === 0 ? 'ok' : 'error';
+    
+    return {
+      status,
+      timestamp: new Date().toISOString(),
+      checks: {
+        discordReady,
+        activityLoggingInitialized,
+        databaseConnected
+      },
+      issues,
+      botStatus: this.status,
+      uptime: process.uptime()
+    };
+  }
+  
+  /**
+   * 詳細なシステム状態を取得
+   */
+  private async getDetailedSystemStatus(): Promise<any> {
+    const healthStatus = await this.checkSystemHealth();
+    
+    return {
+      ...healthStatus,
+      environment: {
+        nodeEnv: process.env.NODE_ENV,
+        platform: process.platform,
+        nodeVersion: process.version,
+        memoryUsage: process.memoryUsage(),
+        cpuUsage: process.cpuUsage()
+      },
+      discord: {
+        clientId: this.client.user?.id,
+        username: this.client.user?.username,
+        guilds: this.client.guilds.cache.size,
+        users: this.client.users.cache.size,
+        ping: this.client.ws.ping
+      },
+      config: {
+        adminNotificationsEnabled: config.monitoring.adminNotification.enabled,
+        healthCheckEnabled: config.monitoring.healthCheck.enabled
+      }
+    };
+  }
+  
+  /**
+   * システムエラーハンドリング
+   */
+  private async handleSystemError(healthStatus: any): Promise<void> {
+    console.error('🚨 システムエラー検知:', healthStatus);
+    
+    // 管理者通知
+    if (config.monitoring.adminNotification.enabled) {
+      const errorMessage = healthStatus.issues.join('\n• ');
+      await this.sendAdminNotification(
+        '🚨 **システムエラー検知**',
+        `**検知時刻**: ${healthStatus.timestamp}\n**問題**:\n• ${errorMessage}\n\n**対処**: システムの自動復旧を試行中...`
+      );
+    }
+    
+    // 自動復旧試行
+    await this.attemptAutoRecovery(healthStatus);
+  }
+  
+  /**
+   * 管理者通知を送信
+   */
+  private async sendAdminNotification(title: string, message: string): Promise<void> {
+    try {
+      if (!config.monitoring.adminNotification.enabled || !config.monitoring.adminNotification.userId) {
+        console.log('⚠️ 管理者通知が無効または管理者IDが未設定です');
+        return;
+      }
+      
+      const adminUserId = config.monitoring.adminNotification.userId;
+      const fullMessage = `${title}\n\n${message}\n\n---\n*TimeLogger Bot システム監視*`;
+      
+      await this.sendDirectMessage(adminUserId, fullMessage);
+      console.log(`📢 管理者通知送信完了: ${adminUserId}`);
+    } catch (error) {
+      console.error('❌ 管理者通知送信エラー:', error);
+    }
+  }
+  
+  /**
+   * 自動復旧試行
+   */
+  private async attemptAutoRecovery(healthStatus: any): Promise<void> {
+    console.log('🔄 自動復旧を試行中...');
+    
+    // Discord接続の再試行
+    if (!healthStatus.checks.discordReady) {
+      try {
+        console.log('🔄 Discord再接続を試行中...');
+        if (this.client.readyAt === null) {
+          await this.client.login(config.discord.token);
+        }
+      } catch (error) {
+        console.error('❌ Discord再接続失敗:', error);
+      }
+    }
+    
+    // 活動記録システムの再初期化
+    if (!healthStatus.checks.activityLoggingInitialized) {
+      try {
+        console.log('🔄 活動記録システム再初期化を試行中...');
+        await this.initializeActivityLogging();
+      } catch (error) {
+        console.error('❌ 活動記録システム再初期化失敗:', error);
+      }
+    }
+    
+    console.log('✅ 自動復旧試行完了');
   }
 
   /**

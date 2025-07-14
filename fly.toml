@@ -19,7 +19,7 @@ kill_timeout = '5s'
   source = 'timelogger_data'
   destination = '/app/data'
 
-# HTTPサーバー設定
+# HTTPサーバー設定（Discord Botは不要だが、ヘルスチェック用に軽量サーバーを実装）
 [http_service]
   internal_port = 3000
   force_https = true
