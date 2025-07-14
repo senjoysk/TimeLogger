@@ -172,8 +172,9 @@ export function createTodoListEmbed(
     const priorityIcon = getPriorityIcon(todo.priority);
     const statusIcon = getStatusIcon(todo.status);
     const dueDate = todo.due_date ? ` (期日: ${todo.due_date})` : '';
+    const shortId = todo.id.substring(0, 8); // ID前8文字を表示
     
-    return `${index + 1}. ${statusIcon} ${priorityIcon} ${todo.content}${dueDate}`;
+    return `${index + 1}. \`${shortId}\` ${statusIcon} ${priorityIcon} ${todo.content}${dueDate}`;
   }).join('\n');
 
   embed.setDescription(todoList);

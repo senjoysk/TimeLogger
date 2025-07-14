@@ -89,7 +89,12 @@ class MockTodoRepository implements ITodoRepository {
   async getTodosWithDueDate() { return []; }
   async getTodosByActivityId() { return []; }
   async getTodosByDateRange() { return []; }
-  async getTodosByStatusOptimized() { return []; }
+  async getTodosByStatusOptimized(userId: string, statuses: string[]) { 
+    return this.todos.filter(todo => 
+      todo.userId === userId && 
+      statuses.includes(todo.status)
+    ); 
+  }
 }
 
 class MockMessageClassificationRepository implements IMessageClassificationRepository {
@@ -1029,6 +1034,188 @@ describe('TodoCommandHandler', () => {
       expect(interaction.update).toHaveBeenCalled();
       const updateCall = (interaction.update as jest.Mock).mock.calls[0][0];
       expect(updateCall.embeds[0].data.title).toBe('📝 活動ログ作成完了');
+    });
+  });
+
+  describe('複数行ボタン生成テスト（25件TODO対応）', () => {
+    test('25件のTODOが表示されたときに複数行のボタンが生成される', async () => {
+      // 25件のTODOを作成
+      const todos = [];
+      for (let i = 1; i <= 25; i++) {
+        const todo = await mockTodoRepo.createTodo({
+          userId: 'test-user',
+          content: `TODO ${i}`,
+          priority: i % 3 - 1, // -1, 0, 1の循環
+        });
+        todos.push(todo);
+      }
+
+      const message = createMockMessage('!todo', 'test-user') as Message;
+      message.reply = jest.fn().mockResolvedValue({});
+      
+      await handler.handleCommand(message, 'test-user', [], 'Asia/Tokyo');
+      
+      expect(message.reply).toHaveBeenCalled();
+      const replyCall = (message.reply as jest.Mock).mock.calls[0][0];
+      
+      // Embedが正しく生成されていることを確認
+      expect(replyCall).toHaveProperty('embeds');
+      expect(replyCall.embeds[0].data.title).toBe('📋 TODO一覧');
+      
+      // 現在の実装では5つのコンポーネントしか生成されないため、これは失敗する
+      // これがRed Phaseのテスト - 25個のコンポーネント（アクションロー）を期待
+      expect(replyCall).toHaveProperty('components');
+      expect(replyCall.components.length).toBe(25); // 🔴 Red Phase: 現在の実装では失敗するはず
+    });
+
+    test('30件のTODOが表示されたときに最大25件のボタンが生成される', async () => {
+      // 30件のTODOを作成
+      const todos = [];
+      for (let i = 1; i <= 30; i++) {
+        const todo = await mockTodoRepo.createTodo({
+          userId: 'test-user',
+          content: `TODO ${i}`,
+          priority: 0,
+        });
+        todos.push(todo);
+      }
+
+      const message = createMockMessage('!todo', 'test-user') as Message;
+      message.reply = jest.fn().mockResolvedValue({});
+      
+      await handler.handleCommand(message, 'test-user', [], 'Asia/Tokyo');
+      
+      expect(message.reply).toHaveBeenCalled();
+      const replyCall = (message.reply as jest.Mock).mock.calls[0][0];
+      
+      // Embedが正しく生成されていることを確認
+      expect(replyCall).toHaveProperty('embeds');
+      expect(replyCall.embeds[0].data.title).toBe('📋 TODO一覧');
+      
+      // 現在の実装では5つのコンポーネントしか生成されないため、これは失敗する
+      expect(replyCall).toHaveProperty('components');
+      expect(replyCall.components.length).toBe(25); // 🔴 Red Phase: 現在の実装では失敗するはず
+    });
+
+    test('6番目のTODOのボタンが操作可能である', async () => {
+      // 10件のTODOを作成
+      const todos = [];
+      for (let i = 1; i <= 10; i++) {
+        const todo = await mockTodoRepo.createTodo({
+          userId: 'test-user',
+          content: `TODO ${i}`,
+          priority: 0,
+        });
+        todos.push(todo);
+      }
+
+      // 6番目のTODOを完了操作
+      const sixthTodo = todos[5]; // 0-indexedなので5番目が6番目
+      const interaction = createMockButtonInteraction(
+        `todo_complete_${sixthTodo.id}`, 
+        'test-user'
+      ) as ButtonInteraction;
+      
+      await handler.handleButtonInteraction(interaction, 'test-user', 'Asia/Tokyo');
+      
+      expect(interaction.reply).toHaveBeenCalled();
+      const replyCall = (interaction.reply as jest.Mock).mock.calls[0][0];
+      expect(replyCall.content).toContain('🎉');
+      expect(replyCall.content).toContain('完了しました');
+      
+      // TODOが実際に完了状態になっていることを確認
+      const updatedTodo = await mockTodoRepo.getTodoById(sixthTodo.id);
+      expect(updatedTodo?.status).toBe('completed');
+    });
+
+    test('TODOが5件以下の場合は従来通り動作する', async () => {
+      // 3件のTODOを作成
+      const todos = [];
+      for (let i = 1; i <= 3; i++) {
+        const todo = await mockTodoRepo.createTodo({
+          userId: 'test-user',
+          content: `TODO ${i}`,
+          priority: 0,
+        });
+        todos.push(todo);
+      }
+
+      const message = createMockMessage('!todo', 'test-user') as Message;
+      message.reply = jest.fn().mockResolvedValue({});
+      
+      await handler.handleCommand(message, 'test-user', [], 'Asia/Tokyo');
+      
+      expect(message.reply).toHaveBeenCalled();
+      const replyCall = (message.reply as jest.Mock).mock.calls[0][0];
+      
+      // Embedが正しく生成されていることを確認
+      expect(replyCall).toHaveProperty('embeds');
+      expect(replyCall.embeds[0].data.title).toBe('📋 TODO一覧');
+      
+      // 3つのコンポーネントが生成されることを確認
+      expect(replyCall).toHaveProperty('components');
+      expect(replyCall.components.length).toBe(3);
+    });
+  });
+
+  describe('TODO ID表示機能テスト', () => {
+    test('TODO一覧でTODO IDが表示される', async () => {
+      // 複数のTODOを作成
+      const todos = [];
+      for (let i = 1; i <= 5; i++) {
+        const todo = await mockTodoRepo.createTodo({
+          userId: 'test-user',
+          content: `テストTODO ${i}`,
+          priority: 0,
+        });
+        todos.push(todo);
+      }
+
+      const message = createMockMessage('!todo', 'test-user') as Message;
+      message.reply = jest.fn().mockResolvedValue({});
+      
+      await handler.handleCommand(message, 'test-user', [], 'Asia/Tokyo');
+      
+      expect(message.reply).toHaveBeenCalled();
+      const replyCall = (message.reply as jest.Mock).mock.calls[0][0];
+      
+      // Embedの内容を確認
+      expect(replyCall).toHaveProperty('embeds');
+      const embed = replyCall.embeds[0];
+      expect(embed.data.title).toBe('📋 TODO一覧');
+      
+      // TODO IDが表示されていることを確認
+      const description = embed.data.description;
+      expect(description).toBeDefined();
+      
+      // 各TODOのIDが短縮形で表示されていることを確認
+      todos.forEach((todo, index) => {
+        const shortId = todo.id.substring(0, 8);
+        expect(description).toContain(`\`${shortId}\``);
+        expect(description).toContain(`テストTODO ${index + 1}`);
+      });
+    });
+
+    test('TODO IDが正しいフォーマットで表示される', async () => {
+      const testTodo = await mockTodoRepo.createTodo({
+        userId: 'test-user',
+        content: 'ID表示テスト',
+        priority: 1,
+      });
+
+      const message = createMockMessage('!todo', 'test-user') as Message;
+      message.reply = jest.fn().mockResolvedValue({});
+      
+      await handler.handleCommand(message, 'test-user', [], 'Asia/Tokyo');
+      
+      expect(message.reply).toHaveBeenCalled();
+      const replyCall = (message.reply as jest.Mock).mock.calls[0][0];
+      
+      const description = replyCall.embeds[0].data.description;
+      const shortId = testTodo.id.substring(0, 8);
+      
+      // フォーマットが正しいことを確認: 番号. `ID` アイコン 優先度 内容
+      expect(description).toMatch(new RegExp(`1\\. \`${shortId}\` ⏳ 🔴 ID表示テスト`));
     });
   });
 });  
