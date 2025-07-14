@@ -890,7 +890,7 @@ export function createDefaultConfig(databasePath: string, geminiApiKey: string):
     defaultTimezone: 'Asia/Tokyo',
     enableAutoAnalysis: true,
     cacheValidityMinutes: 60,
-    targetUserId: process.env.TARGET_USER_ID || '' // テスト環境での動作を保証
+    targetUserId: '' // マルチユーザー対応により削除（レガシー設定）
   };
 }
 
