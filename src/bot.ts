@@ -15,6 +15,8 @@ export class TaskLoggerBot {
   private activityLoggingIntegration?: ActivityLoggingIntegration;
   // Fly.ioヘルスチェック用HTTPサーバー
   private healthServer?: express.Application;
+  // エラー発生回数トラッキング
+  private errorCounters: Map<string, number> = new Map();
 
   constructor() {
     // Discord クライアントの初期化
@@ -54,10 +56,11 @@ export class TaskLoggerBot {
       const healthStatus = await this.checkSystemHealth();
       
       if (healthStatus.status === 'error') {
-        // 異常検知時の処理
+        // 異常検知時の処理（重大なエラーのみ通知）
         await this.handleSystemError(healthStatus);
         res.status(503).json(healthStatus);
       } else {
+        // 正常時は通知しない、レスポンスのみ返す
         res.json(healthStatus);
       }
     });
@@ -123,7 +126,8 @@ export class TaskLoggerBot {
       const repository = this.activityLoggingIntegration?.getRepository();
       if (repository) {
         // 簡単なクエリでデータベース接続を確認
-        await repository.getUserSettings('health-check');
+        // getAllUsersメソッドを使用（存在することが確認済み）
+        await repository.getAllUsers();
         databaseConnected = true;
       }
     } catch (error) {
@@ -181,8 +185,11 @@ export class TaskLoggerBot {
   private async handleSystemError(healthStatus: any): Promise<void> {
     console.error('🚨 システムエラー検知:', healthStatus);
     
-    // 管理者通知
-    if (config.monitoring.adminNotification.enabled) {
+    // 重大なエラーかどうかを判定
+    const isCriticalError = this.isCriticalError(healthStatus);
+    
+    // 管理者通知（重大なエラーの場合のみ）
+    if (config.monitoring.adminNotification.enabled && isCriticalError) {
       const errorMessage = healthStatus.issues.join('\n• ');
       await this.sendAdminNotification(
         '🚨 **システムエラー検知**',
@@ -192,6 +199,59 @@ export class TaskLoggerBot {
     
     // 自動復旧試行
     await this.attemptAutoRecovery(healthStatus);
+  }
+  
+  /**
+   * 重大なエラーかどうかを判定
+   */
+  private isCriticalError(healthStatus: any): boolean {
+    // Discord接続が切れている場合は重大
+    if (!healthStatus.checks.discordReady) {
+      this.incrementErrorCount('discord_connection');
+      return true;
+    }
+    
+    // 活動記録システムが初期化されていない場合は重大
+    if (!healthStatus.checks.activityLoggingInitialized) {
+      this.incrementErrorCount('activity_logging');
+      return true;
+    }
+    
+    // データベース接続エラーが連続して発生している場合
+    if (!healthStatus.checks.databaseConnected) {
+      const errorCount = this.incrementErrorCount('database_connection');
+      // 3回以上連続でエラーが発生した場合は重大とみなす
+      if (errorCount >= 3) {
+        return true;
+      }
+    } else {
+      // 正常な場合はカウンターをリセット
+      this.resetErrorCount('database_connection');
+    }
+    
+    // それ以外は重大ではない（一時的なエラーの可能性）
+    return false;
+  }
+  
+  /**
+   * エラーカウンターを増加
+   */
+  private incrementErrorCount(errorType: string): number {
+    const currentCount = this.errorCounters.get(errorType) || 0;
+    const newCount = currentCount + 1;
+    this.errorCounters.set(errorType, newCount);
+    console.log(`⚠️ エラーカウント増加: ${errorType} = ${newCount}回`);
+    return newCount;
+  }
+  
+  /**
+   * エラーカウンターをリセット
+   */
+  private resetErrorCount(errorType: string): void {
+    if (this.errorCounters.has(errorType)) {
+      this.errorCounters.set(errorType, 0);
+      console.log(`✅ エラーカウントリセット: ${errorType}`);
+    }
   }
   
   /**
