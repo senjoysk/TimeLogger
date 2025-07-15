@@ -129,9 +129,29 @@ fi
 log_info "デプロイ前ステータス確認中..."
 flyctl status --app "$STAGING_APP_NAME" || log_warning "アプリがまだ存在しないか、停止しています"
 
-# 3.5. マシン自動起動機能
-log_info "マシン状態確認・自動復旧中..."
+# 3.5. アプリ・マシン自動起動機能
+log_info "アプリ・マシン状態確認・自動復旧中..."
 
+# まずアプリ自体がsuspended状態でないか確認
+APP_STATUS=$(flyctl apps list --json 2>/dev/null | jq -r '.[] | select(.Name == "'$STAGING_APP_NAME'") | .Status' 2>/dev/null || echo "unknown")
+if [[ "$APP_STATUS" == "suspended" ]]; then
+    log_warning "アプリが suspended 状態です。復旧中..."
+    if flyctl apps resume "$STAGING_APP_NAME"; then
+        log_success "アプリが復旧しました"
+        # アプリ復旧後の待機時間
+        log_info "アプリ復旧完了を待機中..."
+        sleep 10
+    else
+        log_error "アプリの復旧に失敗しました"
+        exit 1
+    fi
+elif [[ "$APP_STATUS" == "deployed" ]]; then
+    log_info "アプリは正常に動作中です"
+else
+    log_warning "アプリ状態の確認に失敗しました (状態: $APP_STATUS)"
+fi
+
+# 次にマシンレベルの状態確認・起動
 # jqの存在確認
 if ! command -v jq &> /dev/null; then
     log_warning "jq が見つかりません。マシン状態の詳細確認をスキップします"
@@ -162,7 +182,7 @@ else
             log_info "すべてのマシンが実行中です"
         fi
     else
-        log_warning "マシン情報の取得に失敗しました"
+        log_warning "マシン情報の取得に失敗しました（アプリ復旧直後のため正常な可能性があります）"
     fi
 fi
 
