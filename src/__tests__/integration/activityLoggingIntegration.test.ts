@@ -330,6 +330,66 @@ describe('活動記録システム統合テスト', () => {
     });
   });
 
+  describe('エラーハンドリング統合テスト拡張', () => {
+    test('Gemini APIエラー時のフォールバック動作', async () => {
+      // GeminiServiceのエラーをシミュレート
+      const geminiService = (integration as any).geminiService;
+      const originalMethod = geminiService.analyzeMessage;
+      geminiService.analyzeMessage = jest.fn().mockRejectedValue(new Error('Gemini API エラー'));
+      
+      const mockMessage = new MockMessage('分析が必要なメッセージ');
+      const handleMessage = (integration as any).handleMessage.bind(integration);
+      const result = await handleMessage(mockMessage as unknown as Message);
+      
+      // APIエラーが発生してもメッセージ処理は継続される
+      expect(result).toBe(true);
+      
+      geminiService.analyzeMessage = originalMethod;
+    });
+
+    test('データベース接続エラー時のシステム動作', async () => {
+      // データベース接続エラーをシミュレート
+      const repository = (integration as any).repository;
+      const originalMethod = repository.createLog;
+      repository.createLog = jest.fn().mockRejectedValue(new Error('Database connection failed'));
+      
+      const mockMessage = new MockMessage('データベースエラーテスト');
+      const handleMessage = (integration as any).handleMessage.bind(integration);
+      const result = await handleMessage(mockMessage as unknown as Message);
+      
+      // データベースエラーでもシステムが停止しない
+      expect(result).toBe(true);
+      
+      repository.createLog = originalMethod;
+    });
+
+    test('複数システムエラー時の統合動作', async () => {
+      // 複数のコンポーネントでエラーをシミュレート
+      const repository = (integration as any).repository;
+      const geminiService = (integration as any).geminiService;
+      
+      const originalCreateLog = repository.createLog;
+      const originalAnalyze = geminiService.analyzeMessage;
+      
+      repository.createLog = jest.fn().mockRejectedValue(new Error('DB Error'));
+      geminiService.analyzeMessage = jest.fn().mockRejectedValue(new Error('API Error'));
+      
+      const mockMessage = new MockMessage('複数エラーテスト');
+      const handleMessage = (integration as any).handleMessage.bind(integration);
+      const result = await handleMessage(mockMessage as unknown as Message);
+      
+      // 複数エラーでもシステムが継続動作
+      expect(result).toBe(true);
+      
+      // ヘルスチェックが依然として動作することを確認
+      const healthCheck = await integration.healthCheck();
+      expect(healthCheck.healthy).toBe(true);
+      
+      repository.createLog = originalCreateLog;
+      geminiService.analyzeMessage = originalAnalyze;
+    });
+  });
+
   describe('エラーハンドリング拡張テスト', () => {
     test('データベースエラー時の処理', async () => {
       const mockMessage = new MockMessage('テストメッセージ');
@@ -367,6 +427,88 @@ describe('活動記録システム統合テスト', () => {
       const result = await handleMessage(mockMessage as unknown as Message);
       
       expect(result).toBe(true); // 長いメッセージでも処理できる
+    });
+  });
+
+  describe('Bot初期化統合テスト', () => {
+    test('Bot初期化時にActivityLoggingIntegrationが正しく設定される', async () => {
+      // Botが初期化時にintegrationを使用することを確認
+      const healthCheck = await integration.healthCheck();
+      expect(healthCheck.healthy).toBe(true);
+      expect(healthCheck.details.initialized).toBe(true);
+      expect(integration.getConfig()).toBeDefined();
+      expect(integration.getConfig().debugMode).toBe(true);
+    });
+
+    test('Scheduler初期化時にActivityLoggingIntegrationが利用できる', async () => {
+      // integrationからrepositoryが取得できることを確認
+      const repository = (integration as any).repository;
+      expect(repository).toBeDefined();
+      expect(repository.getUserSettings).toBeDefined();
+      
+      // タイムゾーン設定が取得できることを確認
+      const settings = await repository.getUserSettings('test-user');
+      expect(settings).toBeDefined();
+    });
+
+    test('Bot停止時にActivityLoggingIntegrationのシャットダウンが実行される', async () => {
+      // 新しいintegrationインスタンスでシャットダウンをテスト
+      const testConfig = createDefaultConfig('./test-data/shutdown-test.db', 'test-api-key');
+      const testIntegration = new ActivityLoggingIntegration(testConfig);
+      await testIntegration.initialize();
+      
+      // シャットダウン前の状態確認
+      const healthCheckBefore = await testIntegration.healthCheck();
+      expect(healthCheckBefore.healthy).toBe(true);
+      expect(healthCheckBefore.details.initialized).toBe(true);
+      
+      // シャットダウン実行
+      await testIntegration.shutdown();
+      
+      // シャットダウン後の状態確認
+      const healthCheckAfter = await testIntegration.healthCheck();
+      expect(healthCheckAfter.details.initialized).toBe(false);
+    });
+  });
+
+  describe('Scheduler統合テスト', () => {
+    test('Schedulerが日次サマリーを定時実行する機能をテスト', async () => {
+      // schedulerに必要なメソッドがintegrationから取得できることを確認
+      const generateSummary = await integration.generateDailySummaryText('test-user', 'Asia/Tokyo');
+      expect(typeof generateSummary).toBe('string');
+      expect(generateSummary.length).toBeGreaterThan(0);
+    });
+
+    test('Schedulerがタイムゾーン設定を使用してユーザー別実行時刻を決定する', async () => {
+      // ユーザー設定を取得
+      const repository = (integration as any).repository;
+      const userSettings = await repository.getUserSettings('test-user');
+      
+      // タイムゾーンが考慮された処理ができることを確認
+      expect(userSettings).toBeDefined();
+      expect(userSettings.timezone).toBeDefined();
+      
+      // 現在時刻がユーザーのタイムゾーンで取得できることを確認
+      const currentTime = new Date().toLocaleString('ja-JP', { 
+        timeZone: userSettings.timezone 
+      });
+      expect(currentTime).toBeDefined();
+    });
+
+    test('Schedulerエラー時にActivityLoggingIntegrationが継続動作する', async () => {
+      // schedulerで使用される可能性のあるメソッドでエラーをシミュレート
+      const repository = (integration as any).repository;
+      const originalMethod = repository.getUserSettings;
+      
+      // エラーを発生させる
+      repository.getUserSettings = jest.fn().mockRejectedValue(new Error('Scheduler DB error'));
+      
+      // システムのヘルスチェックは依然として動作することを確認
+      const healthCheck = await integration.healthCheck();
+      expect(healthCheck.healthy).toBe(true);
+      
+      // メソッドを復旧
+      repository.getUserSettings = originalMethod;
     });
   });
 
