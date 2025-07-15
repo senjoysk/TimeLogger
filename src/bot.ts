@@ -3,6 +3,31 @@ import { config } from './config';
 import { BotStatus } from './types';
 import { ActivityLoggingIntegration, createDefaultConfig } from './integration';
 import express from 'express';
+import { 
+  IClientFactory, 
+  IServerFactory, 
+  IConfigService, 
+  ILogger,
+  ITimeProvider 
+} from './interfaces/dependencies';
+import { 
+  DiscordClientFactory, 
+  ExpressServerFactory,
+  RealTimeProvider,
+  ConsoleLogger 
+} from './factories';
+import { ConfigService } from './services/configService';
+
+/**
+ * DI依存関係オプション
+ */
+export interface TaskLoggerBotDependencies {
+  clientFactory?: IClientFactory;
+  serverFactory?: IServerFactory;
+  configService?: IConfigService;
+  logger?: ILogger;
+  timeProvider?: ITimeProvider;
+}
 
 /**
  * Discord Bot のメインクラス
@@ -17,10 +42,24 @@ export class TaskLoggerBot {
   private healthServer?: express.Application;
   // エラー発生回数トラッキング
   private errorCounters: Map<string, number> = new Map();
+  
+  // DI依存関係
+  private readonly clientFactory: IClientFactory;
+  private readonly serverFactory: IServerFactory;
+  private readonly configService: IConfigService;
+  private readonly logger: ILogger;
+  private readonly timeProvider: ITimeProvider;
 
-  constructor() {
-    // Discord クライアントの初期化
-    this.client = new Client({
+  constructor(dependencies?: TaskLoggerBotDependencies) {
+    // DI依存関係の初期化（デフォルトまたは注入された実装を使用）
+    this.clientFactory = dependencies?.clientFactory || new DiscordClientFactory();
+    this.serverFactory = dependencies?.serverFactory || new ExpressServerFactory();
+    this.configService = dependencies?.configService || new ConfigService();
+    this.logger = dependencies?.logger || new ConsoleLogger();
+    this.timeProvider = dependencies?.timeProvider || new RealTimeProvider();
+
+    // Discord クライアントの初期化（ファクトリー使用）
+    this.client = this.clientFactory.create({
       intents: [
         GatewayIntentBits.Guilds,
         GatewayIntentBits.GuildMessages,
@@ -49,7 +88,7 @@ export class TaskLoggerBot {
    * Fly.ioヘルスチェック用HTTPサーバーを設定
    */
   private setupHealthServer(): void {
-    this.healthServer = express();
+    this.healthServer = this.serverFactory.create();
     
     // ヘルスチェックエンドポイント
     this.healthServer.get('/health', async (req, res) => {
@@ -95,10 +134,10 @@ export class TaskLoggerBot {
       });
     });
     
-    // サーバー起動
-    const port = process.env.PORT || 3000;
+    // サーバー起動（ConfigService使用）
+    const port = this.configService.getServerPort();
     this.healthServer.listen(port, () => {
-      console.log(`🏥 ヘルスチェックサーバーがポート${port}で起動しました`);
+      this.logger.info(`🏥 ヘルスチェックサーバーがポート${port}で起動しました`);
     });
   }
 
