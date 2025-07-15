@@ -8,7 +8,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ### Staging環境デプロイ（必須手順）
 ```bash
-# ✅ 必須使用: マシン自動復旧機能付きスクリプト
+# ✅ 必須使用: マシン自動復旧機能付きスクリプト（推奨タイムアウト: 5分）
 npm run staging:deploy
 
 # または直接実行
@@ -18,9 +18,14 @@ npm run staging:deploy
 # fly deploy --app timelogger-staging  # <- これは使わない
 ```
 
+**⏱️ Claude Code実行時の注意:**
+- デプロイには通常3-5分かかります
+- Bashツールでタイムアウト300秒(5分)を指定してください
+- タイムアウトした場合は手動で `flyctl status --app timelogger-staging` で確認
+
 ### Production環境デプロイ（必須手順）
 ```bash
-# ✅ 必須使用: 本番デプロイスクリプト
+# ✅ 必須使用: 本番デプロイスクリプト（推奨タイムアウト: 5分）
 npm run prod:deploy
 
 # または直接実行  
@@ -29,6 +34,11 @@ npm run prod:deploy
 # ❌ 使用禁止: 直接のfly deployコマンド
 # fly deploy --app timelogger-bitter-resonance-9585  # <- これは使わない
 ```
+
+**⏱️ Claude Code実行時の注意:**
+- 本番デプロイには通常3-5分かかります
+- Bashツールでタイムアウト300秒(5分)を指定してください
+- タイムアウトした場合は手動で `flyctl status --app timelogger-bitter-resonance-9585` で確認
 
 **理由**: 
 - Fly.ioのマシンが停止していると`fly deploy`は失敗する
