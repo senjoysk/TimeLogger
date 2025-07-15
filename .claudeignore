@@ -1,0 +1,27 @@
+# Claude Code ignore file
+# These directories/files should not be referenced unless explicitly specified
+
+# Documentation and notes (reference only)
+note/
+worktrees/
+
+# Generated files and reports
+coverage/
+dist/
+node_modules/
+
+# Test data and temporary files
+test-data/
+test_data/
+backups/
+*.log
+
+# Database files
+*.db
+*.db.backup*
+data/
+
+# Temporary and backup files
+*.tmp
+*.bak
+bot-dev.log

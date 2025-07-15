@@ -52,7 +52,7 @@ function scanDirectory(dirPath, violations = []) {
     
     if (stat.isDirectory()) {
       // ディレクトリをスキップする条件
-      if (['node_modules', '.git', 'dist', 'test-data', 'backups', 'note'].includes(item)) {
+      if (['node_modules', '.git', 'dist', 'test-data', 'backups', 'note', 'worktrees'].includes(item)) {
         continue;
       }
       scanDirectory(fullPath, violations);
