@@ -83,13 +83,10 @@ if [ "$FORCE_DEPLOY" = false ]; then
     # ブランチ確認
     CURRENT_BRANCH=$(git branch --show-current)
     if [ "$CURRENT_BRANCH" != "develop" ] && [ "$FORCE_DEPLOY" = false ]; then
-        log_warning "現在のブランチ: $CURRENT_BRANCH (推奨: develop)"
-        read -p "続行しますか？ (y/N): " -n 1 -r
-        echo
-        if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-            log_error "デプロイを中止しました"
-            exit 1
-        fi
+        log_error "現在のブランチ: $CURRENT_BRANCH (必須: develop)"
+        log_error "ステージング環境はdevelopブランチからのみデプロイ可能です"
+        log_info "正しいブランチに切り替えてください: git checkout develop"
+        exit 1
     fi
 fi
 
