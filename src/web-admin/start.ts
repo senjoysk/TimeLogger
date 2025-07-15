@@ -38,8 +38,6 @@ async function startAdminServer() {
     
     console.log('✅ Admin Web App started successfully!');
     console.log(`🌐 Access at: http://localhost:${port}`);
-    console.log(`👤 Username: ${process.env.ADMIN_USERNAME}`);
-    console.log(`🔑 Password: ${process.env.ADMIN_PASSWORD}`);
     
   } catch (error) {
     console.error('❌ Failed to start Admin Web App:', error);
