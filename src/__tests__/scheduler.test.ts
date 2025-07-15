@@ -179,11 +179,23 @@ describe('Scheduler', () => {
 
   describe('エラーハンドリング', () => {
     test('データベースエラー時も適切に処理される', async () => {
+      // console.errorをモックしてエラーログをキャプチャ
+      const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+
       // repositoryでエラーを発生させる
       mockRepository.getAllUsers.mockRejectedValue(new Error('Database error'));
       
       // エラーが発生してもstartメソッドが例外を投げないことを確認
       await expect(scheduler.start()).resolves.not.toThrow();
+
+      // エラーログが出力されることを確認
+      expect(consoleSpy).toHaveBeenCalledWith(
+        expect.stringContaining('❌ タイムゾーン情報の読み込みエラー:'),
+        expect.any(Error)
+      );
+
+      // スパイをクリーンアップ
+      consoleSpy.mockRestore();
     });
 
     test('空のユーザーリスト時も正常に処理される', async () => {
