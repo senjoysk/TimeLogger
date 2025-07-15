@@ -144,7 +144,7 @@ TDD開発    fly.io検証    本番運用
 #### **Staging環境** (fly.io: timelogger-staging)
 - **用途**: fly.io環境での統合テスト、本番前検証
 - **データベース**: 分離DB + テストデータ
-- **トリガー**: developブランチpush → 自動デプロイ
+- **トリガー**: **手動デプロイ** (GitHub Actionsは品質チェックのみ)
 
 #### **Production環境** (fly.io: timelogger-bitter-resonance-9585)
 - **用途**: 実際のDiscord Bot運用
@@ -153,15 +153,16 @@ TDD開発    fly.io検証    本番運用
 
 ### リリースフロー
 ```
-feature/* → develop → staging検証 → main → production
+feature/* → develop → 品質チェック → 手動staging → main → production
 ```
 
 #### 必須プロセス
 1. **Local開発**: TDDサイクル完了 + 全テスト成功
-2. **develop マージ**: プルリクエスト + staging自動デプロイ
-3. **staging検証**: 重要機能動作確認 + 品質ゲート
-4. **main マージ**: staging検証完了後のみ
-5. **production デプロイ**: 自動デプロイ + ヘルスチェック
+2. **develop マージ**: プルリクエスト + GitHub Actions品質チェック
+3. **staging デプロイ**: `./scripts/staging/deploy-to-staging.sh` で手動実行
+4. **staging検証**: 重要機能動作確認 + 品質ゲート
+5. **main マージ**: staging検証完了後のみ
+6. **production デプロイ**: 自動デプロイ + ヘルスチェック
 
 ## 開発環境セットアップ
 1. `nvm use` でNode.js仮想環境を使用（.nvmrcファイルでNode.js 20を指定）
@@ -174,16 +175,23 @@ feature/* → develop → staging検証 → main → production
 2. `.env.staging` でstaging用環境変数設定
 3. `npm run staging:setup` で初期設定実行
 
-### 🚀 Staging環境デプロイ（マシン自動復旧機能付き）
+### 🚀 Staging環境デプロイ（手動実行）
 
 **📋 推奨デプロイ方法:**
 ```bash
 # 🎯 基本デプロイ（推奨）
-npm run staging:deploy
+./scripts/staging/deploy-to-staging.sh
 
 # 🚀 手動デプロイ（オプション付き）
 ./scripts/staging/deploy-to-staging.sh --skip-tests --force
 ```
+
+**📝 手動デプロイ手順:**
+1. **開発完了**: developブランチでの開発とTDDサイクル完了
+2. **品質確認**: GitHub ActionsでPush時の品質チェック通過
+3. **デプロイ実行**: ローカルでstaging環境にデプロイ
+4. **動作確認**: Staging環境でのDiscord Bot動作テスト
+5. **本番マージ**: mainブランチマージでproduction自動デプロイ
 
 **🔧 自動復旧機能:**
 - **マシン停止検出**: jqを使った詳細状態分析
