@@ -444,11 +444,11 @@ describe('活動記録システム統合テスト', () => {
       // integrationからrepositoryが取得できることを確認
       const repository = (integration as any).repository;
       expect(repository).toBeDefined();
-      expect(repository.getUserSettings).toBeDefined();
+      expect(repository.getUserTimezone).toBeDefined();
       
       // タイムゾーン設定が取得できることを確認
-      const settings = await repository.getUserSettings('test-user');
-      expect(settings).toBeDefined();
+      const timezone = await repository.getUserTimezone('test-user');
+      expect(timezone).toBeDefined();
     });
 
     test('Bot停止時にActivityLoggingIntegrationのシャットダウンが実行される', async () => {
@@ -482,33 +482,34 @@ describe('活動記録システム統合テスト', () => {
     test('Schedulerがタイムゾーン設定を使用してユーザー別実行時刻を決定する', async () => {
       // ユーザー設定を取得
       const repository = (integration as any).repository;
-      const userSettings = await repository.getUserSettings('test-user');
+      const userTimezone = await repository.getUserTimezone('test-user');
       
-      // タイムゾーンが考慮された処理ができることを確認
-      expect(userSettings).toBeDefined();
-      expect(userSettings.timezone).toBeDefined();
+      // タイムゾーンが未設定の場合はnullが返されることを確認
+      expect(userTimezone).toBeNull();
       
-      // 現在時刻がユーザーのタイムゾーンで取得できることを確認
+      // デフォルトタイムゾーンでの時刻取得が正常に動作することを確認
+      const defaultTimezone = 'Asia/Tokyo';
       const currentTime = new Date().toLocaleString('ja-JP', { 
-        timeZone: userSettings.timezone 
+        timeZone: userTimezone || defaultTimezone
       });
       expect(currentTime).toBeDefined();
+      expect(typeof currentTime).toBe('string');
     });
 
     test('Schedulerエラー時にActivityLoggingIntegrationが継続動作する', async () => {
       // schedulerで使用される可能性のあるメソッドでエラーをシミュレート
       const repository = (integration as any).repository;
-      const originalMethod = repository.getUserSettings;
+      const originalMethod = repository.getUserTimezone;
       
       // エラーを発生させる
-      repository.getUserSettings = jest.fn().mockRejectedValue(new Error('Scheduler DB error'));
+      repository.getUserTimezone = jest.fn().mockRejectedValue(new Error('Scheduler DB error'));
       
       // システムのヘルスチェックは依然として動作することを確認
       const healthCheck = await integration.healthCheck();
       expect(healthCheck.healthy).toBe(true);
       
       // メソッドを復旧
-      repository.getUserSettings = originalMethod;
+      repository.getUserTimezone = originalMethod;
     });
   });
 
