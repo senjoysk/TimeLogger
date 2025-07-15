@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title><%= title %> - TimeLogger Admin</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        .environment-badge {
+            @apply px-2 py-1 text-xs font-semibold rounded-full;
+        }
+        .environment-development {
+            @apply bg-green-100 text-green-800;
+        }
+        .environment-staging {
+            @apply bg-yellow-100 text-yellow-800;
+        }
+        .environment-production {
+            @apply bg-red-100 text-red-800;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 min-h-screen">
+    <!-- Header -->
+    <header class="bg-white shadow-sm border-b">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between items-center h-16">
+                <div class="flex items-center">
+                    <i class="fas fa-cog text-blue-600 text-xl mr-3"></i>
+                    <h1 class="text-xl font-semibold text-gray-900">TimeLogger Admin</h1>
+                </div>
+                <div class="flex items-center space-x-4">
+                    <span class="environment-badge environment-<%= environment.env %>">
+                        <i class="fas fa-server mr-1"></i>
+                        <%= environment.env.toUpperCase() %>
+                    </span>
+                    <% if (environment.isReadOnly) { %>
+                        <span class="px-2 py-1 bg-gray-100 text-gray-600 text-xs font-medium rounded-full">
+                            <i class="fas fa-lock mr-1"></i>
+                            READ ONLY
+                        </span>
+                    <% } %>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Navigation -->
+    <nav class="bg-gray-800 text-white">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex space-x-8">
+                <a href="/" class="px-3 py-4 text-sm font-medium hover:bg-gray-700 transition-colors">
+                    <i class="fas fa-home mr-2"></i>
+                    Dashboard
+                </a>
+                <a href="/tables" class="px-3 py-4 text-sm font-medium hover:bg-gray-700 transition-colors bg-gray-700">
+                    <i class="fas fa-table mr-2"></i>
+                    Tables
+                </a>
+                <a href="/health" class="px-3 py-4 text-sm font-medium hover:bg-gray-700 transition-colors">
+                    <i class="fas fa-heartbeat mr-2"></i>
+                    Health
+                </a>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
+        <div class="px-4 py-6 sm:px-0">
+            <!-- Table List Header -->
+            <div class="md:flex md:items-center md:justify-between">
+                <div class="flex-1 min-w-0">
+                    <h2 class="text-2xl font-bold leading-7 text-gray-900 sm:text-3xl sm:truncate">
+                        <i class="fas fa-table mr-3"></i>
+                        Table List
+                    </h2>
+                    <p class="mt-1 text-sm text-gray-500">
+                        データベース内のテーブル一覧と概要情報
+                    </p>
+                </div>
+                <div class="mt-4 flex md:mt-0 md:ml-4">
+                    <a href="/" class="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50">
+                        <i class="fas fa-arrow-left mr-2"></i>
+                        ダッシュボード
+                    </a>
+                </div>
+            </div>
+
+            <!-- Tables Grid -->
+            <div class="mt-8 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+                <% tables.forEach(table => { %>
+                    <div class="bg-white overflow-hidden shadow-lg rounded-lg hover:shadow-xl transition-shadow duration-300">
+                        <div class="p-6">
+                            <div class="flex items-center">
+                                <div class="flex-shrink-0">
+                                    <% if (table.name === 'activity_logs') { %>
+                                        <div class="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
+                                            <i class="fas fa-list-alt text-blue-600"></i>
+                                        </div>
+                                    <% } else if (table.name === 'todo_tasks') { %>
+                                        <div class="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
+                                            <i class="fas fa-check-square text-green-600"></i>
+                                        </div>
+                                    <% } else if (table.name === 'user_settings') { %>
+                                        <div class="w-8 h-8 bg-purple-100 rounded-full flex items-center justify-center">
+                                            <i class="fas fa-users text-purple-600"></i>
+                                        </div>
+                                    <% } else if (table.name === 'api_costs') { %>
+                                        <div class="w-8 h-8 bg-yellow-100 rounded-full flex items-center justify-center">
+                                            <i class="fas fa-coins text-yellow-600"></i>
+                                        </div>
+                                    <% } else { %>
+                                        <div class="w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center">
+                                            <i class="fas fa-database text-gray-600"></i>
+                                        </div>
+                                    <% } %>
+                                </div>
+                                <div class="ml-5 w-0 flex-1">
+                                    <h3 class="text-lg font-medium text-gray-900">
+                                        <%= table.name %>
+                                    </h3>
+                                    <p class="mt-1 text-sm text-gray-500">
+                                        <%= table.description %>
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Actions -->
+                        <div class="bg-gray-50 px-6 py-4">
+                            <div class="flex justify-between items-center">
+                                <div class="flex space-x-2">
+                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                                        <i class="fas fa-eye mr-1"></i>
+                                        表示可能
+                                    </span>
+                                    <% if (!environment.isReadOnly) { %>
+                                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                            <i class="fas fa-edit mr-1"></i>
+                                            編集可能
+                                        </span>
+                                    <% } %>
+                                </div>
+                                <a href="/tables/<%= table.name %>" class="inline-flex items-center px-3 py-1 border border-transparent text-sm font-medium rounded-md text-blue-600 bg-blue-100 hover:bg-blue-200">
+                                    詳細
+                                    <i class="fas fa-arrow-right ml-1"></i>
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                <% }) %>
+            </div>
+
+            <!-- Additional Information -->
+            <div class="mt-8 bg-blue-50 border border-blue-200 rounded-lg p-6">
+                <div class="flex">
+                    <div class="flex-shrink-0">
+                        <i class="fas fa-info-circle text-blue-600 text-xl"></i>
+                    </div>
+                    <div class="ml-3">
+                        <h3 class="text-sm font-medium text-blue-800">
+                            テーブルアクセス情報
+                        </h3>
+                        <div class="mt-2 text-sm text-blue-700">
+                            <ul class="list-disc list-inside space-y-1">
+                                <li>各テーブルには適切なアクセス権限が設定されています</li>
+                                <li>Production環境では読み取り専用モードで動作します</li>
+                                <li>データの安全性を確保するため、SQLインジェクション対策が実装されています</li>
+                                <li>ページネーション機能により、大量のデータも効率的に表示されます</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="bg-white border-t mt-12">
+        <div class="max-w-7xl mx-auto py-4 px-4 sm:px-6 lg:px-8">
+            <div class="text-center text-sm text-gray-500">
+                <p>TimeLogger Admin Panel | Environment: <%= environment.env %></p>
+            </div>
+        </div>
+    </footer>
+</body>
+</html>

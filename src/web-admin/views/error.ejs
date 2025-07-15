@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title><%= title %> - TimeLogger Admin</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        .environment-badge {
+            @apply px-2 py-1 text-xs font-semibold rounded-full;
+        }
+        .environment-development {
+            @apply bg-green-100 text-green-800;
+        }
+        .environment-staging {
+            @apply bg-yellow-100 text-yellow-800;
+        }
+        .environment-production {
+            @apply bg-red-100 text-red-800;
+        }
+    </style>
+</head>
+<body class="bg-gray-50">
+    <div class="min-h-screen flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
+        <div class="max-w-md w-full space-y-8">
+            <div class="text-center">
+                <i class="fas fa-exclamation-triangle text-red-500 text-6xl mb-4"></i>
+                <h2 class="mt-6 text-3xl font-extrabold text-gray-900">
+                    エラーが発生しました
+                </h2>
+                <p class="mt-2 text-sm text-gray-600">
+                    <%= message %>
+                </p>
+                <% if (code) { %>
+                    <div class="mt-4">
+                        <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-red-100 text-red-800">
+                            Error Code: <%= code %>
+                        </span>
+                    </div>
+                <% } %>
+            </div>
+            
+            <% if (error && typeof error === 'string') { %>
+                <div class="mt-6 bg-gray-100 rounded-lg p-4">
+                    <h3 class="text-sm font-medium text-gray-900 mb-2">詳細情報 (開発環境のみ)</h3>
+                    <pre class="text-xs text-gray-600 overflow-x-auto whitespace-pre-wrap"><%= error %></pre>
+                </div>
+            <% } %>
+            
+            <div class="mt-8 flex justify-center space-x-4">
+                <a href="/" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700">
+                    <i class="fas fa-home mr-2"></i>
+                    ダッシュボード
+                </a>
+                <a href="javascript:history.back()" class="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
+                    <i class="fas fa-arrow-left mr-2"></i>
+                    戻る
+                </a>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

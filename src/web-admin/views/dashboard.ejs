@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title><%= title %> - TimeLogger Admin</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        /* Custom styles */
+        .environment-badge {
+            @apply px-2 py-1 text-xs font-semibold rounded-full;
+        }
+        .environment-development {
+            @apply bg-green-100 text-green-800;
+        }
+        .environment-staging {
+            @apply bg-yellow-100 text-yellow-800;
+        }
+        .environment-production {
+            @apply bg-red-100 text-red-800;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 min-h-screen">
+    <!-- Header -->
+    <header class="bg-white shadow-sm border-b">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between items-center h-16">
+                <div class="flex items-center">
+                    <i class="fas fa-cog text-blue-600 text-xl mr-3"></i>
+                    <h1 class="text-xl font-semibold text-gray-900">TimeLogger Admin</h1>
+                </div>
+                <div class="flex items-center space-x-4">
+                    <!-- Environment Badge -->
+                    <span class="environment-badge environment-<%= environment.env %>">
+                        <i class="fas fa-server mr-1"></i>
+                        <%= environment.env.toUpperCase() %>
+                    </span>
+                    
+                    <!-- Read-only indicator -->
+                    <% if (environment.isReadOnly) { %>
+                        <span class="px-2 py-1 bg-gray-100 text-gray-600 text-xs font-medium rounded-full">
+                            <i class="fas fa-lock mr-1"></i>
+                            READ ONLY
+                        </span>
+                    <% } %>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Navigation -->
+    <nav class="bg-gray-800 text-white">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex space-x-8">
+                <a href="/" class="px-3 py-4 text-sm font-medium hover:bg-gray-700 transition-colors">
+                    <i class="fas fa-home mr-2"></i>
+                    Dashboard
+                </a>
+                <a href="/tables" class="px-3 py-4 text-sm font-medium hover:bg-gray-700 transition-colors">
+                    <i class="fas fa-table mr-2"></i>
+                    Tables
+                </a>
+                <a href="/health" class="px-3 py-4 text-sm font-medium hover:bg-gray-700 transition-colors">
+                    <i class="fas fa-heartbeat mr-2"></i>
+                    Health
+                </a>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
+        <div class="px-4 py-6 sm:px-0">
+            <!-- Dashboard Header -->
+            <div class="md:flex md:items-center md:justify-between">
+                <div class="flex-1 min-w-0">
+                    <h2 class="text-2xl font-bold leading-7 text-gray-900 sm:text-3xl sm:truncate">
+                        <i class="fas fa-tachometer-alt mr-3"></i>
+                        Dashboard
+                    </h2>
+                    <p class="mt-1 text-sm text-gray-500">
+                        TimeLoggerデータベースの概要統計と管理機能
+                    </p>
+                </div>
+                <div class="mt-4 flex md:mt-0 md:ml-4">
+                    <a href="/tables" class="ml-3 inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700">
+                        <i class="fas fa-table mr-2"></i>
+                        テーブル一覧
+                    </a>
+                </div>
+            </div>
+
+            <!-- Stats Grid -->
+            <div class="mt-8 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+                <% tables.forEach(table => { %>
+                    <div class="bg-white overflow-hidden shadow rounded-lg">
+                        <div class="p-5">
+                            <div class="flex items-center">
+                                <div class="flex-shrink-0">
+                                    <% if (table.name === 'activity_logs') { %>
+                                        <i class="fas fa-list-alt text-blue-600 text-2xl"></i>
+                                    <% } else if (table.name === 'todo_tasks') { %>
+                                        <i class="fas fa-check-square text-green-600 text-2xl"></i>
+                                    <% } else if (table.name === 'user_settings') { %>
+                                        <i class="fas fa-users text-purple-600 text-2xl"></i>
+                                    <% } else if (table.name === 'api_costs') { %>
+                                        <i class="fas fa-coins text-yellow-600 text-2xl"></i>
+                                    <% } else { %>
+                                        <i class="fas fa-database text-gray-600 text-2xl"></i>
+                                    <% } %>
+                                </div>
+                                <div class="ml-5 w-0 flex-1">
+                                    <dl>
+                                        <dt class="text-sm font-medium text-gray-500 truncate">
+                                            <%= table.description %>
+                                        </dt>
+                                        <dd class="text-lg font-medium text-gray-900">
+                                            <% if (table.error) { %>
+                                                <span class="text-red-500">Error</span>
+                                            <% } else { %>
+                                                <%= table.totalCount.toLocaleString() %> records
+                                            <% } %>
+                                        </dd>
+                                    </dl>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="bg-gray-50 px-5 py-3">
+                            <div class="text-sm">
+                                <a href="/tables/<%= table.name %>" class="font-medium text-blue-600 hover:text-blue-500">
+                                    詳細を見る
+                                    <i class="fas fa-arrow-right ml-1"></i>
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                <% }) %>
+            </div>
+
+            <!-- System Information -->
+            <div class="mt-8">
+                <div class="bg-white shadow overflow-hidden sm:rounded-md">
+                    <div class="px-4 py-5 sm:px-6">
+                        <h3 class="text-lg leading-6 font-medium text-gray-900">
+                            <i class="fas fa-clock mr-2"></i>
+                            システム情報
+                        </h3>
+                        <p class="mt-1 max-w-2xl text-sm text-gray-500">
+                            現在のシステム状態と設定
+                        </p>
+                    </div>
+                    <div class="border-t border-gray-200">
+                        <dl>
+                            <div class="bg-gray-50 px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
+                                <dt class="text-sm font-medium text-gray-500">環境</dt>
+                                <dd class="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
+                                    <span class="environment-badge environment-<%= environment.env %>">
+                                        <%= environment.env.toUpperCase() %>
+                                    </span>
+                                </dd>
+                            </div>
+                            <div class="bg-white px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
+                                <dt class="text-sm font-medium text-gray-500">アクセス権限</dt>
+                                <dd class="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
+                                    <% if (environment.isReadOnly) { %>
+                                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                                            <i class="fas fa-lock mr-1"></i>
+                                            読み取り専用
+                                        </span>
+                                    <% } else { %>
+                                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                            <i class="fas fa-unlock mr-1"></i>
+                                            読み書き可能
+                                        </span>
+                                    <% } %>
+                                </dd>
+                            </div>
+                            <div class="bg-gray-50 px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
+                                <dt class="text-sm font-medium text-gray-500">許可された操作</dt>
+                                <dd class="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
+                                    <% environment.allowedOperations.forEach(op => { %>
+                                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 mr-2">
+                                            <%= op %>
+                                        </span>
+                                    <% }) %>
+                                </dd>
+                            </div>
+                            <div class="bg-white px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
+                                <dt class="text-sm font-medium text-gray-500">総テーブル数</dt>
+                                <dd class="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
+                                    <%= tables.length %> テーブル
+                                </dd>
+                            </div>
+                        </dl>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Quick Actions -->
+            <div class="mt-8">
+                <div class="bg-white shadow sm:rounded-lg">
+                    <div class="px-4 py-5 sm:p-6">
+                        <h3 class="text-lg leading-6 font-medium text-gray-900">
+                            <i class="fas fa-bolt mr-2"></i>
+                            クイックアクション
+                        </h3>
+                        <div class="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                            <a href="/tables/activity_logs" class="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
+                                <i class="fas fa-list-alt mr-2"></i>
+                                活動ログ確認
+                            </a>
+                            <a href="/tables/todo_tasks" class="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
+                                <i class="fas fa-check-square mr-2"></i>
+                                TODO管理
+                            </a>
+                            <a href="/tables/user_settings" class="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
+                                <i class="fas fa-users mr-2"></i>
+                                ユーザー設定
+                            </a>
+                            <a href="/tables/api_costs" class="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
+                                <i class="fas fa-coins mr-2"></i>
+                                API費用確認
+                            </a>
+                            <a href="/health" class="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
+                                <i class="fas fa-heartbeat mr-2"></i>
+                                ヘルスチェック
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="bg-white border-t mt-12">
+        <div class="max-w-7xl mx-auto py-4 px-4 sm:px-6 lg:px-8">
+            <div class="text-center text-sm text-gray-500">
+                <p>TimeLogger Admin Panel | Environment: <%= environment.env %> | Generated at <%= new Date().toLocaleString('ja-JP') %></p>
+            </div>
+        </div>
+    </footer>
+
+    <script>
+        // Simple JavaScript for interactivity
+        document.addEventListener('DOMContentLoaded', function() {
+            // Auto-refresh every 30 seconds for health page
+            if (window.location.pathname === '/health') {
+                setTimeout(() => {
+                    window.location.reload();
+                }, 30000);
+            }
+        });
+    </script>
+</body>
+</html>

@@ -4,7 +4,7 @@
   "description": "Discord Bot for tracking daily tasks and activities",
   "main": "dist/index.js",
   "scripts": {
-    "build": "tsc && npm run copy-assets",
+    "build": "tsc && npm run copy-assets && npm run admin:copy-views",
     "copy-assets": "mkdir -p dist/database/migrations && cp src/database/*.sql dist/database/ 2>/dev/null || true && cp src/database/migrations/*.sql dist/database/migrations/ 2>/dev/null || true",
     "start": "node dist/index.js",
     "start:dev": "NODE_ENV=development node dist/index.js",
@@ -59,7 +59,12 @@
     "prod:stop": "./scripts/production/fly-control.sh stop",
     "prod:status": "./scripts/production/status.sh",
     "prod:backup": "./scripts/production/backup.sh",
-    "prod:secrets": "./scripts/production/secrets-update.sh"
+    "prod:secrets": "./scripts/production/secrets-update.sh",
+    "admin:dev": "NODE_ENV=development ts-node src/web-admin/start.ts",
+    "admin:start": "NODE_ENV=production node dist/web-admin/start.js",
+    "admin:staging": "NODE_ENV=staging ts-node src/web-admin/start.ts",
+    "admin:build": "npm run build && npm run admin:copy-views",
+    "admin:copy-views": "mkdir -p dist/web-admin/views && cp -r src/web-admin/views/* dist/web-admin/views/ && mkdir -p dist/web-admin/public && cp -r src/web-admin/public/* dist/web-admin/public/ 2>/dev/null || true"
   },
   "keywords": [
     "discord",
@@ -81,7 +86,9 @@
     "date-fns-tz": "^3.2.0",
     "discord.js": "^14.14.1",
     "dotenv": "^16.3.1",
+    "ejs": "^3.1.10",
     "express": "^5.1.0",
+    "express-basic-auth": "^1.2.1",
     "node-cron": "^3.0.3",
     "sqlite3": "^5.1.6",
     "supertest": "^7.1.3",
