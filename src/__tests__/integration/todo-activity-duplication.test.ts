@@ -84,12 +84,30 @@ class MockButtonInteraction {
   }
 }
 
+describe('Test Setup', () => {
+  test('環境設定が正しく行われている', () => {
+    // console.errorをモックしてエラーログをキャプチャ
+    const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+    
+    expect(process.env.NODE_ENV).toBe('test');
+    expect(typeof ActivityLoggingIntegration).toBe('function');
+    expect(typeof SqliteActivityLogRepository).toBe('function');
+    
+    // スパイをクリーンアップ
+    consoleSpy.mockRestore();
+  });
+});
+
 describe('TODO・活動ログ重複登録防止テスト', () => {
   let integration: ActivityLoggingIntegration;
   let repository: SqliteActivityLogRepository;
   let testDbPath: string;
+  let consoleSpy: jest.SpyInstance;
 
   beforeEach(async () => {
+    // console.errorをモックしてエラーログをキャプチャ
+    consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+
     // テスト用データベースの準備
     testDbPath = path.join(__dirname, '../../../test-data/duplication-test.db');
     const testDir = path.dirname(testDbPath);
@@ -114,7 +132,25 @@ describe('TODO・活動ログ重複登録防止テスト', () => {
     };
 
     integration = new ActivityLoggingIntegration(config);
-    await integration.initialize();
+    
+    try {
+      await integration.initialize();
+    } catch (error) {
+      // 初期化エラーをログに記録して再スロー
+      console.log('統合システム初期化エラー:', error);
+      console.log('エラーの詳細:', JSON.stringify(error, null, 2));
+      console.log('設定:', JSON.stringify(config, null, 2));
+      console.log('データベースパス:', testDbPath);
+      console.log('テストディレクトリ存在:', fs.existsSync(testDir));
+      
+      // より詳細なエラー情報を提供
+      if (error instanceof Error) {
+        console.log('エラーメッセージ:', error.message);
+        console.log('スタックトレース:', error.stack);
+      }
+      
+      throw error;
+    }
 
     // MockGeminiServiceを注入
     const mockGeminiService = new MockGeminiService();
@@ -139,11 +175,21 @@ describe('TODO・活動ログ重複登録防止テスト', () => {
   });
 
   afterEach(async () => {
+    // console.errorのスパイをクリーンアップ
+    if (consoleSpy) {
+      consoleSpy.mockRestore();
+    }
+    
     // クリーンアップ
     if (integration) {
-      // cleanup処理（必要に応じて追加）
+      try {
+        await integration.shutdown();
+      } catch (error) {
+        console.log('統合システムシャットダウンエラー:', error);
+      }
     }
-    // リポジトリは統合システムが管理するためクローズしない
+    
+    // テストデータベースファイルを削除
     if (fs.existsSync(testDbPath)) {
       fs.unlinkSync(testDbPath);
     }
@@ -237,25 +283,33 @@ describe('TODO・活動ログ重複登録防止テスト', () => {
   });
 
   test('無視ボタンを押すと何も登録されない', async () => {
-    const userId = 'test-user-123';
-    const messageContent = '雑談メッセージ';
+    // このテスト用のconsole.errorモック
+    const testConsoleSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
     
-    // AI分類が行われることを確認（無視の場合は何も登録されない）
-    const mockMessage = new MockMessage(messageContent, userId);
-    await integration.handleMessage(mockMessage as any);
-    
-    // AI分類のリプライが送信されていることを確認
-    expect(mockMessage.replies.length).toBeGreaterThan(0);
+    try {
+      const userId = 'test-user-123';
+      const messageContent = '雑談メッセージ';
+      
+      // AI分類が行われることを確認（無視の場合は何も登録されない）
+      const mockMessage = new MockMessage(messageContent, userId);
+      await integration.handleMessage(mockMessage as any);
+      
+      // AI分類のリプライが送信されていることを確認
+      expect(mockMessage.replies.length).toBeGreaterThan(0);
 
-    // 無視の場合は何もアクションを取らない（ボタン押下をシミュレートしない）
-    
-    // 検証: 何も登録されていない
-    const businessDateInfo = repository.calculateBusinessDate(new Date().toISOString(), 'Asia/Tokyo');
-    const activityLogs = await repository.getLogsByDate(userId, businessDateInfo.businessDate);
-    const todos = await repository.getTodosByUserId(userId);
-    
-    expect(activityLogs.length).toBe(0);
-    expect(todos.length).toBe(0);
+      // 無視の場合は何もアクションを取らない（ボタン押下をシミュレートしない）
+      
+      // 検証: 何も登録されていない
+      const businessDateInfo = repository.calculateBusinessDate(new Date().toISOString(), 'Asia/Tokyo');
+      const activityLogs = await repository.getLogsByDate(userId, businessDateInfo.businessDate);
+      const todos = await repository.getTodosByUserId(userId);
+      
+      expect(activityLogs.length).toBe(0);
+      expect(todos.length).toBe(0);
+    } finally {
+      // テスト用スパイをクリーンアップ
+      testConsoleSpy.mockRestore();
+    }
   });
 
   test('複数メッセージでもそれぞれ適切に分類され重複登録されない', async () => {
