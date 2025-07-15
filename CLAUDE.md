@@ -2,6 +2,39 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## 🚨 重要: デプロイ手順
+
+**Claude Codeは必ず以下のデプロイコマンドを使用してください**
+
+### Staging環境デプロイ（必須手順）
+```bash
+# ✅ 必須使用: マシン自動復旧機能付きスクリプト
+npm run staging:deploy
+
+# または直接実行
+./scripts/staging/deploy-to-staging.sh
+
+# ❌ 使用禁止: 直接のfly deployコマンド
+# fly deploy --app timelogger-staging  # <- これは使わない
+```
+
+### Production環境デプロイ（必須手順）
+```bash
+# ✅ 必須使用: 本番デプロイスクリプト
+npm run prod:deploy
+
+# または直接実行  
+./scripts/production/deploy.sh timelogger-bitter-resonance-9585
+
+# ❌ 使用禁止: 直接のfly deployコマンド
+# fly deploy --app timelogger-bitter-resonance-9585  # <- これは使わない
+```
+
+**理由**: 
+- Fly.ioのマシンが停止していると`fly deploy`は失敗する
+- 上記スクリプトにはマシン自動復旧機能が組み込まれている
+- 手動でのマシン起動作業が不要になる
+
 ## 🔴🟢♻️ 開発方針: t_wada式TDD
 
 **すべての開発はテスト駆動開発（TDD）のRed-Green-Refactorサイクルで実施してください**
