@@ -1351,4 +1351,137 @@ describe('TodoCommandHandler', () => {
       expect(message.reply).toHaveBeenCalledWith('❌ 指定されたTODOが見つかりません。');
     });
   });
+
+  describe('ページネーション機能テスト（TDD Red Phase）', () => {
+    test('12件のTODOでページネーションが有効になる', async () => {
+      // 12件のTODOを作成
+      const todos = [];
+      for (let i = 1; i <= 12; i++) {
+        const todo = await mockTodoRepo.createTodo({
+          userId: 'test-user',
+          content: `TODO ${i}`,
+          priority: 0,
+        });
+        todos.push(todo);
+      }
+
+      const message = createMockMessage('!todo', 'test-user') as Message;
+      message.reply = jest.fn().mockResolvedValue({});
+      
+      await handler.handleCommand(message, 'test-user', [], 'Asia/Tokyo');
+      
+      expect(message.reply).toHaveBeenCalled();
+      const replyCall = (message.reply as jest.Mock).mock.calls[0][0];
+      
+      // ページネーションの表示を確認
+      expect(replyCall.embeds[0].data.title).toContain('(1-10/12件)');
+      expect(replyCall.embeds[0].data.title).toContain('ページ 1/2');
+      
+      // ページネーションボタンの存在を確認
+      expect(replyCall.components).toHaveLength(6); // 1つのページネーション + 5つのTODO操作
+      expect(replyCall.components[0].components[0].data.label).toContain('◀️ 前のページ');
+      expect(replyCall.components[0].components[1].data.label).toContain('ページ 1/2');
+      expect(replyCall.components[0].components[2].data.label).toContain('次のページ ▶️');
+    });
+
+    test('createPaginationButtons関数でボタンが正しく生成される', () => {
+      // 現在は存在しない関数のテスト - 実装後にGreenになる
+      const createPaginationButtons = (handler as any).createPaginationButtons;
+      expect(createPaginationButtons).toBeDefined();
+      
+      const buttons = createPaginationButtons(1, 3);
+      expect(buttons).toBeDefined();
+      expect(buttons.components).toHaveLength(3); // 前のページ、現在ページ、次のページ
+    });
+
+    test('ページネーションボタンクリックで次のページに移動する', async () => {
+      // 15件のTODOを作成
+      const todos = [];
+      for (let i = 1; i <= 15; i++) {
+        const todo = await mockTodoRepo.createTodo({
+          userId: 'test-user',
+          content: `TODO ${i}`,
+          priority: 0,
+        });
+        todos.push(todo);
+      }
+
+      const interaction = createMockButtonInteraction('todo_page_next_1', 'test-user') as ButtonInteraction;
+      interaction.update = jest.fn().mockResolvedValue({});
+      
+      await handler.handleButtonInteraction(interaction, 'test-user', 'Asia/Tokyo');
+      
+      expect(interaction.update).toHaveBeenCalled();
+      const updateCall = (interaction.update as jest.Mock).mock.calls[0][0];
+      
+      // 2ページ目の表示を確認
+      expect(updateCall.embeds[0].data.title).toContain('(11-15/15件)');
+      expect(updateCall.embeds[0].data.title).toContain('ページ 2/2');
+    });
+
+    test('最初のページで前のページボタンが無効になる', async () => {
+      // 12件のTODOを作成
+      const todos = [];
+      for (let i = 1; i <= 12; i++) {
+        const todo = await mockTodoRepo.createTodo({
+          userId: 'test-user',
+          content: `TODO ${i}`,
+          priority: 0,
+        });
+        todos.push(todo);
+      }
+
+      const message = createMockMessage('!todo', 'test-user') as Message;
+      message.reply = jest.fn().mockResolvedValue({});
+      
+      await handler.handleCommand(message, 'test-user', [], 'Asia/Tokyo');
+      
+      const replyCall = (message.reply as jest.Mock).mock.calls[0][0];
+      const prevButton = replyCall.components[0].components[0];
+      
+      expect(prevButton.data.disabled).toBe(true);
+    });
+
+    test('最後のページで次のページボタンが無効になる', async () => {
+      // 12件のTODOを作成
+      const todos = [];
+      for (let i = 1; i <= 12; i++) {
+        const todo = await mockTodoRepo.createTodo({
+          userId: 'test-user',
+          content: `TODO ${i}`,
+          priority: 0,
+        });
+        todos.push(todo);
+      }
+
+      // 2ページ目に移動
+      const interaction = createMockButtonInteraction('todo_page_next_1', 'test-user') as ButtonInteraction;
+      interaction.update = jest.fn().mockResolvedValue({});
+      
+      await handler.handleButtonInteraction(interaction, 'test-user', 'Asia/Tokyo');
+      
+      const updateCall = (interaction.update as jest.Mock).mock.calls[0][0];
+      const nextButton = updateCall.components[0].components[2];
+      
+      expect(nextButton.data.disabled).toBe(true);
+    });
+
+    test('createPaginatedEmbed関数でページ情報を含むEmbedが生成される', () => {
+      // 現在は存在しない関数のテスト - 実装後にGreenになる
+      const createPaginatedEmbed = (handler as any).createPaginatedEmbed;
+      expect(createPaginatedEmbed).toBeDefined();
+      
+      const mockTodos = Array(15).fill(null).map((_, i) => ({
+        id: `todo-${i + 1}`,
+        content: `TODO ${i + 1}`,
+        status: 'pending',
+        priority: 0,
+        created_at: new Date().toISOString()
+      }));
+      
+      const embed = createPaginatedEmbed(mockTodos.slice(0, 10), 1, 2, 15);
+      expect(embed.data.title).toContain('(1-10/15件)');
+      expect(embed.data.title).toContain('ページ 1/2');
+    });
+  });
 });  
