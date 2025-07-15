@@ -35,6 +35,8 @@
     "summary:delete-date": "node scripts/delete-today-summary.js",
     "quality:check": "npm run build && npm run test && npm run test:integration && npm run test:e2e",
     "quality:quick": "npm run build && npm run test:unit",
+    "quality:coverage": "node scripts/quality/coverage-check.js",
+    "quality:gate": "npm run quality:coverage && npm run check:database-paths",
     "precommit": "npm run quality:check",
     "validate:commands": "ts-node scripts/validate-commands.ts",
     "init:new-db": "ts-node scripts/initialize-new-database.ts",

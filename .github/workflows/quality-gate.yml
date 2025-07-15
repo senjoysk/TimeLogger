@@ -1,0 +1,129 @@
+name: Quality Gate - Test Coverage & Build
+
+on:
+  pull_request:
+    branches: [ develop, main ]
+  push:
+    branches: [ develop, main ]
+
+jobs:
+  quality-check:
+    name: Code Quality & Coverage Check
+    runs-on: ubuntu-latest
+    
+    strategy:
+      matrix:
+        node-version: [20.x]
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup Node.js ${{ matrix.node-version }}
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ matrix.node-version }}
+        cache: 'npm'
+        
+    - name: Install dependencies
+      run: npm ci
+      
+    - name: TypeScript type check
+      run: npm run build
+      
+    - name: Run tests with coverage
+      run: npm run test:coverage
+      env:
+        NODE_ENV: test
+        
+    - name: Coverage threshold check
+      run: |
+        # Extract coverage percentages
+        STATEMENTS=$(npm run test:coverage -- --silent --coverageReporters=text-summary 2>/dev/null | grep "Statements" | grep -o '[0-9]*\.[0-9]*%' | head -1 | sed 's/%//')
+        BRANCHES=$(npm run test:coverage -- --silent --coverageReporters=text-summary 2>/dev/null | grep "Branches" | grep -o '[0-9]*\.[0-9]*%' | head -1 | sed 's/%//')
+        FUNCTIONS=$(npm run test:coverage -- --silent --coverageReporters=text-summary 2>/dev/null | grep "Functions" | grep -o '[0-9]*\.[0-9]*%' | head -1 | sed 's/%//')
+        LINES=$(npm run test:coverage -- --silent --coverageReporters=text-summary 2>/dev/null | grep "Lines" | grep -o '[0-9]*\.[0-9]*%' | head -1 | sed 's/%//')
+        
+        # Define thresholds
+        MIN_STATEMENTS=65.0
+        MIN_BRANCHES=58.0
+        MIN_FUNCTIONS=70.0
+        MIN_LINES=65.0
+        
+        echo "🔍 Coverage Report:"
+        echo "  Statements: ${STATEMENTS}% (min: ${MIN_STATEMENTS}%)"
+        echo "  Branches: ${BRANCHES}% (min: ${MIN_BRANCHES}%)" 
+        echo "  Functions: ${FUNCTIONS}% (min: ${MIN_FUNCTIONS}%)"
+        echo "  Lines: ${LINES}% (min: ${MIN_LINES}%)"
+        
+        # Check thresholds
+        FAILED=0
+        
+        if (( $(echo "$STATEMENTS < $MIN_STATEMENTS" | bc -l) )); then
+          echo "❌ Statements coverage below threshold: ${STATEMENTS}% < ${MIN_STATEMENTS}%"
+          FAILED=1
+        fi
+        
+        if (( $(echo "$BRANCHES < $MIN_BRANCHES" | bc -l) )); then
+          echo "❌ Branches coverage below threshold: ${BRANCHES}% < ${MIN_BRANCHES}%"
+          FAILED=1
+        fi
+        
+        if (( $(echo "$FUNCTIONS < $MIN_FUNCTIONS" | bc -l) )); then
+          echo "❌ Functions coverage below threshold: ${FUNCTIONS}% < ${MIN_FUNCTIONS}%"
+          FAILED=1
+        fi
+        
+        if (( $(echo "$LINES < $MIN_LINES" | bc -l) )); then
+          echo "❌ Lines coverage below threshold: ${LINES}% < ${MIN_LINES}%"
+          FAILED=1
+        fi
+        
+        if [ $FAILED -eq 1 ]; then
+          echo ""
+          echo "🚨 Quality Gate Failed: Coverage thresholds not met"
+          echo "💡 Please add tests to improve coverage before merging"
+          exit 1
+        fi
+        
+        echo ""
+        echo "✅ Quality Gate Passed: All coverage thresholds met"
+        
+    - name: Database path validation
+      run: npm run check:database-paths
+      
+    - name: Integration test check
+      run: |
+        # Run specific critical integration tests
+        npm test -- --testPathPattern="integration" --verbose=false --silent
+        
+    - name: Build verification
+      run: |
+        npm run build
+        echo "✅ Build verification completed"
+        
+    - name: Quality summary
+      run: |
+        echo "📊 Quality Gate Summary:"
+        echo "  ✅ TypeScript compilation: PASSED"
+        echo "  ✅ Test coverage: PASSED" 
+        echo "  ✅ Integration tests: PASSED"
+        echo "  ✅ Database validation: PASSED"
+        echo "  ✅ Build verification: PASSED"
+        echo ""
+        echo "🎉 Ready for merge!"
+
+  # Staging environment quality check (only for develop branch)
+  staging-quality-check:
+    name: Staging Environment Quality Check
+    runs-on: ubuntu-latest
+    needs: quality-check
+    if: github.ref == 'refs/heads/develop'
+    
+    steps:
+    - name: Staging health check placeholder
+      run: |
+        echo "🔄 Staging environment quality check"
+        echo "📋 This would verify staging deployment quality"
+        echo "🔍 Health checks, smoke tests, etc."
+        echo "✅ Staging quality verification completed"

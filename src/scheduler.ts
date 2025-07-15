@@ -3,6 +3,28 @@ import { TaskLoggerBot } from './bot';
 import { config } from './config';
 import { SqliteActivityLogRepository } from './repositories/sqliteActivityLogRepository';
 import { toZonedTime } from 'date-fns-tz';
+import { 
+  ISchedulerService, 
+  ILogger,
+  ITimeProvider,
+  IConfigService 
+} from './interfaces/dependencies';
+import { 
+  CronSchedulerService,
+  ConsoleLogger,
+  RealTimeProvider 
+} from './factories';
+import { ConfigService } from './services/configService';
+
+/**
+ * Scheduler DI依存関係オプション
+ */
+export interface SchedulerDependencies {
+  schedulerService?: ISchedulerService;
+  logger?: ILogger;
+  timeProvider?: ITimeProvider;
+  configService?: IConfigService;
+}
 
 /**
  * スケジュール管理クラス
@@ -11,19 +33,35 @@ import { toZonedTime } from 'date-fns-tz';
 export class Scheduler {
   private bot: TaskLoggerBot;
   private repository: SqliteActivityLogRepository;
-  private jobs: Map<string, cron.ScheduledTask> = new Map();
+  private jobs: Map<string, any> = new Map(); // cron.ScheduledTaskからanyに変更（DI対応）
   private userTimezones: Map<string, string> = new Map();
+  
+  // DI依存関係
+  private readonly schedulerService: ISchedulerService;
+  private readonly logger: ILogger;
+  private readonly timeProvider: ITimeProvider;
+  private readonly configService: IConfigService;
 
-  constructor(bot: TaskLoggerBot, repository: SqliteActivityLogRepository) {
+  constructor(
+    bot: TaskLoggerBot, 
+    repository: SqliteActivityLogRepository,
+    dependencies?: SchedulerDependencies
+  ) {
     this.bot = bot;
     this.repository = repository;
+    
+    // DI依存関係の初期化（デフォルトまたは注入された実装を使用）
+    this.schedulerService = dependencies?.schedulerService || new CronSchedulerService();
+    this.logger = dependencies?.logger || new ConsoleLogger();
+    this.timeProvider = dependencies?.timeProvider || new RealTimeProvider();
+    this.configService = dependencies?.configService || new ConfigService();
   }
 
   /**
    * 全てのスケジュールを開始
    */
   public async start(): Promise<void> {
-    console.log('⏰ スケジューラーを開始します...');
+    this.logger.info('⏰ スケジューラーを開始します...');
     
     // ユーザーのタイムゾーンを取得
     await this.loadUserTimezones();
@@ -33,7 +71,7 @@ export class Scheduler {
     this.startDailySummarySchedule();
     this.startApiCostReportSchedule();
     
-    console.log('✅ 全てのスケジュールが開始されました');
+    this.logger.info('✅ 全てのスケジュールが開始されました');
     this.logScheduleInfo();
   }
 
@@ -68,46 +106,42 @@ export class Scheduler {
     // 毎時0分に実行
     const cronPattern = '0 * * * *';
     
-    const job = cron.schedule(cronPattern, async () => {
+    const job = this.schedulerService.schedule(cronPattern, async () => {
       try {
-        const now = new Date();
-        console.log(`📊 日次サマリーチェック (UTC: ${now.toISOString()})`);
+        const now = this.timeProvider.now();
+        this.logger.info(`📊 日次サマリーチェック (UTC: ${now.toISOString()})`);
         
         // 全ユーザーに対してサマリーを送信
         await this.bot.sendDailySummaryForAllUsers();
         
       } catch (error) {
-        console.error('❌ 日次サマリースケジュール実行エラー:', error);
+        this.logger.error('❌ 日次サマリースケジュール実行エラー:', error as Error);
       }
-    }, {
-      scheduled: true,
     });
 
     this.jobs.set('dailySummary', job);
-    console.log(`  ✅ 日次サマリースケジュール (${cronPattern}) を開始しました`);
+    this.logger.info(`  ✅ 日次サマリースケジュール (${cronPattern}) を開始しました`);
   }
 
   private startApiCostReportSchedule(): void {
     // 毎時5分に実行し、全ユーザーに対してコストレポートを送信
     const cronPattern = '5 * * * *';
 
-    const job = cron.schedule(cronPattern, async () => {
+    const job = this.schedulerService.schedule(cronPattern, async () => {
       try {
-        const now = new Date();
-        console.log(`💰 APIコストレポートチェック (UTC: ${now.toISOString()})`);
+        const now = this.timeProvider.now();
+        this.logger.info(`💰 APIコストレポートチェック (UTC: ${now.toISOString()})`);
         
         // 全ユーザーに対してコストレポートを送信
         await this.bot.sendApiCostReportForAllUsers();
         
       } catch (error) {
-        console.error('❌ APIコストレポートスケジュール実行エラー:', error);
+        this.logger.error('❌ APIコストレポートスケジュール実行エラー:', error as Error);
       }
-    }, {
-      scheduled: true,
     });
 
     this.jobs.set('apiCostReport', job);
-    console.log(`  ✅ APIコストレポートスケジュール (${cronPattern}) を開始しました`);
+    this.logger.info(`  ✅ APIコストレポートスケジュール (${cronPattern}) を開始しました`);
   }
 
   /**
