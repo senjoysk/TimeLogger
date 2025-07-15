@@ -133,7 +133,7 @@ log_info "アプリ状態: $APP_STATUS"
 
 if [[ "$APP_STATUS" == "suspended" ]]; then
     log_warning "アプリが suspended 状態です。復旧中..."
-    if flyctl apps resume "$STAGING_APP_NAME"; then
+    if flyctl scale count 1 --app "$STAGING_APP_NAME"; then
         log_success "アプリが復旧しました"
         # アプリ復旧後の待機時間
         log_info "アプリ復旧完了を待機中..."

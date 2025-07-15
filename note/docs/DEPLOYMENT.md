@@ -269,10 +269,10 @@ git commit -m "Deploy準備"
 ### 緊急時の手動操作
 ```bash
 # 手動でアプリを起動
-flyctl resume --app timelogger-bitter-resonance-9585
+flyctl scale count 1 --app timelogger-bitter-resonance-9585
 
 # 手動でアプリをサスペンド
-flyctl suspend --app timelogger-bitter-resonance-9585
+flyctl scale count 0 --app timelogger-bitter-resonance-9585
 
 # マシンを手動起動
 flyctl machines start --app timelogger-bitter-resonance-9585
