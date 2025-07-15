@@ -129,6 +129,43 @@ fi
 log_info "デプロイ前ステータス確認中..."
 flyctl status --app "$STAGING_APP_NAME" || log_warning "アプリがまだ存在しないか、停止しています"
 
+# 3.5. マシン自動起動機能
+log_info "マシン状態確認・自動復旧中..."
+
+# jqの存在確認
+if ! command -v jq &> /dev/null; then
+    log_warning "jq が見つかりません。マシン状態の詳細確認をスキップします"
+else
+    # マシンリスト取得と停止中マシンの検出
+    MACHINES=$(flyctl machines list --app "$STAGING_APP_NAME" --json 2>/dev/null || echo "[]")
+    
+    if [[ "$MACHINES" != "[]" ]] && [[ "$MACHINES" != "" ]]; then
+        STOPPED_MACHINES=$(echo "$MACHINES" | jq -r '.[] | select(.state == "stopped") | .id' 2>/dev/null || echo "")
+        
+        if [[ -n "$STOPPED_MACHINES" ]]; then
+            log_warning "停止中のマシンを検出しました"
+            echo "$STOPPED_MACHINES" | while read -r machine_id; do
+                if [[ -n "$machine_id" ]]; then
+                    log_info "マシン $machine_id を起動中..."
+                    if flyctl machine start "$machine_id" --app "$STAGING_APP_NAME"; then
+                        log_success "マシン $machine_id が起動しました"
+                    else
+                        log_error "マシン $machine_id の起動に失敗しました"
+                    fi
+                fi
+            done
+            
+            # 起動完了待機
+            log_info "マシン起動完了を待機中..."
+            sleep 15
+        else
+            log_info "すべてのマシンが実行中です"
+        fi
+    else
+        log_warning "マシン情報の取得に失敗しました"
+    fi
+fi
+
 # 4. デプロイ実行
 log_info "Staging環境デプロイ実行中..."
 

@@ -87,55 +87,11 @@ jobs:
       - name: 🚀 Fly.io CLI セットアップ
         uses: superfly/flyctl-actions/setup-flyctl@master
       
-      - name: 🔍 Staging環境ステータス確認
+      - name: 🚀 Staging環境デプロイ実行（マシン自動復旧付き）
         run: |
-          echo "📊 デプロイ前ステータス:"
-          flyctl status --app ${{ env.STAGING_APP_NAME }} || echo "⚠️ アプリが見つかりません（初回デプロイの可能性）"
-      
-      - name: 🚀 Staging環境デプロイ実行
-        run: |
-          echo "🚀 Staging環境にデプロイを開始します..."
-          
-          # staging用の設定ファイルが存在する場合はそれを使用
-          if [ -f "fly-staging.toml" ]; then
-            flyctl deploy --config fly-staging.toml --app ${{ env.STAGING_APP_NAME }}
-          else
-            flyctl deploy --app ${{ env.STAGING_APP_NAME }}
-          fi
-      
-      - name: ⏳ デプロイ完了待機
-        run: |
-          echo "⏳ アプリの起動を待機中..."
-          for i in {1..12}; do
-            if flyctl status --app ${{ env.STAGING_APP_NAME }} | grep -q "started"; then
-              echo "✅ アプリが正常に起動しました"
-              break
-            fi
-            if [ $i -eq 12 ]; then
-              echo "⚠️ アプリの起動に時間がかかっています"
-              flyctl logs --app ${{ env.STAGING_APP_NAME }}
-            fi
-            sleep 10
-          done
-      
-      - name: 🏥 ヘルスチェック
-        run: |
-          echo "🏥 Staging環境ヘルスチェック実行中..."
-          STAGING_URL="https://${{ env.STAGING_APP_NAME }}.fly.dev"
-          
-          for i in {1..6}; do
-            if curl -f -s "$STAGING_URL/health" > /dev/null; then
-              echo "✅ ヘルスチェック成功"
-              break
-            fi
-            if [ $i -eq 6 ]; then
-              echo "❌ ヘルスチェック失敗"
-              flyctl logs --app ${{ env.STAGING_APP_NAME }}
-              exit 1
-            fi
-            echo "⏳ ヘルスチェック中... ($i/6)"
-            sleep 10
-          done
+          echo "🚀 staging環境デプロイ（マシン自動復旧機能付き）を実行します..."
+          chmod +x scripts/staging/deploy-to-staging.sh
+          ./scripts/staging/deploy-to-staging.sh --skip-tests --force
       
       - name: 📊 デプロイ完了レポート
         if: always()

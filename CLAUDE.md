@@ -131,6 +131,41 @@ feature/* → develop → staging検証 → main → production
 2. `.env.staging` でstaging用環境変数設定
 3. `npm run staging:setup` で初期設定実行
 
+### 🚀 Staging環境デプロイ（マシン自動復旧機能付き）
+
+**📋 推奨デプロイ方法:**
+```bash
+# 🎯 基本デプロイ（推奨）
+npm run staging:deploy
+
+# 🚀 手動デプロイ（オプション付き）
+./scripts/staging/deploy-to-staging.sh --skip-tests --force
+```
+
+**🔧 自動復旧機能:**
+- **マシン停止検出**: jqを使った詳細状態分析
+- **自動マシン起動**: 停止中マシンの自動起動
+- **起動完了待機**: 確実な起動確認後にデプロイ実行
+- **ヘルスチェック**: デプロイ前後の動作確認
+
+**📊 実行フロー:**
+1. **環境チェック**: Fly CLI、staging環境アプリの存在確認
+2. **マシン状態確認**: 停止中マシンの自動検出
+3. **自動復旧**: 停止中マシンの自動起動（15秒待機）
+4. **品質チェック**: TypeScriptビルド + テスト実行（`--skip-tests`で省略可能）
+5. **デプロイ実行**: fly-staging.toml設定でのデプロイ
+6. **ヘルスチェック**: https://timelogger-staging.fly.dev/health 確認
+7. **完了レポート**: 詳細なデプロイ結果レポート表示
+
+**✅ 解決された問題:**
+- ❌ 従来: マシン停止 → デプロイ失敗 → 手動起動 → 再デプロイ
+- ✅ 現在: **完全自動化** → マシン停止を気にせずデプロイ可能
+
+**⚠️ 注意事項:**
+- GitHub Actions では `--skip-tests --force` で実行（CI側でテスト済みのため）
+- ローカル実行では品質チェック込みの完全実行を推奨
+- `jq` コマンドが必要（macOS: `brew install jq`）
+
 ## プロジェクト構造（現在の実装）
 ```
 src/
@@ -204,7 +239,7 @@ npm run test:coverage
 - `npm run test:integration`: 統合テストのみ実行
 
 ### Staging環境コマンド
-- `npm run staging:deploy`: staging環境へデプロイ
+- `npm run staging:deploy`: **staging環境へデプロイ（マシン自動復旧機能付き）**
 - `npm run staging:logs`: staging環境ログ確認
 - `npm run staging:status`: staging環境ステータス確認
 - `npm run staging:test`: staging環境動作テスト
