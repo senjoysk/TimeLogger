@@ -1,8 +1,9 @@
-# 夜間サスペンドシステム デプロイメント手順
+# TimeLogger デプロイメント手順
 
 ## 概要
 
-このドキュメントでは、夜間サスペンドシステムをFly.ioにデプロイし、GitHub Actionsで自動化する手順を説明します。
+このドキュメントでは、TimeLoggerのデプロイメント手順を説明します。
+現在の構成では、**手動デプロイ**によるローカル実行が推奨されています。
 
 ## 前提条件
 
@@ -10,240 +11,262 @@
 - GitHub Repository
 - Discord Bot Token
 - Google Gemini API Key
+- Node.js 20.x (nvm推奨)
 
-## 1. Fly.io設定
+## 🌍 環境構成
 
-### アプリケーションの作成・設定
+### 3層環境構成
+```
+Local環境 → Staging環境 → Production環境
+  ↓           ↓            ↓
+TDD開発    fly.io検証    本番運用
+```
+
+#### Local環境 (開発者端末)
+- **用途**: TDD開発、単体テスト、機能実装
+- **データベース**: ローカルSQLite
+- **実行**: `npm run dev`, `npm run test:watch`
+
+#### Staging環境 (fly.io: timelogger-staging)
+- **用途**: fly.io環境での統合テスト、本番前検証
+- **データベース**: 分離DB + テストデータ
+- **デプロイ**: `./scripts/staging/deploy-to-staging.sh`
+
+#### Production環境 (fly.io: timelogger-bitter-resonance-9585)
+- **用途**: 実際のDiscord Bot運用
+- **データベース**: 本番データ
+- **デプロイ**: `./scripts/production/deploy.sh`
+
+## 🚀 リリースフロー
+
+### 現在のリリースフロー
+```
+feature/* → develop → 品質チェック → 手動staging → main → 手動production
+```
+
+### 必須プロセス
+1. **Local開発**: TDDサイクル完了 + 全テスト成功
+2. **develop マージ**: プルリクエスト + GitHub Actions品質チェック
+3. **staging デプロイ**: `./scripts/staging/deploy-to-staging.sh` で手動実行
+4. **staging検証**: 重要機能動作確認 + 品質ゲート
+5. **main マージ**: staging検証完了後のみ
+6. **production デプロイ**: `./scripts/production/deploy.sh` で手動実行
+
+## 🔧 環境セットアップ
+
+### 開発環境セットアップ
+```bash
+# Node.js仮想環境を使用
+nvm use
+
+# 依存関係をインストール
+npm install
+
+# .envファイルを作成
+cp .env.example .env
+# Discord Bot Token と Google Gemini API Key を設定
+```
+
+### Staging環境セットアップ
+```bash
+# Staging環境用アプリ作成
+fly apps create timelogger-staging
+
+# staging用設定ファイルの確認
+ls fly-staging.toml
+
+# 環境変数設定
+flyctl secrets set DISCORD_TOKEN="your-staging-discord-token" --app timelogger-staging
+flyctl secrets set GOOGLE_API_KEY="your-google-gemini-api-key" --app timelogger-staging
+```
+
+### Production環境セットアップ
+```bash
+# Production環境用アプリ作成（既存の場合はスキップ）
+fly apps create timelogger-bitter-resonance-9585
+
+# 環境変数設定
+flyctl secrets set DISCORD_TOKEN="your-production-discord-token" --app timelogger-bitter-resonance-9585
+flyctl secrets set GOOGLE_API_KEY="your-google-gemini-api-key" --app timelogger-bitter-resonance-9585
+flyctl secrets set ADMIN_USER_ID="your-discord-user-id" --app timelogger-bitter-resonance-9585
+```
+
+## 🏗️ デプロイ手順
+
+### Staging環境デプロイ
 
 ```bash
-# Fly.ioにログイン
-flyctl auth login
+# developブランチからのみデプロイ可能
+git checkout develop
+git pull origin develop
 
-# アプリケーションの作成（既存の場合はスキップ）
-flyctl launch --name timelogger-bitter-resonance-9585
+# Staging環境にデプロイ
+./scripts/staging/deploy-to-staging.sh
 
-# 環境変数の設定
-flyctl secrets set DISCORD_BOT_TOKEN="your-discord-bot-token"
-flyctl secrets set GOOGLE_API_KEY="your-google-gemini-api-key"
-flyctl secrets set SHUTDOWN_TOKEN="$(openssl rand -base64 32)"
-flyctl secrets set WAKE_TOKEN="$(openssl rand -base64 32)"
-flyctl secrets set RECOVERY_TOKEN="$(openssl rand -base64 32)"
-
-# 注意: TARGET_USER_IDは削除済み（マルチユーザー対応）
-# 注意: DATABASE_PATHは統一パス使用、設定不要
-
-# 設定確認
-flyctl secrets list
+# オプション
+./scripts/staging/deploy-to-staging.sh --skip-tests    # テストスキップ
+./scripts/staging/deploy-to-staging.sh --force        # ブランチチェック回避
 ```
 
-### fly.toml設定
+#### デプロイに含まれる処理
+1. **前提条件チェック**
+   - flyctl コマンド確認
+   - ログイン状態確認
+   - Git状態確認
+   - **ブランチ確認** (developブランチ必須)
 
-```toml
-# fly.toml
-app = "timelogger-bitter-resonance-9585"
-primary_region = "nrt"
+2. **品質チェック**
+   - 依存関係インストール
+   - TypeScriptビルド
+   - 単体テスト実行
+   - 統合テスト実行
 
-[build]
+3. **アプリ・マシン状態確認**
+   - アプリのsuspended状態確認・復旧
+   - 停止マシンの自動起動
 
-[env]
-  NODE_ENV = "production"
-  PORT = "3000"
+4. **デプロイ実行**
+   - Fly.ioへのデプロイ
+   - 起動確認
+   - ヘルスチェック
 
-[http_service]
-  internal_port = 3000
-  force_https = true
-  auto_stop_machines = false
-  auto_start_machines = true
-  min_machines_running = 0
-  processes = ["app"]
-
-[[http_service.checks]]
-  interval = "30s"
-  timeout = "10s"
-  grace_period = "5s"
-  method = "GET"
-  path = "/health"
-  protocol = "http"
-  tls_skip_verify = false
-
-[services]
-  protocol = "tcp"
-  internal_port = 3000
-
-  [[services.ports]]
-    port = 80
-    handlers = ["http"]
-    force_https = true
-
-  [[services.ports]]
-    port = 443
-    handlers = ["tls", "http"]
-
-  [services.concurrency]
-    type = "connections"
-    hard_limit = 25
-    soft_limit = 20
-
-  [[services.tcp_checks]]
-    interval = "15s"
-    timeout = "2s"
-    grace_period = "1s"
-    restart_limit = 0
-
-  [[services.http_checks]]
-    interval = "30s"
-    timeout = "10s"
-    grace_period = "5s"
-    restart_limit = 0
-    method = "GET"
-    path = "/health"
-    protocol = "http"
-    tls_skip_verify = false
-```
-
-## 2. GitHub Secrets設定
-
-GitHubリポジトリの Settings → Secrets and variables → Actions で以下を設定：
-
-### 必須Secrets
+### Production環境デプロイ
 
 ```bash
-# Fly.io API Token
-FLY_API_TOKEN=your-fly-api-token
+# mainブランチからのみデプロイ可能
+git checkout main
+git pull origin main
 
-# 夜間サスペンド用認証トークン
-SHUTDOWN_TOKEN=your-shutdown-token
+# Production環境にデプロイ
+./scripts/production/deploy.sh
 
-# 起動用認証トークン  
-WAKE_TOKEN=your-wake-token
-
-# リカバリ用認証トークン
-RECOVERY_TOKEN=your-recovery-token
+# オプション
+./scripts/production/deploy.sh --skip-tests    # テストスキップ
+./scripts/production/deploy.sh --force         # ブランチチェック回避
+./scripts/production/deploy.sh --dry-run       # ドライランモード
 ```
 
-### Fly.io API Tokenの取得
+#### デプロイに含まれる処理
+1. **本番環境確認**
+   - 本番デプロイの確認プロンプト
+   - 実際のユーザーへの影響警告
 
+2. **前提条件チェック**
+   - flyctl コマンド確認
+   - ログイン状態確認
+   - Git状態確認
+   - **ブランチ確認** (mainブランチ必須)
+
+3. **品質チェック**
+   - 依存関係インストール
+   - TypeScriptビルド
+   - テスト実行
+
+4. **シークレット管理**
+   - .env.productionファイルからの自動設定
+   - Fly.ioシークレットへの一括反映
+
+5. **デプロイ実行**
+   - Fly.ioへのデプロイ
+   - 起動確認
+
+## 🔒 ブランチ保護
+
+### 厳格なブランチ制限
+- **Production環境**: `main`ブランチからのみデプロイ可能
+- **Staging環境**: `develop`ブランチからのみデプロイ可能
+- **違反時**: エラーで停止、明確な指示メッセージ
+
+### 緊急時の回避方法
 ```bash
-# Fly.io API Token生成
-flyctl auth token
-
-# 生成されたトークンをGitHub Secretsに設定
+# 強制デプロイ（緊急時のみ）
+./scripts/production/deploy.sh --force
+./scripts/staging/deploy-to-staging.sh --force
 ```
 
-### 認証トークンの生成
+## 📊 GitHub Actions (品質チェックのみ)
 
+### GitHub Actions の役割
+- **デプロイ無し**: 自動デプロイは実行されません
+- **品質チェック**: テスト、ビルド、カバレッジ確認のみ
+- **手動デプロイガイド**: 成功時に手動デプロイ手順を表示
+
+### ワークフロー
+- **Staging Quality Check**: developブランチpush時
+- **Production Quality Check**: mainブランチpush時
+
+## 🔍 動作確認
+
+### Staging環境確認
 ```bash
-# 安全なランダムトークン生成
-openssl rand -base64 32  # SHUTDOWN_TOKEN用
-openssl rand -base64 32  # WAKE_TOKEN用  
-openssl rand -base64 32  # RECOVERY_TOKEN用
+# ヘルスチェック
+curl https://timelogger-staging.fly.dev/health
+
+# アプリ状態確認
+flyctl status --app timelogger-staging
+
+# ログ確認
+flyctl logs --app timelogger-staging
 ```
 
-## 3. アプリケーションの統合
-
-### メインアプリケーションの修正
-
-```typescript
-// src/index.ts
-import { NightSuspendServer } from './api/nightSuspendServer';
-import { MorningMessageRecovery } from './services/morningMessageRecovery';
-import { SqliteNightSuspendRepository } from './repositories/sqliteNightSuspendRepository';
-
-// ... existing Discord bot setup
-
-// 夜間サスペンドサーバーの統合
-const nightSuspendRepo = new SqliteNightSuspendRepository(database);
-const morningRecovery = new MorningMessageRecovery(client, nightSuspendRepo, {
-  targetUserId: 'YOUR_DISCORD_USER_ID',
-  timezone: 'Asia/Tokyo'
-});
-
-const nightSuspendServer = new NightSuspendServer(morningRecovery);
-await nightSuspendServer.start();
-
-console.log('🌙 夜間サスペンドシステムが統合されました');
-```
-
-## 4. 動作確認
-
-### 手動テスト
-
+### Production環境確認
 ```bash
 # ヘルスチェック
 curl https://timelogger-bitter-resonance-9585.fly.dev/health
 
-# サスペンド状態確認
-curl https://timelogger-bitter-resonance-9585.fly.dev/api/suspend-status
+# アプリ状態確認
+flyctl status --app timelogger-bitter-resonance-9585
 
-# 夜間サスペンド（要認証）
-curl -X POST \
-  -H "Authorization: Bearer YOUR_SHUTDOWN_TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{"action":"prepare_suspend"}' \
-  https://timelogger-bitter-resonance-9585.fly.dev/api/night-suspend
-
-# 朝の起動（要認証）
-curl -X POST \
-  -H "Authorization: Bearer YOUR_WAKE_TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{"trigger":"manual_test"}' \
-  https://timelogger-bitter-resonance-9585.fly.dev/api/wake-up
-
-# メッセージリカバリ（要認証）
-curl -X POST \
-  -H "Authorization: Bearer YOUR_RECOVERY_TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{"trigger":"manual_test"}' \
-  https://timelogger-bitter-resonance-9585.fly.dev/api/morning-recovery
-```
-
-### GitHub Actions手動実行
-
-1. GitHubリポジトリのActionsタブに移動
-2. "夜間サスペンド自動化"ワークフローを選択
-3. "Run workflow"をクリック
-4. アクションを選択して実行
-
-## 5. 自動化スケジュール
-
-### 運用スケジュール
-
-- **夜間サスペンド**: 毎日 0:00 JST (15:00 UTC)
-- **朝の起動**: 毎日 7:00 JST (22:00 UTC前日)
-
-### タイムゾーン注意事項
-
-- GitHub ActionsはUTCで動作
-- 日本時間(JST)はUTC+9時間
-- サマータイムは考慮不要（日本にはサマータイムがない）
-
-## 6. 監視とログ
-
-### アプリケーションログ
-
-```bash
-# リアルタイムログ
+# ログ確認
 flyctl logs --app timelogger-bitter-resonance-9585
-
-# 特定時間のログ
-flyctl logs --app timelogger-bitter-resonance-9585 --since 1h
 ```
 
-### GitHub Actionsログ
+### Discord Bot動作確認
+重要なコマンドの動作確認:
+- `!cost` - API使用量レポート
+- `!summary` - 日次サマリー
+- `!timezone` - タイムゾーン設定
+- `!edit [ID]` - ログ編集機能
+- `!logs` - ログ一覧表示
 
-- リポジトリの Actions タブで実行履歴を確認
-- 失敗時は詳細ログを確認して対応
-
-## 7. トラブルシューティング
+## 🛠️ トラブルシューティング
 
 ### よくある問題
 
-1. **認証エラー**: トークンが正しく設定されているか確認
-2. **タイムアウト**: Fly.ioアプリの起動に時間がかかる場合
-3. **Discord API制限**: レート制限に達した場合
+#### 1. ブランチエラー
+```bash
+[ERROR] 現在のブランチ: feature/xxx (必須: main)
+[ERROR] 本番環境はmainブランチからのみデプロイ可能です
+```
+**解決**: 正しいブランチに切り替え
+```bash
+git checkout main
+git pull origin main
+```
+
+#### 2. 未コミット変更
+```bash
+[ERROR] 未コミットの変更があります
+```
+**解決**: 変更をコミットまたはスタッシュ
+```bash
+git add .
+git commit -m "Deploy準備"
+```
+
+#### 3. テスト失敗
+```bash
+[ERROR] テストに失敗しました
+```
+**解決**: テストを修正するか、緊急時のみ `--skip-tests` オプション使用
+
+#### 4. マシンsuspended
+```bash
+[WARNING] 停止中のマシンを検出しました
+```
+**解決**: 自動で起動処理が実行されます（手動実行不要）
 
 ### 緊急時の手動操作
-
 ```bash
 # 手動でアプリを起動
 flyctl resume --app timelogger-bitter-resonance-9585
@@ -251,48 +274,56 @@ flyctl resume --app timelogger-bitter-resonance-9585
 # 手動でアプリをサスペンド
 flyctl suspend --app timelogger-bitter-resonance-9585
 
-# アプリの状態確認
-flyctl status --app timelogger-bitter-resonance-9585
+# マシンを手動起動
+flyctl machines start --app timelogger-bitter-resonance-9585
+
+# 詳細な状態確認
+flyctl machines list --app timelogger-bitter-resonance-9585
 ```
 
-## 8. コスト最適化
+## 📈 コスト最適化
 
-### 期待される効果
-
-- **夜間サスペンド**: 7時間/日 × 70% = 約70%のコスト削減
-- **自動化**: 運用コスト削減
-- **リカバリ**: 機能の継続性保証
+### 現在の構成
+- **Staging**: 開発時のみ起動（夜間自動停止）
+- **Production**: 24時間稼働
+- **マシン**: 最小スペック（1 CPU, 256MB RAM）
 
 ### 監視項目
-
 - Fly.ioの請求状況
 - GitHub Actionsの実行時間
 - Discord Bot APIの使用量
 
-## 9. セキュリティ
+## 🔐 セキュリティ
 
-### 認証トークン管理
+### 認証・シークレット管理
+- **環境変数**: Fly.ioシークレットで管理
+- **本番設定**: `.env.production` ファイル（gitignore済み）
+- **GitHub Actions**: デプロイ権限を削除、品質チェックのみ
 
+### 推奨事項
 - トークンは定期的に更新
-- GitHub Secretsに安全に保管
 - 本番環境とテスト環境で分離
+- ログイン状態の定期確認
 
-### API エンドポイント
+## 🎯 ベストプラクティス
 
-- 認証必須
-- HTTPS通信のみ
-- レート制限実装
+### デプロイ前チェックリスト
+- [ ] 正しいブランチ（staging: develop, production: main）
+- [ ] 全テストが成功
+- [ ] 未コミット変更なし
+- [ ] 前回のデプロイから問題なし
+- [ ] Discord Bot動作確認済み
 
-## 10. 今後の拡張
+### 本番デプロイ時の注意点
+- 営業時間外での実行を推奨
+- ロールバック手順を事前に確認
+- デプロイ後の動作監視を実施
+- 重要機能の疎通確認
 
-### マルチユーザー対応
+## 📋 今後の拡張
 
-- ユーザー別の設定管理
-- 個別のサスペンドスケジュール
-- 通知設定のカスタマイズ
-
-### 監視の強化
-
+### 予定している改善
+- モニタリング強化
 - アラート機能
-- メトリクス収集
-- ダッシュボード作成
+- デプロイ自動化の再検討
+- パフォーマンス監視
