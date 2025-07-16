@@ -206,8 +206,13 @@ describe('AdminRepository TODO管理機能拡張', () => {
   });
 
   describe('🔴 Red Phase 2-3: TODO検索・フィルタリング', () => {
-    test.skip('期限切れのTODOタスクを取得できる', async () => {
+    test('期限切れのTODOタスクを取得できる', async () => {
       // Arrange
+      const testUserId = 'test-user-123';
+      
+      // 【重要】テストユーザーを先に登録
+      await sqliteRepo.saveUserTimezone(testUserId, 'Asia/Tokyo');
+      
       const yesterday = new Date();
       yesterday.setDate(yesterday.getDate() - 1);
       const yesterdayStr = yesterday.toISOString().split('T')[0];
@@ -218,7 +223,7 @@ describe('AdminRepository TODO管理機能拡張', () => {
 
       // 期限切れのTODO
       const overdueTodo = await repository.createTodoTask({
-        userId: 'test-user-123',
+        userId: testUserId,
         title: 'Overdue TODO',
         description: 'This is overdue',
         priority: 'high' as TodoPriority,
@@ -227,7 +232,7 @@ describe('AdminRepository TODO管理機能拡張', () => {
 
       // 期限切れでないTODO
       await repository.createTodoTask({
-        userId: 'test-user-123',
+        userId: testUserId,
         title: 'Future TODO',
         description: 'This is not overdue',
         priority: 'medium' as TodoPriority,
@@ -241,6 +246,8 @@ describe('AdminRepository TODO管理機能拡張', () => {
       expect(result).toBeDefined();
       expect(result.length).toBeGreaterThan(0);
       expect(result.some(todo => todo.id === overdueTodo.id)).toBe(true);
+      // 期限切れでないTODOは含まれていないことを確認
+      expect(result.every(todo => todo.title !== 'Future TODO')).toBe(true);
     });
   });
 });
