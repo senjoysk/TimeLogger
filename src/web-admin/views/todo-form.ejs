@@ -103,7 +103,7 @@
                                 <option value="">ユーザーを選択してください</option>
                                 <% users.forEach(user => { %>
                                     <option value="<%= user.userId %>" <%= todo && todo.userId === user.userId ? 'selected' : '' %>>
-                                        <%= user.username || user.userId %>
+                                        <%= user.userId %>
                                     </option>
                                 <% }) %>
                             </select>

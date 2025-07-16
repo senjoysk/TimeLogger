@@ -146,7 +146,7 @@
                                     <option value="all" <%= selectedUserId === 'all' ? 'selected' : '' %>>全ユーザー</option>
                                     <% users.forEach(user => { %>
                                         <option value="<%= user.userId %>" <%= selectedUserId === user.userId ? 'selected' : '' %>>
-                                            <%= user.username || user.userId %>
+                                            <%= user.userId %>
                                         </option>
                                     <% }) %>
                                 </select>
