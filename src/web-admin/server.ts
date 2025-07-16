@@ -19,6 +19,7 @@ export class AdminServer {
   private securityService: SecurityService;
   private port: number;
   private databasePath: string;
+  private sqliteRepo: SqliteActivityLogRepository;
 
   constructor(databasePath: string, port: number = 3001) {
     this.port = port;
@@ -26,13 +27,32 @@ export class AdminServer {
     this.app = express();
     
     // サービスの初期化
-    const sqliteRepo = new SqliteActivityLogRepository(databasePath);
-    const adminRepo = new AdminRepository(sqliteRepo);
+    this.sqliteRepo = new SqliteActivityLogRepository(databasePath);
+    const adminRepo = new AdminRepository(this.sqliteRepo);
     this.adminService = new AdminService(adminRepo);
     this.securityService = new SecurityService();
     
     this.setupMiddleware();
     this.setupRoutes();
+  }
+
+  /**
+   * データベーススキーマを初期化（非同期）
+   * サーバー起動前に必ず呼び出すこと
+   */
+  async initializeDatabase(): Promise<void> {
+    try {
+      // テスト環境では軽量なスキーマ初期化を使用
+      if (process.env.NODE_ENV === 'test') {
+        await this.sqliteRepo.ensureSchema();
+      } else {
+        await this.sqliteRepo.initializeDatabase();
+      }
+      console.log('✅ AdminServer: データベース初期化完了');
+    } catch (error) {
+      console.error('❌ AdminServer: データベース初期化エラー:', error);
+      throw error;
+    }
   }
 
   private setupMiddleware(): void {
@@ -90,18 +110,26 @@ export class AdminServer {
   }
 
   public async start(): Promise<void> {
-    return new Promise((resolve, reject) => {
-      try {
-        this.app.listen(this.port, () => {
-          console.log(`Admin Web App started on port ${this.port}`);
-          console.log(`Environment: ${this.securityService.getEnvironment().env}`);
-          console.log(`Read-only mode: ${this.securityService.getEnvironment().isReadOnly}`);
-          resolve();
-        });
-      } catch (error) {
-        reject(error);
-      }
-    });
+    try {
+      // まずデータベースを初期化
+      await this.initializeDatabase();
+      
+      return new Promise((resolve, reject) => {
+        try {
+          this.app.listen(this.port, () => {
+            console.log(`Admin Web App started on port ${this.port}`);
+            console.log(`Environment: ${this.securityService.getEnvironment().env}`);
+            console.log(`Read-only mode: ${this.securityService.getEnvironment().isReadOnly}`);
+            resolve();
+          });
+        } catch (error) {
+          reject(error);
+        }
+      });
+    } catch (error) {
+      console.error('❌ Failed to initialize database before starting server:', error);
+      throw error;
+    }
   }
 
   public getApp(): express.Application {

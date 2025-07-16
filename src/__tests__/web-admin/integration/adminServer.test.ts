@@ -27,10 +27,11 @@ describe('AdminServer Integration Tests', () => {
     
     // AdminServerを初期化
     adminServer = new AdminServer(testDbPath, 3002);
-    app = adminServer.getApp();
     
-    // 少し待機してデータベースが初期化されるのを待つ
-    await new Promise(resolve => setTimeout(resolve, 1000));
+    // 【重要】データベースを明示的に初期化
+    await adminServer.initializeDatabase();
+    
+    app = adminServer.getApp();
   });
 
   afterAll(async () => {
