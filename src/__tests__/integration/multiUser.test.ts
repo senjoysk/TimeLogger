@@ -51,7 +51,7 @@ describe('Multi-user Support Integration Tests', () => {
     await sharedDb.cleanupForTest();
   });
 
-  describe('🟢 Green Phase: マルチユーザー対応のテスト', () => {
+  describe('マルチユーザー対応機能のテスト（実装済み）', () => {
     test('基本的なメッセージ処理の確認', async () => {
       const userId = '770478489203507241';
       const mockMessage = new MockMessage('テストメッセージ', userId, 'TestUser');
@@ -85,7 +85,7 @@ describe('Multi-user Support Integration Tests', () => {
     }, 10000);
 
     test('複数ユーザーが同時にメッセージを送信できる', async () => {
-      // 🟢 Green Phase: マルチユーザー対応により複数ユーザーが同時利用可能
+      // マルチユーザー対応により複数ユーザーが同時利用可能
       
       const user1Id = '770478489203507241';
       const user2Id = 'different-user-123';
@@ -110,13 +110,13 @@ describe('Multi-user Support Integration Tests', () => {
       const user2Logs = await repository.getLogsByDateRange(user2Id, today, today);
       
       expect(user1Logs).toHaveLength(1);
-      expect(user2Logs).toHaveLength(1); // ✅ マルチユーザー対応により両方のログが保存される
+      expect(user2Logs).toHaveLength(1); // マルチユーザー対応により両方のログが保存される
       expect(user1Logs[0].content).toBe('プロジェクトA開始');
-      expect(user2Logs[0].content).toBe('会議参加'); // ✅ ログが保存される
+      expect(user2Logs[0].content).toBe('会議参加'); // ログが保存される
     }, 10000);
 
     test('異なるユーザーのデータが分離されている', async () => {
-      // 🟢 Green Phase: マルチユーザー対応により複数ユーザーのデータが分離される
+      // マルチユーザー対応により複数ユーザーのデータが分離される
       
       const user1Id = '770478489203507241';
       const user2Id = 'another-user-456';
@@ -140,12 +140,12 @@ describe('Multi-user Support Integration Tests', () => {
       const user3Logs = await repository.getLogsByDateRange(user3Id, today, today);
       
       expect(user1Logs).toHaveLength(2);
-      expect(user2Logs).toHaveLength(1); // ✅ マルチユーザー対応により1件
-      expect(user3Logs).toHaveLength(1); // ✅ マルチユーザー対応により1件
+      expect(user2Logs).toHaveLength(1); // マルチユーザー対応により1件
+      expect(user3Logs).toHaveLength(1); // マルチユーザー対応により1件
     }, 10000);
 
     test('ユーザー制限メッセージが出力されない', async () => {
-      // 🟢 Green Phase: マルチユーザー対応により制限メッセージは出力されない
+      // マルチユーザー対応により制限メッセージは出力されない
       
       const consoleLogSpy = jest.spyOn(console, 'log');
       const nonTargetUserId = 'non-target-user';
@@ -160,15 +160,15 @@ describe('Multi-user Support Integration Tests', () => {
       );
       
       // マルチユーザー対応後は制限メッセージが出力されない
-      expect(restrictionLog).toBeUndefined(); // ✅ 制限メッセージは出力されない
+      expect(restrictionLog).toBeUndefined(); // 制限メッセージは出力されない
       
       consoleLogSpy.mockRestore();
     }, 10000);
   });
 
-  describe('🟢 Green Phase: 自動ユーザー登録機能のテスト', () => {
+  describe('自動ユーザー登録機能のテスト（実装済み）', () => {
     test('新規ユーザーが自動的に登録される', async () => {
-      // 🟢 Green Phase: マルチユーザー対応により新規ユーザーが自動登録される
+      // マルチユーザー対応により新規ユーザーが自動登録される
       
       const newUserId = 'new-user-123456';
       const mockMessage = new MockMessage('初めてのメッセージ', newUserId, 'NewUser');
@@ -178,7 +178,7 @@ describe('Multi-user Support Integration Tests', () => {
       
       // 初期状態：ユーザーは存在しない
       const existsBefore = await repository.userExists(newUserId);
-      expect(existsBefore).toBe(false); // ✅ userExists メソッドが実装済み
+      expect(existsBefore).toBe(false); // userExists メソッドが実装済み
       
       // メッセージを処理
       const handleMessage = (integration as any).handleMessage.bind(integration);
@@ -187,7 +187,7 @@ describe('Multi-user Support Integration Tests', () => {
       
       // ユーザーが自動登録されている
       const existsAfter = await repository.userExists(newUserId);
-      expect(existsAfter).toBe(true); // ✅ registerUser メソッドが実装済み
+      expect(existsAfter).toBe(true); // registerUser メソッドが実装済み
       
       // ウェルカムメッセージとTODO分類の両方が送信される
       expect(mockMessage.replies).toHaveLength(2);
@@ -198,13 +198,13 @@ describe('Multi-user Support Integration Tests', () => {
     }, 10000);
 
     test('既存ユーザーには重複登録されない', async () => {
-      // 🟢 Green Phase: 既存ユーザーの処理をテスト
+      // 既存ユーザーの処理をテスト
       
       const existingUserId = 'existing-user-789';
       const repository = (integration as any).repository;
       
       // 事前にユーザーを登録
-      await repository.registerUser(existingUserId, 'ExistingUser'); // ✅ registerUser メソッドが実装済み
+      await repository.registerUser(existingUserId, 'ExistingUser'); // registerUser メソッドが実装済み
       
       const mockMessage = new MockMessage('2回目のメッセージ', existingUserId, 'ExistingUser');
       
@@ -228,7 +228,7 @@ describe('Multi-user Support Integration Tests', () => {
     }, 10000);
 
     test('ユーザー情報が正しく保存される', async () => {
-      // 🟢 Green Phase: ユーザー情報の保存をテスト
+      // ユーザー情報の保存をテスト
       
       const newUserId = 'user-with-info-999';
       const username = 'TestUserWithInfo';
@@ -241,7 +241,7 @@ describe('Multi-user Support Integration Tests', () => {
       await handleMessage(mockMessage as unknown as Message);
       
       // ユーザー情報を取得
-      const userInfo = await repository.getUserInfo(newUserId); // ✅ getUserInfo メソッドが実装済み
+      const userInfo = await repository.getUserInfo(newUserId); // getUserInfo メソッドが実装済み
       expect(userInfo).toBeDefined();
       expect(userInfo.userId).toBe(newUserId);
       expect(userInfo.username).toBe(username);

@@ -175,6 +175,7 @@ export class NewFeature {
 2. **小さなステップ**: 一度に一つのことだけ
 3. **三角測量**: 複数のテストケースから一般化
 4. **明白な実装**: シンプルで分かりやすいコード
+5. **適切なコメント管理**: TDDサイクルに応じたコメント更新
 
 ---
 
@@ -326,6 +327,75 @@ const BATCH_SIZE = 3;
 for (let i = 0; i < chunks.length; i += BATCH_SIZE) {
   // バッチ処理
 }
+```
+
+#### TDDテストコメント規約
+
+##### 開発中のフェーズ表記
+```typescript
+// 🔴 Red Phase: 実装前の失敗するテスト
+describe('🔴 Red Phase: 新機能のテスト', () => {
+  test('機能が正常に動作する', () => {
+    // この時点では実装がないため、テストは失敗する
+    expect(newFeature.process()).toBe('expected'); // ❌ 失敗
+  });
+});
+
+// 🟢 Green Phase: 最小限の実装でテストが通る
+describe('🟢 Green Phase: 新機能のテスト', () => {
+  test('機能が正常に動作する', () => {
+    // 最小限の実装により、テストが通る
+    expect(newFeature.process()).toBe('expected'); // ✅ 成功
+  });
+});
+
+// ♻️ Refactor Phase: リファクタリング完了
+describe('♻️ Refactor Phase: 新機能のテスト', () => {
+  test('機能が正常に動作する', () => {
+    // リファクタリング後もテストが通る
+    expect(newFeature.process()).toBe('expected'); // ✅ 成功（より良い実装）
+  });
+});
+```
+
+##### 実装完了後のコメント形式
+```typescript
+// ✅ 良い例: 実装完了後の適切なコメント
+describe('新機能のテスト', () => {
+  test('機能が正常に動作する', () => {
+    // 新機能により、ユーザーは○○を実行できる
+    // 期待値: 入力Aに対して結果Bを返す
+    expect(newFeature.process('input')).toBe('expected');
+  });
+});
+
+// ✅ 良い例: 実装済み機能への対応
+describe('既存機能のテスト（実装済み）', () => {
+  test('機能が正常に動作する', () => {
+    // 既存機能の動作を確認するテスト
+    // 機能仕様: ○○の場合に□□を返す
+    expect(existingFeature.process()).toBe('expected');
+  });
+});
+```
+
+##### 避けるべきコメント
+```typescript
+// ❌ 悪い例: 実装済み機能にGreen Phaseコメント
+describe('🟢 Green Phase: 既存機能のテスト', () => {
+  test('機能が動作する', () => {
+    // 既に実装済みなのにGreen Phaseコメントは不適切
+    expect(existingFeature.process()).toBe('expected');
+  });
+});
+
+// ❌ 悪い例: 長期間のフェーズ表記
+describe('🔴 Red Phase: 完了した機能のテスト', () => {
+  test('機能が動作する', () => {
+    // 実装完了後もフェーズ表記を残すのは不適切
+    expect(completedFeature.process()).toBe('expected');
+  });
+});
 ```
 
 ---
