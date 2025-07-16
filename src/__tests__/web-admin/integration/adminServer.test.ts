@@ -31,7 +31,7 @@ describe('AdminServer Integration Tests', () => {
     // 【重要】データベースを明示的に初期化
     await adminServer.initializeDatabase();
     
-    app = adminServer.getApp();
+    app = adminServer.getExpressApp();
   });
 
   afterAll(async () => {
@@ -176,6 +176,23 @@ describe('AdminServer Integration Tests', () => {
         .expect(200);
       
       expect(response.body.environment.env).toBe('test');
+    });
+  });
+
+  describe('Base Path Configuration', () => {
+    test('開発環境ではbasePathが空文字列になる', async () => {
+      const response = await request(app)
+        .get('/')
+        .auth('testuser', 'testpass');
+      
+      // HTMLレスポンスの中にbasePathが正しく設定されているか確認
+      expect(response.text).toContain('href="/tables"');
+      expect(response.text).not.toContain('href="/admin/tables"');
+    });
+
+    test('basePathがlocalsに設定されている', async () => {
+      // AdminServerの内部状態を確認
+      expect(app.locals.basePath).toBe('');
     });
   });
 });

@@ -94,7 +94,10 @@ export class IntegratedServer {
     });
 
     // Admin アプリのマウント（認証付き）
-    this.app.use('/admin', adminAuth, this.adminServer.getExpressApp());
+    // basePathを設定してからマウント
+    const adminApp = this.adminServer.getExpressApp();
+    adminApp.locals.basePath = '/admin';
+    this.app.use('/admin', adminAuth, adminApp);
 
     // 404ハンドラー
     this.app.use((req, res) => {

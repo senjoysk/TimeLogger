@@ -99,6 +99,9 @@ export class AdminServer {
     // 環境情報をテンプレートで使用可能にする
     this.app.locals.environment = this.securityService.getEnvironment();
     
+    // basePathを設定（開発環境では空文字列、本番環境では/admin）
+    this.app.locals.basePath = '';
+    
     // アプリケーション設定
     this.app.set('databasePath', this.databasePath);
     
