@@ -12,6 +12,12 @@ import { createTodoRouter } from './todos';
 export function createRoutes(adminService: AdminService, securityService: SecurityService, databasePath: string): Router {
   const router = Router();
 
+  // すべてのレスポンスにbasePathを追加するミドルウェア
+  router.use((req, res, next) => {
+    res.locals.basePath = req.app.locals.basePath || '';
+    next();
+  });
+
   // ダッシュボード
   router.use('/', createDashboardRoutes(adminService, securityService));
   
