@@ -122,8 +122,13 @@ describe('basePath統合テスト', () => {
         .send({
           userId: 'testuser',
           title: 'Test TODO',
-          content: 'Test content'
+          description: 'Test content'
         });
+      
+      // エラーの場合はログを出力
+      if (response.status === 500) {
+        console.log('Error response:', response.text);
+      }
       
       // basePath = "" の場合、リダイレクト先は "/todos"
       expect(response.status).toBe(302);
@@ -219,8 +224,13 @@ describe('basePath統合テスト', () => {
         .send({
           userId: 'testuser',
           title: 'Test TODO',
-          content: 'Test content'
+          description: 'Test content'
         });
+      
+      // エラーの場合はログを出力
+      if (response.status === 500) {
+        console.log('Error response:', response.text);
+      }
       
       // basePath = "/admin" の場合、リダイレクト先は "/admin/todos"
       expect(response.status).toBe(302);

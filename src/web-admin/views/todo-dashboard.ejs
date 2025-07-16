@@ -299,7 +299,7 @@
                 return;
             }
 
-            fetch('/todos/bulk/status', {
+            fetch('<%= basePath %>/todos/bulk/status', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -330,7 +330,7 @@
                 return;
             }
 
-            fetch('/todos/bulk/delete', {
+            fetch('<%= basePath %>/todos/bulk/delete', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
