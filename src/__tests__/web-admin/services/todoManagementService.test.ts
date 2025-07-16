@@ -5,18 +5,22 @@
 
 import { TodoManagementService } from '../../../web-admin/services/todoManagementService';
 import { AdminRepository } from '../../../web-admin/repositories/adminRepository';
+import { SqliteActivityLogRepository } from '../../../repositories/sqliteActivityLogRepository';
 import { TodoTask, TodoStatus, TodoPriority } from '../../../types/todo';
 
 // モック
 jest.mock('../../../web-admin/repositories/adminRepository');
+jest.mock('../../../repositories/sqliteActivityLogRepository');
 const mockAdminRepository = AdminRepository as jest.MockedClass<typeof AdminRepository>;
+const mockSqliteRepo = SqliteActivityLogRepository as jest.MockedClass<typeof SqliteActivityLogRepository>;
 
 describe('TodoManagementService', () => {
   let service: TodoManagementService;
   let mockRepository: jest.Mocked<AdminRepository>;
 
   beforeEach(() => {
-    mockRepository = new mockAdminRepository('test-db.db') as jest.Mocked<AdminRepository>;
+    const mockSqliteInstance = new mockSqliteRepo('test-db.db') as jest.Mocked<SqliteActivityLogRepository>;
+    mockRepository = new mockAdminRepository(mockSqliteInstance) as jest.Mocked<AdminRepository>;
     service = new TodoManagementService(mockRepository);
   });
 

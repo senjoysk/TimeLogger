@@ -4,15 +4,18 @@
  */
 
 import { AdminRepository } from '../../../web-admin/repositories/adminRepository';
+import { SqliteActivityLogRepository } from '../../../repositories/sqliteActivityLogRepository';
 import { TodoTask, TodoStatus, TodoPriority } from '../../../types/todo';
 import path from 'path';
 
 describe('AdminRepository TODO管理機能拡張', () => {
   let repository: AdminRepository;
+  let sqliteRepo: SqliteActivityLogRepository;
   const testDbPath = path.join(__dirname, '../../../../test-admin-todo.db');
 
   beforeEach(() => {
-    repository = new AdminRepository(testDbPath);
+    sqliteRepo = new SqliteActivityLogRepository(testDbPath);
+    repository = new AdminRepository(sqliteRepo);
   });
 
   describe('🔴 Red Phase 2-1: TODO CRUD操作', () => {
