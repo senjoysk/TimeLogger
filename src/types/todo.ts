@@ -8,6 +8,11 @@
 export type TodoStatus = 'pending' | 'in_progress' | 'completed' | 'cancelled';
 
 /**
+ * TODO優先度
+ */
+export type TodoPriority = 'low' | 'medium' | 'high';
+
+/**
  * TODOソースタイプ
  */
 export type TodoSourceType = 'manual' | 'ai_suggested' | 'ai_classified' | 'activity_derived';
@@ -28,6 +33,21 @@ export interface Todo {
   sourceType: TodoSourceType;
   relatedActivityId?: string;
   aiConfidence?: number; // 0.0-1.0
+}
+
+/**
+ * Admin Web App用のTODOタスク（拡張型）
+ */
+export interface TodoTask {
+  id: string;
+  userId: string;
+  title: string;
+  description?: string;
+  status: TodoStatus;
+  priority: TodoPriority;
+  dueDate?: string | null;
+  createdAt: string;
+  updatedAt: string;
 }
 
 /**

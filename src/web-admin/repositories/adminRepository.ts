@@ -6,6 +6,8 @@
 import { IAdminRepository } from '../interfaces/adminInterfaces';
 import { SearchFilters, PaginationOptions } from '../types/admin';
 import { SqliteActivityLogRepository } from '../../repositories/sqliteActivityLogRepository';
+import { TodoTask, TodoStatus, TodoPriority, Todo } from '../../types/todo';
+import { v4 as uuidv4 } from 'uuid';
 
 export class AdminRepository implements IAdminRepository {
   private sqliteRepo: SqliteActivityLogRepository;
@@ -147,5 +149,214 @@ export class AdminRepository implements IAdminRepository {
     const start = (page - 1) * limit;
     const end = start + limit;
     return items.slice(start, end);
+  }
+
+  // ===== TODO管理機能 (Phase 2) =====
+
+  /**
+   * Todo型からTodoTask型への変換ヘルパー
+   */
+  private mapTodoToTodoTask(todo: Todo): TodoTask {
+    const priorityMap: { [key: number]: TodoPriority } = {
+      1: 'high',
+      0: 'medium',
+      '-1': 'low'
+    };
+
+    return {
+      id: todo.id,
+      userId: todo.userId,
+      title: todo.content,
+      description: '', // Todo型にはdescriptionがないため空文字
+      status: todo.status,
+      priority: priorityMap[todo.priority] || 'medium',
+      dueDate: todo.dueDate || null,
+      createdAt: todo.createdAt,
+      updatedAt: todo.updatedAt
+    };
+  }
+
+  /**
+   * 新しいTODOタスクを作成
+   */
+  async createTodoTask(data: {
+    userId: string;
+    title: string;
+    description?: string;
+    priority: TodoPriority;
+    dueDate?: string;
+  }): Promise<TodoTask> {
+    // SqliteActivityLogRepositoryを使用してTODOを作成
+    const createdTodo = await this.sqliteRepo.createTodo({
+      userId: data.userId,
+      content: data.title, // titleをcontentにマッピング
+      priority: data.priority === 'high' ? 1 : data.priority === 'low' ? -1 : 0,
+      dueDate: data.dueDate || undefined,
+      sourceType: 'manual'
+    });
+
+    // 作成されたTodoをTodoTaskに変換して返す
+    return this.mapTodoToTodoTask(createdTodo);
+  }
+
+  /**
+   * TODOタスクを更新
+   */
+  async updateTodoTask(todoId: string, updates: {
+    title?: string;
+    description?: string;
+    status?: TodoStatus;
+    priority?: TodoPriority;
+    dueDate?: string;
+  }): Promise<TodoTask> {
+    // 既存のTODOを取得
+    const existingTodo = await this.getTodoTaskById(todoId);
+    if (!existingTodo) {
+      throw new Error('TODO not found');
+    }
+
+    // SqliteActivityLogRepositoryを使用してTODOを更新
+    const updateData: any = {};
+    if (updates.title) updateData.content = updates.title;
+    if (updates.status) updateData.status = updates.status;
+    if (updates.priority) {
+      updateData.priority = updates.priority === 'high' ? 1 : updates.priority === 'low' ? -1 : 0;
+    }
+    if (updates.dueDate !== undefined) updateData.dueDate = updates.dueDate;
+
+    await this.sqliteRepo.updateTodo(todoId, updateData);
+
+    // 更新後のTODOを取得して返す
+    const updatedTodo = await this.getTodoTaskById(todoId);
+    if (!updatedTodo) {
+      throw new Error('Failed to retrieve updated TODO');
+    }
+
+    return updatedTodo;
+  }
+
+  /**
+   * TODOタスクを削除
+   */
+  async deleteTodoTask(todoId: string): Promise<boolean> {
+    try {
+      await this.sqliteRepo.deleteTodo(todoId);
+      return true;
+    } catch (error) {
+      return false;
+    }
+  }
+
+  /**
+   * TODOタスクをIDで取得
+   */
+  async getTodoTaskById(todoId: string): Promise<TodoTask | null> {
+    try {
+      const todo = await this.sqliteRepo.getTodoById(todoId);
+      return todo ? this.mapTodoToTodoTask(todo) : null;
+    } catch (error) {
+      return null;
+    }
+  }
+
+  /**
+   * 複数のTODOタスクのステータスを一括変更
+   */
+  async bulkUpdateTodoStatus(todoIds: string[], newStatus: TodoStatus): Promise<number> {
+    let updatedCount = 0;
+    
+    for (const todoId of todoIds) {
+      try {
+        await this.updateTodoTask(todoId, { status: newStatus });
+        updatedCount++;
+      } catch (error) {
+        // エラーが発生した場合はスキップ
+        continue;
+      }
+    }
+    
+    return updatedCount;
+  }
+
+  /**
+   * 複数のTODOタスクを一括削除
+   */
+  async bulkDeleteTodos(todoIds: string[]): Promise<number> {
+    let deletedCount = 0;
+    
+    for (const todoId of todoIds) {
+      try {
+        const success = await this.deleteTodoTask(todoId);
+        if (success) {
+          deletedCount++;
+        }
+      } catch (error) {
+        // エラーが発生した場合はスキップ
+        continue;
+      }
+    }
+    
+    return deletedCount;
+  }
+
+  /**
+   * ユーザー別TODO一覧を取得
+   */
+  async getTodosByUserId(
+    userId: string,
+    filters?: { status?: TodoStatus; priority?: TodoPriority },
+    options?: { page?: number; limit?: number }
+  ): Promise<TodoTask[]> {
+    const { page = 1, limit = 50 } = options || {};
+    
+    try {
+      const todos = await this.sqliteRepo.getTodosByUserId(userId);
+      
+      // Todo型からTodoTask型へ変換
+      let todoTasks = todos.map(todo => this.mapTodoToTodoTask(todo));
+      
+      // フィルタリング
+      if (filters?.status) {
+        todoTasks = todoTasks.filter(todo => todo.status === filters.status);
+      }
+      if (filters?.priority) {
+        todoTasks = todoTasks.filter(todo => todo.priority === filters.priority);
+      }
+      
+      // ページネーション
+      return this.paginate(todoTasks, page, limit);
+    } catch (error) {
+      return [];
+    }
+  }
+
+  /**
+   * 期限切れのTODOタスクを取得
+   */
+  async getOverdueTodos(): Promise<TodoTask[]> {
+    const today = new Date().toISOString().split('T')[0];
+    
+    try {
+      // 全ユーザーのTODOを取得
+      const allUsers = await this.sqliteRepo.getAllUsers();
+      const allTodos = [];
+      
+      for (const user of allUsers) {
+        const todos = await this.sqliteRepo.getTodosByUserId(user.userId);
+        allTodos.push(...todos);
+      }
+      
+      // 期限切れのTODOをフィルタリング
+      const overdueTodos = allTodos.filter(todo => 
+        todo.dueDate && 
+        todo.dueDate < today && 
+        todo.status !== 'completed'
+      );
+      
+      // Todo型からTodoTask型へ変換
+      return overdueTodos.map(todo => this.mapTodoToTodoTask(todo));
+    } catch (error) {
+      return [];
+    }
   }
 }

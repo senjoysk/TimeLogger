@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title><%= title %> - TimeLogger Admin</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        .environment-badge {
+            @apply px-2 py-1 text-xs font-semibold rounded-full;
+        }
+        .environment-development {
+            @apply bg-green-100 text-green-800;
+        }
+        .environment-staging {
+            @apply bg-yellow-100 text-yellow-800;
+        }
+        .environment-production {
+            @apply bg-red-100 text-red-800;
+        }
+        .priority-high {
+            @apply bg-red-100 text-red-800;
+        }
+        .priority-medium {
+            @apply bg-yellow-100 text-yellow-800;
+        }
+        .priority-low {
+            @apply bg-green-100 text-green-800;
+        }
+        .status-pending {
+            @apply bg-gray-100 text-gray-800;
+        }
+        .status-in_progress {
+            @apply bg-blue-100 text-blue-800;
+        }
+        .status-completed {
+            @apply bg-green-100 text-green-800;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 min-h-screen">
+    <!-- Header -->
+    <header class="bg-white shadow-sm border-b">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between items-center h-16">
+                <div class="flex items-center">
+                    <i class="fas fa-cog text-blue-600 text-xl mr-3"></i>
+                    <h1 class="text-xl font-semibold text-gray-900">TimeLogger Admin</h1>
+                </div>
+                <div class="flex items-center space-x-4">
+                    <span class="environment-badge environment-<%= environment.env %>">
+                        <i class="fas fa-server mr-1"></i>
+                        <%= environment.env.toUpperCase() %>
+                    </span>
+                    <% if (environment.isReadOnly) { %>
+                        <span class="px-2 py-1 bg-gray-100 text-gray-600 text-xs font-medium rounded-full">
+                            <i class="fas fa-lock mr-1"></i>
+                            READ ONLY
+                        </span>
+                    <% } %>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Navigation -->
+    <nav class="bg-gray-800 text-white">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex space-x-8">
+                <a href="/" class="px-3 py-4 text-sm font-medium hover:bg-gray-700 transition-colors">
+                    <i class="fas fa-home mr-2"></i>
+                    Dashboard
+                </a>
+                <a href="/tables" class="px-3 py-4 text-sm font-medium hover:bg-gray-700 transition-colors">
+                    <i class="fas fa-table mr-2"></i>
+                    Tables
+                </a>
+                <a href="/todos" class="px-3 py-4 text-sm font-medium hover:bg-gray-700 transition-colors bg-gray-700">
+                    <i class="fas fa-check-square mr-2"></i>
+                    TODO管理
+                </a>
+                <a href="/health" class="px-3 py-4 text-sm font-medium hover:bg-gray-700 transition-colors">
+                    <i class="fas fa-heartbeat mr-2"></i>
+                    Health
+                </a>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
+        <div class="px-4 py-6 sm:px-0">
+            <!-- Header with Actions -->
+            <div class="md:flex md:items-center md:justify-between mb-6">
+                <div class="flex-1 min-w-0">
+                    <h2 class="text-2xl font-bold leading-7 text-gray-900 sm:text-3xl sm:truncate">
+                        <i class="fas fa-check-square mr-3"></i>
+                        TODO管理
+                    </h2>
+                    <p class="mt-1 text-sm text-gray-500">
+                        TODOタスクの作成・編集・削除を管理
+                    </p>
+                </div>
+                <div class="mt-4 flex md:mt-0 md:ml-4">
+                    <% if (!environment.isReadOnly) { %>
+                        <a href="/todos/new" class="ml-3 inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700">
+                            <i class="fas fa-plus mr-2"></i>
+                            新規TODO作成
+                        </a>
+                    <% } %>
+                </div>
+            </div>
+
+            <!-- Overdue TODOs Alert -->
+            <% if (overdueTodos && overdueTodos.length > 0) { %>
+                <div class="mb-6 bg-red-50 border border-red-200 rounded-lg p-4">
+                    <div class="flex">
+                        <div class="flex-shrink-0">
+                            <i class="fas fa-exclamation-triangle text-red-600 text-xl"></i>
+                        </div>
+                        <div class="ml-3">
+                            <h3 class="text-sm font-medium text-red-800">
+                                期限切れのTODO
+                            </h3>
+                            <div class="mt-2 text-sm text-red-700">
+                                <p><%= overdueTodos.length %> 件のTODOタスクが期限を過ぎています。</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            <% } %>
+
+            <!-- Filter Section -->
+            <div class="mb-6 bg-white shadow sm:rounded-lg">
+                <div class="px-4 py-5 sm:p-6">
+                    <h3 class="text-lg leading-6 font-medium text-gray-900">
+                        <i class="fas fa-filter mr-2"></i>
+                        フィルター
+                    </h3>
+                    <form method="GET" class="mt-4">
+                        <div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                            <div>
+                                <label for="userId" class="block text-sm font-medium text-gray-700">ユーザー</label>
+                                <select id="userId" name="userId" class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md">
+                                    <option value="all" <%= selectedUserId === 'all' ? 'selected' : '' %>>全ユーザー</option>
+                                    <% users.forEach(user => { %>
+                                        <option value="<%= user.userId %>" <%= selectedUserId === user.userId ? 'selected' : '' %>>
+                                            <%= user.username || user.userId %>
+                                        </option>
+                                    <% }) %>
+                                </select>
+                            </div>
+                            <div class="sm:col-span-2">
+                                <button type="submit" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700">
+                                    <i class="fas fa-search mr-2"></i>
+                                    検索
+                                </button>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- TODO List -->
+            <div class="bg-white shadow overflow-hidden sm:rounded-md">
+                <% if (todos && todos.length > 0) { %>
+                    <ul class="divide-y divide-gray-200">
+                        <% todos.forEach(todo => { %>
+                            <li class="hover:bg-gray-50">
+                                <div class="px-4 py-4 sm:px-6">
+                                    <div class="flex items-center justify-between">
+                                        <div class="flex-1">
+                                            <div class="flex items-center">
+                                                <input type="checkbox" class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded" data-todo-id="<%= todo.id %>">
+                                                <div class="ml-3">
+                                                    <p class="text-sm font-medium text-gray-900">
+                                                        <%= todo.title %>
+                                                    </p>
+                                                    <% if (todo.description) { %>
+                                                        <p class="text-sm text-gray-500">
+                                                            <%= todo.description %>
+                                                        </p>
+                                                    <% } %>
+                                                    <div class="mt-2 flex items-center text-sm text-gray-500">
+                                                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium priority-<%= todo.priority %>">
+                                                            <i class="fas fa-flag mr-1"></i>
+                                                            <%= todo.priority %>
+                                                        </span>
+                                                        <span class="ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium status-<%= todo.status %>">
+                                                            <% if (todo.status === 'pending') { %>
+                                                                <i class="fas fa-clock mr-1"></i>
+                                                            <% } else if (todo.status === 'in_progress') { %>
+                                                                <i class="fas fa-spinner mr-1"></i>
+                                                            <% } else if (todo.status === 'completed') { %>
+                                                                <i class="fas fa-check mr-1"></i>
+                                                            <% } %>
+                                                            <%= todo.status %>
+                                                        </span>
+                                                        <% if (todo.dueDate) { %>
+                                                            <span class="ml-2">
+                                                                <i class="fas fa-calendar mr-1"></i>
+                                                                <%= new Date(todo.dueDate).toLocaleDateString('ja-JP') %>
+                                                            </span>
+                                                        <% } %>
+                                                        <span class="ml-2">
+                                                            <i class="fas fa-user mr-1"></i>
+                                                            <%= todo.userId %>
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="ml-5 flex-shrink-0">
+                                            <% if (!environment.isReadOnly) { %>
+                                                <a href="/todos/<%= todo.id %>/edit" class="inline-flex items-center px-3 py-1 border border-gray-300 text-sm leading-5 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
+                                                    <i class="fas fa-edit mr-1"></i>
+                                                    編集
+                                                </a>
+                                                <form method="POST" action="/todos/<%= todo.id %>/delete" class="inline-block ml-2">
+                                                    <button type="submit" onclick="return confirm('本当に削除しますか？')" class="inline-flex items-center px-3 py-1 border border-red-300 text-sm leading-5 font-medium rounded-md text-red-700 bg-white hover:bg-red-50">
+                                                        <i class="fas fa-trash mr-1"></i>
+                                                        削除
+                                                    </button>
+                                                </form>
+                                            <% } %>
+                                        </div>
+                                    </div>
+                                </div>
+                            </li>
+                        <% }) %>
+                    </ul>
+
+                    <!-- Bulk Actions -->
+                    <% if (!environment.isReadOnly && todos.length > 0) { %>
+                        <div class="bg-gray-50 px-4 py-3 sm:px-6">
+                            <div class="flex items-center space-x-4">
+                                <span class="text-sm text-gray-700">選択したアイテム:</span>
+                                <select id="bulkStatusSelect" class="rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm">
+                                    <option value="">ステータス変更...</option>
+                                    <option value="pending">pending</option>
+                                    <option value="in_progress">in_progress</option>
+                                    <option value="completed">completed</option>
+                                </select>
+                                <button onclick="bulkUpdateStatus()" class="inline-flex items-center px-3 py-1 border border-gray-300 text-sm leading-5 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
+                                    <i class="fas fa-check mr-1"></i>
+                                    更新
+                                </button>
+                                <button onclick="bulkDelete()" class="inline-flex items-center px-3 py-1 border border-red-300 text-sm leading-5 font-medium rounded-md text-red-700 bg-white hover:bg-red-50">
+                                    <i class="fas fa-trash mr-1"></i>
+                                    一括削除
+                                </button>
+                            </div>
+                        </div>
+                    <% } %>
+                <% } else { %>
+                    <div class="text-center py-12">
+                        <i class="fas fa-tasks text-gray-400 text-6xl mb-4"></i>
+                        <h3 class="text-lg font-medium text-gray-900 mb-2">TODOタスクがありません</h3>
+                        <p class="text-gray-500">
+                            新しいTODOタスクを作成してください。
+                        </p>
+                        <% if (!environment.isReadOnly) { %>
+                            <div class="mt-6">
+                                <a href="/todos/new" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700">
+                                    <i class="fas fa-plus mr-2"></i>
+                                    新規TODO作成
+                                </a>
+                            </div>
+                        <% } %>
+                    </div>
+                <% } %>
+            </div>
+        </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="bg-white border-t mt-12">
+        <div class="max-w-7xl mx-auto py-4 px-4 sm:px-6 lg:px-8">
+            <div class="text-center text-sm text-gray-500">
+                <p>TimeLogger Admin Panel | Environment: <%= environment.env %></p>
+            </div>
+        </div>
+    </footer>
+
+    <script>
+        // 一括ステータス更新
+        function bulkUpdateStatus() {
+            const selectedIds = getSelectedTodoIds();
+            const newStatus = document.getElementById('bulkStatusSelect').value;
+
+            if (selectedIds.length === 0) {
+                alert('TODOを選択してください');
+                return;
+            }
+
+            if (!newStatus) {
+                alert('ステータスを選択してください');
+                return;
+            }
+
+            fetch('/todos/bulk/status', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    todoIds: selectedIds,
+                    status: newStatus
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    window.location.reload();
+                }
+            });
+        }
+
+        // 一括削除
+        function bulkDelete() {
+            const selectedIds = getSelectedTodoIds();
+
+            if (selectedIds.length === 0) {
+                alert('TODOを選択してください');
+                return;
+            }
+
+            if (!confirm(`${selectedIds.length}件のTODOを削除しますか？`)) {
+                return;
+            }
+
+            fetch('/todos/bulk/delete', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    todoIds: selectedIds
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    window.location.reload();
+                }
+            });
+        }
+
+        // 選択されたTODO IDを取得
+        function getSelectedTodoIds() {
+            const checkboxes = document.querySelectorAll('input[data-todo-id]:checked');
+            return Array.from(checkboxes).map(cb => cb.getAttribute('data-todo-id'));
+        }
+    </script>
+</body>
+</html>

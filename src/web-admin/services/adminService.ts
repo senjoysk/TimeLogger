@@ -25,6 +25,13 @@ export class AdminService implements IAdminService {
   }
 
   /**
+   * リポジトリへのアクセス（TODO管理機能用）
+   */
+  getRepository(): IAdminRepository {
+    return this.repository;
+  }
+
+  /**
    * 全テーブル一覧を取得
    */
   async getTableList(): Promise<TableInfo[]> {

@@ -18,9 +18,11 @@ export class AdminServer {
   private adminService: AdminService;
   private securityService: SecurityService;
   private port: number;
+  private databasePath: string;
 
   constructor(databasePath: string, port: number = 3001) {
     this.port = port;
+    this.databasePath = databasePath;
     this.app = express();
     
     // サービスの初期化
@@ -77,8 +79,11 @@ export class AdminServer {
     // 環境情報をテンプレートで使用可能にする
     this.app.locals.environment = this.securityService.getEnvironment();
     
+    // アプリケーション設定
+    this.app.set('databasePath', this.databasePath);
+    
     // ルーティング設定
-    this.app.use('/', createRoutes(this.adminService, this.securityService));
+    this.app.use('/', createRoutes(this.adminService, this.securityService, this.databasePath));
     
     // エラーハンドラー（最後に設定）
     this.app.use(errorHandler);

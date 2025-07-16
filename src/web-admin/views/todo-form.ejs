@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title><%= title %> - TimeLogger Admin</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        .environment-badge {
+            @apply px-2 py-1 text-xs font-semibold rounded-full;
+        }
+        .environment-development {
+            @apply bg-green-100 text-green-800;
+        }
+        .environment-staging {
+            @apply bg-yellow-100 text-yellow-800;
+        }
+        .environment-production {
+            @apply bg-red-100 text-red-800;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 min-h-screen">
+    <!-- Header -->
+    <header class="bg-white shadow-sm border-b">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between items-center h-16">
+                <div class="flex items-center">
+                    <i class="fas fa-cog text-blue-600 text-xl mr-3"></i>
+                    <h1 class="text-xl font-semibold text-gray-900">TimeLogger Admin</h1>
+                </div>
+                <div class="flex items-center space-x-4">
+                    <span class="environment-badge environment-<%= environment.env %>">
+                        <i class="fas fa-server mr-1"></i>
+                        <%= environment.env.toUpperCase() %>
+                    </span>
+                    <% if (environment.isReadOnly) { %>
+                        <span class="px-2 py-1 bg-gray-100 text-gray-600 text-xs font-medium rounded-full">
+                            <i class="fas fa-lock mr-1"></i>
+                            READ ONLY
+                        </span>
+                    <% } %>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Navigation -->
+    <nav class="bg-gray-800 text-white">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex space-x-8">
+                <a href="/" class="px-3 py-4 text-sm font-medium hover:bg-gray-700 transition-colors">
+                    <i class="fas fa-home mr-2"></i>
+                    Dashboard
+                </a>
+                <a href="/tables" class="px-3 py-4 text-sm font-medium hover:bg-gray-700 transition-colors">
+                    <i class="fas fa-table mr-2"></i>
+                    Tables
+                </a>
+                <a href="/todos" class="px-3 py-4 text-sm font-medium hover:bg-gray-700 transition-colors bg-gray-700">
+                    <i class="fas fa-check-square mr-2"></i>
+                    TODO管理
+                </a>
+                <a href="/health" class="px-3 py-4 text-sm font-medium hover:bg-gray-700 transition-colors">
+                    <i class="fas fa-heartbeat mr-2"></i>
+                    Health
+                </a>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="max-w-3xl mx-auto py-6 sm:px-6 lg:px-8">
+        <div class="px-4 py-6 sm:px-0">
+            <!-- Header -->
+            <div class="md:flex md:items-center md:justify-between mb-6">
+                <div class="flex-1 min-w-0">
+                    <h2 class="text-2xl font-bold leading-7 text-gray-900 sm:text-3xl sm:truncate">
+                        <i class="fas fa-<%= todo ? 'edit' : 'plus' %> mr-3"></i>
+                        <%= title %>
+                    </h2>
+                    <p class="mt-1 text-sm text-gray-500">
+                        TODOタスクの<%= todo ? '編集' : '作成' %>
+                    </p>
+                </div>
+                <div class="mt-4 flex md:mt-0 md:ml-4">
+                    <a href="/todos" class="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50">
+                        <i class="fas fa-arrow-left mr-2"></i>
+                        TODO一覧に戻る
+                    </a>
+                </div>
+            </div>
+
+            <!-- Form -->
+            <div class="bg-white shadow sm:rounded-lg">
+                <form method="POST" action="<%= action %>">
+                    <div class="px-4 py-5 sm:p-6">
+                        <!-- User Selection -->
+                        <div class="mb-6">
+                            <label for="userId" class="block text-sm font-medium text-gray-700">ユーザー</label>
+                            <select id="userId" name="userId" required class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md">
+                                <option value="">ユーザーを選択してください</option>
+                                <% users.forEach(user => { %>
+                                    <option value="<%= user.userId %>" <%= todo && todo.userId === user.userId ? 'selected' : '' %>>
+                                        <%= user.username || user.userId %>
+                                    </option>
+                                <% }) %>
+                            </select>
+                        </div>
+
+                        <!-- Title -->
+                        <div class="mb-6">
+                            <label for="title" class="block text-sm font-medium text-gray-700">タイトル</label>
+                            <input type="text" id="title" name="title" required
+                                   value="<%= todo ? todo.title : '' %>"
+                                   class="mt-1 focus:ring-blue-500 focus:border-blue-500 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md"
+                                   placeholder="TODOタスクのタイトル">
+                        </div>
+
+                        <!-- Description -->
+                        <div class="mb-6">
+                            <label for="description" class="block text-sm font-medium text-gray-700">説明（任意）</label>
+                            <textarea id="description" name="description" rows="3"
+                                      class="mt-1 focus:ring-blue-500 focus:border-blue-500 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md"
+                                      placeholder="TODOタスクの詳細説明"><%= todo ? todo.description || '' : '' %></textarea>
+                        </div>
+
+                        <div class="grid grid-cols-1 gap-6 sm:grid-cols-3">
+                            <!-- Priority -->
+                            <div>
+                                <label for="priority" class="block text-sm font-medium text-gray-700">優先度</label>
+                                <select id="priority" name="priority" required class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md">
+                                    <option value="low" <%= todo && todo.priority === 'low' ? 'selected' : '' %>>低</option>
+                                    <option value="medium" <%= !todo || todo.priority === 'medium' ? 'selected' : '' %>>中</option>
+                                    <option value="high" <%= todo && todo.priority === 'high' ? 'selected' : '' %>>高</option>
+                                </select>
+                            </div>
+
+                            <!-- Status (編集時のみ) -->
+                            <% if (todo) { %>
+                                <div>
+                                    <label for="status" class="block text-sm font-medium text-gray-700">ステータス</label>
+                                    <select id="status" name="status" class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md">
+                                        <option value="pending" <%= todo.status === 'pending' ? 'selected' : '' %>>保留中</option>
+                                        <option value="in_progress" <%= todo.status === 'in_progress' ? 'selected' : '' %>>進行中</option>
+                                        <option value="completed" <%= todo.status === 'completed' ? 'selected' : '' %>>完了</option>
+                                        <option value="cancelled" <%= todo.status === 'cancelled' ? 'selected' : '' %>>キャンセル</option>
+                                    </select>
+                                </div>
+                            <% } %>
+
+                            <!-- Due Date -->
+                            <div>
+                                <label for="dueDate" class="block text-sm font-medium text-gray-700">期限（任意）</label>
+                                <input type="date" id="dueDate" name="dueDate"
+                                       value="<%= todo && todo.dueDate ? todo.dueDate : '' %>"
+                                       class="mt-1 focus:ring-blue-500 focus:border-blue-500 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Form Actions -->
+                    <div class="px-4 py-3 bg-gray-50 text-right sm:px-6">
+                        <a href="/todos" class="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 mr-3">
+                            キャンセル
+                        </a>
+                        <button type="submit" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700">
+                            <i class="fas fa-<%= todo ? 'save' : 'plus' %> mr-2"></i>
+                            <%= todo ? '保存' : '作成' %>
+                        </button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- Help Section -->
+            <div class="mt-6 bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <div class="flex">
+                    <div class="flex-shrink-0">
+                        <i class="fas fa-info-circle text-blue-600 text-xl"></i>
+                    </div>
+                    <div class="ml-3">
+                        <h3 class="text-sm font-medium text-blue-800">
+                            TODOタスク作成のヒント
+                        </h3>
+                        <div class="mt-2 text-sm text-blue-700">
+                            <ul class="list-disc list-inside space-y-1">
+                                <li>タイトルは簡潔で分かりやすくしてください</li>
+                                <li>優先度を設定することで、重要なタスクを識別できます</li>
+                                <li>期限を設定すると、期限切れアラートが表示されます</li>
+                                <li>説明欄にはタスクの詳細や手順を記載できます</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="bg-white border-t mt-12">
+        <div class="max-w-7xl mx-auto py-4 px-4 sm:px-6 lg:px-8">
+            <div class="text-center text-sm text-gray-500">
+                <p>TimeLogger Admin Panel | Environment: <%= environment.env %></p>
+            </div>
+        </div>
+    </footer>
+</body>
+</html>
