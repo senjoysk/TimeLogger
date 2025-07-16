@@ -131,7 +131,7 @@ router.get('/new', async (req, res, next) => {
       environment,
       users,
       todo: null, // 新規作成の場合
-      action: '/todos'
+      action: `${req.app.locals.basePath || ''}/todos`
     });
   } catch (error) {
     next(error);
@@ -162,7 +162,7 @@ router.post('/', async (req, res, next) => {
       dueDate
     });
 
-    res.redirect('/todos');
+    res.redirect(`${req.app.locals.basePath || ''}/todos`);
   } catch (error) {
     next(error);
   }
@@ -207,7 +207,7 @@ router.get('/:id/edit', async (req, res, next) => {
       environment,
       users,
       todo,
-      action: `/todos/${todoId}`
+      action: `${req.app.locals.basePath || ''}/todos/${todoId}`
     });
   } catch (error) {
     next(error);
@@ -239,7 +239,7 @@ router.post('/:id', async (req, res, next) => {
       dueDate
     });
 
-    res.redirect('/todos');
+    res.redirect(`${req.app.locals.basePath || ''}/todos`);
   } catch (error) {
     next(error);
   }
@@ -262,7 +262,7 @@ router.post('/:id/delete', async (req, res, next) => {
     const todoId = req.params.id;
     await todoService.deleteTodo(todoId);
 
-    res.redirect('/todos');
+    res.redirect(`${req.app.locals.basePath || ''}/todos`);
   } catch (error) {
     next(error);
   }
