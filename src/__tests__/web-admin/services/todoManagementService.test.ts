@@ -18,8 +18,11 @@ describe('TodoManagementService', () => {
   let service: TodoManagementService;
   let mockRepository: jest.Mocked<AdminRepository>;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     const mockSqliteInstance = new mockSqliteRepo('test-db.db') as jest.Mocked<SqliteActivityLogRepository>;
+    // モックのメソッドを設定
+    mockSqliteInstance.initializeDatabase = jest.fn().mockResolvedValue(undefined);
+    
     mockRepository = new mockAdminRepository(mockSqliteInstance) as jest.Mocked<AdminRepository>;
     service = new TodoManagementService(mockRepository);
   });

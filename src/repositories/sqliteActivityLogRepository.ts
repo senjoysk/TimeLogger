@@ -57,6 +57,47 @@ export class SqliteActivityLogRepository implements IActivityLogRepository, IApi
   }
 
   /**
+   * スキーマを強制的に初期化（テスト環境用）
+   * 既存のinitializeDatabase()とは別の軽量版
+   */
+  public async ensureSchema(): Promise<void> {
+    try {
+      // newSchema.sqlから直接スキーマを読み込み適用
+      let schemaPath = path.join(__dirname, '../database/newSchema.sql');
+      
+      // 別のパスも試す
+      if (!fs.existsSync(schemaPath)) {
+        schemaPath = path.join(__dirname, '../../src/database/newSchema.sql');
+      }
+      
+      if (!fs.existsSync(schemaPath)) {
+        throw new Error(`スキーマファイルが見つかりません: ${schemaPath}`);
+      }
+      
+      const schemaContent = fs.readFileSync(schemaPath, 'utf-8');
+      const statements = schemaContent
+        .split(';')
+        .map(stmt => stmt.trim())
+        .filter(stmt => stmt.length > 0);
+      
+      for (const statement of statements) {
+        try {
+          await this.runQuery(statement);
+        } catch (error) {
+          // テーブルが既に存在する場合などのエラーは無視
+          console.log(`スキーマ適用をスキップ: ${statement.substring(0, 50)}...`);
+        }
+      }
+      
+      this.connected = true;
+      console.log('✅ スキーマの強制初期化が完了しました');
+    } catch (error) {
+      console.error('❌ スキーマ強制初期化エラー:', error);
+      throw new ActivityLogError('スキーマの初期化に失敗しました', 'SCHEMA_INIT_ERROR', { error });
+    }
+  }
+
+  /**
    * テスト環境でuser_settingsテーブルにPhase 3の拡張カラムを追加
    */
   private async ensureUserSettingsColumns(): Promise<void> {

@@ -337,7 +337,7 @@ export class AdminRepository implements IAdminRepository {
     const today = new Date().toISOString().split('T')[0];
     
     try {
-      // 全ユーザーのTODOを取得
+      // 全ユーザーのTODOを取得（TODO: 後でより効率的な実装に変更）
       const allUsers = await this.sqliteRepo.getAllUsers();
       const allTodos = [];
       
@@ -346,12 +346,16 @@ export class AdminRepository implements IAdminRepository {
         allTodos.push(...todos);
       }
       
-      // 期限切れのTODOをフィルタリング
-      const overdueTodos = allTodos.filter(todo => 
-        todo.dueDate && 
-        todo.dueDate < today && 
-        todo.status !== 'completed'
-      );
+      // 期限切れのTODOをフィルタリング（日付文字列比較）
+      const overdueTodos = allTodos.filter(todo => {
+        if (!todo.dueDate || todo.status === 'completed') {
+          return false;
+        }
+        
+        // 日付文字列を正規化して比較
+        const todoDate = todo.dueDate.split('T')[0]; // YYYY-MM-DD部分のみ取得
+        return todoDate < today;
+      });
       
       // Todo型からTodoTask型へ変換
       return overdueTodos.map(todo => this.mapTodoToTodoTask(todo));
