@@ -551,7 +551,9 @@ export class TodoCommandHandler implements ITodoCommandHandler {
     }
     
     // TODO操作ボタンを作成（Discord制限: 最大5行まで）
-    const maxTodos = Math.min(pageTodos.length, 5); // Discord制限: 最大5個のActionRow
+    // ページネーションがある場合は4つまで、ない場合は5つまで
+    const hasPagination = activeTodos.length > 10;
+    const maxTodos = Math.min(pageTodos.length, hasPagination ? 4 : 5);
     
     for (let i = 0; i < maxTodos; i++) {
       const todo = pageTodos[i];
@@ -963,8 +965,8 @@ export class TodoCommandHandler implements ITodoCommandHandler {
     // ページネーションボタン
     components.push(this.createPaginationButtons(newPage, totalPages));
     
-    // TODO操作ボタン（最大5個）
-    const maxTodos = Math.min(pageTodos.length, 5);
+    // TODO操作ボタン（ページネーションがあるので最大4個）
+    const maxTodos = Math.min(pageTodos.length, 4);
     
     for (let i = 0; i < maxTodos; i++) {
       const todo = pageTodos[i];
