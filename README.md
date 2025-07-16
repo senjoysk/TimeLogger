@@ -26,6 +26,14 @@ Discord を使って自然言語で活動記録とTODO管理を行い、Gemini A
 - **自動生成**: 毎日5:00に前日の完全なサマリーを自動送信
 - **キャッシュ機能**: 分析結果をキャッシュして高速レスポンス
 
+### 🌐 管理Webアプリケーション（🆕 新機能）
+- **統合管理画面**: Webブラウザベースの包括的な管理インターフェース
+- **データベース管理**: 全テーブルの閲覧・検索・ページネーション機能
+- **TODO管理UI**: 直感的なWeb UIでのTODO作成・編集・削除・一括操作
+- **ユーザーフィルタリング**: マルチユーザー環境での効率的なデータ管理
+- **環境別アクセス制御**: 開発・本番環境での適切な権限管理
+- **レスポンシブデザイン**: デスクトップ・モバイル対応の美しいUI
+
 ### 🗄️ データ管理
 - **永続化**: 全活動記録・TODO情報を永続的に保存
 - **SQLite データベース**: 軽量で高速なローカルデータベース
@@ -95,6 +103,10 @@ GOOGLE_API_KEY=your_google_gemini_api_key_here
 
 # 環境設定
 NODE_ENV=development
+
+# 管理Webアプリケーション認証（値は個別設定）
+ADMIN_USERNAME=your_admin_username
+ADMIN_PASSWORD=your_admin_password
 ```
 
 ### 4. Discord Bot の作成
@@ -143,7 +155,7 @@ NODE_ENV=development
 ### 開発環境での起動
 
 ```bash
-# 開発環境設定で起動
+# Discord Bot 開発環境設定で起動
 npm run dev
 
 # または watch モードで開発（ファイル変更時に自動再起動）
@@ -152,6 +164,32 @@ npm run watch
 # 本番環境設定でローカルテスト
 npm run dev:prod
 ```
+
+### 管理Webアプリケーションの起動
+
+```bash
+# 管理Webアプリケーションを開発モードで起動
+npm run admin:dev
+
+# アクセスURL
+http://localhost:3001
+
+# 認証情報（環境変数で設定）
+Username: ${ADMIN_USERNAME}
+Password: ${ADMIN_PASSWORD}
+```
+
+#### 管理画面の機能
+- **📊 ダッシュボード**: システム概要とクイックアクセス
+- **🗃️ データベース管理**: 全テーブルの閲覧・検索・ページネーション
+- **✅ TODO管理**: Web UIでの包括的なTODO操作
+- **👥 マルチユーザー対応**: ユーザー別データ管理
+- **🔧 システム監視**: ヘルスチェックとシステム情報
+
+#### セキュリティ設定
+- **認証情報**: 環境変数`ADMIN_USERNAME`と`ADMIN_PASSWORD`で設定
+- **環境別制御**: 本番環境では自動的に読み取り専用モード
+- **セキュリティヘッダー**: XSS防止、フレーム防止等を自動設定
 
 ### 本番環境での起動
 
@@ -290,7 +328,7 @@ npm run start:prod
 
 ## スクリプト管理
 
-### Bot管理スクリプト
+### Discord Bot管理スクリプト
 
 #### 開発環境操作
 ```bash
@@ -359,6 +397,33 @@ npm run prod:secrets
 | `prod:status` | 本番環境の詳細ステータス確認 | 運用監視 |
 | `prod:backup` | 本番データベースバックアップ | 定期バックアップ |
 | `prod:secrets` | 本番環境変数の更新 | 設定変更時 |
+
+### 管理Webアプリケーションスクリプト
+
+#### 開発環境操作
+```bash
+# 管理Webアプリケーション起動
+npm run admin:dev
+
+# ビューファイルのコピー（ビルド時自動実行）
+npm run admin:copy-views
+
+# 静的ファイルのコピー
+npm run admin:copy-static
+```
+
+#### 管理画面の機能説明
+| 機能 | URL | 説明 |
+|------|-----|------|
+| **ダッシュボード** | `/` | システム概要とテーブル一覧 |
+| **データベース管理** | `/tables` | 全テーブルの閲覧・検索 |
+| **TODO管理** | `/todos` | TODO CRUD操作・一括処理 |
+| **ヘルスチェック** | `/health` | システム監視・環境情報 |
+
+#### アクセス制御
+- **開発環境**: 全機能利用可能（作成・編集・削除）
+- **本番環境**: 読み取り専用モード（安全性確保）
+- **認証**: Basic認証（環境変数で設定）
 
 ### データ管理スクリプト
 
@@ -460,6 +525,35 @@ src/
 ├── components/                            # 📍 UIコンポーネント（TODO機能）
 │   ├── classificationResultEmbed.ts       # 分類結果表示Embed
 │   └── todoListEmbed.ts                   # TODO一覧表示Embed
+├── web-admin/                             # 📍 管理Webアプリケーション
+│   ├── start.ts                           # 管理アプリエントリーポイント
+│   ├── server.ts                          # Express サーバー設定
+│   ├── interfaces/                        # Web管理インターフェース
+│   │   └── adminInterfaces.ts             # 管理機能型定義
+│   ├── repositories/                      # Web管理リポジトリ
+│   │   └── adminRepository.ts             # 管理機能データアクセス
+│   ├── services/                          # Web管理サービス
+│   │   ├── adminService.ts                # 管理機能ビジネスロジック
+│   │   ├── securityService.ts             # セキュリティ・認証
+│   │   └── todoManagementService.ts       # Web TODO管理サービス
+│   ├── routes/                            # Express ルーティング
+│   │   ├── index.ts                       # ルート統合
+│   │   ├── dashboard.ts                   # ダッシュボード
+│   │   ├── tables.ts                      # データベース管理
+│   │   └── todos.ts                       # TODO管理
+│   ├── views/                             # EJS テンプレート
+│   │   ├── dashboard.ejs                  # ダッシュボード画面
+│   │   ├── table-list.ejs                 # テーブル一覧
+│   │   ├── table-detail.ejs               # テーブル詳細
+│   │   ├── todo-dashboard.ejs             # TODO管理画面
+│   │   └── todo-form.ejs                  # TODO作成・編集フォーム
+│   ├── middleware/                        # Express ミドルウェア
+│   │   └── errorHandler.ts               # エラーハンドリング
+│   ├── types/                             # Web管理型定義
+│   │   └── admin.ts                       # 管理画面共通型
+│   └── public/                            # 静的ファイル
+│       ├── css/                           # スタイルシート
+│       └── js/                            # JavaScript
 └── __tests__/                             # 📍 テストスイート（65.35%カバレッジ）
     ├── integration/                       # 統合テスト
     ├── repositories/                      # リポジトリテスト
@@ -595,12 +689,22 @@ src/__tests__/
 
 ## 技術スタック
 
+### Core System
 - **言語**: Node.js + TypeScript
 - **Discord**: discord.js v14
 - **AI**: Google Gemini 1.5 Flash
 - **データベース**: SQLite3
 - **スケジューラー**: node-cron
 - **テストフレームワーク**: Jest（65.35%カバレッジ）
+
+### 管理Webアプリケーション
+- **Webフレームワーク**: Express.js v4
+- **テンプレートエンジン**: EJS (Embedded JavaScript)
+- **UIフレームワーク**: Tailwind CSS v3
+- **アイコン**: Font Awesome v6
+- **認証**: express-basic-auth
+- **セキュリティ**: セキュリティヘッダー、環境別アクセス制御
+- **レスポンシブデザイン**: モバイル・デスクトップ対応
 
 ## パフォーマンス・品質指標
 

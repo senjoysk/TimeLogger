@@ -165,10 +165,26 @@ feature/* → develop → 品質チェック → 手動staging → main → prod
 6. **production デプロイ**: 自動デプロイ + ヘルスチェック
 
 ## 開発環境セットアップ
+
+### Discord Bot開発環境
 1. `nvm use` でNode.js仮想環境を使用（.nvmrcファイルでNode.js 20を指定）
 2. `npm install` で依存関係をインストール（仮想環境内）
 3. `.env.example` を参考に `.env` ファイルを作成
 4. Discord Bot Token と Google Gemini API Key を設定
+
+### 管理Webアプリケーション開発環境
+1. 上記Discord Bot環境セットアップを完了
+2. 管理Webアプリケーション用環境変数を設定：
+```bash
+# .env ファイルに追加（値は個別設定）
+ADMIN_USERNAME=your_admin_username
+ADMIN_PASSWORD=your_admin_password
+```
+3. 管理Webアプリケーション起動：
+```bash
+npm run admin:dev
+# アクセス: http://localhost:3001
+```
 
 ### Staging環境セットアップ
 1. `fly apps create timelogger-staging` でstaging環境作成
@@ -246,15 +262,45 @@ src/
 │   ├── unifiedAnalysisService.ts     # 統合分析サービス
 │   └── analysisCacheService.ts       # 分析キャッシュサービス
 ├── types/
-│   └── activityLog.ts                # 📍 活動ログ型定義
+│   ├── activityLog.ts                # 📍 活動ログ型定義
+│   └── todo.ts                       # 📍 TODO型定義
 ├── utils/
 │   ├── errorHandler.ts               # 📍 統一エラーハンドリング
 │   ├── timeUtils.ts                  # 時間関連ユーティリティ
 │   └── commandValidator.ts           # コマンドバリデーション
+├── web-admin/                        # 📍 管理Webアプリケーション
+│   ├── start.ts                      # 管理アプリエントリーポイント
+│   ├── server.ts                     # Express サーバー設定
+│   ├── interfaces/                   # Web管理インターフェース
+│   │   └── adminInterfaces.ts        # 管理機能型定義
+│   ├── repositories/                 # Web管理リポジトリ
+│   │   └── adminRepository.ts        # 管理機能データアクセス
+│   ├── services/                     # Web管理サービス
+│   │   ├── adminService.ts           # 管理機能ビジネスロジック
+│   │   ├── securityService.ts        # セキュリティ・認証
+│   │   └── todoManagementService.ts  # Web TODO管理サービス
+│   ├── routes/                       # Express ルーティング
+│   │   ├── index.ts                  # ルート統合
+│   │   ├── dashboard.ts              # ダッシュボード
+│   │   ├── tables.ts                 # データベース管理
+│   │   └── todos.ts                  # TODO管理
+│   ├── views/                        # EJS テンプレート
+│   │   ├── dashboard.ejs             # ダッシュボード画面
+│   │   ├── table-list.ejs            # テーブル一覧
+│   │   ├── table-detail.ejs          # テーブル詳細
+│   │   ├── todo-dashboard.ejs        # TODO管理画面
+│   │   └── todo-form.ejs             # TODO作成・編集フォーム
+│   ├── middleware/                   # Express ミドルウェア
+│   │   └── errorHandler.ts          # エラーハンドリング
+│   ├── types/                        # Web管理型定義
+│   │   └── admin.ts                  # 管理画面共通型
+│   └── public/                       # 静的ファイル
+│       ├── css/                      # スタイルシート
+│       └── js/                       # JavaScript
 ├── database/
 │   ├── newSchema.sql                 # 📍 現在のDBスキーマ
 │   └── database.ts                   # データベース操作
-└── __tests__/                        # 📍 テストスイート（45.5%カバレッジ）
+└── __tests__/                        # 📍 テストスイート（65.35%カバレッジ）
     ├── integration/                  # 統合テスト
     ├── repositories/                 # リポジトリテスト
     ├── services/                     # サービステスト
@@ -283,11 +329,18 @@ npm run test:coverage
 ```
 
 ### その他の開発コマンド
+
+#### Discord Bot関連
 - `npm run dev`: 開発モードで実行
 - `npm run build`: TypeScriptをビルド
 - `npm start`: 本番モードで実行
 - `npm run watch`: ファイル変更を監視して自動再起動
 - `npm run test:integration`: 統合テストのみ実行
+
+#### 管理Webアプリケーション関連
+- `npm run admin:dev`: 管理Webアプリケーション開発モード起動
+- `npm run admin:copy-views`: EJSビューファイルをdistにコピー
+- `npm run admin:copy-static`: 静的ファイルをdistにコピー
 
 ### Staging環境コマンド
 - `npm run staging:deploy`: **staging環境へデプロイ（マシン自動復旧機能付き）**
@@ -406,3 +459,169 @@ staging環境のDiscord Botで以下のコマンドを確認：
 5. **TODOリストで進捗管理**
 
 **🚨 CRITICAL: 実装前に必ずテストを書き、Red-Green-Refactorサイクルを守ること**
+
+## 🌐 管理Webアプリケーション開発ガイド
+
+### Web管理機能開発の原則
+
+#### 1. **セキュリティファースト開発**
+- **環境別アクセス制御**: 本番環境では読み取り専用モード必須
+- **認証必須**: 全てのルートでBasic認証を実装
+- **セキュリティヘッダー**: X-Content-Type-Options, X-Frame-Options等を設定
+- **入力検証**: 全てのユーザー入力にバリデーション実装
+
+#### 2. **レスポンシブUI設計**
+- **Tailwind CSS**: 統一されたデザインシステム使用
+- **モバイルファースト**: スマートフォン対応を優先
+- **アクセシビリティ**: キーボードナビゲーション対応
+- **環境識別**: 開発・本番環境の視覚的区別
+
+#### 3. **Express.js ベストプラクティス**
+- **Router分離**: 機能別にルーターを分割
+- **ミドルウェア活用**: エラーハンドリング、認証の統一化
+- **EJSテンプレート**: サーバーサイドレンダリング
+- **静的ファイル**: 効率的な静的ファイル配信
+
+### Web管理開発TDD手順
+
+#### Phase 1: UI設計とルーティング
+```bash
+# 1. 🔴 Red Phase: UIテストケース作成
+npm run test:watch -- src/__tests__/web-admin/routes/
+
+# 2. 🟢 Green Phase: ルーティング実装
+# - Express Router作成
+# - 基本的なレスポンス実装
+
+# 3. ♻️ Refactor Phase: UI改善
+# - EJSテンプレート作成
+# - Tailwind CSSスタイリング
+```
+
+#### Phase 2: ビジネスロジック実装
+```bash
+# 1. 🔴 Red Phase: サービステスト作成
+npm run test:watch -- src/__tests__/web-admin/services/
+
+# 2. 🟢 Green Phase: サービス実装
+# - データアクセスロジック
+# - バリデーション処理
+
+# 3. ♻️ Refactor Phase: エラーハンドリング強化
+```
+
+#### Phase 3: セキュリティとパフォーマンス
+```bash
+# 1. セキュリティテスト
+# - 認証テスト
+# - アクセス制御テスト
+
+# 2. パフォーマンステスト
+# - レスポンス時間測定
+# - ページネーション効率化
+```
+
+### Web管理コーディング規約
+
+#### 1. **Express ルーター構造**
+```typescript
+// ✅ 良い例: 機能別ルーター分離
+export function createTodoRouter(databasePath: string): Router {
+  const router = Router();
+  
+  // サービス初期化
+  initializeServices(databasePath);
+  
+  // ルート定義
+  router.get('/', handleTodoList);
+  router.post('/', handleTodoCreate);
+  
+  return router;
+}
+```
+
+#### 2. **EJSテンプレート規約**
+```html
+<!-- ✅ 良い例: 共通レイアウトとパーシャル -->
+<%- include('partials/header', { title: 'TODO管理' }) %>
+<%- include('partials/navigation', { currentPage: 'todos' }) %>
+
+<!-- メインコンテンツ -->
+<main class="max-w-7xl mx-auto py-6">
+  <!-- ... -->
+</main>
+
+<%- include('partials/footer') %>
+```
+
+#### 3. **セキュリティ実装**
+```typescript
+// ✅ 良い例: 環境別アクセス制御
+if (environment.isReadOnly) {
+  return res.status(403).render('error', {
+    title: 'アクセス拒否',
+    message: 'Production環境では編集操作は許可されていません'
+  });
+}
+```
+
+#### 4. **エラーハンドリング**
+```typescript
+// ✅ 良い例: 統一エラーハンドリング
+try {
+  const result = await todoService.createTodo(data);
+  res.redirect('/todos');
+} catch (error) {
+  next(error); // エラーミドルウェアに委譲
+}
+```
+
+### Web管理デバッグ手順
+
+#### 1. **ログ確認**
+```bash
+# サーバーログの確認
+npm run admin:dev
+
+# 特定のルートのデバッグ
+curl -u ${ADMIN_USERNAME}:${ADMIN_PASSWORD} http://localhost:3001/todos -v
+```
+
+#### 2. **テンプレートデバッグ**
+```bash
+# EJSテンプレートの構文チェック
+npm run admin:copy-views
+
+# ブラウザ開発者ツール
+# - Network タブでリクエスト確認
+# - Console タブでJavaScriptエラー確認
+```
+
+#### 3. **データベース確認**
+```bash
+# データベース内容確認
+sqlite3 data/app.db "SELECT * FROM todo_tasks LIMIT 5;"
+
+# テーブルスキーマ確認
+sqlite3 data/app.db ".schema todo_tasks"
+```
+
+### Web管理ベストプラクティス
+
+#### 1. **UX設計**
+- **明確なナビゲーション**: 現在位置の明示
+- **確認ダイアログ**: 危険な操作の事前確認
+- **レスポンシブデザイン**: 全デバイス対応
+- **アクセシビリティ**: キーボード操作対応
+
+#### 2. **パフォーマンス**
+- **ページネーション**: 大量データの効率表示
+- **静的ファイルキャッシュ**: CSS/JSファイルの最適配信
+- **データベースクエリ最適化**: N+1問題の回避
+
+#### 3. **保守性**
+- **コンポーネント化**: 再利用可能なEJSパーシャル
+- **設定分離**: 環境変数による設定管理
+- **ログ記録**: 運用時のトラブルシューティング支援
+
+**🌐 管理Webアプリケーションは、セキュリティ・UX・保守性を重視した堅牢な管理インターフェースです**
