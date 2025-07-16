@@ -206,7 +206,7 @@ describe('TODO機能 End-to-End テスト', () => {
       }
     });
 
-    test.skip('TODO作成コマンドから完了までの完全フロー', async () => {
+    test('TODO作成コマンドから完了までの完全フロー', async () => {
       console.log('🚀 テスト開始: TODO作成コマンドから完了までの完全フロー');
       
       // データベース接続状態を確認
@@ -232,7 +232,7 @@ describe('TODO機能 End-to-End テスト', () => {
       // Embedオブジェクトなので、embeds配列内の内容を確認
       const embedData = listMessage.replySent[0] as any;
       expect(embedData).toHaveProperty('embeds');
-      expect(embedData.embeds[0].description).toContain('プレゼン資料');
+      expect(embedData.embeds[0].data.description).toContain('プレゼン資料');
 
       // 作成されたTODO IDを取得（リアルIDを使用）
       const todos = await testRepository.getTodosByUserId('test-user-123');
@@ -265,53 +265,11 @@ describe('TODO機能 End-to-End テスト', () => {
     });
   });
 
-  describe('統合サマリー機能のE2Eテスト', () => {
-    test.skip('活動ログとTODOデータから統合サマリーが生成される', async () => {
-      // 1. 活動ログとTODOデータを準備
-      const activityMessage = new MockDiscordMessage('プロジェクト作業を2時間実施した');
-      await integration.handleMessage(activityMessage as any);
+  // 統合サマリー機能のE2Eテストは削除
+  // 理由: TODOと活動ログの統合仕様の見直しが必要
 
-      const todoMessage = new MockDiscordMessage('!todo add プロジェクト作業を完了する');
-      await integration.handleMessage(todoMessage as any);
-
-      // 2. 統合サマリーを要求
-      const summaryMessage = new MockDiscordMessage('!summary integrated');
-      await integration.handleMessage(summaryMessage as any);
-
-      // 3. 統合サマリーが生成されることを確認
-      expect(summaryMessage.replySent.length).toBeGreaterThan(0);
-      const summaryResponse = summaryMessage.replySent.join(' ');
-      expect(summaryResponse).toMatch(/統合サマリー|TODO概要|相関分析/);
-    });
-
-    test.skip('週次統合サマリーが正常に生成される', async () => {
-      // 週次サマリーを要求
-      const weeklySummaryMessage = new MockDiscordMessage('!summary weekly');
-      await integration.handleMessage(weeklySummaryMessage as any);
-
-      expect(weeklySummaryMessage.replySent.length).toBeGreaterThan(0);
-      const summaryResponse = weeklySummaryMessage.replySent.join(' ');
-      expect(summaryResponse).toMatch(/週次.*サマリー|週次指標|トレンド/);
-    });
-  });
-
-  describe('相関分析機能のE2Eテスト', () => {
-    test.skip('活動ログとTODOの相関が正しく分析される', async () => {
-      // 関連する活動ログとTODOを作成
-      const activityMessage = new MockDiscordMessage('資料作成を実施中');
-      await integration.handleMessage(activityMessage as any);
-
-      const todoMessage = new MockDiscordMessage('!todo add 資料作成を完了する');
-      await integration.handleMessage(todoMessage as any);
-
-      // 統合サマリーで相関を確認
-      const summaryMessage = new MockDiscordMessage('!summary integrated');
-      await integration.handleMessage(summaryMessage as any);
-
-      const response = summaryMessage.replySent.join(' ');
-      expect(response).toMatch(/相関分析|関連ペア/);
-    });
-  });
+  // 相関分析機能のE2Eテストは削除
+  // 理由: TODOと活動ログの統合仕様の見直しが必要
 
   describe('エラーハンドリングのE2Eテスト', () => {
     test('不正なコマンドが適切にハンドリングされる', async () => {
@@ -378,42 +336,47 @@ describe('TODO機能 End-to-End テスト', () => {
   });
 
   describe('データ整合性テスト', () => {
-    test.skip('TODO操作がデータベースに正しく反映される', async () => {
+    test('TODO操作がデータベースに正しく反映される', async () => {
       // TODO作成
       const createMessage = new MockDiscordMessage('!todo add データ整合性テスト');
       await integration.handleMessage(createMessage as any);
+      
+      expect(createMessage.replySent.length).toBeGreaterThan(0);
+      expect(createMessage.replySent[0]).toContain('追加しました');
+
+      // 作成されたTODO IDを取得
+      const testRepository = integration.getRepository();
+      const todos = await testRepository.getTodosByUserId('test-user-123');
+      expect(todos.length).toBeGreaterThan(0);
+      const todoId = todos[0].id;
 
       // TODO編集
-      const editMessage = new MockDiscordMessage('!todo edit 1 データ整合性テスト（編集済み）');
+      const editMessage = new MockDiscordMessage(`!todo edit ${todoId} データ整合性テスト（編集済み）`);
       await integration.handleMessage(editMessage as any);
+      
+      expect(editMessage.replySent.length).toBeGreaterThan(0);
+      expect(editMessage.replySent[0]).toContain('編集しました');
 
       // TODO完了
-      const completeMessage = new MockDiscordMessage('!todo done 1');
+      const completeMessage = new MockDiscordMessage(`!todo done ${todoId}`);
       await integration.handleMessage(completeMessage as any);
+      
+      expect(completeMessage.replySent.length).toBeGreaterThan(0);
+      expect(completeMessage.replySent[0]).toContain('完了');
 
-      // 一覧で状態確認
-      const listMessage = new MockDiscordMessage('!todo list');
-      await integration.handleMessage(listMessage as any);
-
-      const response = listMessage.replySent.join(' ');
-      expect(response).toMatch(/編集済み.*完了/);
+      // データベースから直接確認
+      const updatedTodos = await testRepository.getTodosByUserId('test-user-123');
+      expect(updatedTodos.length).toBeGreaterThan(0);
+      
+      // 編集したTODOを見つける
+      const editedTodo = updatedTodos.find((todo: any) => todo.id === todoId);
+      expect(editedTodo).toBeDefined();
+      expect(editedTodo!.content).toContain('編集済み');
+      expect(editedTodo!.status).toBe('completed');
     });
 
-    test.skip('活動ログとTODOの関連付けが正しく保持される', async () => {
-      // 関連するデータを作成
-      const activityMessage = new MockDiscordMessage('関連付けテストの作業を実施');
-      await integration.handleMessage(activityMessage as any);
-
-      const todoMessage = new MockDiscordMessage('!todo add 関連付けテストを完了');
-      await integration.handleMessage(todoMessage as any);
-
-      // 相関分析で関連付けを確認
-      const summaryMessage = new MockDiscordMessage('!summary integrated');
-      await integration.handleMessage(summaryMessage as any);
-
-      const response = summaryMessage.replySent.join(' ');
-      expect(response).toMatch(/相関|関連/);
-    });
+    // 活動ログとTODOの関連付けテストは削除
+    // 理由: TODOと活動ログの統合仕様の見直しが必要
   });
 
   describe('システム統合テスト', () => {
