@@ -44,13 +44,13 @@ class Application {
       await this.bot.waitForSystemInitialization();
       
       // 統合HTTPサーバーの起動（Admin Web App + Health Check）
-      if (process.env.ADMIN_USER && process.env.ADMIN_PASSWORD) {
+      if (process.env.ADMIN_USERNAME && process.env.ADMIN_PASSWORD) {
         console.log('🌐 統合HTTPサーバーを起動中...');
         const databasePath = process.env.DATABASE_PATH || './data/new-activity-logs.db';
         this.integratedServer = new IntegratedServer(databasePath);
         await this.integratedServer.start();
       } else {
-        console.log('ℹ️ ADMIN_USER/ADMIN_PASSWORD未設定のため、Web管理アプリは起動しません');
+        console.log('ℹ️ ADMIN_USERNAME/ADMIN_PASSWORD未設定のため、Web管理アプリは起動しません');
       }
       
       // スケジューラーの初期化（活動記録システム初期化完了後）

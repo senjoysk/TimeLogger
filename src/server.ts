@@ -88,7 +88,7 @@ export class IntegratedServer {
 
     // Admin認証設定
     const adminAuth = basicAuth({
-      users: { [process.env.ADMIN_USER || 'admin']: process.env.ADMIN_PASSWORD || 'password' },
+      users: { [process.env.ADMIN_USERNAME || 'admin']: process.env.ADMIN_PASSWORD || 'password' },
       challenge: true,
       realm: 'TimeLogger Admin'
     });
