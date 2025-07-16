@@ -7,7 +7,10 @@ import {
   Message, 
   ButtonInteraction, 
   EmbedBuilder,
-  ComponentType
+  ComponentType,
+  ActionRowBuilder,
+  ButtonBuilder,
+  ButtonStyle
 } from 'discord.js';
 import { ITodoRepository, IMessageClassificationRepository } from '../repositories/interfaces';
 import { GeminiService } from '../services/geminiService';
@@ -25,6 +28,7 @@ import {
   createClassificationButtons,
   createTodoListEmbed,
   createTodoActionButtons,
+  createPaginatedEmbed,
   generateSessionId
 } from '../components/classificationResultEmbed';
 import { ActivityLogError } from '../types/activityLog';
@@ -278,9 +282,16 @@ export class TodoCommandHandler implements ITodoCommandHandler {
       if (action === 'confirm' || action === 'classify' || action === 'ignore') {
         await this.handleClassificationButton(interaction, action, type, sessionId, userId, timezone);
       } else if (action === 'todo') {
-        // TODOアクションの場合、todoIdは第3要素以降のすべて
-        const todoId = idParts.slice(2).join('_');
-        await this.handleTodoActionButton(interaction, type, todoId, userId, timezone);
+        // ページネーションボタンの処理
+        if (type === 'page') {
+          const pageAction = idParts[2]; // prev または next
+          const currentPage = parseInt(idParts[3]);
+          await this.handlePaginationInteraction(interaction, pageAction, currentPage, userId);
+        } else {
+          // TODOアクションの場合、todoIdは第3要素以降のすべて
+          const todoId = idParts.slice(2).join('_');
+          await this.handleTodoActionButton(interaction, type, todoId, userId, timezone);
+        }
       } else {
         await interaction.reply({ content: '❌ 未知のボタン操作です。', ephemeral: true });
       }
@@ -501,28 +512,50 @@ export class TodoCommandHandler implements ITodoCommandHandler {
   }
 
   /**
-   * TODO一覧を表示
+   * TODO一覧を表示（ページネーション対応）
    */
-  private async showTodoList(message: Message, userId: string): Promise<void> {
+  private async showTodoList(message: Message, userId: string, page: number = 1): Promise<void> {
     // パフォーマンス最適化: メモリ内フィルタリングをDB直接クエリに変更
     const activeTodos = await this.todoRepository.getTodosByStatusOptimized(userId, ['pending', 'in_progress']);
 
-    const embed = createTodoListEmbed(activeTodos.map(todo => ({
-      id: todo.id,
-      content: todo.content,
-      status: todo.status,
-      priority: todo.priority,
-      due_date: todo.dueDate,
-      created_at: todo.createdAt
-    })), userId);
+    const pageSize = 10;
+    const totalPages = Math.ceil(activeTodos.length / pageSize);
+    const startIndex = (page - 1) * pageSize;
+    const pageTodos = activeTodos.slice(startIndex, startIndex + pageSize);
 
-    // TODO操作ボタンを作成（Discord制限: 最大5行まで）
+    // 11件以上の場合はページネーション対応のEmbedを使用
+    const embed = activeTodos.length > 10 
+      ? createPaginatedEmbed(pageTodos.map(todo => ({
+          id: todo.id,
+          content: todo.content,
+          status: todo.status,
+          priority: todo.priority,
+          due_date: todo.dueDate,
+          created_at: todo.createdAt
+        })), page, totalPages, activeTodos.length)
+      : createTodoListEmbed(activeTodos.map(todo => ({
+          id: todo.id,
+          content: todo.content,
+          status: todo.status,
+          priority: todo.priority,
+          due_date: todo.dueDate,
+          created_at: todo.createdAt
+        })), userId);
+
+    // コンポーネントを作成
     const components = [];
-    const maxTodos = Math.min(activeTodos.length, 5); // Discord制限: 最大5個のActionRow
+    
+    // ページネーションボタン（11件以上の場合）
+    if (activeTodos.length > 10) {
+      components.push(this.createPaginationButtons(page, totalPages));
+    }
+    
+    // TODO操作ボタンを作成（Discord制限: 最大5行まで）
+    const maxTodos = Math.min(pageTodos.length, 5); // Discord制限: 最大5個のActionRow
     
     for (let i = 0; i < maxTodos; i++) {
-      const todo = activeTodos[i];
-      const actionRow = createTodoActionButtons(todo.id, todo.status, i);
+      const todo = pageTodos[i];
+      const actionRow = createTodoActionButtons(todo.id, todo.status, startIndex + i);
       components.push(actionRow);
     }
 
@@ -857,6 +890,112 @@ export class TodoCommandHandler implements ITodoCommandHandler {
     }
 
     return null;
+  }
+
+  /**
+   * ページネーション用のボタンを生成
+   */
+  private createPaginationButtons(currentPage: number, totalPages: number): ActionRowBuilder<ButtonBuilder> {
+    const buttonRow = new ActionRowBuilder<ButtonBuilder>();
+    
+    // 前のページボタン
+    buttonRow.addComponents(
+      new ButtonBuilder()
+        .setCustomId(`todo_page_prev_${currentPage}`)
+        .setLabel('◀️ 前のページ')
+        .setStyle(ButtonStyle.Secondary)
+        .setDisabled(currentPage === 1)
+    );
+    
+    // 現在のページ情報ボタン（無効化）
+    buttonRow.addComponents(
+      new ButtonBuilder()
+        .setCustomId('todo_page_info')
+        .setLabel(`ページ ${currentPage}/${totalPages}`)
+        .setStyle(ButtonStyle.Primary)
+        .setDisabled(true)
+    );
+    
+    // 次のページボタン
+    buttonRow.addComponents(
+      new ButtonBuilder()
+        .setCustomId(`todo_page_next_${currentPage}`)
+        .setLabel('次のページ ▶️')
+        .setStyle(ButtonStyle.Secondary)
+        .setDisabled(currentPage === totalPages)
+    );
+    
+    return buttonRow;
+  }
+
+  /**
+   * ページネーションインタラクションを処理
+   */
+  private async handlePaginationInteraction(
+    interaction: ButtonInteraction, 
+    action: string, 
+    currentPage: number, 
+    userId: string
+  ): Promise<void> {
+    const newPage = action === 'prev' ? currentPage - 1 : currentPage + 1;
+    
+    // 新しいページのTODO一覧を取得
+    const activeTodos = await this.todoRepository.getTodosByStatusOptimized(userId, ['pending', 'in_progress']);
+    
+    const pageSize = 10;
+    const totalPages = Math.ceil(activeTodos.length / pageSize);
+    const startIndex = (newPage - 1) * pageSize;
+    const pageTodos = activeTodos.slice(startIndex, startIndex + pageSize);
+
+    // 新しいページのEmbedを生成
+    const embed = createPaginatedEmbed(pageTodos.map(todo => ({
+      id: todo.id,
+      content: todo.content,
+      status: todo.status,
+      priority: todo.priority,
+      due_date: todo.dueDate,
+      created_at: todo.createdAt
+    })), newPage, totalPages, activeTodos.length);
+
+    // 新しいページのコンポーネントを生成
+    const components = [];
+    
+    // ページネーションボタン
+    components.push(this.createPaginationButtons(newPage, totalPages));
+    
+    // TODO操作ボタン（最大5個）
+    const maxTodos = Math.min(pageTodos.length, 5);
+    
+    for (let i = 0; i < maxTodos; i++) {
+      const todo = pageTodos[i];
+      const actionRow = createTodoActionButtons(todo.id, todo.status, startIndex + i);
+      components.push(actionRow);
+    }
+
+    // インタラクションを更新
+    await interaction.update({
+      embeds: [embed],
+      components
+    });
+  }
+
+  /**
+   * テスト用にcreatePageEmbedを公開
+   */
+  private createPaginatedEmbed(
+    todos: Array<{
+      id: string;
+      content: string;
+      status: string;
+      priority: number;
+      due_date?: string;
+      created_at: string;
+    }>,
+    currentPage: number,
+    totalPages: number,
+    totalCount: number
+  ): EmbedBuilder {
+    return createPaginatedEmbed(todos, currentPage, totalPages, totalCount);
   }
 
   /**

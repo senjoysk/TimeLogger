@@ -364,6 +364,48 @@ function getStatusIcon(status: string): string {
 }
 
 /**
+ * ページネーション対応のTODO一覧Embedを生成
+ */
+export function createPaginatedEmbed(
+  todos: Array<{
+    id: string;
+    content: string;
+    status: string;
+    priority: number;
+    due_date?: string;
+    created_at: string;
+  }>,
+  currentPage: number,
+  totalPages: number,
+  totalCount: number
+): EmbedBuilder {
+  const embed = new EmbedBuilder()
+    .setTitle(`📋 TODO一覧 (${(currentPage - 1) * 10 + 1}-${(currentPage - 1) * 10 + todos.length}/${totalCount}件) ページ ${currentPage}/${totalPages}`)
+    .setColor(0x00ff00)
+    .setTimestamp()
+    .setFooter({ text: 'ボタンをクリックしてTODOを操作できます' });
+
+  if (todos.length === 0) {
+    embed.setDescription('現在のページにTODOはありません。');
+    return embed;
+  }
+
+  // TODO項目を表示
+  const todoList = todos.map((todo, index) => {
+    const priorityIcon = getPriorityIcon(todo.priority);
+    const statusIcon = getStatusIcon(todo.status);
+    const dueDate = todo.due_date ? ` (期日: ${todo.due_date})` : '';
+    const shortId = todo.id.substring(0, 8);
+    const itemNumber = (currentPage - 1) * 10 + index + 1;
+    
+    return `${itemNumber}. \`${shortId}\` ${statusIcon} ${priorityIcon} ${todo.content}${dueDate}`;
+  }).join('\n');
+
+  embed.setDescription(todoList);
+  return embed;
+}
+
+/**
  * セッションIDを生成
  * 注意: セッションIDには区切り文字（_）を含めないようにする
  */
