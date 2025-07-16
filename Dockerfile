@@ -34,18 +34,23 @@ RUN npm ci --production
 # ビルド済みのファイルをコピー
 COPY --from=builder /app/dist ./dist
 
+# Web管理アプリのビューとスタティックファイルをコピー
+COPY --from=builder /app/src/web-admin/views ./dist/web-admin/views
+COPY --from=builder /app/src/web-admin/public ./dist/web-admin/public
+
 # スキーマファイルをコピー
 COPY src/database/newSchema.sql ./dist/database/
 
 # マイグレーションスクリプトをコピー（現在必要なファイルのみ）
 COPY scripts/production/safe-unified-migration.js ./scripts/production/
 COPY scripts/debug-todos.js ./scripts/
+COPY scripts/start-all.js ./scripts/
 
 # データディレクトリを作成
 RUN mkdir -p /app/data
 
 # スクリプトに実行権限を付与
-RUN chmod +x scripts/production/safe-unified-migration.js
+RUN chmod +x scripts/production/safe-unified-migration.js scripts/start-all.js
 
 # 非rootユーザーで実行
 USER node

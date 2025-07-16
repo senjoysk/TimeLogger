@@ -14,6 +14,9 @@ kill_timeout = '5s'
   NODE_ENV = 'production'
   TZ = 'Asia/Kolkata'
   PORT = '3000'
+  
+  # Web管理アプリ設定（.env.productionから読み込み）
+  # ADMIN_USER と ADMIN_PASSWORD は .env.production に記載
 
 [[mounts]]
   source = 'timelogger_data'

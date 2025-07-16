@@ -108,6 +108,10 @@ export class AdminServer {
     // エラーハンドラー（最後に設定）
     this.app.use(errorHandler);
   }
+  
+  public getExpressApp(): express.Application {
+    return this.app;
+  }
 
   public async start(): Promise<void> {
     try {
@@ -132,7 +136,4 @@ export class AdminServer {
     }
   }
 
-  public getApp(): express.Application {
-    return this.app;
-  }
 }

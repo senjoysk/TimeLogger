@@ -3,6 +3,7 @@ import { TaskLoggerBot } from './bot';
 import { EnhancedScheduler } from './enhancedScheduler';
 import { DynamicReportScheduler } from './services/dynamicReportScheduler';
 import { TimezoneChangeMonitor } from './services/timezoneChangeMonitor';
+import { IntegratedServer } from './server';
 
 /**
  * アプリケーションのメインエントリーポイント
@@ -13,6 +14,7 @@ class Application {
   private scheduler: EnhancedScheduler;
   private dynamicScheduler: DynamicReportScheduler;
   private timezoneMonitor: TimezoneChangeMonitor;
+  private integratedServer: IntegratedServer | null = null;
 
   constructor() {
     this.bot = new TaskLoggerBot();
@@ -40,6 +42,16 @@ class Application {
       // システム初期化の完了を待つ
       console.log('⏳ システム初期化の完了を待機中...');
       await this.bot.waitForSystemInitialization();
+      
+      // 統合HTTPサーバーの起動（Admin Web App + Health Check）
+      if (process.env.ADMIN_USER && process.env.ADMIN_PASSWORD) {
+        console.log('🌐 統合HTTPサーバーを起動中...');
+        const databasePath = process.env.DATABASE_PATH || './data/new-activity-logs.db';
+        this.integratedServer = new IntegratedServer(databasePath);
+        await this.integratedServer.start();
+      } else {
+        console.log('ℹ️ ADMIN_USER/ADMIN_PASSWORD未設定のため、Web管理アプリは起動しません');
+      }
       
       // スケジューラーの初期化（活動記録システム初期化完了後）
       console.log('📅 スケジューラーを初期化中...');

@@ -20,6 +20,9 @@ kill_timeout = '5s'
   ENABLE_DEBUG_ROUTES = 'true'           # デバッグ用API有効化
   API_RATE_LIMIT = 'false'               # レート制限無効化（テスト用）
   CACHE_TTL = '60'                       # キャッシュTTL短縮（テスト用）
+  
+  # Web管理アプリ設定（.env.stagingから読み込み）
+  # ADMIN_USER と ADMIN_PASSWORD は .env.staging に記載
 
 # データベースボリューム（本番と分離）
 [[mounts]]
