@@ -2,17 +2,14 @@ import { Client, GatewayIntentBits, Partials } from 'discord.js';
 import { config } from './config';
 import { BotStatus } from './types';
 import { ActivityLoggingIntegration, createDefaultConfig } from './integration';
-import express from 'express';
 import { 
   IClientFactory, 
-  IServerFactory, 
   IConfigService, 
   ILogger,
   ITimeProvider 
 } from './interfaces/dependencies';
 import { 
   DiscordClientFactory, 
-  ExpressServerFactory,
   RealTimeProvider,
   ConsoleLogger 
 } from './factories';
@@ -23,7 +20,6 @@ import { ConfigService } from './services/configService';
  */
 export interface TaskLoggerBotDependencies {
   clientFactory?: IClientFactory;
-  serverFactory?: IServerFactory;
   configService?: IConfigService;
   logger?: ILogger;
   timeProvider?: ITimeProvider;
@@ -38,14 +34,12 @@ export class TaskLoggerBot {
   private status: BotStatus;
   // 活動記録システム統合
   private activityLoggingIntegration?: ActivityLoggingIntegration;
-  // Fly.ioヘルスチェック用HTTPサーバー
-  private healthServer?: express.Application;
+  // HTTPサーバーはIntegratedServerに統合済み
   // エラー発生回数トラッキング
   private errorCounters: Map<string, number> = new Map();
   
   // DI依存関係
   private readonly clientFactory: IClientFactory;
-  private readonly serverFactory: IServerFactory;
   private readonly configService: IConfigService;
   private readonly logger: ILogger;
   private readonly timeProvider: ITimeProvider;
@@ -53,7 +47,6 @@ export class TaskLoggerBot {
   constructor(dependencies?: TaskLoggerBotDependencies) {
     // DI依存関係の初期化（デフォルトまたは注入された実装を使用）
     this.clientFactory = dependencies?.clientFactory || new DiscordClientFactory();
-    this.serverFactory = dependencies?.serverFactory || new ExpressServerFactory();
     this.configService = dependencies?.configService || new ConfigService();
     this.logger = dependencies?.logger || new ConsoleLogger();
     this.timeProvider = dependencies?.timeProvider || new RealTimeProvider();
@@ -81,65 +74,10 @@ export class TaskLoggerBot {
     // 活動記録システムで統合管理
 
     this.setupEventHandlers();
-    this.setupHealthServer();
+    // ヘルスチェックサーバーはIntegratedServerに統合
   }
 
-  /**
-   * Fly.ioヘルスチェック用HTTPサーバーを設定
-   */
-  private setupHealthServer(): void {
-    this.healthServer = this.serverFactory.create();
-    
-    // ヘルスチェックエンドポイント
-    this.healthServer.get('/health', async (req, res) => {
-      const healthStatus = await this.checkSystemHealth();
-      
-      if (healthStatus.status === 'error') {
-        // 異常検知時の処理（重大なエラーのみ通知）
-        await this.handleSystemError(healthStatus);
-        res.status(503).json(healthStatus);
-      } else {
-        // 正常時は通知しない、レスポンスのみ返す
-        res.json(healthStatus);
-      }
-    });
-    
-    // システム状態詳細エンドポイント
-    this.healthServer.get('/status', async (req, res) => {
-      const detailedStatus = await this.getDetailedSystemStatus();
-      res.json(detailedStatus);
-    });
-    
-    // 管理者通知テスト用エンドポイント
-    this.healthServer.post('/test-notification', async (req, res) => {
-      try {
-        await this.sendAdminNotification('🧪 **テスト通知**', 'ヘルスチェックシステムの通知テストです。');
-        res.json({ success: true, message: '通知テストを送信しました' });
-      } catch (error) {
-        res.status(500).json({ success: false, error: String(error) });
-      }
-    });
-    
-    // 基本的なルート
-    this.healthServer.get('/', (req, res) => {
-      res.json({
-        name: 'TimeLogger Discord Bot',
-        version: '1.0.0',
-        status: 'running',
-        endpoints: {
-          health: '/health',
-          status: '/status',
-          testNotification: '/test-notification'
-        }
-      });
-    });
-    
-    // サーバー起動（ConfigService使用）
-    const port = this.configService.getServerPort();
-    this.healthServer.listen(port, () => {
-      this.logger.info(`🏥 ヘルスチェックサーバーがポート${port}で起動しました`);
-    });
-  }
+  // ヘルスチェックサーバーはIntegratedServerに統合済み
 
   /**
    * システムヘルスチェック
