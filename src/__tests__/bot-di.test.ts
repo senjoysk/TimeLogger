@@ -6,7 +6,6 @@
 import { TaskLoggerBot } from '../bot';
 import { 
   IClientFactory, 
-  IServerFactory, 
   IConfigService, 
   ILogger,
   ITimeProvider 
@@ -30,16 +29,6 @@ const createMockClientFactory = (): IClientFactory => ({
   })
 });
 
-const createMockServerFactory = (): IServerFactory => ({
-  create: jest.fn().mockReturnValue({
-    get: jest.fn(),
-    post: jest.fn(),
-    listen: jest.fn().mockImplementation((port, callback) => {
-      if (callback) callback();
-      return { close: jest.fn() };
-    })
-  })
-});
 
 const createMockLogger = (): ILogger => ({
   info: jest.fn(),
@@ -57,7 +46,6 @@ const createMockTimeProvider = (): ITimeProvider => ({
 
 describe('TaskLoggerBot DI対応テスト', () => {
   let mockClientFactory: IClientFactory;
-  let mockServerFactory: IServerFactory;
   let mockConfigService: IConfigService;
   let mockLogger: ILogger;
   let mockTimeProvider: ITimeProvider;
@@ -68,7 +56,6 @@ describe('TaskLoggerBot DI対応テスト', () => {
     process.env.GEMINI_API_KEY = 'test-api-key';
     
     mockClientFactory = createMockClientFactory();
-    mockServerFactory = createMockServerFactory();
     mockConfigService = new ConfigService();
     mockLogger = createMockLogger();
     mockTimeProvider = createMockTimeProvider();
@@ -82,7 +69,6 @@ describe('TaskLoggerBot DI対応テスト', () => {
     test('DIコンストラクタで依存関係を注入できる', () => {
       const bot = new TaskLoggerBot({
         clientFactory: mockClientFactory,
-        serverFactory: mockServerFactory,
         configService: mockConfigService,
         logger: mockLogger,
         timeProvider: mockTimeProvider
@@ -94,7 +80,6 @@ describe('TaskLoggerBot DI対応テスト', () => {
     test('DIによってDiscord Clientファクトリーが使用される', () => {
       const bot = new TaskLoggerBot({
         clientFactory: mockClientFactory,
-        serverFactory: mockServerFactory,
         configService: mockConfigService,
         logger: mockLogger,
         timeProvider: mockTimeProvider
@@ -106,22 +91,9 @@ describe('TaskLoggerBot DI対応テスト', () => {
       });
     });
 
-    test('DIによってExpressサーバーファクトリーが使用される', () => {
-      const bot = new TaskLoggerBot({
-        clientFactory: mockClientFactory,
-        serverFactory: mockServerFactory,
-        configService: mockConfigService,
-        logger: mockLogger,
-        timeProvider: mockTimeProvider
-      });
-
-      expect(mockServerFactory.create).toHaveBeenCalled();
-    });
-
     test('DIによってConfigServiceが使用される', () => {
       const bot = new TaskLoggerBot({
         clientFactory: mockClientFactory,
-        serverFactory: mockServerFactory,
         configService: mockConfigService,
         logger: mockLogger,
         timeProvider: mockTimeProvider
@@ -131,19 +103,16 @@ describe('TaskLoggerBot DI対応テスト', () => {
       expect(mockConfigService.getServerPort).toBeDefined();
     });
 
-    test('ログが適切に出力される', () => {
+    test('DIによってTimeProviderが使用される', () => {
       const bot = new TaskLoggerBot({
         clientFactory: mockClientFactory,
-        serverFactory: mockServerFactory,
         configService: mockConfigService,
         logger: mockLogger,
         timeProvider: mockTimeProvider
       });
 
-      // Loggerのinfoメソッドがヘルスサーバー起動時に呼ばれることを確認
-      expect(mockLogger.info).toHaveBeenCalledWith(
-        expect.stringContaining('ヘルスチェックサーバーがポート')
-      );
+      // TimeProviderが注入されていることを確認
+      expect(mockTimeProvider.now).toBeDefined();
     });
   });
 

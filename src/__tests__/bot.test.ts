@@ -5,7 +5,6 @@
 
 import { TaskLoggerBot } from '../bot';
 import { Client } from 'discord.js';
-import express from 'express';
 
 // Discord.js のモック
 jest.mock('discord.js', () => ({
@@ -29,18 +28,6 @@ jest.mock('discord.js', () => ({
   }
 }));
 
-// Express のモック
-jest.mock('express', () => {
-  const mockApp = {
-    get: jest.fn(),
-    post: jest.fn(),
-    use: jest.fn(),
-    listen: jest.fn().mockReturnValue({
-      close: jest.fn()
-    })
-  };
-  return jest.fn(() => mockApp);
-});
 
 // ActivityLoggingIntegration のモック
 jest.mock('../integration', () => ({
@@ -88,11 +75,6 @@ describe('TaskLoggerBot', () => {
       });
     });
 
-    test('ヘルスサーバーが設定される', () => {
-      // expressアプリケーションが作成されることを確認
-      expect(express).toHaveBeenCalled();
-    });
-
     test('初期状態が正しく設定される', () => {
       // Botの初期状態を確認（privateフィールドへのアクセスはリフレクションで）
       const status = (bot as any).status;
@@ -110,20 +92,6 @@ describe('TaskLoggerBot', () => {
     test('stopメソッドが存在し、呼び出し可能である', () => {
       // stopメソッドの存在確認
       expect(typeof (bot as any).stop).toBe('function');
-    });
-  });
-
-  describe('ヘルスチェックサーバー', () => {
-    test('ヘルスチェックサーバーが初期化される', () => {
-      // healthServerが設定されることを確認
-      const healthServer = (bot as any).healthServer;
-      expect(healthServer).toBeDefined();
-    });
-
-    test('ヘルスチェックエンドポイントが設定される', () => {
-      // /health エンドポイントが設定されることを確認
-      const mockApp = express();
-      expect(mockApp.get).toHaveBeenCalledWith('/health', expect.any(Function));
     });
   });
 
