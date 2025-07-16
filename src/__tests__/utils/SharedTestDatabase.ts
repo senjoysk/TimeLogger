@@ -44,13 +44,13 @@ export class SharedTestDatabase {
         fs.unlinkSync(this.testDbPath);
       }
 
-      // 統合リポジトリの初期化
-      this.repository = new SqliteActivityLogRepository(this.testDbPath);
+      // 統合リポジトリの初期化（メモリDBで高速化）
+      this.repository = new SqliteActivityLogRepository(':memory:');
       await this.repository.initializeDatabase();
 
       // 統合クラスの初期化（テスト用に最適化）
       const config: ActivityLoggingConfig = {
-        databasePath: this.testDbPath,
+        databasePath: ':memory:', // メモリDBで高速化
         geminiApiKey: 'test-api-key',
         debugMode: false,
         defaultTimezone: 'Asia/Tokyo',
@@ -90,15 +90,22 @@ export class SharedTestDatabase {
     }
 
     try {
-      // テストデータのクリーンアップ（runQueryを使用）
-      await (this.repository as any).runQuery('DELETE FROM activity_logs');
-      await (this.repository as any).runQuery('DELETE FROM user_settings');
-      await (this.repository as any).runQuery('DELETE FROM todo_tasks');
-      await (this.repository as any).runQuery('DELETE FROM message_classifications');
-      await (this.repository as any).runQuery('DELETE FROM api_costs');
-      await (this.repository as any).runQuery('DELETE FROM daily_analysis_cache');
+      // テストデータのクリーンアップ（バッチ処理で高速化）
+      const cleanupQueries = [
+        'DELETE FROM activity_logs',
+        'DELETE FROM user_settings',
+        'DELETE FROM todo_tasks',
+        'DELETE FROM message_classifications',
+        'DELETE FROM api_costs',
+        'DELETE FROM daily_analysis_cache'
+      ];
+
+      // 並列実行で高速化
+      await Promise.all(
+        cleanupQueries.map(query => (this.repository as any).runQuery(query))
+      );
       
-      console.log('✅ テストデータクリーンアップ完了');
+      console.log('✅ テストデータクリーンアップ完了（並列処理）');
     } catch (error) {
       console.error('❌ テストデータクリーンアップエラー:', error);
       throw error;
