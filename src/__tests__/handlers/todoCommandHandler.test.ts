@@ -1378,7 +1378,7 @@ describe('TodoCommandHandler', () => {
       expect(replyCall.embeds[0].data.title).toContain('ページ 1/2');
       
       // ページネーションボタンの存在を確認
-      expect(replyCall.components).toHaveLength(6); // 1つのページネーション + 5つのTODO操作
+      expect(replyCall.components).toHaveLength(5); // 1つのページネーション + 4つのTODO操作（Discord制限対応）
       expect(replyCall.components[0].components[0].data.label).toContain('◀️ 前のページ');
       expect(replyCall.components[0].components[1].data.label).toContain('ページ 1/2');
       expect(replyCall.components[0].components[2].data.label).toContain('次のページ ▶️');
