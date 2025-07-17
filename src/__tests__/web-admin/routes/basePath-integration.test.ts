@@ -28,6 +28,35 @@ describe('basePath統合テスト', () => {
   });
 
   afterAll(async () => {
+    // 念のため全サーバーインスタンスのクリーンアップ
+    if (adminServer) {
+      const repo = (adminServer as any).sqliteRepo;
+      if (repo && typeof repo.close === 'function') {
+        try {
+          await repo.close();
+        } catch (error) {
+          // クリーンアップエラーは無視
+        }
+      }
+    }
+    
+    if (integratedServer) {
+      const adminServerInstance = (integratedServer as any).adminServer;
+      if (adminServerInstance) {
+        const repo = adminServerInstance.sqliteRepo;
+        if (repo && typeof repo.close === 'function') {
+          try {
+            await repo.close();
+          } catch (error) {
+            // クリーンアップエラーは無視
+          }
+        }
+      }
+    }
+    
+    // 短い待機でリソース解放を確実にする
+    await new Promise(resolve => setTimeout(resolve, 100));
+    
     // テストDBクリーンアップ
     if (fs.existsSync(testDbPath)) {
       fs.unlinkSync(testDbPath);
@@ -42,7 +71,11 @@ describe('basePath統合テスト', () => {
 
     afterEach(async () => {
       if (adminServer) {
-        // サーバーのクリーンアップ（必要に応じて）
+        // データベース接続を閉じる
+        const repo = (adminServer as any).sqliteRepo;
+        if (repo && typeof repo.close === 'function') {
+          await repo.close();
+        }
       }
     });
 
@@ -174,7 +207,14 @@ describe('basePath統合テスト', () => {
 
     afterEach(async () => {
       if (integratedServer) {
-        // サーバーのクリーンアップ（必要に応じて）
+        // AdminServerのデータベース接続を閉じる
+        const adminServer = (integratedServer as any).adminServer;
+        if (adminServer) {
+          const repo = adminServer.sqliteRepo;
+          if (repo && typeof repo.close === 'function') {
+            await repo.close();
+          }
+        }
       }
     });
 
