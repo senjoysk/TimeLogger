@@ -42,6 +42,7 @@ export class SummaryTestService {
     const executedAt = new Date().toISOString();
 
     try {
+
       // Bot初期化チェック
       if (!this.bot) {
         return {
@@ -175,7 +176,11 @@ export class SummaryTestService {
 
     // 18:30の場合は送信処理
     try {
-      if (request.dryRun) {
+      // dryRun の値を正しく boolean として評価
+      // HTTPリクエストでは文字列として送られてくる可能性があるため、型安全に変換
+      const isDryRun = Boolean(request.dryRun === true || (request.dryRun as any) === 'true');
+
+      if (isDryRun) {
         // ドライランモード：実際の送信は行わない
         const summaryPreview = await this.generateSummaryPreview(user.userId);
         

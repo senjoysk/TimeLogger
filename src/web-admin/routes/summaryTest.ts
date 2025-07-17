@@ -28,7 +28,13 @@ export function createSummaryTestRouter(bot: TaskLoggerBot | null): Router {
    */
   router.post('/execute', async (req: Request, res: Response) => {
     try {
-      const testRequest: SummaryTestRequest = req.body;
+      const rawRequest = req.body;
+      
+      // dryRunを正しくbooleanに変換
+      const testRequest: SummaryTestRequest = {
+        ...rawRequest,
+        dryRun: rawRequest.dryRun === true || rawRequest.dryRun === 'true'
+      };
       
       // 入力検証
       if (testRequest.dryRun === undefined) {
