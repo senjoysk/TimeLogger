@@ -29,18 +29,20 @@ export function createRoutes(adminService: AdminService, securityService: Securi
   // TODO管理
   router.use('/todos', createTodoRouter(databasePath));
 
-  // 開発ツール（GitHub Issue #37）
-  router.use('/tools/api/time-simulation', createTimeSimulationRouter());
-  router.use('/tools/api/summary-test', createSummaryTestRouter(bot));
+  // 開発ツール（GitHub Issue #37）- Production環境では無効化
+  if (securityService.getEnvironment().env !== 'production') {
+    router.use('/tools/api/time-simulation', createTimeSimulationRouter());
+    router.use('/tools/api/summary-test', createSummaryTestRouter(bot));
 
-  // 開発ツール管理画面
-  router.get('/tools/time-simulation', (req, res) => {
-    res.render('time-simulation', { title: '時刻シミュレーション' });
-  });
+    // 開発ツール管理画面
+    router.get('/tools/time-simulation', (req, res) => {
+      res.render('time-simulation', { title: '時刻シミュレーション' });
+    });
 
-  router.get('/tools/summary-test', (req, res) => {
-    res.render('summary-test', { title: 'サマリーテスト' });
-  });
+    router.get('/tools/summary-test', (req, res) => {
+      res.render('summary-test', { title: 'サマリーテスト' });
+    });
+  }
 
   // ヘルスチェック
   router.get('/health', (req, res) => {
