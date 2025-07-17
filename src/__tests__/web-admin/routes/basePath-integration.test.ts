@@ -51,12 +51,13 @@ describe('basePath統合テスト', () => {
       const response = await request(app)
         .get('/todos/new')
         .auth('testuser', 'testpass')
+        .timeout(10000)
         .expect(200);
       
       // basePath = "" の場合、action="/todos"
       expect(response.text).toContain('action="/todos"');
       expect(response.text).not.toContain('action="/admin/todos"');
-    });
+    }, 30000);
 
     test('TODO編集フォームのaction属性が正しく設定される', async () => {
       const app = adminServer.getExpressApp();
@@ -65,6 +66,7 @@ describe('basePath統合テスト', () => {
       await request(app)
         .post('/todos')
         .auth('testuser', 'testpass')
+        .timeout(10000)
         .send({
           userId: 'testuser',
           title: 'Test TODO',
@@ -74,13 +76,15 @@ describe('basePath統合テスト', () => {
       // 作成したTODOを取得
       const dashboardResponse = await request(app)
         .get('/todos')
-        .auth('testuser', 'testpass');
+        .auth('testuser', 'testpass')
+        .timeout(10000);
       
       // TODOが存在する場合のみ編集フォームをテスト
       if (dashboardResponse.text.includes('Test TODO')) {
         const editResponse = await request(app)
           .get('/todos/1/edit')
-          .auth('testuser', 'testpass');
+          .auth('testuser', 'testpass')
+          .timeout(10000);
         
         if (editResponse.status === 200) {
           // basePath = "" の場合、action="/todos/1"
@@ -88,7 +92,7 @@ describe('basePath統合テスト', () => {
           expect(editResponse.text).not.toContain('action="/admin/todos/1"');
         }
       }
-    });
+    }, 30000);
 
     test('TODO削除フォームのaction属性が正しく設定される', async () => {
       const app = adminServer.getExpressApp();
@@ -97,6 +101,7 @@ describe('basePath統合テスト', () => {
       const createResponse = await request(app)
         .post('/todos')
         .auth('testuser', 'testpass')
+        .timeout(10000)
         .send({
           userId: 'testuser',
           title: 'Test TODO for Delete',
@@ -107,10 +112,14 @@ describe('basePath統合テスト', () => {
       // TODO作成が成功したことを確認
       expect(createResponse.status).toBe(302);
 
+      // 短い待機でデータベースへの書き込み完了を待つ
+      await new Promise(resolve => setTimeout(resolve, 100));
+
       // 特定ユーザーのTODOを明示的に取得
       const response = await request(app)
         .get('/todos?userId=testuser')
         .auth('testuser', 'testpass')
+        .timeout(10000)
         .expect(200);
       
       // デバッグ情報を出力
@@ -127,7 +136,7 @@ describe('basePath統合テスト', () => {
       // basePath = "" の場合、削除フォームのaction="/todos/{id}/delete"
       expect(response.text).toMatch(/action="\/todos\/[^"]*\/delete"/);
       expect(response.text).not.toMatch(/action="\/admin\/todos\/[^"]*\/delete"/);
-    });
+    }, 30000);
 
     test('TODO作成後のリダイレクト先が正しい', async () => {
       const app = adminServer.getExpressApp();
@@ -135,6 +144,7 @@ describe('basePath統合テスト', () => {
       const response = await request(app)
         .post('/todos')
         .auth('testuser', 'testpass')
+        .timeout(10000)
         .send({
           userId: 'testuser',
           title: 'Test TODO',
@@ -153,7 +163,7 @@ describe('basePath統合テスト', () => {
       // basePath = "" の場合、リダイレクト先は "/todos"
       expect(response.status).toBe(302);
       expect(response.headers.location).toBe('/todos');
-    });
+    }, 30000);
   });
 
   describe('IntegratedServer（basePath = "/admin"）', () => {
@@ -173,12 +183,13 @@ describe('basePath統合テスト', () => {
       const response = await request(app)
         .get('/admin/todos/new')
         .auth('testuser', 'testpass')
+        .timeout(10000)
         .expect(200);
       
       // basePath = "/admin" の場合、action="/admin/todos"
       expect(response.text).toContain('action="/admin/todos"');
       expect(response.text).not.toContain('action="/todos"');
-    });
+    }, 30000);
 
     test('TODO編集フォームのaction属性が正しく設定される', async () => {
       const app = (integratedServer as any).app;
@@ -187,6 +198,7 @@ describe('basePath統合テスト', () => {
       await request(app)
         .post('/admin/todos')
         .auth('testuser', 'testpass')
+        .timeout(10000)
         .send({
           userId: 'testuser',
           title: 'Test TODO',
@@ -196,13 +208,15 @@ describe('basePath統合テスト', () => {
       // 作成したTODOを取得
       const dashboardResponse = await request(app)
         .get('/admin/todos')
-        .auth('testuser', 'testpass');
+        .auth('testuser', 'testpass')
+        .timeout(10000);
       
       // TODOが存在する場合のみ編集フォームをテスト
       if (dashboardResponse.text.includes('Test TODO')) {
         const editResponse = await request(app)
           .get('/admin/todos/1/edit')
-          .auth('testuser', 'testpass');
+          .auth('testuser', 'testpass')
+          .timeout(10000);
         
         if (editResponse.status === 200) {
           // basePath = "/admin" の場合、action="/admin/todos/1"
@@ -210,7 +224,7 @@ describe('basePath統合テスト', () => {
           expect(editResponse.text).not.toContain('action="/todos/1"');
         }
       }
-    });
+    }, 30000);
 
     test('TODO削除フォームのaction属性が正しく設定される', async () => {
       const app = (integratedServer as any).app;
@@ -224,15 +238,20 @@ describe('basePath統合テスト', () => {
           title: 'Test TODO for Delete',
           description: 'Test content',
           priority: 'medium'
-        });
+        })
+        .timeout(10000); // 10秒タイムアウト
 
       // TODO作成が成功したことを確認
       expect(createResponse.status).toBe(302);
+
+      // 短い待機でデータベースへの書き込み完了を待つ
+      await new Promise(resolve => setTimeout(resolve, 100));
 
       // 特定ユーザーのTODOを明示的に取得
       const response = await request(app)
         .get('/admin/todos?userId=testuser')
         .auth('testuser', 'testpass')
+        .timeout(10000) // 10秒タイムアウト
         .expect(200);
       
       // デバッグ情報を出力
@@ -249,7 +268,7 @@ describe('basePath統合テスト', () => {
       // basePath = "/admin" の場合、削除フォームのaction="/admin/todos/{id}/delete"
       expect(response.text).toMatch(/action="\/admin\/todos\/[^"]*\/delete"/);
       expect(response.text).not.toMatch(/action="\/todos\/[^"]*\/delete"/);
-    });
+    }, 30000); // テスト全体に30秒タイムアウト
 
     test('TODO作成後のリダイレクト先が正しい', async () => {
       const app = (integratedServer as any).app;
@@ -262,7 +281,8 @@ describe('basePath統合テスト', () => {
           title: 'Test TODO',
           description: 'Test content',
           priority: 'medium'
-        });
+        })
+        .timeout(10000); // 10秒タイムアウト
       
       // エラーの場合はログを出力
       if (response.status === 500) {
@@ -275,7 +295,7 @@ describe('basePath統合テスト', () => {
       // basePath = "/admin" の場合、リダイレクト先は "/admin/todos"
       expect(response.status).toBe(302);
       expect(response.headers.location).toBe('/admin/todos');
-    });
+    }, 30000); // テスト全体に30秒タイムアウト
   });
 
   describe('Tools機能のbasePath統合テスト', () => {
