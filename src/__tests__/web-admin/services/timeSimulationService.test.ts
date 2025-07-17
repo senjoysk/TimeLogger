@@ -186,7 +186,7 @@ describe('TimeSimulationService', () => {
 
   describe('現在時刻取得機能テスト', () => {
     test('設定された仮想時刻が取得できる', async () => {
-      // 時刻設定
+      // 時刻設定（Asia/Tokyo 18:30 = UTC 09:30）
       const request: TimeSetRequest = {
         year: 2024,
         month: 1,
@@ -198,14 +198,14 @@ describe('TimeSimulationService', () => {
 
       await service.setTime(request);
 
-      // 現在時刻取得
+      // 現在時刻取得（UTC時刻で返される）
       const currentTime = service.getCurrentTime();
 
       expect(currentTime).toBeDefined();
       expect(currentTime.year).toBe(2024);
       expect(currentTime.month).toBe(1);
       expect(currentTime.day).toBe(15);
-      expect(currentTime.hour).toBe(18);
+      expect(currentTime.hour).toBe(9); // Asia/Tokyo 18:30 = UTC 09:30
       expect(currentTime.minute).toBe(30);
     });
 

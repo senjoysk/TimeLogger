@@ -881,6 +881,23 @@ export class ActivityLoggingIntegration {
 
 
   /**
+   * 全ユーザーのタイムゾーン情報を取得（Bot用）
+   */
+  async getAllUserTimezones(): Promise<Array<{ user_id: string; timezone: string }>> {
+    if (!this.isInitialized) {
+      throw new ActivityLogError('システムが初期化されていません', 'SYSTEM_NOT_INITIALIZED');
+    }
+
+    try {
+      // スケジューラー用のメソッドを使用
+      return await this.repository.getAllUserTimezonesForScheduler();
+    } catch (error) {
+      console.error('❌ 全ユーザータイムゾーン取得エラー:', error);
+      throw new ActivityLogError('全ユーザータイムゾーンの取得に失敗しました', 'GET_ALL_USER_TIMEZONES_ERROR', { error });
+    }
+  }
+
+  /**
    * システムリソースをクリーンアップ（TODO機能統合対応）
    */
   async destroy(): Promise<void> {

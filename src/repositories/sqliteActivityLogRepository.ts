@@ -1305,34 +1305,6 @@ export class SqliteActivityLogRepository implements IActivityLogRepository, IApi
     }
   }
 
-  /**
-   * DynamicReportScheduler用の全ユーザータイムゾーン取得
-   */
-  async getAllUserTimezonesForScheduler(): Promise<Array<{
-    user_id: string;
-    timezone: string;
-  }>> {
-    try {
-      const sql = `
-        SELECT user_id, timezone 
-        FROM user_settings
-        WHERE is_active = 1
-      `;
-      
-      const rows = await this.allQuery(sql);
-      
-      console.log(`📍 DynamicReportScheduler用タイムゾーン取得: ${rows.length}件`);
-      return rows.map(row => ({
-        user_id: row.user_id,
-        timezone: row.timezone
-      }));
-    } catch (error) {
-      console.error('❌ DynamicReportScheduler用タイムゾーン取得エラー:', error);
-      throw new ActivityLogError('DynamicReportScheduler用タイムゾーン取得に失敗しました', 'GET_ALL_USER_TIMEZONES_FOR_SCHEDULER_ERROR', { error });
-    }
-  }
-
-
   // === 統合サービス対応メソッド ===
 
   /**
@@ -2198,6 +2170,33 @@ export class SqliteActivityLogRepository implements IActivityLogRepository, IApi
     } catch (error) {
       console.error('❌ 全ユーザー取得エラー:', error);
       throw new ActivityLogError('全ユーザーの取得に失敗しました', 'GET_ALL_USERS_ERROR', { error });
+    }
+  }
+
+  /**
+   * スケジューラー用の全ユーザータイムゾーン情報を取得
+   * DynamicReportScheduler用のシンプルなインターフェース
+   */
+  async getAllUserTimezonesForScheduler(): Promise<Array<{ user_id: string; timezone: string }>> {
+    try {
+      const rows = await this.allQuery(`
+        SELECT user_id, timezone 
+        FROM user_settings 
+        WHERE is_active = 1 
+        ORDER BY user_id
+      `);
+      
+      if (!rows || rows.length === 0) {
+        return [];
+      }
+      
+      return rows.map(row => ({
+        user_id: row.user_id,
+        timezone: row.timezone || 'Asia/Tokyo'
+      }));
+    } catch (error) {
+      console.error('❌ スケジューラー用タイムゾーン取得エラー:', error);
+      throw new ActivityLogError('スケジューラー用タイムゾーンの取得に失敗しました', 'GET_SCHEDULER_TIMEZONES_ERROR', { error });
     }
   }
 

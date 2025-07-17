@@ -522,6 +522,74 @@ export class TaskLoggerBot {
     await this.sendDailySummaryForAllUsers();
   }
 
+  // ========================================
+  // テスト用メソッド群
+  // ========================================
+
+  /**
+   * 登録ユーザー一覧を取得（テスト用）
+   */
+  public async getRegisteredUsers(): Promise<Array<{ userId: string; timezone: string }>> {
+    try {
+      if (!this.activityLoggingIntegration) {
+        return [];
+      }
+
+      // SqliteActivityLogRepositoryから登録ユーザーを取得
+      const users = await this.activityLoggingIntegration.getAllUserTimezones();
+      return users.map(user => ({
+        userId: user.user_id,
+        timezone: user.timezone
+      }));
+    } catch (error) {
+      console.error('❌ 登録ユーザー取得エラー:', error);
+      return [];
+    }
+  }
+
+  /**
+   * サマリープレビューを生成（テスト用）
+   */
+  public async generateSummaryPreview(userId: string): Promise<string> {
+    try {
+      if (!this.activityLoggingIntegration) {
+        return '🌅 今日一日お疲れさまでした！\n\n活動記録システムでのサマリー機能は開発中です。';
+      }
+
+      // 実際のサマリー生成ロジックを使用
+      const timezone = await this.getUserTimezone(userId);
+      return await this.activityLoggingIntegration.generateDailySummaryText(userId, timezone);
+    } catch (error) {
+      console.error(`❌ ${userId} のサマリープレビュー生成エラー:`, error);
+      return '🌅 今日一日お疲れさまでした！\n\nサマリーの詳細を確認するには `!summary` コマンドをお使いください。';
+    }
+  }
+
+  /**
+   * 日次サマリーを指定ユーザーに送信（テスト用公開メソッド）
+   */
+  public async sendDailySummaryToUserForTest(userId: string, timezone: string): Promise<void> {
+    return this.sendDailySummaryToUser(userId, timezone);
+  }
+
+  /**
+   * ユーザーのタイムゾーンを取得（プライベートメソッドのヘルパー）
+   */
+  private async getUserTimezone(userId: string): Promise<string> {
+    try {
+      if (!this.activityLoggingIntegration) {
+        return 'Asia/Tokyo'; // デフォルト
+      }
+      
+      const users = await this.activityLoggingIntegration.getAllUserTimezones();
+      const user = users.find(u => u.user_id === userId);
+      return user?.timezone || 'Asia/Tokyo';
+    } catch (error) {
+      console.error(`❌ ${userId} のタイムゾーン取得エラー:`, error);
+      return 'Asia/Tokyo';
+    }
+  }
+
   /**
    * APIコストレポートを全ユーザーに送信
    */

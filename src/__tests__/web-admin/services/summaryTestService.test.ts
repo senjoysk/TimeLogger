@@ -80,7 +80,7 @@ describe('SummaryTestService', () => {
       ]);
 
       // Discord送信メソッドのモック
-      mockBot.sendDailySummaryToUser = jest.fn().mockResolvedValue(undefined);
+      mockBot.sendDailySummaryToUserForTest = jest.fn().mockResolvedValue(undefined);
 
       const request: SummaryTestRequest = {
         dryRun: true,
@@ -91,7 +91,7 @@ describe('SummaryTestService', () => {
       await service.executeTest(request);
 
       // ドライランなのでDiscord送信メソッドは呼ばれない
-      expect(mockBot.sendDailySummaryToUser).not.toHaveBeenCalled();
+      expect(mockBot.sendDailySummaryToUserForTest).not.toHaveBeenCalled();
     });
   });
 
@@ -231,7 +231,7 @@ describe('SummaryTestService', () => {
       ]);
 
       // Discord送信メソッドのモック
-      mockBot.sendDailySummaryToUser = jest.fn().mockResolvedValue(undefined);
+      mockBot.sendDailySummaryToUserForTest = jest.fn().mockResolvedValue(undefined);
 
       const request: SummaryTestRequest = {
         dryRun: false,
@@ -242,7 +242,7 @@ describe('SummaryTestService', () => {
       await service.executeTest(request);
 
       // 実際送信なのでDiscord送信メソッドが呼ばれる
-      expect(mockBot.sendDailySummaryToUser).toHaveBeenCalledWith('user1', 'Asia/Tokyo');
+      expect(mockBot.sendDailySummaryToUserForTest).toHaveBeenCalledWith('user1', 'Asia/Tokyo');
     });
   });
 
@@ -286,7 +286,7 @@ describe('SummaryTestService', () => {
       ]);
 
       // Discord送信でエラーをスロー
-      mockBot.sendDailySummaryToUser = jest.fn().mockRejectedValue(new Error('Discord API エラー'));
+      mockBot.sendDailySummaryToUserForTest = jest.fn().mockRejectedValue(new Error('Discord API エラー'));
 
       const request: SummaryTestRequest = {
         dryRun: false,
