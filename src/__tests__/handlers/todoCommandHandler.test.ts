@@ -16,8 +16,10 @@ class MockTodoRepository implements ITodoRepository {
   private nextId = 1;
 
   async createTodo(request: CreateTodoRequest): Promise<Todo> {
-    // より現実的なUUID形式のIDを生成（実際のシステムに近づける）
-    const uuid = `todo-${this.nextId.toString().padStart(8, '0')}-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+    // 短縮IDが一意になるようなUUID形式のIDを生成
+    // 最初の8文字が一意になるように設計
+    const uniquePrefix = `${this.nextId.toString(36).padStart(8, '0')}`; // 36進数で8文字
+    const uuid = `${uniquePrefix}-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
     const todo: Todo = {
       id: uuid,
       userId: request.userId,
@@ -1127,6 +1129,10 @@ describe('TodoCommandHandler', () => {
       // 6番目のTODOを短縮IDで完了操作
       const sixthTodo = todos[5]; // 0-indexedなので5番目が6番目
       const shortId = sixthTodo.id.substring(0, 8);
+      
+      // updateTodoStatusが正しい完全IDで呼ばれることを確認
+      const updateStatusSpy = jest.spyOn(mockTodoRepo, 'updateTodoStatus');
+      
       const message = createMockMessage(`!todo done ${shortId}`, 'test-user') as Message;
       
       await handler.handleCommand(message, 'test-user', ['done', shortId], 'Asia/Tokyo');
@@ -1136,9 +1142,14 @@ describe('TodoCommandHandler', () => {
       expect(replyCall).toContain('🎉');
       expect(replyCall).toContain('完了しました');
       
+      // 重要: 短縮IDではなく完全IDでupdateが呼ばれることを確認
+      expect(updateStatusSpy).toHaveBeenCalledWith(sixthTodo.id, 'completed');
+      
       // TODOが実際に完了状態になっていることを確認
       const updatedTodo = await mockTodoRepo.getTodoById(sixthTodo.id);
       expect(updatedTodo?.status).toBe('completed');
+      
+      updateStatusSpy.mockRestore();
     });
 
     test('TODOが5件以下の場合は従来通り動作する', async () => {
