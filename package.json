@@ -18,6 +18,7 @@
     "test:integration": "jest --testPathPattern=integration",
     "test:e2e": "jest --testPathPattern=e2e",
     "test:unit": "jest --testPathIgnorePatterns=integration,e2e",
+    "test:smoke": "jest --testPathPattern=basePath-integration --verbose",
     "test:realtime": "jest --testPathPattern=realTimeAnalysis",
     "test:realtime:watch": "jest --testPathPattern=realTimeAnalysis --watch",
     "validate:realtime": "npm run build && node scripts/test/realtime-analysis-validation.js",

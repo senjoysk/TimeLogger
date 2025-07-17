@@ -94,19 +94,35 @@ describe('basePath統合テスト', () => {
       const app = adminServer.getExpressApp();
       
       // まずTODOを作成
-      await request(app)
+      const createResponse = await request(app)
         .post('/todos')
         .auth('testuser', 'testpass')
         .send({
           userId: 'testuser',
           title: 'Test TODO for Delete',
-          content: 'Test content'
+          description: 'Test content',
+          priority: 'medium'
         });
 
+      // TODO作成が成功したことを確認
+      expect(createResponse.status).toBe(302);
+
+      // 特定ユーザーのTODOを明示的に取得
       const response = await request(app)
-        .get('/todos')
+        .get('/todos?userId=testuser')
         .auth('testuser', 'testpass')
         .expect(200);
+      
+      // デバッグ情報を出力
+      console.log('AdminServer - TODOページのレスポンスを確認中...');
+      if (!response.text.includes('Test TODO for Delete')) {
+        console.log('TODOが見つかりません。userId=testuserでクエリ実行');
+        console.log('レスポンスの一部:');
+        console.log(response.text.substring(0, 1000) + '...');
+      }
+      
+      // TODOが表示されているかを確認
+      expect(response.text).toContain('Test TODO for Delete');
       
       // basePath = "" の場合、削除フォームのaction="/todos/{id}/delete"
       expect(response.text).toMatch(/action="\/todos\/[^"]*\/delete"/);
@@ -122,12 +138,16 @@ describe('basePath統合テスト', () => {
         .send({
           userId: 'testuser',
           title: 'Test TODO',
-          description: 'Test content'
+          description: 'Test content',
+          priority: 'medium'
         });
       
       // エラーの場合はログを出力
       if (response.status === 500) {
-        console.log('Error response:', response.text);
+        console.log('AdminServer TODO作成エラー:');
+        console.log('Status:', response.status);
+        console.log('Response:', response.text);
+        console.log('Headers:', response.headers);
       }
       
       // basePath = "" の場合、リダイレクト先は "/todos"
@@ -196,19 +216,35 @@ describe('basePath統合テスト', () => {
       const app = (integratedServer as any).app;
       
       // まずTODOを作成
-      await request(app)
+      const createResponse = await request(app)
         .post('/admin/todos')
         .auth('testuser', 'testpass')
         .send({
           userId: 'testuser',
           title: 'Test TODO for Delete',
-          content: 'Test content'
+          description: 'Test content',
+          priority: 'medium'
         });
 
+      // TODO作成が成功したことを確認
+      expect(createResponse.status).toBe(302);
+
+      // 特定ユーザーのTODOを明示的に取得
       const response = await request(app)
-        .get('/admin/todos')
+        .get('/admin/todos?userId=testuser')
         .auth('testuser', 'testpass')
         .expect(200);
+      
+      // デバッグ情報を出力
+      console.log('IntegratedServer - TODOページのレスポンスを確認中...');
+      if (!response.text.includes('Test TODO for Delete')) {
+        console.log('TODOが見つかりません。userId=testuserでクエリ実行');
+        console.log('レスポンスの一部:');
+        console.log(response.text.substring(0, 1000) + '...');
+      }
+      
+      // TODOが表示されているかを確認
+      expect(response.text).toContain('Test TODO for Delete');
       
       // basePath = "/admin" の場合、削除フォームのaction="/admin/todos/{id}/delete"
       expect(response.text).toMatch(/action="\/admin\/todos\/[^"]*\/delete"/);
@@ -224,12 +260,16 @@ describe('basePath統合テスト', () => {
         .send({
           userId: 'testuser',
           title: 'Test TODO',
-          description: 'Test content'
+          description: 'Test content',
+          priority: 'medium'
         });
       
       // エラーの場合はログを出力
       if (response.status === 500) {
-        console.log('Error response:', response.text);
+        console.log('IntegratedServer TODO作成エラー:');
+        console.log('Status:', response.status);
+        console.log('Response:', response.text);
+        console.log('Headers:', response.headers);
       }
       
       // basePath = "/admin" の場合、リダイレクト先は "/admin/todos"
