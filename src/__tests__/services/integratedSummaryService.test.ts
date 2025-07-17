@@ -405,39 +405,4 @@ describe('IntegratedSummaryService', () => {
     });
   });
 
-  describe('generateWeeklySummary', () => {
-    test('週次統合サマリーを生成する', async () => {
-      const userId = 'test-user';
-      const endDate = '2024-01-15';
-      const timezone = 'Asia/Tokyo';
-
-      // 週間データを準備
-      for (let i = 0; i < 7; i++) {
-        const date = new Date('2024-01-15');
-        date.setDate(date.getDate() - i);
-        const dateStr = date.toISOString().split('T')[0];
-
-        mockRepository.addTodo({
-          id: `todo-${i}`,
-          userId,
-          content: `タスク${i}`,
-          status: i % 2 === 0 ? 'completed' : 'pending',
-          priority: 1,
-          createdAt: `${dateStr}T08:00:00Z`,
-          updatedAt: `${dateStr}T10:00:00Z`,
-          completedAt: i % 2 === 0 ? `${dateStr}T10:00:00Z` : undefined,
-          sourceType: 'manual'
-        });
-      }
-
-      const weeklySummary = await service.generateWeeklySummary(userId, endDate, timezone);
-
-      expect(weeklySummary).toBeDefined();
-      expect(weeklySummary.period.endDate).toBe(endDate);
-      expect(weeklySummary.dailySummaries).toHaveLength(7);
-      expect(weeklySummary.weeklyMetrics).toBeDefined();
-      expect(weeklySummary.weeklyMetrics.averageCompletionRate).toBeGreaterThanOrEqual(0);
-      expect(weeklySummary.weeklyTrends).toBeDefined();
-    });
-  });
 });

@@ -95,7 +95,7 @@ This application is a Discord bot that tracks user activities and generates summ
     - `activityService.ts` manages the recording and retrieval of user activities, interacting with `database.ts`.
     - `summaryService.ts` uses `geminiService.ts` to generate textual summaries of user activities.
 4.  **Data Persistence**: `database.ts` provides an abstraction layer for all database operations, executing queries defined in `schema.sql`.
-5.  **Scheduled Tasks**: `scheduler.ts` uses `node-cron` to trigger periodic actions, such as generating daily or weekly summaries via `summaryService.ts`.
+5.  **Scheduled Tasks**: `scheduler.ts` uses `node-cron` to trigger periodic actions, such as generating daily summaries via `summaryService.ts`.
 
 ## 8. Instructions for AI Assistant
 
