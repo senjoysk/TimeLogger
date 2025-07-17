@@ -599,7 +599,7 @@ export class TodoCommandHandler implements ITodoCommandHandler {
       return;
     }
 
-    await this.todoRepository.updateTodoStatus(todoId, 'completed');
+    await this.todoRepository.updateTodoStatus(todo.id, 'completed');
     
     await message.reply(`🎉 TODO「${todo.content}」を完了しました！`);
     console.log(`✅ TODO完了: ${userId} "${todo.content}"`);
@@ -623,7 +623,7 @@ export class TodoCommandHandler implements ITodoCommandHandler {
 
     // TODO更新（簡易実装）
     const oldContent = todo.content;
-    await this.todoRepository.updateTodo(todoId, { content: newContent });
+    await this.todoRepository.updateTodo(todo.id, { content: newContent });
     
     await message.reply(`✏️ TODO「${oldContent}」を「${newContent}」に編集しました！`);
     console.log(`✏️ TODO編集: ${userId} "${todo.content}" -> "${newContent}"`);
@@ -645,7 +645,7 @@ export class TodoCommandHandler implements ITodoCommandHandler {
       return;
     }
 
-    await this.todoRepository.deleteTodo(todoId);
+    await this.todoRepository.deleteTodo(todo.id);
     
     await message.reply(`🗑️ TODO「${todo.content}」を削除しました。`);
     console.log(`🗑️ TODO削除: ${userId} "${todo.content}"`);
@@ -745,24 +745,24 @@ export class TodoCommandHandler implements ITodoCommandHandler {
 
     switch (action) {
       case 'complete':
-        await this.todoRepository.updateTodoStatus(todoId, 'completed');
+        await this.todoRepository.updateTodoStatus(todo.id, 'completed');
         await interaction.reply({ content: `🎉 TODO「${todo.content}」を完了しました！`, ephemeral: true });
         break;
         
       case 'start':
-        await this.todoRepository.updateTodoStatus(todoId, 'in_progress');
+        await this.todoRepository.updateTodoStatus(todo.id, 'in_progress');
         await interaction.reply({ content: `🚀 TODO「${todo.content}」を開始しました！`, ephemeral: true });
         break;
         
       case 'edit':
         await interaction.reply({ 
-          content: `✏️ TODO編集は \`!todo edit ${todoId} <新しい内容>\` コマンドを使用してください。`, 
+          content: `✏️ TODO編集は \`!todo edit ${todo.id} <新しい内容>\` コマンドを使用してください。`, 
           ephemeral: true 
         });
         break;
         
       case 'delete':
-        await this.todoRepository.deleteTodo(todoId);
+        await this.todoRepository.deleteTodo(todo.id);
         await interaction.reply({ content: `🗑️ TODO「${todo.content}」を削除しました。`, ephemeral: true });
         break;
         

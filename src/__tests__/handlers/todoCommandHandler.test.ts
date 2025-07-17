@@ -16,8 +16,10 @@ class MockTodoRepository implements ITodoRepository {
   private nextId = 1;
 
   async createTodo(request: CreateTodoRequest): Promise<Todo> {
+    // より現実的なUUID形式のIDを生成（実際のシステムに近づける）
+    const uuid = `todo-${this.nextId.toString().padStart(8, '0')}-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
     const todo: Todo = {
-      id: `todo-${this.nextId++}`,
+      id: uuid,
       userId: request.userId,
       content: request.content,
       status: 'pending',
@@ -31,6 +33,7 @@ class MockTodoRepository implements ITodoRepository {
       aiConfidence: request.aiConfidence
     };
     this.todos.push(todo);
+    this.nextId++;
     return todo;
   }
 
@@ -1515,6 +1518,7 @@ describe('TodoCommandHandler', () => {
       const message = createMockMessage(`!todo done ${shortId}`, 'test-user') as Message;
       
       await handler.handleCommand(message, 'test-user', ['done', shortId], 'Asia/Tokyo');
+      
       
       // 🚨 重要: updateTodoStatusには完全ID（testTodo.id）が渡されるべき
       // 現在のバグのある実装では短縮ID（shortId）が渡されるため、このテストは失敗する
