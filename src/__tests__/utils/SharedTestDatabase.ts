@@ -56,7 +56,8 @@ export class SharedTestDatabase {
         defaultTimezone: 'Asia/Tokyo',
         enableAutoAnalysis: false, // テスト時は自動分析無効
         cacheValidityMinutes: 1, // テスト用に短時間設定
-        targetUserId: '' // マルチユーザー対応により削除
+        targetUserId: '', // マルチユーザー対応により削除
+        repository: this.repository // 共有リポジトリを注入
       };
 
       this.integration = new ActivityLoggingIntegration(config);
@@ -119,10 +120,9 @@ export class SharedTestDatabase {
         this.integration = null;
       }
 
-      if (this.repository) {
-        await this.repository.close();
-        this.repository = null;
-      }
+      // リポジトリは既にintegrationのshutdownで閉じられているため、
+      // 手動で閉じる必要はない
+      this.repository = null;
 
       // テストDBファイルを削除
       if (fs.existsSync(this.testDbPath)) {

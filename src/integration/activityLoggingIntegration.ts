@@ -44,6 +44,8 @@ export interface ActivityLoggingConfig {
   cacheValidityMinutes: number;
   /** 対象ユーザーID（レガシー設定・将来削除予定） */
   targetUserId: string;
+  /** 外部リポジトリの注入（テスト用） */
+  repository?: SqliteActivityLogRepository;
 }
 
 /**
@@ -93,10 +95,17 @@ export class ActivityLoggingIntegration {
       console.log('🚀 活動記録システムの初期化を開始...');
 
       // 1. データベース接続とRepository初期化
-      this.repository = new SqliteActivityLogRepository(this.config.databasePath);
-      // リポジトリの初期化を明示的に実行
-      await this.repository.initializeDatabase();
-      console.log('✅ データベース接続・初期化完了');
+      if (this.config.repository) {
+        // 外部から注入されたリポジトリを使用（テスト用）
+        this.repository = this.config.repository;
+        console.log('✅ 外部リポジトリを使用（テスト用）');
+      } else {
+        // 通常の場合は新しいリポジトリを作成
+        this.repository = new SqliteActivityLogRepository(this.config.databasePath);
+        // リポジトリの初期化を明示的に実行
+        await this.repository.initializeDatabase();
+        console.log('✅ データベース接続・初期化完了');
+      }
 
       // 2. サービス層の初期化
       // コスト管理機能の初期化（統合版）
