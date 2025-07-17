@@ -13,12 +13,11 @@ import {
   DailyAnalysisResult,
   ActivityLogError
 } from '../types/activityLog';
-import { WeeklyIntegratedSummary } from '../types/integratedSummary';
 
 /**
  * サマリーコマンドの種類
  */
-export type SummaryCommandType = 'today' | 'date' | 'integrated' | 'weekly' | 'help';
+export type SummaryCommandType = 'today' | 'date' | 'integrated' | 'help';
 
 /**
  * サマリーコマンドの解析結果
@@ -86,9 +85,6 @@ export class SummaryHandler implements ISummaryHandler {
           await this.generateIntegratedSummary(message, userId, parsedCommand, timezone);
           break;
 
-        case 'weekly':
-          await this.generateWeeklySummary(message, userId, parsedCommand, timezone);
-          break;
         
         case 'help':
           await this.showHelp(message);
@@ -175,37 +171,6 @@ export class SummaryHandler implements ISummaryHandler {
     }
   }
 
-  /**
-   * 週次サマリーを生成・表示
-   */
-  private async generateWeeklySummary(message: Message, userId: string, parsedCommand: ParsedSummaryCommand, timezone: string): Promise<void> {
-    if (!this.integratedSummaryService) {
-      await message.reply('❌ 週次サマリー機能は利用できません。');
-      return;
-    }
-
-    try {
-      // 対象日を決定（週の終了日）
-      const endDate = parsedCommand.targetDate || this.activityLogService.calculateBusinessDate(timezone).businessDate;
-
-      // 進行状況メッセージを送信
-      const progressMessage = await message.reply('🔄 週次分析中です。しばらくお待ちください...');
-
-      // 週次サマリーを生成
-      const weeklySummary = await this.integratedSummaryService.generateWeeklySummary(userId, endDate, timezone);
-
-      // 結果をフォーマットして送信
-      const formattedSummary = this.formatWeeklySummary(weeklySummary, timezone);
-      
-      await progressMessage.edit(formattedSummary);
-      
-      console.log(`📊 週次サマリー生成完了: ${userId} ${endDate}`);
-    } catch (error) {
-      console.error('❌ 週次サマリー生成エラー:', error);
-      throw error instanceof ActivityLogError ? error :
-        new ActivityLogError('週次サマリーの生成に失敗しました', 'GENERATE_WEEKLY_SUMMARY_ERROR', { error });
-    }
-  }
 
   /**
    * 分析結果をDiscord用にフォーマット
@@ -339,62 +304,6 @@ export class SummaryHandler implements ISummaryHandler {
     return sections.join('\n');
   }
 
-  /**
-   * 週次サマリーをフォーマット
-   */
-  private formatWeeklySummary(weeklySummary: WeeklyIntegratedSummary, timezone: string): string {
-    const sections: string[] = [];
-
-    // ヘッダー
-    const startDate = this.formatBusinessDate(weeklySummary.period.startDate, timezone);
-    const endDate = this.formatBusinessDate(weeklySummary.period.endDate, timezone);
-    sections.push(`📊 **週次統合サマリー (${startDate} - ${endDate})**`);
-
-    // 週次メトリクス
-    const metrics = weeklySummary.weeklyMetrics;
-    const completionPercent = Math.round(metrics.averageCompletionRate * 100);
-    const totalHours = Math.floor(metrics.totalActivityMinutes / 60);
-    
-    sections.push(`\n📈 **週次指標**`);
-    sections.push(`• 平均完了率: ${completionPercent}% | 総活動時間: ${totalHours}時間`);
-    sections.push(`• 総TODO: ${metrics.totalTodos}件 | 完了: ${metrics.completedTodos}件`);
-    sections.push(`• 生産性スコア: ${Math.round(metrics.averageProductivityScore)}/100`);
-
-    if (metrics.mostProductiveDay) {
-      const bestDay = this.formatBusinessDate(metrics.mostProductiveDay, timezone);
-      sections.push(`• 最も生産的: ${bestDay}`);
-    }
-
-    // トレンド
-    if (weeklySummary.weeklyTrends.length > 0) {
-      sections.push(`\n📊 **週次トレンド**`);
-      for (const trend of weeklySummary.weeklyTrends.slice(0, 3)) {
-        const arrow = trend.direction === 'up' ? '↗️' : trend.direction === 'down' ? '↘️' : '➡️';
-        sections.push(`${arrow} ${trend.metric}: ${trend.changePercent > 0 ? '+' : ''}${trend.changePercent}%`);
-      }
-    }
-
-    // インサイト
-    if (weeklySummary.weeklyInsights.length > 0) {
-      sections.push(`\n✨ **週次インサイト**`);
-      for (const insight of weeklySummary.weeklyInsights.slice(0, 2)) {
-        const emoji = insight.type === 'strength' ? '💪' : insight.type === 'improvement_area' ? '📈' : '🔍';
-        sections.push(`${emoji} ${insight.title}: ${insight.description}`);
-      }
-    }
-
-    // 来週への推奨
-    if (weeklySummary.nextWeekRecommendations.length > 0) {
-      sections.push(`\n🎯 **来週への推奨**`);
-      for (const rec of weeklySummary.nextWeekRecommendations.slice(0, 2)) {
-        const priorityEmoji = rec.priority === 'high' ? '🔥' : '💡';
-        sections.push(`${priorityEmoji} ${rec.content}`);
-      }
-    }
-
-    const result = sections.join('\n');
-    return result.length > 2000 ? result.substring(0, 1997) + '...' : result;
-  }
 
   /**
    * 信頼度に基づく絵文字を取得
@@ -443,19 +352,16 @@ export class SummaryHandler implements ISummaryHandler {
 **基本的な使い方:**
 \`!summary\` - 今日の活動サマリーを表示
 \`!summary integrated\` - TODO統合サマリーを表示
-\`!summary weekly\` - 週次統合サマリーを表示
 \`!summary <日付>\` - 指定日のサマリーを表示
 \`!summary refresh\` - キャッシュを無視して再分析
 
 **サマリータイプ:**
 📝 **基本サマリー** - 活動ログのみの分析
 📊 **統合サマリー** - 活動ログ + TODO + 相関分析
-📈 **週次サマリー** - 週間トレンドと生産性分析
 
 **使用例:**
 \`!summary\` → 今日の基本サマリー
 \`!summary integrated\` → 今日の統合サマリー
-\`!summary weekly\` → 週次統合サマリー
 \`!summary todo 2025-06-27\` → 6月27日の統合サマリー
 \`!summary yesterday\` → 昨日のサマリー
 
@@ -501,11 +407,6 @@ export class SummaryHandler implements ISummaryHandler {
       return { type: 'integrated', targetDate };
     }
 
-    // 週次サマリー
-    if (firstArg === 'weekly' || firstArg === 'week' || firstArg === '週次' || firstArg === '週') {
-      const targetDate = args[1] || undefined;
-      return { type: 'weekly', targetDate };
-    }
 
     // 強制リフレッシュ
     if (firstArg === 'refresh' || firstArg === 'reload' || firstArg === '更新') {

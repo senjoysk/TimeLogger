@@ -249,5 +249,6 @@ describe('SummaryHandler', () => {
       expect(mockMessage.replies.length).toBeGreaterThan(0);
       expect(mockMessage.replies[0]).toContain('❌');
     });
+
   });
 });

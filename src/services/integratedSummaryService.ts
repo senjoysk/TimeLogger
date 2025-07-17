@@ -14,10 +14,6 @@ import {
   CorrelationInsights,
   ProductivityMetrics,
   IntegratedRecommendation,
-  WeeklyIntegratedSummary,
-  WeeklyMetrics,
-  WeeklyTrend,
-  WeeklyInsight,
   IntegratedMetrics,
   PriorityDistribution,
   StatusTransition,
@@ -45,10 +41,6 @@ export interface IIntegratedSummaryService {
    */
   calculateIntegratedMetrics(userId: string, businessDate: string, timezone: string): Promise<IntegratedMetrics>;
   
-  /**
-   * 週次統合サマリー生成
-   */
-  generateWeeklySummary(userId: string, endDate: string, timezone: string): Promise<WeeklyIntegratedSummary>;
 }
 
 /**
@@ -469,66 +461,6 @@ export class IntegratedSummaryService implements IIntegratedSummaryService {
     };
   }
 
-  /**
-   * 週次統合サマリー生成
-   */
-  async generateWeeklySummary(
-    userId: string, 
-    endDate: string, 
-    timezone: string
-  ): Promise<WeeklyIntegratedSummary> {
-    const startDate = new Date(endDate);
-    startDate.setDate(startDate.getDate() - 6);
-    const startDateStr = startDate.toISOString().split('T')[0];
-
-    // 7日間の日別サマリーを並行生成（50-70%性能向上）
-    console.log(`🚀 週次サマリー並行生成開始: ${userId} ${endDate}`);
-    
-    const datePromises = Array.from({ length: 7 }, (_, i) => {
-      const date = new Date(endDate);
-      date.setDate(date.getDate() - i);
-      const dateStr = date.toISOString().split('T')[0];
-      
-      return this.generateIntegratedSummary(userId, dateStr, timezone)
-        .then(summary => {
-          console.log(`📅 日別サマリー成功: ${dateStr} - 活動ログ${summary.activitySummary.totalLogCount}件`);
-          return { summary, dateStr, index: i };
-        })
-        .catch(error => {
-          console.warn(`日別サマリー生成スキップ: ${dateStr}`, error);
-          return { summary: null, dateStr, index: i };
-        });
-    });
-
-    const results = await Promise.all(datePromises);
-    
-    // 成功した結果のみを取得し、日付順にソート
-    const dailySummaries = results
-      .filter(result => result.summary !== null)
-      .sort((a, b) => a.index - b.index)
-      .map(result => result.summary!)
-      .reverse(); // 古い日付から新しい日付の順に並べ替え
-    
-    console.log(`✅ 週次サマリー並行生成完了: ${dailySummaries.length}/7日分`);
-
-    // 週次メトリクス計算
-    const weeklyMetrics = this.calculateWeeklyMetrics(dailySummaries);
-    const weeklyTrends = this.calculateWeeklyTrends(dailySummaries);
-    const weeklyInsights = this.generateWeeklyInsights(dailySummaries, weeklyMetrics);
-    const nextWeekRecommendations = this.generateNextWeekRecommendations(weeklyMetrics, weeklyTrends);
-
-    return {
-      period: {
-        startDate: startDateStr,
-        endDate
-      },
-      dailySummaries,
-      weeklyMetrics,
-      weeklyTrends,
-      weeklyInsights,
-      nextWeekRecommendations
-    };
-  }
 
   /**
    * 優先度分布を計算
@@ -555,105 +487,9 @@ export class IntegratedSummaryService implements IIntegratedSummaryService {
     }));
   }
 
-  /**
-   * 週次メトリクス計算
-   */
-  private calculateWeeklyMetrics(dailySummaries: IntegratedSummaryResult[]): WeeklyMetrics {
-    const validSummaries = dailySummaries.filter(s => s.todoSummary.totalTodos > 0);
-    
-    if (validSummaries.length === 0) {
-      return {
-        averageCompletionRate: 0,
-        totalActivityMinutes: 0,
-        totalTodos: 0,
-        completedTodos: 0,
-        averageProductivityScore: 0,
-        mostProductiveDay: '',
-        mostEfficientTimeSlot: ''
-      };
-    }
 
-    const averageCompletionRate = validSummaries.reduce((sum, s) => 
-      sum + s.todoSummary.completionRate, 0) / validSummaries.length;
-    
-    const totalActivityMinutes = dailySummaries.reduce((sum, s) => 
-      sum + s.activitySummary.timeDistribution.totalEstimatedMinutes, 0);
-    
-    const totalTodos = dailySummaries.reduce((sum, s) => sum + s.todoSummary.totalTodos, 0);
-    const completedTodos = dailySummaries.reduce((sum, s) => sum + s.todoSummary.completedTodos, 0);
-    
-    const averageProductivityScore = validSummaries.reduce((sum, s) => 
-      sum + s.productivityMetrics.overallScore, 0) / validSummaries.length;
 
-    const mostProductiveDay = validSummaries.reduce((best, current) => 
-      current.productivityMetrics.overallScore > best.productivityMetrics.overallScore ? current : best
-    ).businessDate;
 
-    return {
-      averageCompletionRate,
-      totalActivityMinutes,
-      totalTodos,
-      completedTodos,
-      averageProductivityScore,
-      mostProductiveDay,
-      mostEfficientTimeSlot: '09:00-10:00' // 簡易実装
-    };
-  }
-
-  /**
-   * 週次トレンド計算
-   */
-  private calculateWeeklyTrends(dailySummaries: IntegratedSummaryResult[]): WeeklyTrend[] {
-    // 簡易実装
-    return [
-      {
-        metric: '完了率',
-        direction: 'up',
-        changePercent: 5,
-        description: '週を通して完了率が向上しています'
-      }
-    ];
-  }
-
-  /**
-   * 週次インサイト生成
-   */
-  private generateWeeklyInsights(
-    dailySummaries: IntegratedSummaryResult[], 
-    weeklyMetrics: WeeklyMetrics
-  ): WeeklyInsight[] {
-    const insights: WeeklyInsight[] = [];
-
-    if (weeklyMetrics.averageCompletionRate > 0.8) {
-      insights.push({
-        type: 'strength',
-        title: '高い完了率',
-        description: '週を通して安定してタスクを完了できています',
-        relatedData: { completionRate: weeklyMetrics.averageCompletionRate }
-      });
-    }
-
-    return insights;
-  }
-
-  /**
-   * 来週への推奨事項生成
-   */
-  private generateNextWeekRecommendations(
-    weeklyMetrics: WeeklyMetrics,
-    weeklyTrends: WeeklyTrend[]
-  ): IntegratedRecommendation[] {
-    return [
-      {
-        type: 'time_management',
-        content: '来週も現在のペースを維持して頑張りましょう',
-        priority: 'medium',
-        expectedImpact: '生産性維持',
-        implementationDifficulty: 'easy',
-        evidenceSource: ['週次パフォーマンス分析']
-      }
-    ];
-  }
 
   /**
    * 生産性スコアに基づく絵文字を取得
