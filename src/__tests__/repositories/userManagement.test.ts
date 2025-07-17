@@ -9,10 +9,13 @@ import { UserInfo, UserStats } from '../../repositories/interfaces';
 import { Database } from 'sqlite3';
 import * as path from 'path';
 import * as fs from 'fs';
+import { format } from 'date-fns-tz';
+import { ConfigService } from '../../services/configService';
 
 describe('Phase 3: ユーザー管理機能テスト', () => {
   let repository: SqliteActivityLogRepository;
   let testDbPath: string;
+  let configService: ConfigService;
 
   beforeEach(async () => {
     // テスト用データベースを作成
@@ -20,6 +23,9 @@ describe('Phase 3: ユーザー管理機能テスト', () => {
     if (fs.existsSync(testDbPath)) {
       fs.unlinkSync(testDbPath);
     }
+    
+    // ConfigServiceを初期化
+    configService = new ConfigService();
     
     repository = new SqliteActivityLogRepository(testDbPath);
     await repository.initializeDatabase();
@@ -80,8 +86,9 @@ describe('Phase 3: ユーザー管理機能テスト', () => {
       const userId = 'testuser';
       await repository.registerUser(userId, 'Test User');
       
-      // テスト用のログを作成（今日の日付を使用）
-      const todayBusinessDate = new Date().toISOString().split('T')[0];
+      // テスト用のログを作成（今日の日付を正しいタイムゾーンで使用）
+      const defaultTimezone = configService.getDefaultTimezone();
+      const todayBusinessDate = format(new Date(), 'yyyy-MM-dd', { timeZone: defaultTimezone });
       await repository.saveLog({
         userId,
         content: 'テスト活動1',
