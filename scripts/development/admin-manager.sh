@@ -3,41 +3,128 @@
 # 管理Webアプリケーション プロセス管理スクリプト
 PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 PID_FILE="$PROJECT_DIR/.admin-web.pid"
+NODE_PID_FILE="$PROJECT_DIR/.admin-node.pid"
 LOG_FILE="$PROJECT_DIR/admin-web.log"
 PORT=3001
+
+# プロセス検出関数
+find_admin_processes() {
+  # npm wrapperプロセスとNode.jsプロセスの両方を検出
+  echo "🔍 Admin関連プロセスを検索中..."
+  
+  # npm run admin:dev プロセス
+  NPM_PIDS=$(pgrep -f "npm run admin:dev\|admin:dev" 2>/dev/null || true)
+  
+  # Node.js プロセス（ts-node src/web-admin/start.ts）
+  NODE_PIDS=$(pgrep -f "ts-node.*src/web-admin/start" 2>/dev/null || true)
+  
+  # ポート3001を使用しているプロセス
+  PORT_PIDS=$(lsof -ti :$PORT 2>/dev/null || true)
+  
+  echo "NPM processes: $NPM_PIDS"
+  echo "Node processes: $NODE_PIDS"
+  echo "Port $PORT processes: $PORT_PIDS"
+}
+
+# プロセスツリー終了関数
+terminate_process_tree() {
+  local pid=$1
+  local signal=${2:-TERM}
+  
+  if [ -z "$pid" ]; then
+    return
+  fi
+  
+  echo "🔄 プロセス $pid とその子プロセスを終了中 (SIG$signal)..."
+  
+  # 子プロセスを取得
+  local children=$(pgrep -P "$pid" 2>/dev/null || true)
+  
+  # 子プロセスを再帰的に終了
+  for child in $children; do
+    terminate_process_tree "$child" "$signal"
+  done
+  
+  # メインプロセスを終了
+  if ps -p "$pid" > /dev/null 2>&1; then
+    kill -"$signal" "$pid" 2>/dev/null || true
+  fi
+}
+
+# 段階的プロセス終了関数
+graceful_shutdown() {
+  local pids="$1"
+  
+  if [ -z "$pids" ]; then
+    return
+  fi
+  
+  echo "🛑 段階的プロセス終了を開始..."
+  
+  # Phase 1: SIGTERM で優雅な終了を試行
+  for pid in $pids; do
+    if ps -p "$pid" > /dev/null 2>&1; then
+      echo "📤 SIGTERM送信: PID $pid"
+      terminate_process_tree "$pid" "TERM"
+    fi
+  done
+  
+  sleep 3
+  
+  # Phase 2: まだ残っているプロセスをSIGKILLで強制終了
+  for pid in $pids; do
+    if ps -p "$pid" > /dev/null 2>&1; then
+      echo "💥 SIGKILL送信: PID $pid"
+      terminate_process_tree "$pid" "KILL"
+    fi
+  done
+  
+  sleep 1
+}
 
 case "$1" in
   "start")
     echo "🚀 管理Webアプリケーション を起動しています..."
     
-    # ポート3001を使用している既存プロセスを停止
-    echo "🧹 ポート$PORTを使用しているプロセスをクリーンアップ中..."
-    lsof -ti :$PORT | xargs -r kill -9 2>/dev/null || true
-    sleep 1
+    # 既存プロセスの完全クリーンアップ
+    find_admin_processes
+    ALL_PIDS="$NPM_PIDS $NODE_PIDS $PORT_PIDS"
     
-    # 既存のPIDファイルプロセスをチェック・停止
-    if [ -f "$PID_FILE" ]; then
-      OLD_PID=$(cat "$PID_FILE")
-      if ps -p "$OLD_PID" > /dev/null 2>&1; then
-        echo "⚠️  既存の管理Webアプリプロセス (PID: $OLD_PID) を停止中..."
-        kill "$OLD_PID"
-        sleep 2
-      fi
-      rm -f "$PID_FILE"
+    if [ -n "$ALL_PIDS" ]; then
+      echo "⚠️  既存のAdmin関連プロセスを停止中..."
+      graceful_shutdown "$ALL_PIDS"
     fi
     
-    # 関連プロセスを強制停止（念のため）
-    pkill -f "ts-node.*src/web-admin/start" 2>/dev/null || true
-    pkill -f "admin:dev" 2>/dev/null || true
+    # PIDファイルのクリーンアップ
+    rm -f "$PID_FILE" "$NODE_PID_FILE"
+    
+    # ポートの最終確認
+    echo "🧹 ポート$PORTを使用しているプロセスを最終クリーンアップ中..."
+    lsof -ti :$PORT | xargs -r kill -9 2>/dev/null || true
     sleep 1
     
     # 新しいプロセスを起動
     cd "$PROJECT_DIR"
     npm run admin:dev > "$LOG_FILE" 2>&1 &
-    NEW_PID=$!
-    echo "$NEW_PID" > "$PID_FILE"
+    NEW_NPM_PID=$!
+    echo "$NEW_NPM_PID" > "$PID_FILE"
     
-    echo "✅ 管理Webアプリ起動完了 (PID: $NEW_PID)"
+    # Node.jsプロセスの検出を待つ
+    echo "⏳ Node.jsプロセスの起動を待機中..."
+    for i in {1..10}; do
+      sleep 1
+      NEW_NODE_PID=$(pgrep -f "ts-node.*src/web-admin/start" | head -1)
+      if [ -n "$NEW_NODE_PID" ]; then
+        echo "$NEW_NODE_PID" > "$NODE_PID_FILE"
+        break
+      fi
+    done
+    
+    echo "✅ 管理Webアプリ起動完了"
+    echo "📊 NPM Wrapper PID: $NEW_NPM_PID"
+    if [ -n "$NEW_NODE_PID" ]; then
+      echo "📊 Node.js Process PID: $NEW_NODE_PID"
+    fi
     echo "📝 ログファイル: $LOG_FILE"
     echo "🌐 アクセス URL: http://localhost:$PORT"
     echo "🔧 開発環境で実行中"
@@ -46,33 +133,45 @@ case "$1" in
   "stop")
     echo "🛑 管理Webアプリケーション を停止しています..."
     
-    # ポート3001を使用している全プロセスを停止
-    echo "🧹 ポート$PORTを使用しているプロセスを停止中..."
-    lsof -ti :$PORT | xargs -r kill 2>/dev/null || true
-    sleep 2
+    # 現在実行中のすべてのAdmin関連プロセスを検出
+    find_admin_processes
+    ALL_PIDS="$NPM_PIDS $NODE_PIDS $PORT_PIDS"
     
-    # まだ残っている場合は強制終了
-    lsof -ti :$PORT | xargs -r kill -9 2>/dev/null || true
-    
+    # PIDファイルからの取得も試行
+    FILE_PIDS=""
     if [ -f "$PID_FILE" ]; then
-      PID=$(cat "$PID_FILE")
-      if ps -p "$PID" > /dev/null 2>&1; then
-        echo "⏸️  管理Webアプリプロセス (PID: $PID) を停止中..."
-        kill "$PID"
-        sleep 2
-        
-        # まだ動いている場合は強制終了
-        if ps -p "$PID" > /dev/null 2>&1; then
-          echo "💥 強制終了中..."
-          kill -9 "$PID"
-        fi
-      fi
-      rm -f "$PID_FILE"
+      FILE_PIDS="$FILE_PIDS $(cat "$PID_FILE")"
+    fi
+    if [ -f "$NODE_PID_FILE" ]; then
+      FILE_PIDS="$FILE_PIDS $(cat "$NODE_PID_FILE")"
     fi
     
-    # 関連プロセスを強制停止（念のため）
-    pkill -f "ts-node.*src/web-admin/start" 2>/dev/null || true
-    pkill -f "admin:dev" 2>/dev/null || true
+    # すべてのPIDをマージ
+    ALL_SHUTDOWN_PIDS="$ALL_PIDS $FILE_PIDS"
+    
+    if [ -n "$ALL_SHUTDOWN_PIDS" ]; then
+      echo "🔍 停止対象プロセス: $ALL_SHUTDOWN_PIDS"
+      graceful_shutdown "$ALL_SHUTDOWN_PIDS"
+    else
+      echo "ℹ️ 停止対象のプロセスが見つかりません"
+    fi
+    
+    # ポートの最終クリーンアップ
+    echo "🧹 ポート$PORTを使用しているプロセスを最終クリーンアップ中..."
+    lsof -ti :$PORT | xargs -r kill -9 2>/dev/null || true
+    sleep 1
+    
+    # PIDファイルのクリーンアップ
+    rm -f "$PID_FILE" "$NODE_PID_FILE"
+    
+    # 停止確認
+    find_admin_processes
+    if [ -n "$NPM_PIDS$NODE_PIDS$PORT_PIDS" ]; then
+      echo "⚠️ まだ動作中のプロセスがあります:"
+      echo "NPM: $NPM_PIDS | Node: $NODE_PIDS | Port: $PORT_PIDS"
+    else
+      echo "✅ すべてのAdmin関連プロセスが停止しました"
+    fi
     
     echo "✅ 管理Webアプリ停止完了"
     ;;
@@ -87,25 +186,74 @@ case "$1" in
   "status")
     echo "📊 管理Webアプリケーション ステータス:"
     
-    echo "🔌 ポート$PORT使用プロセス:"
-    lsof -i :$PORT || echo "ポート$PORTを使用しているプロセスはありません"
+    # プロセス検出の実行
+    find_admin_processes
     
+    # PIDファイルの確認
+    echo ""
+    echo "📁 PIDファイル状況:"
     if [ -f "$PID_FILE" ]; then
-      PID=$(cat "$PID_FILE")
-      if ps -p "$PID" > /dev/null 2>&1; then
-        echo "✅ 管理Webアプリ実行中 (PID: $PID)"
-        echo "📊 プロセス詳細:"
-        ps -f -p "$PID"
+      NPM_FILE_PID=$(cat "$PID_FILE")
+      if ps -p "$NPM_FILE_PID" > /dev/null 2>&1; then
+        echo "✅ NPM Wrapper実行中 (PID: $NPM_FILE_PID)"
+        echo "📊 NPM Wrapper詳細:"
+        ps -f -p "$NPM_FILE_PID"
       else
-        echo "❌ PIDファイルのプロセスは停止済み (古いPIDファイル削除)"
+        echo "❌ NPM Wrapper停止済み (古いPIDファイル削除)"
         rm -f "$PID_FILE"
       fi
     else
-      echo "❌ 管理Webアプリ停止中 (PIDファイルなし)"
+      echo "❌ NPM PIDファイルなし"
     fi
     
-    echo "📋 関連プロセス一覧:"
-    ps aux | grep -E "(ts-node.*src/web-admin|admin:dev)" | grep -v grep || echo "関連プロセスなし"
+    if [ -f "$NODE_PID_FILE" ]; then
+      NODE_FILE_PID=$(cat "$NODE_PID_FILE")
+      if ps -p "$NODE_FILE_PID" > /dev/null 2>&1; then
+        echo "✅ Node.js Process実行中 (PID: $NODE_FILE_PID)"
+        echo "📊 Node.js Process詳細:"
+        ps -f -p "$NODE_FILE_PID"
+      else
+        echo "❌ Node.js Process停止済み (古いPIDファイル削除)"
+        rm -f "$NODE_PID_FILE"
+      fi
+    else
+      echo "❌ Node.js PIDファイルなし"
+    fi
+    
+    # プロセス検索結果
+    echo ""
+    echo "🔍 実際のプロセス検索結果:"
+    if [ -n "$NPM_PIDS" ]; then
+      echo "✅ NPM processes: $NPM_PIDS"
+      for pid in $NPM_PIDS; do
+        ps -f -p "$pid"
+      done
+    else
+      echo "❌ NPM processなし"
+    fi
+    
+    if [ -n "$NODE_PIDS" ]; then
+      echo "✅ Node.js processes: $NODE_PIDS"
+      for pid in $NODE_PIDS; do
+        ps -f -p "$pid"
+      done
+    else
+      echo "❌ Node.js processなし"
+    fi
+    
+    if [ -n "$PORT_PIDS" ]; then
+      echo "✅ Port $PORT processes: $PORT_PIDS"
+      for pid in $PORT_PIDS; do
+        ps -f -p "$pid" 2>/dev/null || true
+      done
+    else
+      echo "❌ Port $PORT processなし"
+    fi
+    
+    # ポート使用状況
+    echo ""
+    echo "🔌 ポート使用状況:"
+    lsof -i :$PORT || echo "ポート$PORTは使用されていません"
     ;;
     
   "logs")
