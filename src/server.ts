@@ -14,13 +14,13 @@ export class IntegratedServer {
   private adminServer: AdminServer;
   private databasePath: string;
 
-  constructor(databasePath: string) {
+  constructor(databasePath: string, private bot?: any) {
     this.port = parseInt(process.env.PORT || '3000');
     this.databasePath = databasePath;
     this.app = express();
     
     // Admin serverを作成（独立したポートでは起動しない）
-    this.adminServer = new AdminServer(databasePath);
+    this.adminServer = new AdminServer(databasePath, 3001, bot);
     
     this.setupMiddleware();
     this.setupRoutes();

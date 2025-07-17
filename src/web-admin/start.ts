@@ -4,6 +4,7 @@
 
 import { AdminServer } from './server';
 import { config } from '../config';
+import { TaskLoggerBot } from '../bot';
 
 async function startAdminServer() {
   try {
@@ -30,8 +31,17 @@ async function startAdminServer() {
     const port = parseInt(process.env.ADMIN_PORT || '3001');
     console.log(`🚀 Admin server starting on port ${port}`);
     
-    // AdminServerを初期化
-    const adminServer = new AdminServer(databasePath, port);
+    // Discord Botを初期化
+    console.log('🤖 Discord Bot を初期化中...');
+    const bot = new TaskLoggerBot();
+    await bot.start();
+    
+    // システム初期化の完了を待つ
+    console.log('⏳ システム初期化の完了を待機中...');
+    await bot.waitForSystemInitialization();
+    
+    // AdminServerを初期化（Botインスタンスを渡す）
+    const adminServer = new AdminServer(databasePath, port, bot);
     
     // サーバー起動
     await adminServer.start();

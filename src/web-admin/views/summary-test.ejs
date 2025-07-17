@@ -1,0 +1,418 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>サマリーテスト - TimeLogger 管理画面</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
+    <style>
+        /* カスタムスタイル */
+        .result-card {
+            transition: all 0.3s ease;
+        }
+        .result-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+        }
+        .status-sent {
+            background: linear-gradient(135deg, #10b981, #059669);
+            color: white;
+        }
+        .status-skipped {
+            background: linear-gradient(135deg, #f59e0b, #d97706);
+            color: white;
+        }
+        .status-error {
+            background: linear-gradient(135deg, #ef4444, #dc2626);
+            color: white;
+        }
+        .code-block {
+            background: #1f2937;
+            color: #f9fafb;
+            font-family: 'Courier New', monospace;
+            border-radius: 0.5rem;
+            padding: 1rem;
+            overflow-x: auto;
+        }
+    </style>
+</head>
+<body class="bg-gray-50">
+    <!-- ヘッダー -->
+    <header class="bg-white shadow-sm border-b">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between items-center py-4">
+                <div class="flex items-center space-x-4">
+                    <h1 class="text-2xl font-bold text-gray-900">📊 サマリーテスト</h1>
+                    <span class="px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm font-medium">
+                        開発ツール
+                    </span>
+                </div>
+                <nav class="flex space-x-4">
+                    <a href="<%= basePath %>/" class="text-gray-600 hover:text-blue-600">ダッシュボード</a>
+                    <a href="<%= basePath %>/tools/time-simulation" class="text-gray-600 hover:text-blue-600">時刻シミュレーション</a>
+                    <a href="<%= basePath %>/tools/summary-test" class="text-blue-600 font-medium">サマリーテスト</a>
+                </nav>
+            </div>
+        </div>
+    </header>
+
+    <!-- メインコンテンツ -->
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8" x-data="summaryTest()">
+        
+        <!-- システム状態表示 -->
+        <div class="bg-white rounded-lg shadow-md p-6 mb-8">
+            <h2 class="text-xl font-semibold text-gray-900 mb-4">🔍 システム状態</h2>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4" x-show="systemStatus">
+                <div class="text-center">
+                    <div class="text-2xl mb-2">
+                        <span x-show="systemStatus.botStatus.isInitialized" class="text-green-500">✅</span>
+                        <span x-show="!systemStatus.botStatus.isInitialized" class="text-red-500">❌</span>
+                    </div>
+                    <div class="text-sm text-gray-600">Bot初期化</div>
+                </div>
+                <div class="text-center">
+                    <div class="text-2xl mb-2">
+                        <span x-show="systemStatus.botStatus.clientReady" class="text-green-500">✅</span>
+                        <span x-show="!systemStatus.botStatus.clientReady" class="text-red-500">❌</span>
+                    </div>
+                    <div class="text-sm text-gray-600">Discord接続</div>
+                </div>
+                <div class="text-center">
+                    <div class="text-2xl mb-2 font-mono text-blue-600" x-text="formatUptime(systemStatus.botStatus.uptime)"></div>
+                    <div class="text-sm text-gray-600">稼働時間</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- テスト設定フォーム -->
+        <div class="bg-white rounded-lg shadow-md p-6 mb-8">
+            <h2 class="text-xl font-semibold text-gray-900 mb-4">⚙️ テスト設定</h2>
+            
+            <form @submit.prevent="executeTest()" class="space-y-6">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <!-- 実行モード -->
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-3">実行モード</label>
+                        <div class="space-y-2">
+                            <label class="flex items-center">
+                                <input type="radio" x-model="testForm.dryRun" :value="true" class="mr-2">
+                                <span class="text-sm">🔍 ドライランモード（実際の送信なし）</span>
+                            </label>
+                            <label class="flex items-center">
+                                <input type="radio" x-model="testForm.dryRun" :value="false" class="mr-2">
+                                <span class="text-sm">📤 実際送信モード</span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- テスト時刻 -->
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">テスト時刻（省略可）</label>
+                        <input type="datetime-local" x-model="testForm.testDateTime"
+                               class="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                        <p class="mt-1 text-xs text-gray-500">未設定の場合は現在時刻を使用</p>
+                    </div>
+                </div>
+
+                <!-- 対象ユーザー選択 -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-3">対象ユーザー</label>
+                    <div class="space-y-2">
+                        <label class="flex items-center">
+                            <input type="radio" x-model="userSelectionMode" value="all" class="mr-2">
+                            <span class="text-sm">全ユーザー</span>
+                        </label>
+                        <label class="flex items-center">
+                            <input type="radio" x-model="userSelectionMode" value="selected" class="mr-2">
+                            <span class="text-sm">選択したユーザーのみ</span>
+                        </label>
+                    </div>
+                    
+                    <div x-show="userSelectionMode === 'selected'" class="mt-4 space-y-2">
+                        <template x-for="user in users" :key="user.userId">
+                            <label class="flex items-center">
+                                <input type="checkbox" :value="user.userId" x-model="testForm.targetUsers" class="mr-2">
+                                <span class="text-sm" x-text="`${user.userId} (${user.timezone})`"></span>
+                            </label>
+                        </template>
+                    </div>
+                </div>
+
+                <div class="flex justify-between items-center">
+                    <button type="submit" 
+                            class="bg-blue-600 text-white px-6 py-2 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+                            :disabled="isLoading">
+                        <span x-show="!isLoading">テストを実行</span>
+                        <span x-show="isLoading">実行中...</span>
+                    </button>
+                    
+                    <button type="button" @click="loadUsers()"
+                            class="bg-gray-600 text-white px-6 py-2 rounded-md hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2">
+                        ユーザー一覧を更新
+                    </button>
+                </div>
+            </form>
+        </div>
+
+        <!-- テスト結果 -->
+        <div class="bg-white rounded-lg shadow-md p-6" x-show="testResult">
+            <h2 class="text-xl font-semibold text-gray-900 mb-4">📋 テスト結果</h2>
+            
+            <!-- 実行サマリー -->
+            <div class="bg-gray-50 rounded-lg p-4 mb-6" x-show="testResult && testResult.summary">
+                <h3 class="font-medium text-gray-900 mb-3">実行サマリー</h3>
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div class="text-center">
+                        <div class="text-2xl font-bold text-blue-600" x-text="testResult.summary.totalUsers"></div>
+                        <div class="text-sm text-gray-600">対象ユーザー</div>
+                    </div>
+                    <div class="text-center">
+                        <div class="text-2xl font-bold text-green-600" x-text="testResult.summary.sentCount"></div>
+                        <div class="text-sm text-gray-600">送信済み</div>
+                    </div>
+                    <div class="text-center">
+                        <div class="text-2xl font-bold text-yellow-600" x-text="testResult.summary.skippedCount"></div>
+                        <div class="text-sm text-gray-600">スキップ</div>
+                    </div>
+                    <div class="text-center">
+                        <div class="text-2xl font-bold text-red-600" x-text="testResult.summary.errorCount"></div>
+                        <div class="text-sm text-gray-600">エラー</div>
+                    </div>
+                </div>
+                <div class="mt-4 text-sm text-gray-600">
+                    <p>実行時刻: <span x-text="testResult.executedAt"></span></p>
+                    <p>実行モード: <span x-text="testResult.testSettings.dryRun ? 'ドライラン' : '実際送信'"></span></p>
+                </div>
+            </div>
+
+            <!-- 詳細結果 -->
+            <div class="space-y-4" x-show="testResult && testResult.results">
+                <h3 class="font-medium text-gray-900">詳細結果</h3>
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    <template x-for="result in testResult.results" :key="result.userId">
+                        <div class="result-card rounded-lg p-4 border"
+                             :class="getStatusClass(result.status)">
+                            <div class="flex justify-between items-start mb-2">
+                                <div class="font-medium" x-text="result.userId"></div>
+                                <div class="text-xs opacity-75" x-text="getStatusText(result.status)"></div>
+                            </div>
+                            <div class="text-sm opacity-75 mb-2" x-text="result.timezone"></div>
+                            <div class="text-sm font-mono mb-2" x-text="result.localTime"></div>
+                            <div class="text-sm" x-text="result.reason"></div>
+                            <div x-show="result.errorDetail" class="text-xs mt-2 opacity-75" x-text="result.errorDetail"></div>
+                            <div x-show="result.summaryPreview" class="mt-2">
+                                <details class="text-xs">
+                                    <summary class="cursor-pointer">サマリープレビュー</summary>
+                                    <div class="mt-1 p-2 bg-black bg-opacity-10 rounded text-xs" x-text="result.summaryPreview"></div>
+                                </details>
+                            </div>
+                        </div>
+                    </template>
+                </div>
+            </div>
+        </div>
+
+        <!-- 登録ユーザー一覧 -->
+        <div class="bg-white rounded-lg shadow-md p-6 mt-8" x-show="users.length > 0">
+            <h2 class="text-xl font-semibold text-gray-900 mb-4">👥 登録ユーザー一覧</h2>
+            
+            <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ユーザーID</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">タイムゾーン</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">アクション</th>
+                        </tr>
+                    </thead>
+                    <tbody class="bg-white divide-y divide-gray-200">
+                        <template x-for="user in users" :key="user.userId">
+                            <tr class="hover:bg-gray-50">
+                                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900" x-text="user.userId"></td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500" x-text="user.timezone"></td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                    <button @click="previewSummary(user.userId)" 
+                                            class="text-blue-600 hover:text-blue-800">
+                                        プレビュー
+                                    </button>
+                                </td>
+                            </tr>
+                        </template>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- アラート表示 -->
+        <div x-show="alert.show" 
+             class="fixed bottom-4 right-4 max-w-sm bg-white rounded-lg shadow-lg p-4 border-l-4"
+             :class="alert.type === 'success' ? 'border-green-400' : 'border-red-400'"
+             x-transition:enter="transition ease-out duration-300"
+             x-transition:enter-start="opacity-0 transform translate-y-2"
+             x-transition:enter-end="opacity-100 transform translate-y-0"
+             x-transition:leave="transition ease-in duration-200"
+             x-transition:leave-start="opacity-100 transform translate-y-0"
+             x-transition:leave-end="opacity-0 transform translate-y-2">
+            <div class="flex items-center">
+                <div class="flex-shrink-0">
+                    <span x-show="alert.type === 'success'" class="text-green-400">✅</span>
+                    <span x-show="alert.type === 'error'" class="text-red-400">❌</span>
+                </div>
+                <div class="ml-3">
+                    <p class="text-sm font-medium text-gray-900" x-text="alert.message"></p>
+                </div>
+                <div class="ml-auto pl-3">
+                    <button @click="alert.show = false" class="text-gray-400 hover:text-gray-600">
+                        <span class="sr-only">Close</span>
+                        ×
+                    </button>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        // ベースパスを取得
+        const basePath = '<%= basePath %>' || '';
+        
+        function summaryTest() {
+            return {
+                systemStatus: null,
+                users: [],
+                testResult: null,
+                isLoading: false,
+                userSelectionMode: 'all',
+                testForm: {
+                    dryRun: true,
+                    testDateTime: '',
+                    targetUsers: []
+                },
+                alert: {
+                    show: false,
+                    type: 'success',
+                    message: ''
+                },
+
+                async init() {
+                    await this.loadSystemStatus();
+                    await this.loadUsers();
+                },
+
+                async loadSystemStatus() {
+                    try {
+                        const response = await fetch(`${basePath}/tools/api/summary-test/status`);
+                        const data = await response.json();
+                        if (data.success) {
+                            this.systemStatus = data;
+                        }
+                    } catch (error) {
+                        this.showAlert('error', 'システム状態の取得に失敗しました');
+                    }
+                },
+
+                async loadUsers() {
+                    try {
+                        const response = await fetch(`${basePath}/tools/api/summary-test/users`);
+                        const data = await response.json();
+                        if (data.success) {
+                            this.users = data.users;
+                        } else {
+                            this.showAlert('error', data.error || 'ユーザー情報の取得に失敗しました');
+                        }
+                    } catch (error) {
+                        this.showAlert('error', 'ユーザー情報の取得に失敗しました');
+                    }
+                },
+
+                async executeTest() {
+                    if (this.isLoading) return;
+                    
+                    this.isLoading = true;
+                    this.testResult = null;
+                    
+                    try {
+                        const requestData = {
+                            dryRun: this.testForm.dryRun,
+                            testDateTime: this.testForm.testDateTime || undefined,
+                            targetUsers: this.userSelectionMode === 'selected' ? this.testForm.targetUsers : undefined
+                        };
+
+                        const response = await fetch(`${basePath}/tools/api/summary-test/execute`, {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify(requestData)
+                        });
+                        
+                        const data = await response.json();
+                        this.testResult = data;
+                        
+                        if (data.success) {
+                            this.showAlert('success', 'テストが完了しました');
+                        } else {
+                            this.showAlert('error', data.error || 'テストの実行に失敗しました');
+                        }
+                    } catch (error) {
+                        this.showAlert('error', 'サーバーエラーが発生しました');
+                    } finally {
+                        this.isLoading = false;
+                    }
+                },
+
+                async previewSummary(userId) {
+                    try {
+                        const response = await fetch(`${basePath}/tools/api/summary-test/preview/${userId}`);
+                        const data = await response.json();
+                        if (data.success) {
+                            alert(`${userId}のサマリープレビュー:\n\n${data.summaryPreview}`);
+                        } else {
+                            this.showAlert('error', data.error || 'プレビューの生成に失敗しました');
+                        }
+                    } catch (error) {
+                        this.showAlert('error', 'プレビューの生成に失敗しました');
+                    }
+                },
+
+                getStatusClass(status) {
+                    switch (status) {
+                        case 'sent': return 'status-sent';
+                        case 'skipped': return 'status-skipped';
+                        case 'error': return 'status-error';
+                        default: return 'bg-gray-100';
+                    }
+                },
+
+                getStatusText(status) {
+                    switch (status) {
+                        case 'sent': return '送信済み';
+                        case 'skipped': return 'スキップ';
+                        case 'error': return 'エラー';
+                        default: return '不明';
+                    }
+                },
+
+                formatUptime(seconds) {
+                    const hours = Math.floor(seconds / 3600);
+                    const minutes = Math.floor((seconds % 3600) / 60);
+                    return `${hours}h ${minutes}m`;
+                },
+
+                showAlert(type, message) {
+                    this.alert = {
+                        show: true,
+                        type: type,
+                        message: message
+                    };
+                    
+                    // 5秒後に自動で閉じる
+                    setTimeout(() => {
+                        this.alert.show = false;
+                    }, 5000);
+                }
+            }
+        }
+    </script>
+</body>
+</html>

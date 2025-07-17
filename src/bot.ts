@@ -566,10 +566,46 @@ export class TaskLoggerBot {
   }
 
   /**
-   * 日次サマリーを指定ユーザーに送信（テスト用公開メソッド）
+   * 日次サマリーを指定ユーザーに送信（テスト用公開メソッド - 時刻チェックなし）
    */
   public async sendDailySummaryToUserForTest(userId: string, timezone: string): Promise<void> {
-    return this.sendDailySummaryToUser(userId, timezone);
+    try {
+      const user = await this.client.users.fetch(userId);
+      if (!user) {
+        console.error(`❌ ユーザーが見つかりません: ${userId}`);
+        return;
+      }
+
+      console.log(`⏰ ${userId} (${timezone}): テストモード - 時刻チェックをスキップして送信開始`);
+
+      const dmChannel = await user.createDM();
+      
+      if (!this.activityLoggingIntegration) {
+        const briefSummary = '🌅 今日一日お疲れさまでした！\n\n活動記録システムでのサマリー機能は開発中です。\n\n（テストモードで送信）';
+        await dmChannel.send(briefSummary);
+        return;
+      }
+
+      // 活動記録システムを使って実際のサマリーを生成
+      try {
+        const summaryText = await this.activityLoggingIntegration.generateDailySummaryText(userId, timezone);
+        await dmChannel.send(summaryText + '\n\n（テストモードで送信）');
+        console.log(`✅ ${userId} に日次サマリーを送信しました（テストモード）`);
+      } catch (summaryError) {
+        console.error(`❌ ${userId} のサマリー生成エラー:`, summaryError);
+        
+        // フォールバック: シンプルなメッセージ
+        const fallbackMessage = '🌅 今日一日お疲れさまでした！\n\n' +
+          'サマリーの詳細を確認するには `!summary` コマンドをお使いください。\n\n（テストモードで送信）';
+        await dmChannel.send(fallbackMessage);
+      }
+      
+      this.status.lastSummaryTime = new Date();
+      
+    } catch (error) {
+      console.error(`❌ ${userId} へのサマリー送信エラー（テストモード）:`, error);
+      throw error;
+    }
   }
 
   /**

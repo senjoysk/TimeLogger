@@ -277,4 +277,102 @@ describe('basePath統合テスト', () => {
       expect(response.headers.location).toBe('/admin/todos');
     });
   });
+
+  describe('Tools機能のbasePath統合テスト', () => {
+    describe('AdminServer単体（basePath = ""）', () => {
+      beforeEach(async () => {
+        adminServer = new AdminServer(testDbPath, 3002);
+        await adminServer.initializeDatabase();
+      });
+
+      test('時刻シミュレーション画面のリンクが正しく設定される', async () => {
+        const app = adminServer.getExpressApp();
+        const response = await request(app)
+          .get('/tools/time-simulation')
+          .auth('testuser', 'testpass')
+          .expect(200);
+        
+        // basePath = "" の場合、ナビゲーションリンクにbasePathが含まれない
+        expect(response.text).toContain('href="/"');
+        expect(response.text).toContain('href="/tools/time-simulation"');
+        expect(response.text).toContain('href="/tools/summary-test"');
+        expect(response.text).not.toContain('href="/admin/tools/');
+      });
+
+      test('サマリーテスト画面のリンクが正しく設定される', async () => {
+        const app = adminServer.getExpressApp();
+        const response = await request(app)
+          .get('/tools/summary-test')
+          .auth('testuser', 'testpass')
+          .expect(200);
+        
+        // basePath = "" の場合、ナビゲーションリンクにbasePathが含まれない
+        expect(response.text).toContain('href="/"');
+        expect(response.text).toContain('href="/tools/time-simulation"');
+        expect(response.text).toContain('href="/tools/summary-test"');
+        expect(response.text).not.toContain('href="/admin/tools/');
+      });
+
+      test('ダッシュボードのTools機能へのリンクが正しく設定される', async () => {
+        const app = adminServer.getExpressApp();
+        const response = await request(app)
+          .get('/')
+          .auth('testuser', 'testpass')
+          .expect(200);
+        
+        // basePath = "" の場合、ダッシュボードからのリンクにbasePathが含まれない
+        expect(response.text).toContain('href="/tools/time-simulation"');
+        expect(response.text).toContain('href="/tools/summary-test"');
+        expect(response.text).not.toContain('href="/admin/tools/');
+      });
+    });
+
+    describe('IntegratedServer（basePath = "/admin"）', () => {
+      beforeEach(async () => {
+        integratedServer = new IntegratedServer(testDbPath);
+        await integratedServer.initialize();
+      });
+
+      test('時刻シミュレーション画面のリンクが正しく設定される', async () => {
+        const app = (integratedServer as any).app;
+        const response = await request(app)
+          .get('/admin/tools/time-simulation')
+          .auth('testuser', 'testpass')
+          .expect(200);
+        
+        // basePath = "/admin" の場合、すべてのリンクに/adminが含まれる
+        expect(response.text).toContain('href="/admin/"');
+        expect(response.text).toContain('href="/admin/tools/time-simulation"');
+        expect(response.text).toContain('href="/admin/tools/summary-test"');
+        expect(response.text).not.toContain('href="/tools/');
+      });
+
+      test('サマリーテスト画面のリンクが正しく設定される', async () => {
+        const app = (integratedServer as any).app;
+        const response = await request(app)
+          .get('/admin/tools/summary-test')
+          .auth('testuser', 'testpass')
+          .expect(200);
+        
+        // basePath = "/admin" の場合、すべてのリンクに/adminが含まれる
+        expect(response.text).toContain('href="/admin/"');
+        expect(response.text).toContain('href="/admin/tools/time-simulation"');
+        expect(response.text).toContain('href="/admin/tools/summary-test"');
+        expect(response.text).not.toContain('href="/tools/');
+      });
+
+      test('ダッシュボードのTools機能へのリンクが正しく設定される', async () => {
+        const app = (integratedServer as any).app;
+        const response = await request(app)
+          .get('/admin/')
+          .auth('testuser', 'testpass')
+          .expect(200);
+        
+        // basePath = "/admin" の場合、ダッシュボードからのリンクに/adminが含まれる
+        expect(response.text).toContain('href="/admin/tools/time-simulation"');
+        expect(response.text).toContain('href="/admin/tools/summary-test"');
+        expect(response.text).not.toContain('href="/tools/');
+      });
+    });
+  });
 });

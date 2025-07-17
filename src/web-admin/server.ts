@@ -21,7 +21,7 @@ export class AdminServer {
   private databasePath: string;
   private sqliteRepo: SqliteActivityLogRepository;
 
-  constructor(databasePath: string, port: number = 3001) {
+  constructor(databasePath: string, port: number = 3001, private bot?: any) {
     this.port = port;
     this.databasePath = databasePath;
     this.app = express();
@@ -106,7 +106,7 @@ export class AdminServer {
     this.app.set('databasePath', this.databasePath);
     
     // ルーティング設定
-    this.app.use('/', createRoutes(this.adminService, this.securityService, this.databasePath));
+    this.app.use('/', createRoutes(this.adminService, this.securityService, this.databasePath, this.bot));
     
     // エラーハンドラー（最後に設定）
     this.app.use(errorHandler);

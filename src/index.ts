@@ -46,8 +46,8 @@ class Application {
       // 統合HTTPサーバーの起動（Admin Web App + Health Check）
       if (process.env.ADMIN_USERNAME && process.env.ADMIN_PASSWORD) {
         console.log('🌐 統合HTTPサーバーを起動中...');
-        const databasePath = process.env.DATABASE_PATH || './data/new-activity-logs.db';
-        this.integratedServer = new IntegratedServer(databasePath);
+        const databasePath = process.env.DATABASE_PATH || './data/app.db';
+        this.integratedServer = new IntegratedServer(databasePath, this.bot);
         await this.integratedServer.start();
       } else {
         console.log('ℹ️ ADMIN_USERNAME/ADMIN_PASSWORD未設定のため、Web管理アプリは起動しません');
