@@ -1501,8 +1501,8 @@ describe('TodoCommandHandler', () => {
     });
   });
 
-  // 🔴 Red Phase: 短縮IDバグ検知のための新しいテストセクション
-  describe('🐛 短縮IDバグ検知テスト (現在のバグある実装では失敗する)', () => {
+  // 短縮IDバグ検知のための堅牢なテストセクション
+  describe('短縮IDバグ検知テスト (実装済み)', () => {
     test('短縮IDでTODO完了時にrepositoryに完全IDが渡されることを確認', async () => {
       // 完全なUUID形式のIDを持つTODOを作成
       const testTodo = await mockTodoRepo.createTodo({
@@ -1520,8 +1520,7 @@ describe('TodoCommandHandler', () => {
       await handler.handleCommand(message, 'test-user', ['done', shortId], 'Asia/Tokyo');
       
       
-      // 🚨 重要: updateTodoStatusには完全ID（testTodo.id）が渡されるべき
-      // 現在のバグのある実装では短縮ID（shortId）が渡されるため、このテストは失敗する
+      // 重要: updateTodoStatusには完全ID（testTodo.id）が渡されるべき
       expect(updateStatusSpy).toHaveBeenCalledWith(testTodo.id, 'completed');
       
       // 追加検証: 短縮IDが渡されていないことを確認
@@ -1543,7 +1542,7 @@ describe('TodoCommandHandler', () => {
       
       await handler.handleCommand(message, 'test-user', ['edit', shortId, '編集後の内容'], 'Asia/Tokyo');
       
-      // 🚨 重要: updateTodoには完全IDが渡されるべき
+      // 重要: updateTodoには完全IDが渡されるべき
       expect(updateTodoSpy).toHaveBeenCalledWith(testTodo.id, { content: '編集後の内容' });
       expect(updateTodoSpy).not.toHaveBeenCalledWith(shortId, expect.any(Object));
       
@@ -1563,7 +1562,7 @@ describe('TodoCommandHandler', () => {
       
       await handler.handleCommand(message, 'test-user', ['delete', shortId], 'Asia/Tokyo');
       
-      // 🚨 重要: deleteTodoには完全IDが渡されるべき
+      // 重要: deleteTodoには完全IDが渡されるべき
       expect(deleteTodoSpy).toHaveBeenCalledWith(testTodo.id);
       expect(deleteTodoSpy).not.toHaveBeenCalledWith(shortId);
       
