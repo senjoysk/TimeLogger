@@ -155,7 +155,21 @@ export class TimezoneChangeMonitor {
         return;
       }
 
+      // getUserTimezoneChanges メソッドの存在確認
+      if (typeof this.repository.getUserTimezoneChanges !== 'function') {
+        console.error('❌ getUserTimezoneChanges is not a function');
+        this.stats.totalErrors++;
+        return;
+      }
+
       const changes = await this.repository.getUserTimezoneChanges(this.lastCheckTime || undefined);
+      
+      // changesがnull、undefined、または配列でない場合の処理
+      if (!changes || !Array.isArray(changes)) {
+        console.warn('⚠️ getUserTimezoneChanges returned invalid data, skipping');
+        this.lastCheckTime = new Date();
+        return;
+      }
       
       for (const change of changes) {
         try {
@@ -189,7 +203,20 @@ export class TimezoneChangeMonitor {
         return;
       }
 
+      // getUnprocessedNotifications メソッドの存在確認
+      if (typeof this.repository.getUnprocessedNotifications !== 'function') {
+        console.error('❌ getUnprocessedNotifications is not a function');
+        this.stats.totalErrors++;
+        return;
+      }
+
       const notifications = await this.repository.getUnprocessedNotifications();
+
+      // notificationsがnull、undefined、または配列でない場合の処理
+      if (!notifications || !Array.isArray(notifications)) {
+        console.warn('⚠️ getUnprocessedNotifications returned invalid data, skipping');
+        return;
+      }
 
       for (const notification of notifications) {
         try {
@@ -200,7 +227,9 @@ export class TimezoneChangeMonitor {
           );
 
           // 処理済みマーク
-          await this.repository.markNotificationAsProcessed(notification.id);
+          if (typeof this.repository.markNotificationAsProcessed === 'function') {
+            await this.repository.markNotificationAsProcessed(notification.id);
+          }
           
           this.stats.totalProcessedNotifications++;
           this.stats.lastActivity = new Date();

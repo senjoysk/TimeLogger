@@ -69,6 +69,12 @@ export class DynamicReportScheduler {
     try {
       const userTimezones = await this.repository.getAllUserTimezonesForScheduler();
       
+      // userTimezonesがnull、undefined、または配列でない場合の処理
+      if (!userTimezones || !Array.isArray(userTimezones)) {
+        console.warn('⚠️ userTimezones is not iterable or is null/undefined, skipping initialization');
+        return;
+      }
+      
       for (const { user_id, timezone } of userTimezones) {
         await this.onTimezoneChanged(user_id, null, timezone);
       }

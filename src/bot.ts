@@ -475,10 +475,11 @@ export class TaskLoggerBot {
       const { toZonedTime } = require('date-fns-tz');
       const localTime = toZonedTime(now, timezone);
       const hours = localTime.getHours();
+      const minutes = localTime.getMinutes();
       
-      // サマリー時刻かチェック
-      if (hours !== 18) { // config.app.summaryTime.hour
-        console.log(`⏰ ${userId} (${timezone}): サマリー時刻ではありません (現在: ${hours}:00)`);
+      // サマリー時刻かチェック（18:30）
+      if (hours !== 18 || minutes !== 30) {
+        console.log(`⏰ ${userId} (${timezone}): サマリー時刻ではありません (現在: ${hours}:${minutes.toString().padStart(2, '0')})`);
         return;
       }
       

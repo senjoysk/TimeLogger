@@ -1,13 +1,14 @@
 /**
  * DynamicReportScheduler テストスイート
  * 
- * 🔴 Red Phase: 動的cronスケジューラーの失敗するテストを作成
+ * 動的cronスケジューラーの機能テスト
  * 
  * テスト対象:
  * - タイムゾーン追加時のcronジョブ作成
  * - 同一UTC時刻でのcron再利用
  * - ユーザー離脱時のcron削除
  * - UTC時刻計算の正確性
+ * - 配列チェックとエラーハンドリングの統合
  */
 
 import { DynamicReportScheduler } from '../../services/dynamicReportScheduler';
@@ -34,9 +35,9 @@ describe('DynamicReportScheduler', () => {
     jest.clearAllMocks();
   });
 
-  describe('🔴 Red Phase: cronジョブ作成テスト', () => {
+  describe('cronジョブ作成テスト', () => {
     test('should create cron job for new timezone', async () => {
-      // 🔴 Red: まだ実装していないのでエラーになる
+      // 新しいタイムゾーン用のcronジョブ作成テスト
       
       // 初期状態: cronジョブなし
       expect(scheduler.getActiveJobCount()).toBe(0);
@@ -57,7 +58,7 @@ describe('DynamicReportScheduler', () => {
     });
 
     test('should reuse existing cron for same UTC time', async () => {
-      // 🔴 Red: UTC時刻の重複利用テスト
+      // UTC時刻の重複利用テスト
       
       // Asia/Tokyo (UTC 09:30)
       await scheduler.onTimezoneChanged('user1', null, 'Asia/Tokyo');
@@ -72,7 +73,7 @@ describe('DynamicReportScheduler', () => {
     });
 
     test('should remove cron when no users in timezone', async () => {
-      // 🔴 Red: 不要cronの削除テスト
+      // 不要cronの削除テスト
       
       // ユーザー追加
       await scheduler.onTimezoneChanged('user1', null, 'Asia/Tokyo');
@@ -88,9 +89,9 @@ describe('DynamicReportScheduler', () => {
     });
   });
 
-  describe('🔴 Red Phase: UTC時刻計算テスト', () => {
+  describe('UTC時刻計算テスト', () => {
     test('should calculate correct UTC time for Asia/Tokyo', () => {
-      // 🔴 Red: タイムゾーン→UTC変換テスト
+      // タイムゾーン→UTC変換テスト
       const utcTime = scheduler.calculateUtcTimeFor1830('Asia/Tokyo');
       expect(utcTime).toEqual({ hour: 9, minute: 30 });
     });
@@ -113,9 +114,9 @@ describe('DynamicReportScheduler', () => {
     });
   });
 
-  describe('🔴 Red Phase: ユーザー管理テスト', () => {
+  describe('ユーザー管理テスト', () => {
     test('should track users by timezone', async () => {
-      // 🔴 Red: タイムゾーン別ユーザー管理
+      // タイムゾーン別ユーザー管理テスト
       
       await scheduler.onTimezoneChanged('user1', null, 'Asia/Tokyo');
       await scheduler.onTimezoneChanged('user2', null, 'Asia/Tokyo');
@@ -128,7 +129,7 @@ describe('DynamicReportScheduler', () => {
     });
 
     test('should handle user timezone changes correctly', async () => {
-      // 🔴 Red: ユーザーのタイムゾーン変更
+      // ユーザーのタイムゾーン変更テスト
       
       // 初期設定
       await scheduler.onTimezoneChanged('user1', null, 'Asia/Tokyo');
@@ -141,9 +142,9 @@ describe('DynamicReportScheduler', () => {
     });
   });
 
-  describe('🔴 Red Phase: 初期化テスト', () => {
+  describe('初期化テスト', () => {
     test('should initialize with existing user timezones', async () => {
-      // 🔴 Red: アプリ起動時の既存ユーザー読み込み
+      // アプリ起動時の既存ユーザー読み込みテスト
       
       // モックデータ準備
       const mockRepository = {
@@ -168,7 +169,7 @@ describe('DynamicReportScheduler', () => {
     });
 
     test('should handle empty user list during initialization', async () => {
-      // 🔴 Red: ユーザーがいない場合の初期化
+      // ユーザーがいない場合の初期化テスト
       
       const mockRepository = {
         getAllUserTimezonesForScheduler: jest.fn().mockResolvedValue([])
@@ -182,9 +183,9 @@ describe('DynamicReportScheduler', () => {
     });
   });
 
-  describe('🔴 Red Phase: エラーハンドリングテスト', () => {
+  describe('エラーハンドリングテスト', () => {
     test('should handle invalid timezone gracefully', async () => {
-      // 🔴 Red: 無効なタイムゾーンの処理
+      // 無効なタイムゾーンの処理テスト
       
       await expect(async () => {
         await scheduler.onTimezoneChanged('user1', null, 'Invalid/Timezone');
@@ -195,7 +196,7 @@ describe('DynamicReportScheduler', () => {
     });
 
     test('should handle cron creation failure gracefully', async () => {
-      // 🔴 Red: cron作成失敗時の処理
+      // cron作成失敗時の処理テスト
       
       mockCron.schedule.mockImplementation(() => {
         throw new Error('Cron creation failed');
@@ -207,11 +208,60 @@ describe('DynamicReportScheduler', () => {
       
       expect(scheduler.getActiveJobCount()).toBe(0);
     });
+
+    test('should handle userTimezones is not iterable error during initialization', async () => {
+      // userTimezones is not iterable エラーの検出テスト（dynamicReportScheduler.ts:73-76で修正済み）
+      
+      const mockRepository = {
+        getAllUserTimezonesForScheduler: jest.fn().mockResolvedValue(null) // nullが返される場合
+      };
+      
+      scheduler.setRepository(mockRepository);
+      
+      // 初期化時にエラーが発生してもアプリケーションは継続する
+      await expect(async () => {
+        await scheduler.initialize();
+      }).not.toThrow();
+      
+      expect(scheduler.getActiveJobCount()).toBe(0);
+    });
+
+    test('should handle undefined userTimezones during initialization', async () => {
+      // undefined userTimezones の処理テスト
+      
+      const mockRepository = {
+        getAllUserTimezonesForScheduler: jest.fn().mockResolvedValue(undefined)
+      };
+      
+      scheduler.setRepository(mockRepository);
+      
+      await expect(async () => {
+        await scheduler.initialize();
+      }).not.toThrow();
+      
+      expect(scheduler.getActiveJobCount()).toBe(0);
+    });
+
+    test('should handle non-array userTimezones during initialization', async () => {
+      // 配列以外のuserTimezones の処理テスト
+      
+      const mockRepository = {
+        getAllUserTimezonesForScheduler: jest.fn().mockResolvedValue("not an array")
+      };
+      
+      scheduler.setRepository(mockRepository);
+      
+      await expect(async () => {
+        await scheduler.initialize();
+      }).not.toThrow();
+      
+      expect(scheduler.getActiveJobCount()).toBe(0);
+    });
   });
 
-  describe('🔴 Red Phase: 状態管理テスト', () => {
+  describe('状態管理テスト', () => {
     test('should provide active job status', () => {
-      // 🔴 Red: アクティブなcronジョブの状態取得
+      // アクティブなcronジョブの状態取得テスト
       
       expect(scheduler.getActiveCronSchedule()).toEqual([]);
       expect(scheduler.getActiveJobCount()).toBe(0);
@@ -219,7 +269,7 @@ describe('DynamicReportScheduler', () => {
     });
 
     test('should provide debug information', async () => {
-      // 🔴 Red: デバッグ情報の提供
+      // デバッグ情報の提供テスト
       
       await scheduler.onTimezoneChanged('user1', null, 'Asia/Tokyo');
       await scheduler.onTimezoneChanged('user2', null, 'America/New_York');

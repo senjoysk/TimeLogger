@@ -1,13 +1,14 @@
 /**
  * TimezoneChangeMonitor テストスイート
  * 
- * 🔴 Red Phase: タイムゾーン変更監視システムの失敗するテストを作成
+ * タイムゾーン変更監視システムの機能テスト
  * 
  * テスト対象:
  * - データベースポーリングによるタイムゾーン変更検出
  * - 通知テーブルによるタイムゾーン変更検出
  * - TimezoneCommandHandlerとの統合
  * - DynamicReportSchedulerとの連携
+ * - メソッド存在確認とエラーハンドリング
  */
 
 import { TimezoneChangeMonitor } from '../../services/timezoneChangeMonitor';
@@ -46,9 +47,9 @@ describe('TimezoneChangeMonitor', () => {
     monitor.stop(); // 監視を停止
   });
 
-  describe('🔴 Red Phase: ポーリング監視テスト', () => {
+  describe('ポーリング監視テスト', () => {
     test('should detect timezone changes from database polling', async () => {
-      // 🔴 Red: まだ実装していないのでエラーになる
+      // データベースポーリングによるタイムゾーン変更検出テスト
 
       // モックデータ準備
       mockRepository.getUserTimezoneChanges.mockResolvedValue([
@@ -75,7 +76,7 @@ describe('TimezoneChangeMonitor', () => {
     });
 
     test('should handle multiple timezone changes in one poll', async () => {
-      // 🔴 Red: 複数変更の同時処理テスト
+      // 複数変更の同時処理テスト
 
       mockRepository.getUserTimezoneChanges.mockResolvedValue([
         {
@@ -105,7 +106,7 @@ describe('TimezoneChangeMonitor', () => {
     });
 
     test('should track last check time to avoid duplicates', async () => {
-      // 🔴 Red: 重複処理防止テスト
+      // 重複処理防止テスト
 
       // 最初のポーリング
       mockRepository.getUserTimezoneChanges.mockResolvedValueOnce([
@@ -130,7 +131,7 @@ describe('TimezoneChangeMonitor', () => {
     });
 
     test('should handle polling errors gracefully', async () => {
-      // 🔴 Red: ポーリングエラー処理テスト
+      // ポーリングエラー処理テスト
 
       // console.errorをモックしてエラーログをキャプチャ
       const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
@@ -156,9 +157,9 @@ describe('TimezoneChangeMonitor', () => {
     });
   });
 
-  describe('🔴 Red Phase: 通知テーブル監視テスト', () => {
+  describe('通知テーブル監視テスト', () => {
     test('should process unprocessed notifications', async () => {
-      // 🔴 Red: 通知テーブル処理テスト
+      // 通知テーブル処理テスト
 
       mockRepository.getUnprocessedNotifications.mockResolvedValue([
         {
@@ -184,7 +185,7 @@ describe('TimezoneChangeMonitor', () => {
     });
 
     test('should handle notification processing errors', async () => {
-      // 🔴 Red: 通知処理エラーハンドリング
+      // 通知処理エラーハンドリングテスト
 
       // console.errorをモックしてエラーログをキャプチャ
       const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
@@ -222,7 +223,7 @@ describe('TimezoneChangeMonitor', () => {
     });
 
     test('should batch process multiple notifications', async () => {
-      // 🔴 Red: バッチ処理テスト
+      // バッチ処理テスト
 
       // console.errorをモックしてエラーログをキャプチャ
       const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
@@ -257,9 +258,9 @@ describe('TimezoneChangeMonitor', () => {
     });
   });
 
-  describe('🔴 Red Phase: TimezoneCommandHandler統合テスト', () => {
+  describe('TimezoneCommandHandler統合テスト', () => {
     test('should handle timezone command integration', async () => {
-      // 🔴 Red: コマンドハンドラー統合テスト
+      // コマンドハンドラー統合テスト
 
       // 既存設定の模擬
       mockRepository.getUserSettings.mockResolvedValue({
@@ -282,7 +283,7 @@ describe('TimezoneChangeMonitor', () => {
     });
 
     test('should handle command with same timezone gracefully', async () => {
-      // 🔴 Red: 同一タイムゾーン設定時の処理
+      // 同一タイムゾーン設定時の処理テスト
 
       mockRepository.getUserSettings.mockResolvedValue({
         user_id: 'user1',
@@ -300,7 +301,7 @@ describe('TimezoneChangeMonitor', () => {
     });
 
     test('should handle command for new user', async () => {
-      // 🔴 Red: 新規ユーザーのタイムゾーン設定
+      // 新規ユーザーのタイムゾーン設定テスト
 
       mockRepository.getUserSettings.mockResolvedValue(null);
 
@@ -317,9 +318,9 @@ describe('TimezoneChangeMonitor', () => {
     });
   });
 
-  describe('🔴 Red Phase: 監視制御テスト', () => {
+  describe('監視制御テスト', () => {
     test('should start and stop polling monitor', async () => {
-      // 🔴 Red: 監視開始・停止テスト
+      // 監視開始・停止テスト
 
       expect(monitor.isRunning()).toBe(false);
 
@@ -331,7 +332,7 @@ describe('TimezoneChangeMonitor', () => {
     });
 
     test('should start and stop notification processor', async () => {
-      // 🔴 Red: 通知プロセッサー制御テスト
+      // 通知プロセッサー制御テスト
 
       expect(monitor.isProcessorActive()).toBe(false);
 
@@ -343,7 +344,7 @@ describe('TimezoneChangeMonitor', () => {
     });
 
     test('should configure polling interval', async () => {
-      // 🔴 Red: ポーリング間隔設定テスト
+      // ポーリング間隔設定テスト
 
       // デフォルト間隔
       expect(monitor.getPollingInterval()).toBe(10000); // 10秒
@@ -358,9 +359,9 @@ describe('TimezoneChangeMonitor', () => {
     });
   });
 
-  describe('🔴 Red Phase: ステータス・デバッグテスト', () => {
+  describe('ステータス・デバッグテスト', () => {
     test('should provide monitoring status', async () => {
-      // 🔴 Red: 監視状態取得テスト
+      // 監視状態取得テスト
 
       const status = monitor.getStatus();
       
@@ -372,7 +373,7 @@ describe('TimezoneChangeMonitor', () => {
     });
 
     test('should provide statistics', async () => {
-      // 🔴 Red: 統計情報取得テスト
+      // 統計情報取得テスト
 
       // いくつかの処理を実行
       mockRepository.getUnprocessedNotifications.mockResolvedValue([
@@ -397,7 +398,7 @@ describe('TimezoneChangeMonitor', () => {
     });
 
     test('should reset statistics', () => {
-      // 🔴 Red: 統計リセットテスト
+      // 統計リセットテスト
 
       // 統計をリセット
       monitor.resetStatistics();
@@ -408,9 +409,9 @@ describe('TimezoneChangeMonitor', () => {
     });
   });
 
-  describe('🔴 Red Phase: エラーハンドリングテスト', () => {
+  describe('エラーハンドリングテスト', () => {
     test('should handle scheduler unavailable', async () => {
-      // 🔴 Red: スケジューラー未設定エラー
+      // スケジューラー未設定エラーテスト
 
       const monitorWithoutScheduler = new TimezoneChangeMonitor();
       
@@ -420,7 +421,7 @@ describe('TimezoneChangeMonitor', () => {
     });
 
     test('should handle repository unavailable', async () => {
-      // 🔴 Red: リポジトリ未設定エラー
+      // リポジトリ未設定エラーテスト
 
       const monitorWithoutRepository = new TimezoneChangeMonitor();
       monitorWithoutRepository.setScheduler(mockScheduler);
@@ -431,7 +432,7 @@ describe('TimezoneChangeMonitor', () => {
     });
 
     test('should recover from temporary database errors', async () => {
-      // 🔴 Red: 一時的DB障害からの復旧テスト
+      // 一時的DB障害からの復旧テスト
 
       // console.errorをモックしてエラーログをキャプチャ
       const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
@@ -464,6 +465,121 @@ describe('TimezoneChangeMonitor', () => {
 
       // スパイをクリーンアップ
       consoleSpy.mockRestore();
+    });
+
+    test('should handle getUserTimezoneChanges is not a function error', async () => {
+      // getUserTimezoneChanges is not a function エラーの検出テスト（timezoneChangeMonitor.ts:159-163で修正済み）
+      
+      // console.errorをモックしてエラーログをキャプチャ
+      const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+
+      // getUserTimezoneChanges メソッドが存在しないリポジトリを作成
+      const incompleteRepository = {
+        // getUserTimezoneChanges: jest.fn(), // このメソッドを削除
+        getUnprocessedNotifications: jest.fn().mockResolvedValue([]),
+        markNotificationAsProcessed: jest.fn().mockResolvedValue(undefined),
+        getUserSettings: jest.fn().mockResolvedValue({ user_id: 'test', timezone: 'Asia/Tokyo' }),
+        updateTimezone: jest.fn().mockResolvedValue(undefined)
+      } as any;
+      
+      monitor.setRepository(incompleteRepository);
+      
+      // startPollingMonitorで getUserTimezoneChanges is not a function エラーが発生
+      await expect(async () => {
+        await monitor.startPollingMonitor();
+      }).not.toThrow();
+      
+      // 短い間隔でポーリングを実行
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
+      // エラーログが出力されることを確認
+      expect(consoleSpy).toHaveBeenCalledWith(
+        expect.stringContaining('❌ getUserTimezoneChanges is not a function')
+      );
+      
+      // スケジューラーは呼ばれない
+      expect(mockScheduler.onTimezoneChanged).not.toHaveBeenCalled();
+      
+      // スパイをクリーンアップ
+      consoleSpy.mockRestore();
+    });
+
+    test('should handle missing repository methods gracefully', async () => {
+      // リポジトリのメソッドが不完全な場合のテスト
+      
+      // console.errorをモックしてエラーログをキャプチャ
+      const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+
+      // 一部のメソッドが存在しないリポジトリ
+      const incompleteRepository = {
+        getUserTimezoneChanges: jest.fn().mockResolvedValue([]),
+        // getUnprocessedNotifications: jest.fn(), // このメソッドを削除
+        // markNotificationAsProcessed: jest.fn(), // このメソッドを削除
+        getUserSettings: jest.fn().mockResolvedValue({ user_id: 'test', timezone: 'Asia/Tokyo' }),
+        updateTimezone: jest.fn().mockResolvedValue(undefined)
+      } as any;
+      
+      monitor.setRepository(incompleteRepository);
+      
+      // startNotificationProcessorで getUnprocessedNotifications is not a function エラーが発生
+      await expect(async () => {
+        await monitor.startNotificationProcessor();
+      }).not.toThrow();
+      
+      // 短い間隔で処理を実行
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
+      // エラーログが出力されることを確認
+      expect(consoleSpy).toHaveBeenCalledWith(
+        expect.stringContaining('❌ getUnprocessedNotifications is not a function')
+      );
+      
+      // スケジューラーは呼ばれない
+      expect(mockScheduler.onTimezoneChanged).not.toHaveBeenCalled();
+      
+      // スパイをクリーンアップ
+      consoleSpy.mockRestore();
+    });
+
+    test('should handle repository methods returning non-arrays', async () => {
+      // リポジトリメソッドが配列以外を返す場合のテスト
+      
+      // console.errorをモックしてエラーログをキャプチャ
+      const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+      const consoleWarnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+
+      const badRepository = {
+        getUserTimezoneChanges: jest.fn().mockResolvedValue("not an array"), // 配列でない
+        getUnprocessedNotifications: jest.fn().mockResolvedValue(null), // null
+        markNotificationAsProcessed: jest.fn().mockResolvedValue(undefined),
+        getUserSettings: jest.fn().mockResolvedValue({ user_id: 'test', timezone: 'Asia/Tokyo' }),
+        updateTimezone: jest.fn().mockResolvedValue(undefined)
+      };
+      
+      monitor.setRepository(badRepository);
+      
+      // 配列以外が返されてもエラーが発生しない
+      await expect(async () => {
+        await monitor.startPollingMonitor();
+      }).not.toThrow();
+      await expect(async () => {
+        await monitor.startNotificationProcessor();
+      }).not.toThrow();
+      
+      // 短い間隔で処理を実行
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
+      // 警告ログが出力されることを確認（配列以外のデータの場合は警告が出力される）
+      expect(consoleWarnSpy).toHaveBeenCalledWith(
+        expect.stringContaining('⚠️ getUserTimezoneChanges returned invalid data, skipping')
+      );
+      expect(consoleWarnSpy).toHaveBeenCalledWith(
+        expect.stringContaining('⚠️ getUnprocessedNotifications returned invalid data, skipping')
+      );
+      
+      // スパイをクリーンアップ
+      consoleSpy.mockRestore();
+      consoleWarnSpy.mockRestore();
     });
   });
 });
