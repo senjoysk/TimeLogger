@@ -101,12 +101,12 @@ export class SharedTestDatabase {
         'DELETE FROM daily_analysis_cache'
       ];
 
-      // 並列実行で高速化
-      await Promise.all(
-        cleanupQueries.map(query => (this.repository as any).runQuery(query))
-      );
+      // 順次実行で安定性向上（SQLiteの排他制御を考慮）
+      for (const query of cleanupQueries) {
+        await (this.repository as any).runQuery(query);
+      }
       
-      console.log('✅ テストデータクリーンアップ完了（並列処理）');
+      console.log('✅ テストデータクリーンアップ完了（順次処理）');
     } catch (error) {
       console.error('❌ テストデータクリーンアップエラー:', error);
       throw error;

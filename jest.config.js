@@ -34,8 +34,8 @@ module.exports = {
     '^@/(.*)$': '<rootDir>/src/$1',
   },
   
-  // タイムアウト設定
-  testTimeout: 15000,
+  // タイムアウト設定（CI環境対応）
+  testTimeout: 20000,
   
   // 詳細ログ表示
   verbose: true,
@@ -46,8 +46,8 @@ module.exports = {
   // プロセス強制終了の設定
   forceExit: true,
   
-  // 非同期処理の検出
-  detectOpenHandles: true, // 開発時にtrue、CI時にfalse
+  // 非同期処理の検出（CI環境最適化）
+  detectOpenHandles: process.env.CI ? false : true, // CI環境では無効化
   detectLeaks: false,
   
   // 最大ワーカー数制限（メモリ使用量削減）

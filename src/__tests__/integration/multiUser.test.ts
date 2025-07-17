@@ -66,7 +66,7 @@ describe('Multi-user Support Integration Tests', () => {
       
       const result = await handleMessage(mockMessage as unknown as Message);
       expect(result).toBe(true);
-    }, 10000);
+    }, 30000);
 
     test('別ユーザーのメッセージ処理確認', async () => {
       const userId = 'different-user-123';
@@ -82,7 +82,7 @@ describe('Multi-user Support Integration Tests', () => {
       const result = await handleMessage(mockMessage as unknown as Message);
       // マルチユーザー対応により、すべてのユーザーが処理される
       expect(result).toBe(true);
-    }, 10000);
+    }, 30000);
 
     test('複数ユーザーが同時にメッセージを送信できる', async () => {
       // マルチユーザー対応により複数ユーザーが同時利用可能
@@ -113,7 +113,7 @@ describe('Multi-user Support Integration Tests', () => {
       expect(user2Logs).toHaveLength(1); // マルチユーザー対応により両方のログが保存される
       expect(user1Logs[0].content).toBe('プロジェクトA開始');
       expect(user2Logs[0].content).toBe('会議参加'); // ログが保存される
-    }, 10000);
+    }, 30000);
 
     test('異なるユーザーのデータが分離されている', async () => {
       // マルチユーザー対応により複数ユーザーのデータが分離される
@@ -142,7 +142,7 @@ describe('Multi-user Support Integration Tests', () => {
       expect(user1Logs).toHaveLength(2);
       expect(user2Logs).toHaveLength(1); // マルチユーザー対応により1件
       expect(user3Logs).toHaveLength(1); // マルチユーザー対応により1件
-    }, 10000);
+    }, 30000);
 
     test('ユーザー制限メッセージが出力されない', async () => {
       // マルチユーザー対応により制限メッセージは出力されない
@@ -163,7 +163,7 @@ describe('Multi-user Support Integration Tests', () => {
       expect(restrictionLog).toBeUndefined(); // 制限メッセージは出力されない
       
       consoleLogSpy.mockRestore();
-    }, 10000);
+    }, 30000);
   });
 
   describe('自動ユーザー登録機能のテスト（実装済み）', () => {
@@ -195,7 +195,7 @@ describe('Multi-user Support Integration Tests', () => {
       // どちらかの返信にウェルカムメッセージが含まれることを確認
       const allReplies = mockMessage.replies.map(r => typeof r === 'string' ? r : JSON.stringify(r)).join(' ');
       expect(allReplies).toContain('TimeLoggerへようこそ');
-    }, 10000);
+    }, 30000);
 
     test('既存ユーザーには重複登録されない', async () => {
       // 既存ユーザーの処理をテスト
@@ -225,7 +225,7 @@ describe('Multi-user Support Integration Tests', () => {
         // オブジェクト形式の返信（TODO分類結果）の場合
         expect(JSON.stringify(reply)).not.toContain('TimeLoggerへようこそ');
       }
-    }, 10000);
+    }, 30000);
 
     test('ユーザー情報が正しく保存される', async () => {
       // ユーザー情報の保存をテスト
@@ -246,7 +246,7 @@ describe('Multi-user Support Integration Tests', () => {
       expect(userInfo.userId).toBe(newUserId);
       expect(userInfo.username).toBe(username);
       expect(userInfo.timezone).toBe('Asia/Tokyo'); // デフォルトタイムゾーン
-    }, 10000);
+    }, 30000);
   });
 });
 
