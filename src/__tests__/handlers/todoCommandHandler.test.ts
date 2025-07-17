@@ -43,29 +43,42 @@ class MockTodoRepository implements ITodoRepository {
   }
 
   async updateTodo(id: string, update: any): Promise<void> {
+    // 実際のSQLiteと同じ動作をシミュレート: 厳密なID一致のみ
     const todo = this.todos.find(t => t.id === id);
-    if (todo) {
-      Object.assign(todo, update);
-      todo.updatedAt = new Date().toISOString();
+    if (!todo) {
+      // 実際のSQLiteではWHERE句で一致しないとUPDATEは無効
+      return;
     }
+    
+    Object.assign(todo, update);
+    todo.updatedAt = new Date().toISOString();
   }
 
   async updateTodoStatus(id: string, status: any): Promise<void> {
+    // 実際のSQLiteと同じ動作をシミュレート: 厳密なID一致のみ
     const todo = this.todos.find(t => t.id === id);
-    if (todo) {
-      todo.status = status;
-      todo.updatedAt = new Date().toISOString();
-      if (status === 'completed') {
-        todo.completedAt = new Date().toISOString();
-      }
+    if (!todo) {
+      // 実際のSQLiteではWHERE句で一致しないとUPDATEは無効
+      // モックでも同様に、見つからない場合は何もしない（エラーも出さない）
+      return;
+    }
+    
+    todo.status = status;
+    todo.updatedAt = new Date().toISOString();
+    if (status === 'completed') {
+      todo.completedAt = new Date().toISOString();
     }
   }
 
   async deleteTodo(id: string): Promise<void> {
+    // 実際のSQLiteと同じ動作をシミュレート: 厳密なID一致のみ
     const index = this.todos.findIndex(t => t.id === id);
-    if (index !== -1) {
-      this.todos.splice(index, 1);
+    if (index === -1) {
+      // 実際のSQLiteではWHERE句で一致しないとDELETEは無効
+      return;
     }
+    
+    this.todos.splice(index, 1);
   }
 
   async searchTodos(userId: string, keyword: string): Promise<Todo[]> {
@@ -1482,6 +1495,97 @@ describe('TodoCommandHandler', () => {
       const embed = createPaginatedEmbed(mockTodos.slice(0, 10), 1, 2, 15);
       expect(embed.data.title).toContain('(1-10/15件)');
       expect(embed.data.title).toContain('ページ 1/2');
+    });
+  });
+
+  // 🔴 Red Phase: 短縮IDバグ検知のための新しいテストセクション
+  describe('🐛 短縮IDバグ検知テスト (現在のバグある実装では失敗する)', () => {
+    test('短縮IDでTODO完了時にrepositoryに完全IDが渡されることを確認', async () => {
+      // 完全なUUID形式のIDを持つTODOを作成
+      const testTodo = await mockTodoRepo.createTodo({
+        userId: 'test-user',
+        content: '短縮IDバグ検知テスト'
+      });
+      
+      // updateTodoStatusメソッドにスパイを設定
+      const updateStatusSpy = jest.spyOn(mockTodoRepo, 'updateTodoStatus');
+      
+      // 短縮IDを使用してコマンド実行
+      const shortId = testTodo.id.substring(0, 8);
+      const message = createMockMessage(`!todo done ${shortId}`, 'test-user') as Message;
+      
+      await handler.handleCommand(message, 'test-user', ['done', shortId], 'Asia/Tokyo');
+      
+      // 🚨 重要: updateTodoStatusには完全ID（testTodo.id）が渡されるべき
+      // 現在のバグのある実装では短縮ID（shortId）が渡されるため、このテストは失敗する
+      expect(updateStatusSpy).toHaveBeenCalledWith(testTodo.id, 'completed');
+      
+      // 追加検証: 短縮IDが渡されていないことを確認
+      expect(updateStatusSpy).not.toHaveBeenCalledWith(shortId, 'completed');
+      
+      updateStatusSpy.mockRestore();
+    });
+
+    test('短縮IDでTODO編集時にrepositoryに完全IDが渡されることを確認', async () => {
+      const testTodo = await mockTodoRepo.createTodo({
+        userId: 'test-user',
+        content: '短縮ID編集バグ検知テスト'
+      });
+      
+      const updateTodoSpy = jest.spyOn(mockTodoRepo, 'updateTodo');
+      
+      const shortId = testTodo.id.substring(0, 8);
+      const message = createMockMessage(`!todo edit ${shortId} 編集後の内容`, 'test-user') as Message;
+      
+      await handler.handleCommand(message, 'test-user', ['edit', shortId, '編集後の内容'], 'Asia/Tokyo');
+      
+      // 🚨 重要: updateTodoには完全IDが渡されるべき
+      expect(updateTodoSpy).toHaveBeenCalledWith(testTodo.id, { content: '編集後の内容' });
+      expect(updateTodoSpy).not.toHaveBeenCalledWith(shortId, expect.any(Object));
+      
+      updateTodoSpy.mockRestore();
+    });
+
+    test('短縮IDでTODO削除時にrepositoryに完全IDが渡されることを確認', async () => {
+      const testTodo = await mockTodoRepo.createTodo({
+        userId: 'test-user',
+        content: '短縮ID削除バグ検知テスト'
+      });
+      
+      const deleteTodoSpy = jest.spyOn(mockTodoRepo, 'deleteTodo');
+      
+      const shortId = testTodo.id.substring(0, 8);
+      const message = createMockMessage(`!todo delete ${shortId}`, 'test-user') as Message;
+      
+      await handler.handleCommand(message, 'test-user', ['delete', shortId], 'Asia/Tokyo');
+      
+      // 🚨 重要: deleteTodoには完全IDが渡されるべき
+      expect(deleteTodoSpy).toHaveBeenCalledWith(testTodo.id);
+      expect(deleteTodoSpy).not.toHaveBeenCalledWith(shortId);
+      
+      deleteTodoSpy.mockRestore();
+    });
+
+    test('短縮IDによる実際のデータベース更新の失敗をシミュレート', async () => {
+      // より厳密なモック: 実際のSQLiteと同じ動作
+      const testTodo = await mockTodoRepo.createTodo({
+        userId: 'test-user',
+        content: 'SQLite動作シミュレーション'
+      });
+      
+      const shortId = testTodo.id.substring(0, 8);
+      
+      // 直接短縮IDでrepositoryのupdateを試行（これは失敗するはず）
+      await mockTodoRepo.updateTodoStatus(shortId, 'completed');
+      
+      // 短縮IDではTODOは更新されない（SQLiteの動作を模倣）
+      const unchangedTodo = await mockTodoRepo.getTodoById(testTodo.id);
+      expect(unchangedTodo?.status).toBe('pending'); // 'completed'ではない
+      
+      // 完全IDなら正常に更新される
+      await mockTodoRepo.updateTodoStatus(testTodo.id, 'completed');
+      const updatedTodo = await mockTodoRepo.getTodoById(testTodo.id);
+      expect(updatedTodo?.status).toBe('completed');
     });
   });
 });  
