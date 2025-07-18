@@ -1,8 +1,8 @@
 /**
- * 🟢 Green Phase: MessageSelectionHandlerの最小限実装
+ * MessageSelectionHandler - メッセージ選択UI処理
  * 
- * テストを通すための最小限のコード
- * 機能はまだ実装しない（仮実装）
+ * ユーザーがメッセージを送信した際に、選択肢UI（TODO/活動ログ/メモ/キャンセル）を表示し、
+ * ユーザーの選択に応じて適切な処理を実行する
  */
 
 export class MessageSelectionHandler {

@@ -9,9 +9,9 @@
 
 import { MessageSelectionHandler } from '../../handlers/messageSelectionHandler';
 
-describe('🔴 Red Phase: MessageSelectionHandlerの基本機能テスト', () => {
+describe('MessageSelectionHandlerの基本機能テスト', () => {
   test('MessageSelectionHandlerクラスが存在する', () => {
-    // この時点では実装がないため、テストは失敗する
+    // 最小限の実装により、テストが通る
     expect(() => {
       new MessageSelectionHandler();
     }).not.toThrow();
