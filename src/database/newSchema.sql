@@ -271,6 +271,34 @@ FROM message_classifications
 WHERE user_classification IS NOT NULL
 GROUP BY ai_classification;
 
+-- メモテーブル
+CREATE TABLE IF NOT EXISTS memo_entries (
+    id TEXT PRIMARY KEY,                    -- UUID
+    user_id TEXT NOT NULL,                  -- Discord User ID
+    content TEXT NOT NULL,                  -- メモ内容
+    title TEXT,                             -- メモタイトル（オプション）
+    tags TEXT,                              -- タグ（カンマ区切り）
+    created_at TEXT NOT NULL DEFAULT (datetime('now', 'utc')),
+    updated_at TEXT NOT NULL DEFAULT (datetime('now', 'utc')),
+    is_deleted BOOLEAN DEFAULT FALSE        -- 論理削除フラグ
+);
+
+-- メモ用インデックス
+CREATE INDEX IF NOT EXISTS idx_memo_entries_user_id ON memo_entries(user_id);
+CREATE INDEX IF NOT EXISTS idx_memo_entries_created_at ON memo_entries(created_at);
+CREATE INDEX IF NOT EXISTS idx_memo_entries_tags ON memo_entries(tags);
+CREATE INDEX IF NOT EXISTS idx_memo_entries_user_created ON memo_entries(user_id, created_at DESC) WHERE is_deleted = 0;
+
+-- メモのupdated_at自動更新トリガー
+CREATE TRIGGER IF NOT EXISTS update_memo_entries_updated_at
+    AFTER UPDATE ON memo_entries
+    FOR EACH ROW
+BEGIN
+    UPDATE memo_entries 
+    SET updated_at = datetime('now', 'utc')
+    WHERE id = NEW.id;
+END;
+
 -- ================================================================
 -- パフォーマンス最適化インデックス
 -- ================================================================

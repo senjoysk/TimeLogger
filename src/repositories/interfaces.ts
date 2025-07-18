@@ -165,6 +165,7 @@ export interface IMessageClassificationRepository {
 }
 
 
+
 /**
  * ユーザー管理機能の抽象化インターフェース
  */

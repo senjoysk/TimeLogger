@@ -85,6 +85,7 @@ export interface ITodoCommandHandler {
    */
   showHelp(message: Message): Promise<void>;
   
+
   /**
    * リソースクリーンアップ
    */
@@ -999,6 +1000,7 @@ export class TodoCommandHandler implements ITodoCommandHandler {
   ): EmbedBuilder {
     return createPaginatedEmbed(todos, currentPage, totalPages, totalCount);
   }
+
 
   /**
    * 期限切れセッションをクリーンアップ

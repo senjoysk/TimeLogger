@@ -2437,4 +2437,6 @@ export class SqliteActivityLogRepository implements IActivityLogRepository, IApi
       logCount: result[0].logCount
     } : null;
   }
+
+  // ================================================================
 }
