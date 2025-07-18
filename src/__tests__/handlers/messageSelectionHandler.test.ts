@@ -17,3 +17,11 @@ describe('MessageSelectionHandlerの基本機能テスト', () => {
     }).not.toThrow();
   });
 });
+
+describe('🔴 Red Phase: ユーザー選択肢UI表示機能テスト', () => {
+  test('showSelectionUIメソッドが存在する', () => {
+    // この時点では実装がないため、テストは失敗する
+    const handler = new MessageSelectionHandler();
+    expect(typeof handler.showSelectionUI).toBe('function');
+  });
+});
