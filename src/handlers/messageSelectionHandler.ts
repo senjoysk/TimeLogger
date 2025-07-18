@@ -9,4 +9,8 @@ export class MessageSelectionHandler {
   constructor() {
     // 最小限の実装：何もしない
   }
+
+  showSelectionUI() {
+    // テストを通すための最小限の実装：何もしない
+  }
 }
