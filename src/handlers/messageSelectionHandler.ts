@@ -8,11 +8,16 @@
 import { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } from 'discord.js';
 
 export class MessageSelectionHandler {
+  private storedMessages: Map<string, string> = new Map();
+
   constructor() {
-    // 最小限の実装：何もしない
+    // 最小限の実装：メッセージ保存用Map初期化
   }
 
   async showSelectionUI(message: any, userId: string, content: string) {
+    // 🟢 Green Phase: メッセージ内容を保存
+    this.storedMessages.set(userId, content);
+    
     // テストを通すための最小限の実装：Embedとボタンを作成
     const embed = new EmbedBuilder()
       .setTitle('📝 メッセージの種類を選択してください')
@@ -46,5 +51,39 @@ export class MessageSelectionHandler {
       embeds: [embed],
       components: [buttons]
     });
+  }
+
+  async handleButtonInteraction(interaction: any, userId: string, timezone: string) {
+    // 🟢 Green Phase: 全ボタン選択の最小限実装
+    if (interaction.customId === 'select_TODO') {
+      await interaction.update({
+        content: '📋 TODOとして登録しました！',
+        embeds: [],
+        components: []
+      });
+    } else if (interaction.customId === 'select_ACTIVITY_LOG') {
+      await interaction.update({
+        content: '📝 活動ログとして記録しました！',
+        embeds: [],
+        components: []
+      });
+    } else if (interaction.customId === 'select_MEMO') {
+      await interaction.update({
+        content: '📄 メモとして保存しました！',
+        embeds: [],
+        components: []
+      });
+    } else if (interaction.customId === 'select_CANCEL') {
+      await interaction.update({
+        content: 'キャンセルしました。',
+        embeds: [],
+        components: []
+      });
+    }
+  }
+
+  getStoredMessage(userId: string): string | undefined {
+    // 🟢 Green Phase: 保存されたメッセージ内容を取得
+    return this.storedMessages.get(userId);
   }
 }
