@@ -88,7 +88,7 @@ npm run test:watch -- path/to/new.test.ts
 - **メインシステム**: ActivityLoggingIntegration（src/integration/activityLoggingIntegration.ts）
 - **統合リポジトリ**: SqliteActivityLogRepository（活動ログ + APIコスト監視）
 - **コマンドシステム**: ICommandHandler実装による個別ハンドラー
-- **テストカバレッジ**: 45.5%（__tests__/ ディレクトリ）
+- **テストカバレッジ**: 65.6%（__tests__/ ディレクトリ）
 
 ## TDDでのコーディング規約
 
@@ -122,7 +122,7 @@ describe('NewService', () => {
 ## 技術スタック
 - **言語**: Node.js + TypeScript
 - **Discord**: discord.js v14
-- **AI**: Google Gemini 1.5 Flash
+- **AI**: Google Gemini gemini-2.0-flash
 - **データベース**: SQLite3
 - **テストフレームワーク**: Jest
 - **スケジューラー**: node-cron
