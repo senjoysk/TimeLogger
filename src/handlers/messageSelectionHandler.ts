@@ -86,4 +86,16 @@ export class MessageSelectionHandler {
     // 🟢 Green Phase: 保存されたメッセージ内容を取得
     return this.storedMessages.get(userId);
   }
+
+  async processNonCommandMessage(message: any, userId: string, timezone: string): Promise<boolean> {
+    // 🟢 Green Phase: ActivityLoggingIntegration統合メソッド
+    // AI分類の代わりにユーザー選択UIを表示
+    try {
+      await this.showSelectionUI(message, userId, message.content);
+      return true; // 処理成功
+    } catch (error) {
+      console.error('MessageSelectionHandler処理エラー:', error);
+      return false; // 処理失敗
+    }
+  }
 }

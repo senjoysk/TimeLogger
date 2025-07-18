@@ -209,3 +209,33 @@ describe('メッセージ内容保存テスト', () => {
     expect(storedMessage).toBe(mockContent);
   });
 });
+
+describe('ActivityLoggingIntegration統合テスト', () => {
+  test('🟢 Green Phase: AI分類の代わりにMessageSelectionHandlerを使用する', async () => {
+    // 最小限の実装により、テストが通る
+    const handler = new MessageSelectionHandler();
+    const mockMessage = { 
+      reply: jest.fn().mockResolvedValue({}),
+      content: 'テストメッセージ内容'
+    } as any;
+    const mockUserId = 'test-user-123';
+    const mockTimezone = 'Asia/Tokyo';
+    
+    // ActivityLoggingIntegrationのprocessMessage相当の動作をテスト
+    const result = await handler.processNonCommandMessage(mockMessage, mockUserId, mockTimezone);
+    
+    // AI分類ではなく、ユーザー選択UIが表示されることを確認
+    expect(mockMessage.reply).toHaveBeenCalledWith(
+      expect.objectContaining({
+        embeds: expect.arrayContaining([
+          expect.objectContaining({
+            data: expect.objectContaining({
+              title: '📝 メッセージの種類を選択してください'
+            })
+          })
+        ])
+      })
+    );
+    expect(result).toBe(true); // 処理成功
+  });
+});
