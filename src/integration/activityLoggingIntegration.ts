@@ -6,6 +6,7 @@
 import { Client, Message, ButtonInteraction } from 'discord.js';
 // Removed better-sqlite3 import - using sqlite3 via repository
 import { SqliteActivityLogRepository } from '../repositories/sqliteActivityLogRepository';
+import { SqliteMemoRepository } from '../repositories/sqliteMemoRepository';
 import { ActivityLogService } from '../services/activityLogService';
 import { UnifiedAnalysisService } from '../services/unifiedAnalysisService';
 import { AnalysisCacheService } from '../services/analysisCacheService';
@@ -16,6 +17,7 @@ import { TimezoneHandler } from '../handlers/timezoneHandler';
 import { UnmatchedCommandHandler } from '../handlers/unmatchedCommandHandler';
 import { TodoCommandHandler } from '../handlers/todoCommandHandler';
 import { ProfileCommandHandler } from '../handlers/profileCommandHandler';
+import { MemoCommandHandler } from '../handlers/memoCommandHandler';
 import { GeminiService } from '../services/geminiService';
 import { MessageClassificationService } from '../services/messageClassificationService';
 import { IntegratedSummaryService } from '../services/integratedSummaryService';
@@ -55,6 +57,7 @@ export interface ActivityLoggingConfig {
 export class ActivityLoggingIntegration {
   // サービス層
   private repository!: SqliteActivityLogRepository;
+  private memoRepository!: SqliteMemoRepository;
   private activityLogService!: ActivityLogService;
   private geminiService!: GeminiService;
   private messageClassificationService!: MessageClassificationService;
@@ -75,6 +78,7 @@ export class ActivityLoggingIntegration {
   private unmatchedHandler!: UnmatchedCommandHandler;
   private todoHandler!: TodoCommandHandler;
   private profileHandler!: ProfileCommandHandler;
+  private memoHandler!: MemoCommandHandler;
   private messageSelectionHandler!: MessageSelectionHandler;
 
   // 設定
@@ -108,6 +112,10 @@ export class ActivityLoggingIntegration {
         await this.repository.initializeDatabase();
         console.log('✅ データベース接続・初期化完了');
       }
+
+      // メモリポジトリの初期化
+      this.memoRepository = new SqliteMemoRepository(this.config.databasePath);
+      console.log('✅ メモリポジトリ初期化完了');
 
       // 2. サービス層の初期化
       // コスト管理機能の初期化（統合版）
@@ -174,6 +182,10 @@ export class ActivityLoggingIntegration {
       
       // プロファイル機能ハンドラーの初期化
       this.profileHandler = new ProfileCommandHandler(this.repository);
+      
+      // メモ機能ハンドラーの初期化
+      this.memoHandler = new MemoCommandHandler(this.memoRepository);
+      
       this.messageSelectionHandler = new MessageSelectionHandler();
       
       // 🟢 Green Phase: MessageSelectionHandlerに依存性注入
@@ -412,6 +424,12 @@ export class ActivityLoggingIntegration {
       case 'プロファイル':
         console.log(`📊 profileコマンド実行: ユーザー=${userId}, タイムゾーン=${timezone}`);
         await this.profileHandler.handle(message, userId, args, timezone);
+        break;
+
+      case 'memo':
+      case 'メモ':
+        console.log(`📝 memoコマンド実行: ユーザー=${userId}, タイムゾーン=${timezone}`);
+        await this.memoHandler.handleCommand(message, args);
         break;
 
       default:

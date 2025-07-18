@@ -1,5 +1,6 @@
 import { ActivityRecord, DailySummary, ActivityAnalysis } from '../types';
 import { Todo, CreateTodoRequest, UpdateTodoRequest, GetTodosOptions, TodoStats, TodoStatus, MessageClassificationHistory, ClassificationResult, MessageClassification } from '../types/todo';
+import { Memo, CreateMemoRequest, UpdateMemoRequest } from '../types/memo';
 
 /**
  * ユーザー情報
@@ -165,6 +166,22 @@ export interface IMessageClassificationRepository {
 }
 
 
+
+/**
+ * メモ管理機能の抽象化インターフェース
+ */
+export interface IMemoRepository {
+  // メモ基本操作
+  createMemo(request: CreateMemoRequest): Promise<Memo>;
+  getMemoById(id: string): Promise<Memo | null>;
+  getMemosByUserId(userId: string): Promise<Memo[]>;
+  updateMemo(id: string, update: UpdateMemoRequest): Promise<void>;
+  deleteMemo(id: string): Promise<void>;
+
+  // メモ検索
+  searchMemos(userId: string, keyword: string): Promise<Memo[]>;
+  getMemosByTag(userId: string, tag: string): Promise<Memo[]>;
+}
 
 /**
  * ユーザー管理機能の抽象化インターフェース
