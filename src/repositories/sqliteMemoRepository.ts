@@ -38,13 +38,13 @@ export class SqliteMemoRepository implements IMemoRepository {
       if (err) {
         console.error('❌ メモテーブル作成エラー:', err);
         throw new MemoError('メモテーブルの作成に失敗しました', 'DATABASE_ERROR', err);
-      }
-    });
-
-    // インデックスの作成
-    this.db.run(`CREATE INDEX IF NOT EXISTS idx_memos_user_id ON memos(user_id)`, (err) => {
-      if (err) {
-        console.error('❌ メモインデックス作成エラー:', err);
+      } else {
+        // テーブル作成成功後にインデックスを作成
+        this.db.run(`CREATE INDEX IF NOT EXISTS idx_memos_user_id ON memos(user_id)`, (err) => {
+          if (err) {
+            console.error('❌ メモインデックス作成エラー:', err);
+          }
+        });
       }
     });
   }

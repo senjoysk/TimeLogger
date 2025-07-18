@@ -11,7 +11,7 @@ export class MessageSelectionHandler {
   private storedMessages: Map<string, string> = new Map();
   private todoRepository?: any;
   private activityLogService?: any;
-  private memoService?: any;
+  private memoRepository?: any;
 
   constructor() {
     // 最小限の実装：メッセージ保存用Map初期化
@@ -27,9 +27,9 @@ export class MessageSelectionHandler {
     this.activityLogService = activityLogService;
   }
 
-  setMemoService(memoService: any) {
-    // 🟢 Green Phase: MemoService依存性注入
-    this.memoService = memoService;
+  setMemoRepository(memoRepository: any) {
+    // 🟢 Green Phase: MemoRepository依存性注入
+    this.memoRepository = memoRepository;
   }
 
   async showSelectionUI(message: any, userId: string, content: string) {
@@ -159,23 +159,44 @@ export class MessageSelectionHandler {
         }
       } else if (interaction.customId === 'select_MEMO') {
         try {
-          if (this.memoService && messageContent) {
-            // 実際のメモ保存処理
-            await this.memoService.saveMemoFromMessage(userId, messageContent, timezone);
-          }
+          // 🔄 先にDiscordに応答してタイムアウトを防ぐ
           await interaction.update({
-            content: '📄 メモとして保存しました！',
+            content: '📄 メモ保存中...',
             embeds: [],
             components: []
           });
+          
+          if (this.memoRepository && messageContent) {
+            // 実際のメモ保存処理
+            const memoRequest = {
+              userId,
+              content: messageContent,
+              tags: []
+            };
+            console.log(`📄 メモ保存開始:`, memoRequest);
+            await this.memoRepository.createMemo(memoRequest);
+            console.log(`✅ メモ保存完了`);
+            
+            // 処理完了後に結果を編集
+            await interaction.editReply({
+              content: '📄 メモとして保存しました！'
+            });
+          } else {
+            console.log(`⚠️ メモ保存スキップ: memoRepository=${!!this.memoRepository}, messageContent="${messageContent}"`);
+            await interaction.editReply({
+              content: '📄 メモとして保存しました！'
+            });
+          }
         } catch (error) {
           console.error('❌ メモ保存エラー:', error);
           const errorMessage = error instanceof Error ? error.message : String(error);
-          await interaction.update({
-            content: `❌ メモ保存中にエラーが発生しました: ${errorMessage}`,
-            embeds: [],
-            components: []
-          });
+          try {
+            await interaction.editReply({
+              content: `❌ メモ保存中にエラーが発生しました: ${errorMessage}`
+            });
+          } catch (editError) {
+            console.error('❌ エラー編集失敗:', editError);
+          }
         }
       } else if (interaction.customId === 'select_CANCEL') {
         await interaction.update({

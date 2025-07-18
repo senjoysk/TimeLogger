@@ -191,6 +191,7 @@ export class ActivityLoggingIntegration {
       // 🟢 Green Phase: MessageSelectionHandlerに依存性注入
       this.messageSelectionHandler.setTodoRepository(this.repository);
       this.messageSelectionHandler.setActivityLogService(this.activityLogService);
+      this.messageSelectionHandler.setMemoRepository(this.memoRepository);
       
       // TimezoneHandlerにDynamicReportSchedulerのコールバックを設定
       this.timezoneHandler.setTimezoneChangeCallback(async (userId: string, oldTimezone: string | null, newTimezone: string) => {
