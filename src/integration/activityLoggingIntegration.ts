@@ -176,6 +176,10 @@ export class ActivityLoggingIntegration {
       this.profileHandler = new ProfileCommandHandler(this.repository);
       this.messageSelectionHandler = new MessageSelectionHandler();
       
+      // 🟢 Green Phase: MessageSelectionHandlerに依存性注入
+      this.messageSelectionHandler.setTodoRepository(this.repository);
+      this.messageSelectionHandler.setActivityLogService(this.activityLogService);
+      
       // TimezoneHandlerにDynamicReportSchedulerのコールバックを設定
       this.timezoneHandler.setTimezoneChangeCallback(async (userId: string, oldTimezone: string | null, newTimezone: string) => {
         try {
@@ -428,8 +432,14 @@ export class ActivityLoggingIntegration {
       
       console.log(`🔘 ボタンインタラクション処理: ${userId} - ${interaction.customId}`);
       
-      // TODOハンドラーに委譲
-      await this.todoHandler.handleButtonInteraction(interaction, userId, timezone);
+      // 🟢 Green Phase: MessageSelectionのボタンかTODOボタンかを判定
+      if (interaction.customId.startsWith('select_')) {
+        // MessageSelectionHandlerに委譲
+        await this.messageSelectionHandler.handleButtonInteraction(interaction, userId, timezone);
+      } else {
+        // TODOハンドラーに委譲（既存機能）
+        await this.todoHandler.handleButtonInteraction(interaction, userId, timezone);
+      }
       
     } catch (error) {
       console.error('❌ ボタンインタラクション処理エラー:', error);

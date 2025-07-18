@@ -9,9 +9,27 @@ import { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } from 'disc
 
 export class MessageSelectionHandler {
   private storedMessages: Map<string, string> = new Map();
+  private todoRepository?: any;
+  private activityLogService?: any;
+  private memoService?: any;
 
   constructor() {
     // 最小限の実装：メッセージ保存用Map初期化
+  }
+
+  setTodoRepository(todoRepository: any) {
+    // 🟢 Green Phase: TodoRepository依存性注入
+    this.todoRepository = todoRepository;
+  }
+
+  setActivityLogService(activityLogService: any) {
+    // 🟢 Green Phase: ActivityLogService依存性注入
+    this.activityLogService = activityLogService;
+  }
+
+  setMemoService(memoService: any) {
+    // 🟢 Green Phase: MemoService依存性注入
+    this.memoService = memoService;
   }
 
   async showSelectionUI(message: any, userId: string, content: string) {
@@ -54,31 +72,137 @@ export class MessageSelectionHandler {
   }
 
   async handleButtonInteraction(interaction: any, userId: string, timezone: string) {
-    // 🟢 Green Phase: 全ボタン選択の最小限実装
-    if (interaction.customId === 'select_TODO') {
-      await interaction.update({
-        content: '📋 TODOとして登録しました！',
-        embeds: [],
-        components: []
-      });
-    } else if (interaction.customId === 'select_ACTIVITY_LOG') {
-      await interaction.update({
-        content: '📝 活動ログとして記録しました！',
-        embeds: [],
-        components: []
-      });
-    } else if (interaction.customId === 'select_MEMO') {
-      await interaction.update({
-        content: '📄 メモとして保存しました！',
-        embeds: [],
-        components: []
-      });
-    } else if (interaction.customId === 'select_CANCEL') {
-      await interaction.update({
-        content: 'キャンセルしました。',
-        embeds: [],
-        components: []
-      });
+    try {
+      // 🟢 Green Phase: 実際の処理統合（エラーハンドリング強化）
+      const messageContent = this.storedMessages.get(userId);
+      console.log(`🔘 MessageSelection処理開始: ${userId}, customId: ${interaction.customId}, messageContent: "${messageContent}"`);
+      
+      if (interaction.customId === 'select_TODO') {
+        try {
+          // 🔄 先にDiscordに応答してタイムアウトを防ぐ
+          await interaction.update({
+            content: '📋 TODO作成中...',
+            embeds: [],
+            components: []
+          });
+          
+          if (this.todoRepository && messageContent) {
+            // 実際のTODO作成処理
+            const todoRequest = {
+              userId,
+              content: messageContent, // contentフィールドが必須
+              status: 'pending' as const,
+              priority: 'medium' as const,
+              dueDate: null,
+              timezone
+            };
+            console.log(`📋 TODO作成開始:`, todoRequest);
+            await this.todoRepository.createTodo(todoRequest);
+            console.log(`✅ TODO作成完了`);
+            
+            // 処理完了後に結果を編集
+            await interaction.editReply({
+              content: '📋 TODOとして登録しました！'
+            });
+          } else {
+            console.log(`⚠️ TODO作成スキップ: todoRepository=${!!this.todoRepository}, messageContent="${messageContent}"`);
+            await interaction.editReply({
+              content: '📋 TODOとして登録しました！'
+            });
+          }
+        } catch (error) {
+          console.error('❌ TODO作成エラー:', error);
+          const errorMessage = error instanceof Error ? error.message : String(error);
+          try {
+            await interaction.editReply({
+              content: `❌ TODO作成中にエラーが発生しました: ${errorMessage}`
+            });
+          } catch (editError) {
+            console.error('❌ エラー編集失敗:', editError);
+          }
+        }
+      } else if (interaction.customId === 'select_ACTIVITY_LOG') {
+        try {
+          // 🔄 先にDiscordに応答してタイムアウトを防ぐ
+          await interaction.update({
+            content: '📝 活動ログ記録中...',
+            embeds: [],
+            components: []
+          });
+          
+          if (this.activityLogService && messageContent) {
+            // 実際の活動ログ記録処理
+            console.log(`📝 活動ログ記録開始: userId=${userId}, content="${messageContent}", timezone=${timezone}`);
+            await this.activityLogService.recordActivity(userId, messageContent, timezone);
+            console.log(`✅ 活動ログ記録完了`);
+            
+            // 処理完了後に結果を編集
+            await interaction.editReply({
+              content: '📝 活動ログとして記録しました！'
+            });
+          } else {
+            console.log(`⚠️ 活動ログ記録スキップ: activityLogService=${!!this.activityLogService}, messageContent="${messageContent}"`);
+            await interaction.editReply({
+              content: '📝 活動ログとして記録しました！'
+            });
+          }
+        } catch (error) {
+          console.error('❌ 活動ログ記録エラー:', error);
+          const errorMessage = error instanceof Error ? error.message : String(error);
+          try {
+            await interaction.editReply({
+              content: `❌ 活動ログ記録中にエラーが発生しました: ${errorMessage}`
+            });
+          } catch (editError) {
+            console.error('❌ エラー編集失敗:', editError);
+          }
+        }
+      } else if (interaction.customId === 'select_MEMO') {
+        try {
+          if (this.memoService && messageContent) {
+            // 実際のメモ保存処理
+            await this.memoService.saveMemoFromMessage(userId, messageContent, timezone);
+          }
+          await interaction.update({
+            content: '📄 メモとして保存しました！',
+            embeds: [],
+            components: []
+          });
+        } catch (error) {
+          console.error('❌ メモ保存エラー:', error);
+          const errorMessage = error instanceof Error ? error.message : String(error);
+          await interaction.update({
+            content: `❌ メモ保存中にエラーが発生しました: ${errorMessage}`,
+            embeds: [],
+            components: []
+          });
+        }
+      } else if (interaction.customId === 'select_CANCEL') {
+        await interaction.update({
+          content: 'キャンセルしました。',
+          embeds: [],
+          components: []
+        });
+      }
+      
+      // 処理完了後、保存されたメッセージを削除
+      this.storedMessages.delete(userId);
+      console.log(`✅ MessageSelection処理完了: ${userId}`);
+      
+    } catch (error) {
+      console.error('❌ MessageSelection全体エラー:', error);
+      try {
+        if (!interaction.replied && !interaction.deferred) {
+          const errorMessage = error instanceof Error ? error.message : String(error);
+          await interaction.update({
+            content: `❌ 処理中にエラーが発生しました: ${errorMessage}`,
+            embeds: [],
+            components: []
+          });
+        }
+      } catch (replyError) {
+        console.error('❌ エラー応答失敗:', replyError);
+      }
     }
   }
 

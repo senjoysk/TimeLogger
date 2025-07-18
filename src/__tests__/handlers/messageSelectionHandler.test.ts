@@ -202,11 +202,15 @@ describe('メッセージ内容保存テスト', () => {
       update: jest.fn().mockResolvedValue({})
     } as any;
     
+    // ボタン処理前にメッセージ内容を確認
+    const storedMessageBefore = handler.getStoredMessage(mockUserId);
+    expect(storedMessageBefore).toBe(mockContent);
+    
     await handler.handleButtonInteraction(mockInteraction, mockUserId, 'Asia/Tokyo');
     
-    // 保存されたメッセージ内容が使用されることを確認
-    const storedMessage = handler.getStoredMessage(mockUserId);
-    expect(storedMessage).toBe(mockContent);
+    // 処理完了後、メッセージは削除される
+    const storedMessageAfter = handler.getStoredMessage(mockUserId);
+    expect(storedMessageAfter).toBeUndefined();
   });
 });
 
@@ -237,5 +241,39 @@ describe('ActivityLoggingIntegration統合テスト', () => {
       })
     );
     expect(result).toBe(true); // 処理成功
+  });
+});
+
+describe('実際の処理統合テスト', () => {
+  test('🟢 Green Phase: TODO選択時に依存サービスでTODO作成する', async () => {
+    // 最小限の実装により、テストが通る
+    const mockTodoRepository = {
+      createTodo: jest.fn().mockResolvedValue({ id: 'todo-123' })
+    };
+    
+    const handler = new MessageSelectionHandler();
+    handler.setTodoRepository(mockTodoRepository as any);
+    
+    // 事前にメッセージ内容を保存
+    await handler.showSelectionUI({ reply: jest.fn() } as any, 'test-user-123', 'テストメッセージ内容');
+    
+    const mockInteraction = { 
+      customId: 'select_TODO',
+      user: { id: 'test-user-123' },
+      update: jest.fn().mockResolvedValue({}),
+      editReply: jest.fn().mockResolvedValue({})
+    } as any;
+    
+    await handler.handleButtonInteraction(mockInteraction, 'test-user-123', 'Asia/Tokyo');
+    
+    // 実際にTODO作成処理が呼ばれることを確認
+    expect(mockTodoRepository.createTodo).toHaveBeenCalledWith({
+      userId: 'test-user-123',
+      content: 'テストメッセージ内容',
+      status: 'pending',
+      priority: 'medium',
+      dueDate: null,
+      timezone: 'Asia/Tokyo'
+    });
   });
 });

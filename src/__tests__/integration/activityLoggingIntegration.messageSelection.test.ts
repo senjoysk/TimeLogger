@@ -92,4 +92,37 @@ describe('🔴 Red Phase: ActivityLoggingIntegration MessageSelection統合テ�
     expect(mockMessageSelectionHandler.processNonCommandMessage).not.toHaveBeenCalled();
     expect(result).toBe(true); // コマンド処理は成功
   });
+
+  test('🔴 Red Phase: MessageSelectionのボタンインタラクションが処理される', async () => {
+    // この時点では実装がないため、テストは失敗する
+    const config = {
+      databasePath: 'test.db',
+      geminiApiKey: 'test-key',
+      debugMode: false,
+      defaultTimezone: 'Asia/Tokyo',
+      enableAutoAnalysis: true,
+      cacheValidityMinutes: 60,
+      targetUserId: 'test-user'
+    };
+    integration = new ActivityLoggingIntegration(config);
+    await integration.initialize();
+
+    // MessageSelection用のボタンインタラクションを作成
+    const mockButtonInteraction = {
+      customId: 'select_TODO',
+      user: { id: 'test-user-123' },
+      replied: false,
+      update: jest.fn().mockResolvedValue({})
+    } as any;
+
+    // ボタンインタラクションを処理
+    await integration.handleButtonInteraction(mockButtonInteraction);
+
+    // MessageSelectionHandlerが呼ばれることを確認
+    expect(mockMessageSelectionHandler.handleButtonInteraction).toHaveBeenCalledWith(
+      mockButtonInteraction,
+      'test-user-123',
+      'Asia/Tokyo'
+    );
+  });
 });
