@@ -152,17 +152,24 @@ describe('ボタンインタラクション処理テスト', () => {
     const mockInteraction = { 
       customId: 'select_MEMO',
       user: { id: 'test-user-123' },
-      update: jest.fn().mockResolvedValue({})
+      update: jest.fn().mockResolvedValue({}),
+      editReply: jest.fn().mockResolvedValue({})
     } as any;
     const mockUserId = 'test-user-123';
     const mockTimezone = 'Asia/Tokyo';
     
     await handler.handleButtonInteraction(mockInteraction, mockUserId, mockTimezone);
     
+    // 新しい2段階処理に対応：まず「保存中...」で更新
     expect(mockInteraction.update).toHaveBeenCalledWith({
-      content: '📄 メモとして保存しました！',
+      content: '📄 メモ保存中...',
       embeds: [],
       components: []
+    });
+    
+    // その後「保存完了」で編集
+    expect(mockInteraction.editReply).toHaveBeenCalledWith({
+      content: '📄 メモとして保存しました！'
     });
   });
 

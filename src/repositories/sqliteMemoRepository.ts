@@ -16,6 +16,7 @@ export class SqliteMemoRepository implements IMemoRepository {
 
   constructor(databasePath: string) {
     this.db = new Database(databasePath);
+    // 初期化は非同期なので、エラーハンドリングを改善
     this.initializeDatabase();
   }
 
@@ -37,15 +38,16 @@ export class SqliteMemoRepository implements IMemoRepository {
     this.db.run(createTableQuery, (err) => {
       if (err) {
         console.error('❌ メモテーブル作成エラー:', err);
-        throw new MemoError('メモテーブルの作成に失敗しました', 'DATABASE_ERROR', err);
-      } else {
-        // テーブル作成成功後にインデックスを作成
-        this.db.run(`CREATE INDEX IF NOT EXISTS idx_memos_user_id ON memos(user_id)`, (err) => {
-          if (err) {
-            console.error('❌ メモインデックス作成エラー:', err);
-          }
-        });
+        // 非同期コールバック内でのthrowは避けて、エラーログのみ記録
+        return;
       }
+      
+      // テーブル作成成功後にインデックスを作成
+      this.db.run(`CREATE INDEX IF NOT EXISTS idx_memos_user_id ON memos(user_id)`, (err) => {
+        if (err) {
+          console.error('❌ メモインデックス作成エラー:', err);
+        }
+      });
     });
   }
 
