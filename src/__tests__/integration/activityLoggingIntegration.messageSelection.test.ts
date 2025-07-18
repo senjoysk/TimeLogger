@@ -6,24 +6,45 @@
 
 import { ActivityLoggingIntegration } from '../../integration/activityLoggingIntegration';
 import { MessageSelectionHandler } from '../../handlers/messageSelectionHandler';
+import { SqliteActivityLogRepository } from '../../repositories/sqliteActivityLogRepository';
+import { GeminiService } from '../../services/geminiService';
+import { DailyReportSender } from '../../services/dailyReportSender';
 
-// MessageSelectionHandlerをモック
-jest.mock('../../handlers/messageSelectionHandler', () => {
-  return {
-    MessageSelectionHandler: jest.fn()
-  };
-});
+// 必要なモックを設定
+jest.mock('../../repositories/sqliteActivityLogRepository');
+jest.mock('../../services/geminiService');
+jest.mock('../../services/dailyReportSender');
+jest.mock('../../handlers/messageSelectionHandler');
+
+// SQLiteモック  
+jest.mock('sqlite3', () => ({
+  Database: jest.fn().mockImplementation(function(path: string, callback: Function) {
+    // pathパラメータを使用
+    console.log(`Mock Database created for path: ${path}`);
+    callback(null);
+  })
+}));
 
 describe('🔴 Red Phase: ActivityLoggingIntegration MessageSelection統合テスト', () => {
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
   let integration: ActivityLoggingIntegration;
   let mockMessage: any;
   let mockMessageSelectionHandler: jest.Mocked<MessageSelectionHandler>;
 
   beforeEach(() => {
+    // モックのリセット
+    jest.clearAllMocks();
+    
     // モックの初期化
     mockMessage = {
-      author: { id: 'test-user-123', bot: false },
+      author: { id: 'test-user-123', bot: false, username: 'TestUser', tag: 'TestUser#1234' },
       content: 'テストメッセージ内容',
+      guild: null, // DMとして扱う
+      channel: {
+        isDMBased: jest.fn().mockReturnValue(true)
+      },
       reply: jest.fn().mockResolvedValue({})
     };
 
@@ -31,13 +52,49 @@ describe('🔴 Red Phase: ActivityLoggingIntegration MessageSelection統合テ�
       processNonCommandMessage: jest.fn().mockResolvedValue(true),
       showSelectionUI: jest.fn().mockResolvedValue(undefined),
       handleButtonInteraction: jest.fn().mockResolvedValue(undefined),
-      getStoredMessage: jest.fn().mockReturnValue('テストメッセージ内容')
+      getStoredMessage: jest.fn().mockReturnValue('テストメッセージ内容'),
+      setTodoRepository: jest.fn(),
+      setActivityLogService: jest.fn()
     } as any;
 
     // MessageSelectionHandlerのコンストラクタモック
     (MessageSelectionHandler as jest.MockedClass<typeof MessageSelectionHandler>).mockImplementation(() => {
       return mockMessageSelectionHandler;
     });
+    
+    // SqliteActivityLogRepositoryのモック設定
+    const mockRepository = {
+      initializeDatabase: jest.fn().mockResolvedValue(undefined),
+      getUserTimezone: jest.fn().mockResolvedValue('Asia/Tokyo'),
+      getApiCostForPeriod: jest.fn().mockResolvedValue({ totalTokens: 0, totalCost: 0 }),
+      getActivityLogsBetween: jest.fn().mockResolvedValue([]),
+      createTodo: jest.fn().mockResolvedValue({ id: 1, content: 'test' }),
+      getTodos: jest.fn().mockResolvedValue([]),
+      close: jest.fn().mockResolvedValue(undefined),
+      ensureUserProfile: jest.fn().mockResolvedValue(false), // 新規ユーザーではない
+      // コストコマンド用のモック
+      getApiCost: jest.fn().mockResolvedValue({ totalCost: 0.001 }),
+      getCurrentMonth: jest.fn().mockReturnValue('2024-01'),
+      getPreviousMonth: jest.fn().mockReturnValue('2023-12')
+    };
+    (SqliteActivityLogRepository as jest.MockedClass<typeof SqliteActivityLogRepository>)
+      .mockImplementation(() => mockRepository as any);
+    
+    // GeminiServiceのモック設定
+    const mockGeminiService = {
+      analyzeActivities: jest.fn().mockResolvedValue({ summary: 'test' })
+    };
+    (GeminiService as jest.MockedClass<typeof GeminiService>)
+      .mockImplementation(() => mockGeminiService as any);
+    
+    // DailyReportSenderのモック設定
+    const mockDailyReportSender = {
+      setRepository: jest.fn(),
+      setGeminiService: jest.fn(),
+      sendReport: jest.fn().mockResolvedValue(undefined)
+    };
+    (DailyReportSender as jest.MockedClass<typeof DailyReportSender>)
+      .mockImplementation(() => mockDailyReportSender as any);
   });
 
   test('🔴 Red Phase: AI分類の代わりにMessageSelectionHandlerが呼ばれる', async () => {

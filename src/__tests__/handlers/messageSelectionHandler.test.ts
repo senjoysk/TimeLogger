@@ -98,17 +98,24 @@ describe('ボタンインタラクション処理テスト', () => {
     const mockInteraction = { 
       customId: 'select_TODO',
       user: { id: 'test-user-123' },
-      update: jest.fn().mockResolvedValue({})
+      update: jest.fn().mockResolvedValue({}),
+      editReply: jest.fn().mockResolvedValue({})
     } as any;
     const mockUserId = 'test-user-123';
     const mockTimezone = 'Asia/Tokyo';
     
     await handler.handleButtonInteraction(mockInteraction, mockUserId, mockTimezone);
     
+    // 最初に処理中メッセージが表示される
     expect(mockInteraction.update).toHaveBeenCalledWith({
-      content: '📋 TODOとして登録しました！',
+      content: '📋 TODO作成中...',
       embeds: [],
       components: []
+    });
+    
+    // その後、完了メッセージが表示される
+    expect(mockInteraction.editReply).toHaveBeenCalledWith({
+      content: '📋 TODOとして登録しました！'
     });
   });
 
@@ -118,17 +125,24 @@ describe('ボタンインタラクション処理テスト', () => {
     const mockInteraction = { 
       customId: 'select_ACTIVITY_LOG',
       user: { id: 'test-user-123' },
-      update: jest.fn().mockResolvedValue({})
+      update: jest.fn().mockResolvedValue({}),
+      editReply: jest.fn().mockResolvedValue({})
     } as any;
     const mockUserId = 'test-user-123';
     const mockTimezone = 'Asia/Tokyo';
     
     await handler.handleButtonInteraction(mockInteraction, mockUserId, mockTimezone);
     
+    // 最初に処理中メッセージが表示される
     expect(mockInteraction.update).toHaveBeenCalledWith({
-      content: '📝 活動ログとして記録しました！',
+      content: '📝 活動ログ記録中...',
       embeds: [],
       components: []
+    });
+    
+    // その後、完了メッセージが表示される
+    expect(mockInteraction.editReply).toHaveBeenCalledWith({
+      content: '📝 活動ログとして記録しました！'
     });
   });
 
