@@ -25,6 +25,7 @@ import { DynamicReportScheduler } from '../services/dynamicReportScheduler';
 import { DailyReportSender } from '../services/dailyReportSender';
 import { ActivityLogError } from '../types/activityLog';
 import { GapHandler } from '../handlers/gapHandler';
+import { MessageSelectionHandler } from '../handlers/messageSelectionHandler';
 
 /**
  * 活動記録システム統合設定インターフェース
@@ -74,6 +75,7 @@ export class ActivityLoggingIntegration {
   private unmatchedHandler!: UnmatchedCommandHandler;
   private todoHandler!: TodoCommandHandler;
   private profileHandler!: ProfileCommandHandler;
+  private messageSelectionHandler!: MessageSelectionHandler;
 
   // 設定
   private config: ActivityLoggingConfig;
@@ -172,6 +174,7 @@ export class ActivityLoggingIntegration {
       
       // プロファイル機能ハンドラーの初期化
       this.profileHandler = new ProfileCommandHandler(this.repository);
+      this.messageSelectionHandler = new MessageSelectionHandler();
       
       // TimezoneHandlerにDynamicReportSchedulerのコールバックを設定
       this.timezoneHandler.setTimezoneChangeCallback(async (userId: string, oldTimezone: string | null, newTimezone: string) => {
@@ -309,8 +312,8 @@ export class ActivityLoggingIntegration {
       if (content.length > 0 && content.length <= 2000) {
         console.log(`🤖 メッセージ分類処理開始: ${userId}`);
         
-        // AI分類を実行（分類結果に基づいてTODO/活動ログ/メモに振り分け）
-        await this.todoHandler.handleMessageClassification(message, userId, timezone);
+        // 🟢 Green Phase: AI分類をMessageSelectionHandlerに置き換え
+        await this.messageSelectionHandler.processNonCommandMessage(message, userId, timezone);
         
         console.log(`✅ メッセージ分類処理完了: ${userId}`);
         return true;
