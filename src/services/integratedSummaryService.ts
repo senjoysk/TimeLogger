@@ -1,8 +1,8 @@
 /**
  * 統合サマリーサービス
  * 
- * 活動ログとTODO情報を統合し、包括的なサマリーと
- * 生産性インサイトを提供するサービス
+ * 活動ログとTODO情報を統合し、基本的なサマリーを提供するサービス
+ * 軽量で高速な日次レポート機能
  */
 
 import { format, toZonedTime } from 'date-fns-tz';
@@ -11,15 +11,9 @@ import { Todo, TodoStatus } from '../types/todo';
 import { 
   IntegratedSummaryResult,
   TodoSummary,
-  CorrelationInsights,
-  ProductivityMetrics,
-  IntegratedRecommendation,
-  IntegratedMetrics,
   PriorityDistribution,
-  StatusTransition,
-  ActivityPattern
+  StatusTransition
 } from '../types/integratedSummary';
-import { ActivityTodoCorrelationService } from './activityTodoCorrelationService';
 import { IUnifiedAnalysisService } from './unifiedAnalysisService';
 
 /**
@@ -36,10 +30,6 @@ export interface IIntegratedSummaryService {
    */
   formatIntegratedSummaryForDiscord(summary: IntegratedSummaryResult, timezone: string): string;
   
-  /**
-   * 統合メトリクス計算
-   */
-  calculateIntegratedMetrics(userId: string, businessDate: string, timezone: string): Promise<IntegratedMetrics>;
   
 }
 
@@ -53,7 +43,6 @@ export class IntegratedSummaryService implements IIntegratedSummaryService {
       getTodosByUserId(userId: string): Promise<Todo[]>;
       getTodosByDateRange(userId: string, startDate: string, endDate: string): Promise<Todo[]>;
     },
-    private correlationService: ActivityTodoCorrelationService,
     private unifiedAnalysisService: IUnifiedAnalysisService
   ) {}
 
@@ -76,34 +65,19 @@ export class IntegratedSummaryService implements IIntegratedSummaryService {
 
       console.log(`🚀 データ一括取得完了: 活動ログ${activities.length}件、TODO${todos.length}件`);
 
-      // 📊 STEP 2: 事前取得データを使って並行分析
+      // 📊 STEP 2: 基本的なサマリーを生成
       const [
         activitySummary,
-        todoSummary,
-        correlationInsights,
-        productivityMetrics
+        todoSummary
       ] = await Promise.all([
         this.generateActivitySummary(userId, businessDate, timezone),
-        this.generateTodoSummaryWithData(userId, businessDate, timezone, todos),
-        this.generateCorrelationInsightsWithData(userId, businessDate, timezone, activities, todos),
-        this.generateProductivityMetricsWithData(userId, businessDate, timezone, activities, todos)
+        this.generateTodoSummaryWithData(userId, businessDate, timezone, todos)
       ]);
-
-      // 統合推奨事項を生成
-      const recommendations = this.generateIntegratedRecommendations(
-        activitySummary,
-        todoSummary,
-        correlationInsights,
-        productivityMetrics
-      );
 
       const result: IntegratedSummaryResult = {
         businessDate,
         activitySummary,
         todoSummary,
-        correlationInsights,
-        productivityMetrics,
-        recommendations,
         generatedAt: new Date().toISOString()
       };
 
@@ -200,175 +174,8 @@ export class IntegratedSummaryService implements IIntegratedSummaryService {
     };
   }
 
-  /**
-   * 相関インサイトを生成
-   */
-  private async generateCorrelationInsights(
-    userId: string, 
-    businessDate: string, 
-    timezone: string
-  ): Promise<CorrelationInsights> {
-    // 1. データ重複排除: 相関分析に必要なデータを一括取得
-    const [activities, todos] = await Promise.all([
-      this.repository.getLogsByDate(userId, businessDate),
-      this.repository.getTodosByUserId(userId)
-    ]);
 
-    return this.generateCorrelationInsightsWithData(userId, businessDate, timezone, activities, todos);
-  }
 
-  /**
-   * 相関インサイトを生成（データ重複排除最適化版）
-   */
-  private async generateCorrelationInsightsWithData(
-    userId: string, 
-    businessDate: string, 
-    timezone: string,
-    activities: ActivityLog[],
-    todos: Todo[]
-  ): Promise<CorrelationInsights> {
-    console.log(`📊 データ重複排除最適化: 活動ログ${activities.length}件、TODO${todos.length}件を使用`);
-
-    // 2. 事前に取得したデータを使って並行分析（15-20%性能向上）
-    const [correlationResult, completionSuggestions] = await Promise.all([
-      this.correlationService.analyzeActivityTodoCorrelationWithData(userId, businessDate, timezone, activities, todos),
-      this.correlationService.suggestTodoCompletionsWithData(userId, businessDate, timezone, activities, todos)
-    ]);
-
-    // 活動パターンを分析（簡易実装）
-    const activityPatterns: ActivityPattern[] = [
-      {
-        type: 'deep_work',
-        description: '集中作業時間',
-        frequency: 3,
-        relatedActivities: 5,
-        todoRelevance: 0.8
-      }
-    ];
-
-    return {
-      correlatedPairs: correlationResult.stats.correlatedPairs,
-      autoLinkOpportunities: correlationResult.stats.autoLinkRecommendations,
-      completionSuggestions,
-      activityPatterns,
-      timeAllocationAlignment: 0.75 // 簡易実装
-    };
-  }
-
-  /**
-   * 生産性メトリクスを生成
-   */
-  private async generateProductivityMetrics(
-    userId: string, 
-    businessDate: string, 
-    timezone: string
-  ): Promise<ProductivityMetrics> {
-    const productivityInsights = await this.correlationService.generateProductivityInsights(
-      userId, businessDate, timezone
-    );
-
-    return {
-      overallScore: productivityInsights.efficiencyScore,
-      todoCompletionRate: productivityInsights.completionRate,
-      averageTaskDuration: productivityInsights.averageTaskDuration,
-      efficiencyTrend: productivityInsights.performanceTrend,
-      mostProductiveHours: productivityInsights.mostProductiveHours,
-      focusTimeRatio: 0.7, // 簡易実装
-      interruptionCount: 3, // 簡易実装
-      taskSwitchingFrequency: 5 // 簡易実装
-    };
-  }
-
-  /**
-   * 生産性メトリクスを生成（データ重複排除最適化版）
-   */
-  private async generateProductivityMetricsWithData(
-    userId: string, 
-    businessDate: string, 
-    timezone: string,
-    activities: ActivityLog[],
-    todos: Todo[]
-  ): Promise<ProductivityMetrics> {
-    // 事前取得データを使って生産性インサイトを生成
-    // TODO: correlationServiceにもデータ事前渡し版を実装する必要があるが、
-    // 現時点では元のメソッドを使用（将来的に最適化可能）
-    const productivityInsights = await this.correlationService.generateProductivityInsights(
-      userId, businessDate, timezone
-    );
-
-    return {
-      overallScore: productivityInsights.efficiencyScore,
-      todoCompletionRate: productivityInsights.completionRate,
-      averageTaskDuration: productivityInsights.averageTaskDuration,
-      efficiencyTrend: productivityInsights.performanceTrend,
-      mostProductiveHours: productivityInsights.mostProductiveHours,
-      focusTimeRatio: 0.7, // 簡易実装
-      interruptionCount: 3, // 簡易実装
-      taskSwitchingFrequency: 5 // 簡易実装
-    };
-  }
-
-  /**
-   * 統合推奨事項を生成
-   */
-  private generateIntegratedRecommendations(
-    activitySummary: DailyAnalysisResult,
-    todoSummary: TodoSummary,
-    correlationInsights: CorrelationInsights,
-    productivityMetrics: ProductivityMetrics
-  ): IntegratedRecommendation[] {
-    const recommendations: IntegratedRecommendation[] = [];
-
-    // TODO完了率に基づく推奨
-    if (todoSummary.completionRate < 0.5) {
-      recommendations.push({
-        type: 'todo_optimization',
-        content: 'TODO完了率が低いです。タスクを小さく分割することを検討してください',
-        priority: 'high',
-        expectedImpact: '完了率15%向上',
-        implementationDifficulty: 'easy',
-        evidenceSource: [`完了率: ${Math.round(todoSummary.completionRate * 100)}%`]
-      });
-    }
-
-    // 生産性スコアに基づく推奨
-    if (productivityMetrics.overallScore < 70) {
-      recommendations.push({
-        type: 'focus_improvement',
-        content: '集中時間を増やすため、通知をオフにして作業に取り組みましょう',
-        priority: 'medium',
-        expectedImpact: '生産性スコア10ポイント向上',
-        implementationDifficulty: 'easy',
-        evidenceSource: [`生産性スコア: ${productivityMetrics.overallScore}`]
-      });
-    }
-
-    // 相関が少ない場合の推奨
-    if (correlationInsights.correlatedPairs === 0) {
-      recommendations.push({
-        type: 'workflow_efficiency',
-        content: '活動ログとTODOの関連性を高めるため、作業時に関連TODOを意識してください',
-        priority: 'low',
-        expectedImpact: 'ワークフロー効率10%向上',
-        implementationDifficulty: 'medium',
-        evidenceSource: ['活動とTODOの相関が見つかりませんでした']
-      });
-    }
-
-    // デフォルト推奨事項
-    if (recommendations.length === 0) {
-      recommendations.push({
-        type: 'time_management',
-        content: '良いペースで進んでいます。この調子を維持しましょう',
-        priority: 'low',
-        expectedImpact: '現在の生産性維持',
-        implementationDifficulty: 'easy',
-        evidenceSource: ['全体的なパフォーマンスが良好']
-      });
-    }
-
-    return recommendations;
-  }
 
   /**
    * Discord用フォーマット
@@ -402,40 +209,13 @@ export class IntegratedSummaryService implements IIntegratedSummaryService {
       sections.push(`• 総活動時間: ${timeText} | 記録数: ${activitySummary.totalLogCount}件`);
     }
 
-    // 相関分析
-    const correlationInsights = summary.correlationInsights;
-    sections.push(`\n🔗 **相関分析**`);
-    sections.push(`• 関連ペア: ${correlationInsights.correlatedPairs}件`);
-    
-    if (correlationInsights.completionSuggestions.length > 0) {
-      sections.push(`• 完了提案: ${correlationInsights.completionSuggestions.length}件`);
-    }
 
-    // 生産性スコア
-    const productivityMetrics = summary.productivityMetrics;
-    const scoreEmoji = this.getProductivityEmoji(productivityMetrics.overallScore);
-    sections.push(`\n⭐ **生産性評価**`);
-    sections.push(`${scoreEmoji} 総合スコア: **${productivityMetrics.overallScore}**/100`);
-    sections.push(`• 完了率: ${Math.round(productivityMetrics.todoCompletionRate * 100)}% | 効率性: ${productivityMetrics.efficiencyTrend === 'improving' ? '向上中' : productivityMetrics.efficiencyTrend === 'declining' ? '低下中' : '安定'}`);
-
-    // 推奨事項
-    if (summary.recommendations.length > 0) {
-      sections.push(`\n💡 **推奨事項**`);
-      const topRecommendations = summary.recommendations
-        .filter(r => r.priority === 'high' || r.priority === 'medium')
-        .slice(0, 2);
-      
-      for (const rec of topRecommendations) {
-        const priorityEmoji = rec.priority === 'high' ? '🔥' : '💭';
-        sections.push(`${priorityEmoji} ${rec.content}`);
-      }
-    }
 
     // フッター
     const generatedTime = new Date(summary.generatedAt);
     const generatedLocal = toZonedTime(generatedTime, timezone);
     const generatedStr = format(generatedLocal, 'HH:mm', { timeZone: timezone });
-    sections.push(`\n🤖 ${generatedStr}に生成 | 統合分析`);
+    sections.push(`\n🤖 ${generatedStr}に生成 | 基本サマリー`);
 
     const result = sections.join('\n');
     
@@ -443,23 +223,6 @@ export class IntegratedSummaryService implements IIntegratedSummaryService {
     return result.length > 2000 ? result.substring(0, 1997) + '...' : result;
   }
 
-  /**
-   * 統合メトリクス計算
-   */
-  async calculateIntegratedMetrics(
-    userId: string, 
-    businessDate: string, 
-    timezone: string
-  ): Promise<IntegratedMetrics> {
-    // 簡易実装 - 実際の実装では詳細な計算を行う
-    return {
-      todoActivityAlignment: 0.75,
-      completionPredictionAccuracy: 0.8,
-      timeEstimationAccuracy: 0.7,
-      workflowEfficiency: 0.85,
-      planExecutionRate: 0.9
-    };
-  }
 
 
   /**
@@ -491,17 +254,6 @@ export class IntegratedSummaryService implements IIntegratedSummaryService {
 
 
 
-  /**
-   * 生産性スコアに基づく絵文字を取得
-   */
-  private getProductivityEmoji(score: number): string {
-    if (score >= 90) return '🚀';
-    if (score >= 80) return '⭐';
-    if (score >= 70) return '👍';
-    if (score >= 60) return '📈';
-    if (score >= 50) return '📊';
-    return '💤';
-  }
 
   /**
    * 業務日をフォーマット

@@ -8,8 +8,6 @@ import { Client, Message, ButtonInteraction } from 'discord.js';
 import { SqliteActivityLogRepository } from '../repositories/sqliteActivityLogRepository';
 import { SqliteMemoRepository } from '../repositories/sqliteMemoRepository';
 import { ActivityLogService } from '../services/activityLogService';
-import { UnifiedAnalysisService } from '../services/unifiedAnalysisService';
-import { AnalysisCacheService } from '../services/analysisCacheService';
 import { EditCommandHandler } from '../handlers/editCommandHandler';
 import { SummaryHandler } from '../handlers/summaryHandler';
 import { LogsCommandHandler } from '../handlers/logsCommandHandler';
@@ -20,8 +18,6 @@ import { ProfileCommandHandler } from '../handlers/profileCommandHandler';
 import { MemoCommandHandler } from '../handlers/memoCommandHandler';
 import { GeminiService } from '../services/geminiService';
 import { MessageClassificationService } from '../services/messageClassificationService';
-import { IntegratedSummaryService } from '../services/integratedSummaryService';
-import { ActivityTodoCorrelationService } from '../services/activityTodoCorrelationService';
 import { GapDetectionService } from '../services/gapDetectionService';
 import { DynamicReportScheduler } from '../services/dynamicReportScheduler';
 import { DailyReportSender } from '../services/dailyReportSender';
@@ -61,11 +57,7 @@ export class ActivityLoggingIntegration {
   private activityLogService!: ActivityLogService;
   private geminiService!: GeminiService;
   private messageClassificationService!: MessageClassificationService;
-  private unifiedAnalysisService!: UnifiedAnalysisService;
-  private analysisCacheService!: AnalysisCacheService;
   private gapDetectionService!: GapDetectionService;
-  private correlationService!: ActivityTodoCorrelationService;
-  private integratedSummaryService!: IntegratedSummaryService;
   private dynamicReportScheduler!: DynamicReportScheduler;
   private dailyReportSender!: DailyReportSender;
 
@@ -126,27 +118,12 @@ export class ActivityLoggingIntegration {
       this.activityLogService = new ActivityLogService(this.repository, this.geminiService);
       console.log('✅ GeminiService初期化完了（統合リポジトリ使用）');
       
-      this.analysisCacheService = new AnalysisCacheService(
-        this.repository,
-        { maxAgeMinutes: this.config.cacheValidityMinutes }
-      );
-      
-      this.unifiedAnalysisService = new UnifiedAnalysisService(
-        this.repository,
-        this.repository // 統合システムでは単一リポジトリを使用
-      );
       
       this.gapDetectionService = new GapDetectionService(this.repository);
       
       
       // TODO機能サービスの初期化
       this.messageClassificationService = new MessageClassificationService(this.geminiService);
-      this.correlationService = new ActivityTodoCorrelationService(this.repository);
-      this.integratedSummaryService = new IntegratedSummaryService(
-        this.repository,
-        this.correlationService,
-        this.unifiedAnalysisService
-      );
       
       // DynamicReportSchedulerの初期化
       this.dynamicReportScheduler = new DynamicReportScheduler();
@@ -157,16 +134,14 @@ export class ActivityLoggingIntegration {
       // 3. ハンドラー層の初期化
       this.editHandler = new EditCommandHandler(this.activityLogService);
       this.summaryHandler = new SummaryHandler(
-        this.unifiedAnalysisService, 
         this.activityLogService,
-        this.integratedSummaryService
+        this.repository
       );
       this.logsHandler = new LogsCommandHandler(this.activityLogService);
       this.timezoneHandler = new TimezoneHandler(this.repository);
       this.gapHandler = new GapHandler(
         this.gapDetectionService,
-        this.activityLogService,
-        this.unifiedAnalysisService
+        this.activityLogService
       );
       this.unmatchedHandler = new UnmatchedCommandHandler(this.activityLogService);
       
@@ -176,8 +151,7 @@ export class ActivityLoggingIntegration {
         this.repository, // IMessageClassificationRepository  
         this.geminiService,
         this.messageClassificationService,
-        this.activityLogService, // 活動ログサービスを注入
-        this.analysisCacheService // キャッシュ無効化のため追加
+        this.activityLogService // 活動ログサービスを注入
       );
       
       // プロファイル機能ハンドラーの初期化
@@ -486,8 +460,8 @@ export class ActivityLoggingIntegration {
       // 活動を記録
       const log = await this.activityLogService.recordActivity(userId, content, timezone);
 
-      // キャッシュを無効化（新しいログが追加されたため）
-      await this.analysisCacheService.invalidateCache(userId, log.businessDate);
+      // キャッシュ無効化はシンプルサマリーでは不要
+      console.log(`📋 ログ記録完了: ${userId} ${log.businessDate}`);
 
       // 記録完了の確認（デバッグモードのみ）
       if (this.config.debugMode) {
@@ -527,22 +501,8 @@ export class ActivityLoggingIntegration {
         // 今日のログ数をチェック
         const logs = await this.activityLogService.getLogsForDate(userId, businessDate, timezone);
         
-        // 一定数のログが蓄積された場合のみ分析実行
-        if (logs.length >= 5 && logs.length % 5 === 0) {
-          console.log(`🔄 自動分析開始（バックグラウンド）: ${userId} ${businessDate} (${logs.length}件)`);
-          
-          // バックグラウンドで分析実行
-          this.unifiedAnalysisService.analyzeDaily({
-            userId,
-            businessDate,
-            timezone,
-            forceRefresh: false
-          }).then(() => {
-            console.log(`✅ 自動分析完了（バックグラウンド）: ${userId} ${businessDate}`);
-          }).catch(error => {
-            console.warn('⚠️ バックグラウンド自動分析失敗:', error);
-          });
-        }
+        // シンプルサマリーでは自動分析は不要
+        console.log(`📋 活動ログ登録完了: ${userId} (${logs.length}件目)`);
       } catch (error) {
         console.warn('⚠️ 自動分析トリガー失敗:', error);
       } finally {
@@ -744,7 +704,7 @@ export class ActivityLoggingIntegration {
         details.database = await this.repository.isConnected();
 
         // サービス存在チェック
-        details.services = !!(this.activityLogService && this.unifiedAnalysisService);
+        details.services = !!(this.activityLogService);
 
         // ハンドラー存在チェック
         details.handlers = !!(this.editHandler && this.summaryHandler && this.logsHandler && this.timezoneHandler);

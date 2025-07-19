@@ -79,7 +79,6 @@ graph TB
         ISS[IntegratedSummaryService]
         UAS[UnifiedAnalysisService]
         MCS[MessageClassificationService]
-        ATCS[ActivityTodoCorrelationService]
     end
     
     subgraph "Repository Layer"

@@ -167,34 +167,6 @@ describe('活動記録システム統合テスト', () => {
       // デバッグモードなのでリアクションが追加される想定
     });
 
-    test('ログ記録時にキャッシュが無効化される', async () => {
-      const userId = 'test-user-123';
-      const messageContent = '新しい活動ログ';
-      
-      // キャッシュサービスのinvalidateCacheメソッドをスパイ
-      const cacheService = (integration as any).analysisCacheService;
-      const invalidateSpy = jest.spyOn(cacheService, 'invalidateCache').mockResolvedValue(true);
-      
-      // TodoHandlerの活動ログ作成メソッドを直接呼び出す（ボタン押下をシミュレート）
-      const todoHandler = (integration as any).todoHandler;
-      
-      // createActivityLogFromMessageを直接テストする
-      const mockInteraction = {
-        update: jest.fn().mockResolvedValue(undefined)
-      };
-      
-      // createActivityLogFromMessageはprivateメソッドなので、リフレクションで呼び出し
-      await (todoHandler as any).createActivityLogFromMessage(
-        mockInteraction,
-        messageContent,
-        userId,
-        'Asia/Tokyo'
-      );
-      
-      expect(invalidateSpy).toHaveBeenCalled();
-      
-      invalidateSpy.mockRestore();
-    });
   });
 
   describe('エラーハンドリングテスト', () => {

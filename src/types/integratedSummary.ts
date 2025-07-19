@@ -4,7 +4,6 @@
  */
 
 import { DailyAnalysisResult } from './activityLog';
-import { TodoCompletionSuggestion, ProductivityInsights } from './correlation';
 
 /**
  * 統合サマリー結果
@@ -16,12 +15,6 @@ export interface IntegratedSummaryResult {
   activitySummary: DailyAnalysisResult;
   /** TODOサマリー */
   todoSummary: TodoSummary;
-  /** 相関分析インサイト */
-  correlationInsights: CorrelationInsights;
-  /** 生産性メトリクス */
-  productivityMetrics: ProductivityMetrics;
-  /** 統合推奨事項 */
-  recommendations: IntegratedRecommendation[];
   /** 生成日時 */
   generatedAt: string;
 }
@@ -80,158 +73,3 @@ export interface StatusTransition {
   durationMinutes?: number;
 }
 
-/**
- * 相関分析インサイト
- */
-export interface CorrelationInsights {
-  /** 相関が見つかったペア数 */
-  correlatedPairs: number;
-  /** 自動リンクの機会数 */
-  autoLinkOpportunities: number;
-  /** TODO完了提案 */
-  completionSuggestions: TodoCompletionSuggestion[];
-  /** 活動パターン分析 */
-  activityPatterns: ActivityPattern[];
-  /** 時間配分の一致度 */
-  timeAllocationAlignment: number;
-}
-
-/**
- * 活動パターン
- */
-export interface ActivityPattern {
-  /** パターンタイプ */
-  type: 'recurring' | 'batch' | 'interruption' | 'deep_work';
-  /** パターンの説明 */
-  description: string;
-  /** 発生頻度 */
-  frequency: number;
-  /** 関連活動数 */
-  relatedActivities: number;
-  /** TODOとの関連性 */
-  todoRelevance: number;
-}
-
-/**
- * 生産性メトリクス
- */
-export interface ProductivityMetrics {
-  /** 総合生産性スコア (0-100) */
-  overallScore: number;
-  /** TODO完了率 (0-1) */
-  todoCompletionRate: number;
-  /** 平均タスク実行時間（分） */
-  averageTaskDuration: number;
-  /** 効率性トレンド */
-  efficiencyTrend: 'improving' | 'stable' | 'declining';
-  /** 最も生産的な時間帯 */
-  mostProductiveHours: string[];
-  /** フォーカス時間の割合 (0-1) */
-  focusTimeRatio: number;
-  /** 中断回数 */
-  interruptionCount: number;
-  /** タスク切り替え頻度 */
-  taskSwitchingFrequency: number;
-}
-
-/**
- * 統合推奨事項
- */
-export interface IntegratedRecommendation {
-  /** 推奨事項のタイプ */
-  type: 'todo_optimization' | 'time_management' | 'focus_improvement' | 'workflow_efficiency';
-  /** 推奨内容 */
-  content: string;
-  /** 優先度 */
-  priority: 'high' | 'medium' | 'low';
-  /** 期待される効果 */
-  expectedImpact: string;
-  /** 実装の難易度 */
-  implementationDifficulty: 'easy' | 'medium' | 'hard';
-  /** 根拠データ */
-  evidenceSource: string[];
-}
-
-
-/**
- * 統合メトリクス計算結果
- */
-export interface IntegratedMetrics {
-  /** TODO-活動の一致度 (0-1) */
-  todoActivityAlignment: number;
-  /** 完了予測の精度 (0-1) */
-  completionPredictionAccuracy: number;
-  /** 時間見積もりの精度 (0-1) */
-  timeEstimationAccuracy: number;
-  /** ワークフロー効率性 (0-1) */
-  workflowEfficiency: number;
-  /** 計画実行率 (0-1) */
-  planExecutionRate: number;
-}
-
-/**
- * 時間配分分析
- */
-export interface TimeAllocationAnalysis {
-  /** 計画された時間配分 */
-  plannedAllocation: CategoryTimeAllocation[];
-  /** 実際の時間配分 */
-  actualAllocation: CategoryTimeAllocation[];
-  /** 配分の一致度 (0-1) */
-  alignmentScore: number;
-  /** 最大の乖離カテゴリ */
-  largestDeviation: {
-    category: string;
-    plannedMinutes: number;
-    actualMinutes: number;
-    deviationPercent: number;
-  };
-}
-
-/**
- * カテゴリ別時間配分
- */
-export interface CategoryTimeAllocation {
-  /** カテゴリ名 */
-  category: string;
-  /** 配分時間（分） */
-  minutes: number;
-  /** 全体に占める割合 (0-1) */
-  percentage: number;
-  /** TODO数 */
-  todoCount: number;
-}
-
-/**
- * TODO効率性分析
- */
-export interface TodoEfficiencyAnalysis {
-  /** 平均完了時間（分） */
-  averageCompletionTime: number;
-  /** 予定より早く完了したTODO数 */
-  earlyCompletions: number;
-  /** 予定より遅く完了したTODO数 */
-  lateCompletions: number;
-  /** 時間見積もり精度 (0-1) */
-  estimationAccuracy: number;
-  /** 最も効率的なカテゴリ */
-  mostEfficientCategory: string;
-  /** 改善が必要なカテゴリ */
-  improvementNeededCategory: string;
-}
-
-/**
- * 活動品質評価
- */
-export interface ActivityQualityAssessment {
-  /** 記録の詳細度スコア (0-1) */
-  detailScore: number;
-  /** 記録の一貫性スコア (0-1) */
-  consistencyScore: number;
-  /** 時間記録の精度スコア (0-1) */
-  timeAccuracyScore: number;
-  /** カテゴリ分類の精度スコア (0-1) */
-  categoryAccuracyScore: number;
-  /** 改善提案 */
-  improvementSuggestions: string[];
-}

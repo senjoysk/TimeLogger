@@ -634,8 +634,7 @@ graph TD
     H --> N[IntegratedSummaryService]
     G --> L
     
-    N --> O[ActivityTodoCorrelationService]
-    O --> P[统合分析結果]
+    N --> P[统合分析結果]
     
     L --> Q[(SQLite DB)]
     M --> R[Gemini API]

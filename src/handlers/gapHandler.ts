@@ -18,7 +18,6 @@ import {
 } from 'discord.js';
 import { IGapDetectionService, TimeGap } from '../services/gapDetectionService';
 import { IActivityLogService } from '../services/activityLogService';
-import { IUnifiedAnalysisService } from '../services/unifiedAnalysisService';
 
 /**
  * ギャップハンドラーインターフェース
@@ -46,8 +45,7 @@ export class GapHandler implements IGapHandler {
 
   constructor(
     private gapDetectionService: IGapDetectionService,
-    private activityLogService: IActivityLogService,
-    private unifiedAnalysisService: IUnifiedAnalysisService
+    private activityLogService: IActivityLogService
   ) {}
 
   /**
@@ -58,32 +56,10 @@ export class GapHandler implements IGapHandler {
       const businessInfo = this.activityLogService.calculateBusinessDate(timezone);
       const businessDate = businessInfo.businessDate;
 
-      const progressMessage = await message.reply('🔍 ギャップを検出中です...');
+      // シンプルサマリーではギャップ機能を一時的に無効化
+      await message.reply('🚧 シンプルサマリーではギャップ機能は使用できません。');
+      return;
 
-      const analysisResult = await this.unifiedAnalysisService.analyzeDaily({
-        userId,
-        businessDate,
-        timezone,
-        forceRefresh: false
-      });
-
-      const gaps = await this.gapDetectionService.detectGapsFromAnalysis(analysisResult, timezone);
-
-      if (gaps.length === 0) {
-        await progressMessage.edit('✅ 7:30〜18:30の間に15分以上の記録の空白はありませんでした。');
-        return;
-      }
-
-      const embed = this.createGapEmbed(gaps, businessDate);
-      const components = this.createGapButtons(gaps);
-
-      await progressMessage.edit({
-        content: '',
-        embeds: [embed],
-        components
-      });
-
-      this.setupInteractionListeners(progressMessage, userId, timezone, gaps);
     } catch (error) {
       console.error('❌ ギャップ検出エラー:', error);
       const errorMessage = `❌ ギャップの検出中にエラーが発生しました\n\nエラー詳細: ${error instanceof Error ? error.message : String(error)}`;

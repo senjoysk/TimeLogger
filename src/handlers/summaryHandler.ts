@@ -1,23 +1,18 @@
 /**
  * サマリーコマンドハンドラー
- * 統合分析による日次サマリー生成
+ * シンプルな日次サマリー生成（完了TODO + 活動ログ一覧）
  */
 
 import { Message } from 'discord.js';
 import { toZonedTime, format } from 'date-fns-tz';
-import { IUnifiedAnalysisService } from '../services/unifiedAnalysisService';
 import { IActivityLogService } from '../services/activityLogService';
-import { IIntegratedSummaryService } from '../services/integratedSummaryService';
-import {
-  AnalysisRequest,
-  DailyAnalysisResult,
-  ActivityLogError
-} from '../types/activityLog';
+import { ActivityLog, ActivityLogError } from '../types/activityLog';
+import { Todo } from '../types/todo';
 
 /**
  * サマリーコマンドの種類
  */
-export type SummaryCommandType = 'today' | 'date' | 'integrated' | 'help';
+export type SummaryCommandType = 'today' | 'date' | 'help';
 
 /**
  * サマリーコマンドの解析結果
@@ -54,9 +49,11 @@ export interface ISummaryHandler {
  */
 export class SummaryHandler implements ISummaryHandler {
   constructor(
-    private unifiedAnalysisService: IUnifiedAnalysisService,
     private activityLogService: IActivityLogService,
-    private integratedSummaryService?: IIntegratedSummaryService
+    private repository: {
+      getLogsByDate(userId: string, businessDate: string): Promise<ActivityLog[]>;
+      getTodosByUserId(userId: string): Promise<Todo[]>;
+    }
   ) {}
 
   /**
@@ -78,20 +75,15 @@ export class SummaryHandler implements ISummaryHandler {
       switch (parsedCommand.type) {
         case 'today':
         case 'date':
-          await this.generateSummary(message, userId, parsedCommand, timezone);
+          await this.generateSimpleSummary(message, userId, parsedCommand, timezone);
           break;
-
-        case 'integrated':
-          await this.generateIntegratedSummary(message, userId, parsedCommand, timezone);
-          break;
-
         
         case 'help':
           await this.showHelp(message);
           break;
         
         default:
-          await this.generateSummary(message, userId, { type: 'today' }, timezone);
+          await this.generateSimpleSummary(message, userId, { type: 'today' }, timezone);
       }
     } catch (error) {
       console.error('❌ サマリーコマンド処理エラー:', error);
@@ -105,33 +97,35 @@ export class SummaryHandler implements ISummaryHandler {
   }
 
   /**
-   * サマリーを生成・表示
+   * シンプルサマリーを生成・表示
    */
-  private async generateSummary(message: Message, userId: string, parsedCommand: ParsedSummaryCommand, timezone: string): Promise<void> {
+  private async generateSimpleSummary(message: Message, userId: string, parsedCommand: ParsedSummaryCommand, timezone: string): Promise<void> {
     try {
       // 対象日を決定
       const targetDate = parsedCommand.targetDate || this.activityLogService.calculateBusinessDate(timezone).businessDate;
 
       // 進行状況メッセージを送信
-      const progressMessage = await message.reply('🔄 分析中です。しばらくお待ちください...');
+      const progressMessage = await message.reply('📋 データを取得中です...');
 
-      // 分析リクエストを作成
-      const analysisRequest: AnalysisRequest = {
-        userId,
-        businessDate: targetDate,
-        timezone,
-        forceRefresh: parsedCommand.forceRefresh || false
-      };
+      // データを並行取得
+      const [activityLogs, todos] = await Promise.all([
+        this.repository.getLogsByDate(userId, targetDate),
+        this.repository.getTodosByUserId(userId)
+      ]);
 
-      // 統合分析を実行
-      const analysisResult = await this.unifiedAnalysisService.analyzeDaily(analysisRequest);
+      // 当日完了したTODOをフィルタリング
+      const completedTodos = todos.filter(todo => {
+        if (todo.status !== 'completed' || !todo.completedAt) return false;
+        const completedDate = todo.completedAt.split('T')[0];
+        return completedDate === targetDate;
+      });
 
       // 結果をフォーマットして送信
-      const formattedSummary = this.formatSummaryResult(analysisResult, timezone);
+      const formattedSummary = this.formatSimpleSummary(targetDate, activityLogs, completedTodos, timezone);
       
       await progressMessage.edit(formattedSummary);
       
-      console.log(`📊 サマリー生成完了: ${userId} ${targetDate}`);
+      console.log(`📊 シンプルサマリー生成完了: ${userId} ${targetDate}`);
     } catch (error) {
       console.error('❌ サマリー生成エラー:', error);
       throw error instanceof ActivityLogError ? error :
@@ -139,167 +133,64 @@ export class SummaryHandler implements ISummaryHandler {
     }
   }
 
-  /**
-   * 統合サマリーを生成・表示
-   */
-  private async generateIntegratedSummary(message: Message, userId: string, parsedCommand: ParsedSummaryCommand, timezone: string): Promise<void> {
-    if (!this.integratedSummaryService) {
-      await message.reply('❌ 統合サマリー機能は利用できません。');
-      return;
-    }
-
-    try {
-      // 対象日を決定
-      const targetDate = parsedCommand.targetDate || this.activityLogService.calculateBusinessDate(timezone).businessDate;
-
-      // 進行状況メッセージを送信
-      const progressMessage = await message.reply('🔄 統合分析中です。しばらくお待ちください...');
-
-      // 統合サマリーを生成
-      const integratedSummary = await this.integratedSummaryService.generateIntegratedSummary(userId, targetDate, timezone);
-
-      // 結果をフォーマットして送信
-      const formattedSummary = this.integratedSummaryService.formatIntegratedSummaryForDiscord(integratedSummary, timezone);
-      
-      await progressMessage.edit(formattedSummary);
-      
-      console.log(`📊 統合サマリー生成完了: ${userId} ${targetDate}`);
-    } catch (error) {
-      console.error('❌ 統合サマリー生成エラー:', error);
-      throw error instanceof ActivityLogError ? error :
-        new ActivityLogError('統合サマリーの生成に失敗しました', 'GENERATE_INTEGRATED_SUMMARY_ERROR', { error });
-    }
-  }
 
 
   /**
-   * 分析結果をDiscord用にフォーマット
+   * シンプルサマリーをDiscord用にフォーマット
    */
-  private formatSummaryResult(result: DailyAnalysisResult, timezone: string): string {
+  private formatSimpleSummary(targetDate: string, activityLogs: ActivityLog[], completedTodos: Todo[], timezone: string): string {
     const sections: string[] = [];
 
     // ヘッダー
-    const dateStr = this.formatBusinessDate(result.businessDate, timezone);
-    sections.push(`📊 **${dateStr}の活動サマリー**`);
-    sections.push(`📝 記録数: ${result.totalLogCount}件`);
+    const dateStr = this.formatBusinessDate(targetDate, timezone);
+    sections.push(`📋 **${dateStr}の活動サマリー**`);
 
-    // 活動時間の概要
-    if (result.timeDistribution.totalEstimatedMinutes > 0) {
-      const totalHours = Math.floor(result.timeDistribution.totalEstimatedMinutes / 60);
-      const totalMinutes = result.timeDistribution.totalEstimatedMinutes % 60;
-      const timeText = totalHours > 0 ? `${totalHours}時間${totalMinutes}分` : `${totalMinutes}分`;
-      
-      sections.push(`⏱️ **総活動時間: ${timeText}**`);
-      
-      // 作業バランス
-      if (result.insights.workBalance) {
-        const balance = result.insights.workBalance;
-        const focusPercent = Math.round(balance.focusTimeRatio * 100);
-        const meetingPercent = Math.round(balance.meetingTimeRatio * 100);
-        const breakPercent = Math.round(balance.breakTimeRatio * 100);
+    // 完了したTODO一覧
+    sections.push(`\n✅ **完了したTODO (${completedTodos.length}件)**`);
+    if (completedTodos.length > 0) {
+      // 完了時刻でソート
+      const sortedTodos = completedTodos.sort((a, b) => {
+        const timeA = a.completedAt || a.updatedAt;
+        const timeB = b.completedAt || b.updatedAt;
+        return timeA.localeCompare(timeB);
+      });
+
+      for (const todo of sortedTodos) {
+        const completedTime = new Date(todo.completedAt || todo.updatedAt);
+        const localTime = toZonedTime(completedTime, timezone);
+        const timeStr = format(localTime, 'HH:mm', { timeZone: timezone });
         
-        sections.push(`📈 **作業バランス**`);
-        sections.push(`🎯 集中作業: ${focusPercent}% | 🤝 会議: ${meetingPercent}% | ☕ 休憩: ${breakPercent}%`);
+        sections.push(`• ${timeStr}: ${todo.content}`);
       }
+    } else {
+      sections.push('• 完了したTODOはありません');
     }
 
-    // カテゴリ別時間集計
-    if (result.categories.length > 0) {
-      sections.push(`\n📂 **カテゴリ別時間集計**`);
-      
-      const sortedCategories = result.categories
-        .sort((a, b) => b.estimatedMinutes - a.estimatedMinutes)
-        .slice(0, 8); // 上位8カテゴリまで表示
+    // 活動ログ一覧
+    sections.push(`\n📝 **活動ログ (${activityLogs.length}件)**`);
+    if (activityLogs.length > 0) {
+      // 時刻でソート
+      const sortedLogs = activityLogs.sort((a, b) => {
+        return a.inputTimestamp.localeCompare(b.inputTimestamp);
+      });
 
-      for (const category of sortedCategories) {
-        const hours = Math.floor(category.estimatedMinutes / 60);
-        const minutes = category.estimatedMinutes % 60;
-        const timeText = hours > 0 ? `${hours}時間${minutes}分` : `${minutes}分`;
+      for (const log of sortedLogs) {
+        const logTime = new Date(log.inputTimestamp);
+        const localTime = toZonedTime(logTime, timezone);
+        const timeStr = format(localTime, 'HH:mm', { timeZone: timezone });
         
-        const confidenceEmoji = this.getConfidenceEmoji(category.confidence);
-        const subCategoryText = category.subCategory ? ` > ${category.subCategory}` : '';
-        
-        sections.push(`• **${category.category}${subCategoryText}**: ${timeText} ${confidenceEmoji}`);
-        
-        if (category.representativeActivities && category.representativeActivities.length > 0) {
-          const activities = category.representativeActivities.slice(0, 2).join(', ');
-          sections.push(`  └ ${activities}`);
-        }
+        sections.push(`• ${timeStr}: ${log.content}`);
       }
-    }
-
-    // タイムライン（主要な活動のみ）
-    if (result.timeline.length > 0) {
-      sections.push(`\n⏰ **主要なタイムライン**`);
-      
-      const majorEvents = result.timeline
-        .filter(event => event.confidence > 0.6 && 
-          (new Date(event.endTime).getTime() - new Date(event.startTime).getTime()) >= 30 * 60 * 1000)
-        .slice(0, 6); // 上位6イベント
-
-      for (const event of majorEvents) {
-        const startTime = new Date(event.startTime);
-        const endTime = new Date(event.endTime);
-        const startLocal = toZonedTime(startTime, timezone);
-        const endLocal = toZonedTime(endTime, timezone);
-        
-        const startStr = format(startLocal, 'HH:mm', { timeZone: timezone });
-        const endStr = format(endLocal, 'HH:mm', { timeZone: timezone });
-        
-        const confidenceEmoji = this.getConfidenceEmoji(event.confidence);
-        
-        sections.push(`${startStr}-${endStr}: **${event.category}** ${event.content} ${confidenceEmoji}`);
-      }
-    }
-
-    // 警告・注意事項
-    if (result.warnings.length > 0) {
-      const importantWarnings = result.warnings.filter(w => w.level !== 'info');
-      
-      if (importantWarnings.length > 0) {
-        sections.push(`\n⚠️ **注意事項**`);
-        
-        for (const warning of importantWarnings.slice(0, 3)) {
-          const severityEmoji = warning.level === 'error' ? '🚨' : '⚠️';
-          sections.push(`${severityEmoji} ${warning.message}`);
-        }
-      }
-    }
-
-    // 生産性スコアと洞察
-    if (result.insights) {
-      sections.push(`\n✨ **今日の振り返り**`);
-      
-      if (result.insights.productivityScore > 0) {
-        const scoreEmoji = this.getProductivityEmoji(result.insights.productivityScore);
-        sections.push(`${scoreEmoji} 生産性スコア: **${result.insights.productivityScore}**/100`);
-      }
-
-      if (result.insights.highlights && result.insights.highlights.length > 0) {
-        sections.push(`🌟 **ハイライト**`);
-        for (const highlight of result.insights.highlights.slice(0, 2)) {
-          sections.push(`• ${highlight}`);
-        }
-      }
-
-      if (result.insights.suggestions && result.insights.suggestions.length > 0) {
-        sections.push(`💡 **改善提案**`);
-        for (const suggestion of result.insights.suggestions.slice(0, 2)) {
-          sections.push(`• ${suggestion}`);
-        }
-      }
-
-      if (result.insights.motivation) {
-        sections.push(`\n🎉 ${result.insights.motivation}`);
-      }
+    } else {
+      sections.push('• 活動ログはありません');
     }
 
     // フッター情報
-    const generatedTime = new Date(result.generatedAt);
-    const generatedLocal = toZonedTime(generatedTime, timezone);
-    const generatedStr = format(generatedLocal, 'HH:mm', { timeZone: timezone });
+    const now = new Date();
+    const localNow = toZonedTime(now, timezone);
+    const generatedStr = format(localNow, 'HH:mm', { timeZone: timezone });
     
-    sections.push(`\n🤖 ${generatedStr}に生成 | データ: ${result.totalLogCount}件のログ`);
+    sections.push(`\n🤖 ${generatedStr}に生成 | TODO: ${completedTodos.length}件 | ログ: ${activityLogs.length}件`);
 
     return sections.join('\n');
   }
@@ -357,7 +248,7 @@ export class SummaryHandler implements ISummaryHandler {
 
 **サマリータイプ:**
 📝 **基本サマリー** - 活動ログのみの分析
-📊 **統合サマリー** - 活動ログ + TODO + 相関分析
+📊 **統合サマリー** - 活動ログ + TODO基本統計
 
 **使用例:**
 \`!summary\` → 今日の基本サマリー
@@ -368,9 +259,6 @@ export class SummaryHandler implements ISummaryHandler {
 **統合サマリーの内容:**
 📝 TODO概要（完了率・進行状況）
 ⏱️ 活動時間の詳細分析
-🔗 活動とTODOの相関分析
-⭐ 生産性スコアと評価
-💡 パーソナライズされた推奨事項
 
 **日付指定方法:**
 • \`YYYY-MM-DD\` 形式 (例: 2025-06-27)
@@ -401,17 +289,6 @@ export class SummaryHandler implements ISummaryHandler {
       return { type: 'help' };
     }
 
-    // 統合サマリー
-    if (firstArg === 'integrated' || firstArg === 'all' || firstArg === '統合' || firstArg === 'todo') {
-      const targetDate = args[1] || undefined;
-      return { type: 'integrated', targetDate };
-    }
-
-
-    // 強制リフレッシュ
-    if (firstArg === 'refresh' || firstArg === 'reload' || firstArg === '更新') {
-      return { type: 'today', forceRefresh: true };
-    }
 
     // 今日
     if (firstArg === 'today' || firstArg === '今日') {
@@ -499,20 +376,4 @@ export class SummaryHandler implements ISummaryHandler {
     };
   }
 
-  /**
-   * サマリー生成の進行状況を表示
-   */
-  private async showProgress(message: Message, stage: string, current: number, total: number): Promise<void> {
-    const progress = Math.round((current / total) * 100);
-    const progressBar = '█'.repeat(Math.floor(progress / 10)) + '░'.repeat(10 - Math.floor(progress / 10));
-    
-    const progressText = `🔄 **分析中... ${progress}%**\n\`${progressBar}\`\n${stage}`;
-    
-    try {
-      await message.edit(progressText);
-    } catch (error) {
-      // 編集に失敗した場合は無視（レート制限回避）
-      console.warn('進行状況更新スキップ:', error);
-    }
-  }
 }

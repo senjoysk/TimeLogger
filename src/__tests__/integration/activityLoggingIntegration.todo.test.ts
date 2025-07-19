@@ -99,8 +99,7 @@ describe('ActivityLoggingIntegration TODO機能統合', () => {
         expect.any(Object), // repository (IMessageClassificationRepository)
         expect.any(Object), // geminiService
         expect.any(Object), // messageClassificationService
-        expect.any(Object), // activityLogService
-        expect.any(Object)  // analysisCacheService
+        expect.any(Object)  // activityLogService
       );
     });
   });
