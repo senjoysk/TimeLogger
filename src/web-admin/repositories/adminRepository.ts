@@ -33,13 +33,53 @@ export class AdminRepository implements IAdminRepository {
   }
 
   /**
-   * テーブルのレコード数を取得
+   * テーブルのレコード数を取得（N+1問題解決版）
    */
   async getTableCount(tableName: string): Promise<number> {
-    // 各テーブルごとに適切な既存メソッドを使用
+    try {
+      // SQLを直接実行してN+1問題を回避
+      const db = (this.sqliteRepo as any).db; // privateなdbインスタンスにアクセス
+      
+      switch (tableName) {
+        case 'activity_logs':
+          const result = await new Promise<number>((resolve, reject) => {
+            db.get("SELECT COUNT(*) as count FROM activity_logs", (err: any, row: any) => {
+              if (err) reject(err);
+              else resolve(row.count);
+            });
+          });
+          return result;
+        case 'todo_tasks':
+          const todoCount = await new Promise<number>((resolve, reject) => {
+            db.get("SELECT COUNT(*) as count FROM todo_tasks", (err: any, row: any) => {
+              if (err) reject(err);
+              else resolve(row.count);
+            });
+          });
+          return todoCount;
+        case 'user_settings':
+          const userCount = await new Promise<number>((resolve, reject) => {
+            db.get("SELECT COUNT(DISTINCT user_id) as count FROM user_settings", (err: any, row: any) => {
+              if (err) reject(err);
+              else resolve(row.count);
+            });
+          });
+          return userCount;
+        default:
+          return 0;
+      }
+    } catch (error) {
+      // エラー時は従来の方法にフォールバック
+      return await this.getTableCountFallback(tableName);
+    }
+  }
+
+  /**
+   * フォールバック用のレコード数取得（従来の方法）
+   */
+  private async getTableCountFallback(tableName: string): Promise<number> {
     switch (tableName) {
       case 'activity_logs':
-        // 全ユーザーの活動ログを取得するため、既存メソッドを使用
         const users = await this.sqliteRepo.getAllUsers();
         let totalLogs = 0;
         for (const user of users) {
@@ -48,7 +88,6 @@ export class AdminRepository implements IAdminRepository {
         }
         return totalLogs;
       case 'todo_tasks':
-        // 全ユーザーのTODOを取得
         const allUsers = await this.sqliteRepo.getAllUsers();
         let totalTodos = 0;
         for (const user of allUsers) {
@@ -60,18 +99,75 @@ export class AdminRepository implements IAdminRepository {
         const userList = await this.sqliteRepo.getAllUsers();
         return userList.length;
       default:
-        // その他のテーブルは暫定的に0を返す
         return 0;
     }
   }
 
   /**
-   * テーブルデータを取得（ページネーション対応）
+   * テーブルデータを取得（ページネーション対応・N+1問題解決版）
    */
   async getTableData(tableName: string, options: PaginationOptions = {}): Promise<any[]> {
     const { page = 1, limit = 50 } = options;
     
-    // 各テーブルごとに適切な既存メソッドを使用
+    try {
+      // SQLを直接実行してN+1問題を回避
+      const db = (this.sqliteRepo as any).db;
+      
+      switch (tableName) {
+        case 'activity_logs':
+          const offset = (page - 1) * limit;
+          const logs = await new Promise<any[]>((resolve, reject) => {
+            db.all(
+              "SELECT * FROM activity_logs ORDER BY created_at DESC LIMIT ? OFFSET ?",
+              [limit, offset],
+              (err: any, rows: any[]) => {
+                if (err) reject(err);
+                else resolve(rows);
+              }
+            );
+          });
+          return logs;
+        case 'todo_tasks':
+          const todoOffset = (page - 1) * limit;
+          const todos = await new Promise<any[]>((resolve, reject) => {
+            db.all(
+              "SELECT * FROM todo_tasks ORDER BY created_at DESC LIMIT ? OFFSET ?",
+              [limit, todoOffset],
+              (err: any, rows: any[]) => {
+                if (err) reject(err);
+                else resolve(rows);
+              }
+            );
+          });
+          return todos;
+        case 'user_settings':
+          const userOffset = (page - 1) * limit;
+          const users = await new Promise<any[]>((resolve, reject) => {
+            db.all(
+              "SELECT DISTINCT user_id, timezone, created_at, updated_at FROM user_settings ORDER BY updated_at DESC LIMIT ? OFFSET ?",
+              [limit, userOffset],
+              (err: any, rows: any[]) => {
+                if (err) reject(err);
+                else resolve(rows);
+              }
+            );
+          });
+          return users;
+        default:
+          return [];
+      }
+    } catch (error) {
+      // エラー時は従来の方法にフォールバック
+      return await this.getTableDataFallback(tableName, options);
+    }
+  }
+
+  /**
+   * フォールバック用のテーブルデータ取得（従来の方法）
+   */
+  private async getTableDataFallback(tableName: string, options: PaginationOptions = {}): Promise<any[]> {
+    const { page = 1, limit = 50 } = options;
+    
     switch (tableName) {
       case 'activity_logs':
         const users = await this.sqliteRepo.getAllUsers();
@@ -80,7 +176,6 @@ export class AdminRepository implements IAdminRepository {
           const logs = await this.sqliteRepo.getActivityRecords(user.userId, 'Asia/Tokyo');
           allLogs.push(...logs);
         }
-        // 日付でソート
         allLogs.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
         return this.paginate(allLogs, page, limit);
       case 'todo_tasks':
@@ -90,7 +185,6 @@ export class AdminRepository implements IAdminRepository {
           const todos = await this.sqliteRepo.getTodosByUserId(user.userId);
           allTodos.push(...todos);
         }
-        // 日付でソート
         allTodos.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
         return this.paginate(allTodos, page, limit);
       case 'user_settings':

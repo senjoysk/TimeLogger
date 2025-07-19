@@ -31,10 +31,11 @@ jobs:
     - name: TypeScript type check
       run: npm run build
       
-    - name: Run tests with coverage
+    - name: Run tests with coverage (CI optimized)
       run: npm run test:coverage
       env:
         NODE_ENV: test
+        CI: true
         
     - name: Coverage threshold check
       run: |
@@ -92,10 +93,10 @@ jobs:
     - name: Database path validation
       run: npm run check:database-paths
       
-    - name: Integration test check
+    - name: Integration test check (CI optimized)
       run: |
-        # Run specific critical integration tests
-        npm test -- --testPathPattern="integration" --verbose=false --silent
+        # Run specific critical integration tests with CI environment
+        CI=true npm test -- --testPathPattern="integration" --verbose=false --silent
         
     - name: Build verification
       run: |

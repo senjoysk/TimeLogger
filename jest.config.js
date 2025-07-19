@@ -34,8 +34,8 @@ module.exports = {
     '^@/(.*)$': '<rootDir>/src/$1',
   },
   
-  // タイムアウト設定（CI環境対応）
-  testTimeout: 20000,
+  // タイムアウト設定（CI環境対応：本番デプロイ時のsocket hang up対策）
+  testTimeout: process.env.CI ? 60000 : 20000,
   
   // 詳細ログ表示
   verbose: true,

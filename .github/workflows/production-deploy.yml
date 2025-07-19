@@ -51,8 +51,10 @@ jobs:
           npm run build
           echo "success=true" >> $GITHUB_OUTPUT
       
-      - name: 🧪 テスト実行
+      - name: 🧪 テスト実行（CI環境最適化）
         id: test
+        env:
+          CI: true
         run: |
           npm test
           npm run test:integration

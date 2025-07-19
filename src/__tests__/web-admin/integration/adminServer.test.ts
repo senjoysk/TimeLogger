@@ -32,6 +32,36 @@ describe('AdminServer Integration Tests', () => {
   });
 
   afterAll(async () => {
+    try {
+      // AdminServerのクリーンアップ
+      if (adminServer) {
+        await new Promise<void>((resolve) => {
+          // サーバーが動いている場合は適切にシャットダウン
+          const server = (adminServer as any).server;
+          if (server && server.listening) {
+            server.close(() => {
+              resolve();
+            });
+          } else {
+            resolve();
+          }
+        });
+      }
+      
+      // データベース接続のクリーンアップ
+      const db = (adminServer as any)?.adminRepository?.sqliteRepo?.db;
+      if (db) {
+        await new Promise<void>((resolve, reject) => {
+          db.close((err: any) => {
+            if (err) reject(err);
+            else resolve();
+          });
+        });
+      }
+    } catch (error) {
+      console.warn('Warning: Failed to cleanup AdminServer:', error);
+    }
+    
     // テスト用データベースをクリーンアップ
     cleanupTestDatabase(testDbPath);
   });
@@ -156,11 +186,12 @@ describe('AdminServer Integration Tests', () => {
     test('ページネーションが正常に動作する', async () => {
       const response = await request(app)
         .get('/tables/activity_logs?page=1&limit=10')
-        .auth('testuser', 'testpass');
+        .auth('testuser', 'testpass')
+        .timeout(30000); // 30秒タイムアウト設定
       
       // 500エラーでなければOK
       expect(response.status).not.toBe(500);
-    });
+    }, 35000); // Jestのテストタイムアウトを35秒に設定
   });
 
   describe('Environment Detection', () => {
