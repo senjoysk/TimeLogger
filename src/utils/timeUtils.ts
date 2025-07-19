@@ -1,4 +1,11 @@
-import { TimeSlot } from '../types';
+/**
+ * 時間枠の定義
+ */
+interface TimeSlot {
+  start: Date;
+  end: Date;
+  label: string;
+}
 import { config } from '../config';
 import { toZonedTime, fromZonedTime } from 'date-fns-tz';
 import { addMinutes, setMinutes, setHours, setSeconds, getHours, getMinutes, getDay, subMinutes, subDays, format } from 'date-fns';

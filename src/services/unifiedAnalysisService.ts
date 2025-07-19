@@ -7,7 +7,6 @@ import { GoogleGenerativeAI, GenerativeModel } from '@google/generative-ai';
 import { toZonedTime, format } from 'date-fns-tz';
 import { config } from '../config';
 import { IActivityLogRepository } from '../repositories/activityLogRepository';
-import { IAnalysisService } from '../repositories/interfaces'; // 既存のAPI Cost監視インターフェース
 import {
   ActivityLog,
   DailyAnalysisResult,
