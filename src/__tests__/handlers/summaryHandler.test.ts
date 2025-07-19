@@ -5,7 +5,8 @@
 
 import { SummaryHandler } from '../../handlers/summaryHandler';
 import { Message } from 'discord.js';
-import { DailyAnalysisResult } from '../../types/activityLog';
+import { ActivityLog } from '../../types/activityLog';
+import { Todo } from '../../types/todo';
 
 // Discordメッセージのモック
 class MockMessage {
@@ -24,9 +25,9 @@ class MockMessage {
   async reply(message: string): Promise<MockMessage> {
     this.replies.push(message);
     const progressMessage = new MockMessage('Progress message');
-    // プログレスメッセージのeditメソッドをオーバーライド
+    // プログレスメッセージのeditメソッドを、元のメッセージのedits配列に追加するよう修正
     progressMessage.edit = async (content: string) => {
-      this.edits.push(content);
+      this.edits.push(content); // 元のmockMessageのedits配列に追加
     };
     return progressMessage;
   }
@@ -36,81 +37,58 @@ class MockMessage {
   }
 }
 
-// モック分析サービス
-class MockUnifiedAnalysisService {
-  private shouldUseCache = true;
-  private analysisCallCount = 0;
-
-  async analyzeDaily(request: any): Promise<DailyAnalysisResult> {
-    this.analysisCallCount++;
-    
-    const result: DailyAnalysisResult = {
-      businessDate: request.businessDate || '2025-06-30',
-      totalLogCount: 5,
-      generatedAt: new Date().toISOString(),
-      categories: [
-        {
-          category: 'プログラミング',
-          estimatedMinutes: 120,
-          confidence: 0.9,
-          logCount: 3,
-          representativeActivities: ['コーディング', 'デバッグ']
-        }
-      ],
-      timeline: [
-        {
-          startTime: '2025-06-30T09:00:00Z',
-          endTime: '2025-06-30T11:00:00Z',
-          category: 'プログラミング',
-          content: 'TimeLoggerの開発',
-          confidence: 0.9,
-          sourceLogIds: ['log1', 'log2']
-        }
-      ],
-      timeDistribution: {
-        totalEstimatedMinutes: 120,
-        workingMinutes: 120,
-        breakMinutes: 0,
-        unaccountedMinutes: 0,
-        overlapMinutes: 0
+// モックリポジトリ
+class MockRepository {
+  async getLogsByDate(userId: string, businessDate: string): Promise<ActivityLog[]> {
+    return [
+      {
+        id: 'log1',
+        userId,
+        content: 'プログラミング作業を開始',
+        inputTimestamp: `${businessDate}T09:00:00.000Z`,
+        businessDate,
+        isDeleted: false,
+        createdAt: `${businessDate}T09:00:00.000Z`,
+        updatedAt: `${businessDate}T09:00:00.000Z`
       },
-      insights: {
-        productivityScore: 85,
-        workBalance: {
-          focusTimeRatio: 0.8,
-          meetingTimeRatio: 0.1,
-          breakTimeRatio: 0.1,
-          adminTimeRatio: 0.0
-        },
-        highlights: ['集中してコーディングができた'],
-        suggestions: ['休憩を増やすと良い'],
-        motivation: '今日もお疲れさまでした！'
+      {
+        id: 'log2',
+        userId,
+        content: 'デバッグ作業',
+        inputTimestamp: `${businessDate}T10:30:00.000Z`,
+        businessDate,
+        isDeleted: false,
+        createdAt: `${businessDate}T10:30:00.000Z`,
+        updatedAt: `${businessDate}T10:30:00.000Z`
+      }
+    ];
+  }
+
+  async getTodosByUserId(userId: string): Promise<Todo[]> {
+    return [
+      {
+        id: 'todo1',
+        userId,
+        content: 'テストケース作成',
+        status: 'completed',
+        priority: 0, // 通常
+        createdAt: '2025-06-30T08:00:00.000Z',
+        updatedAt: '2025-06-30T11:00:00.000Z',
+        completedAt: '2025-06-30T11:00:00.000Z',
+        sourceType: 'manual'
       },
-      warnings: []
-    };
-
-    // forceRefreshがtrueの場合は必ず新しい分析を実行
-    if (request.forceRefresh) {
-      console.log('🔄 強制リフレッシュでの分析実行');
-    }
-
-    return result;
-  }
-
-  async getCachedAnalysis(userId: string, businessDate: string): Promise<DailyAnalysisResult | null> {
-    if (this.shouldUseCache) {
-      console.log('⚡ キャッシュから返却');
-      return this.analyzeDaily({ userId, businessDate, forceRefresh: false });
-    }
-    return null;
-  }
-
-  getAnalysisCallCount(): number {
-    return this.analysisCallCount;
-  }
-
-  setShouldUseCache(useCache: boolean): void {
-    this.shouldUseCache = useCache;
+      {
+        id: 'todo2',
+        userId,
+        content: 'コードレビュー',
+        status: 'completed',
+        priority: 1, // 高
+        createdAt: '2025-06-30T09:00:00.000Z',
+        updatedAt: '2025-06-30T14:00:00.000Z',
+        completedAt: '2025-06-30T14:00:00.000Z',
+        sourceType: 'manual'
+      }
+    ];
   }
 }
 
@@ -127,15 +105,15 @@ class MockActivityLogService {
 
 describe('SummaryHandler', () => {
   let summaryHandler: SummaryHandler;
-  let mockUnifiedAnalysisService: MockUnifiedAnalysisService;
+  let mockRepository: MockRepository;
   let mockActivityLogService: MockActivityLogService;
 
   beforeEach(() => {
-    mockUnifiedAnalysisService = new MockUnifiedAnalysisService();
+    mockRepository = new MockRepository();
     mockActivityLogService = new MockActivityLogService();
     summaryHandler = new SummaryHandler(
-      mockUnifiedAnalysisService as any,
-      mockActivityLogService as any
+      mockActivityLogService as any,
+      mockRepository as any
     );
   });
 
@@ -148,7 +126,8 @@ describe('SummaryHandler', () => {
       expect(mockMessage.replies.length).toBeGreaterThan(0);
       expect(mockMessage.edits.length).toBeGreaterThan(0);
       expect(mockMessage.edits[0]).toContain('活動サマリー');
-      expect(mockMessage.edits[0]).toContain('プログラミング');
+      expect(mockMessage.edits[0]).toContain('完了したTODO');
+      expect(mockMessage.edits[0]).toContain('活動ログ');
     });
 
     test('引数なしの場合は今日のサマリーが生成される', async () => {
@@ -156,35 +135,32 @@ describe('SummaryHandler', () => {
       
       await summaryHandler.handle(mockMessage as unknown as Message, '770478489203507241', [], 'Asia/Tokyo');
       
+      expect(mockMessage.edits.length).toBeGreaterThan(0);
       // 日付フォーマットがyyyy/MM/dd形式に変更されていることを確認
       expect(mockMessage.edits[0]).toContain('2025/06/30');
     });
   });
 
-  describe('キャッシュとリフレッシュ機能', () => {
-    test('refresh引数で強制リフレッシュが実行される', async () => {
-      const mockMessage = new MockMessage('!summary refresh');
+  describe('基本機能の継続テスト', () => {
+    test('指定された日付でサマリーが生成される', async () => {
+      const mockMessage = new MockMessage('!summary 2025-06-29');
       
-      const initialCallCount = mockUnifiedAnalysisService.getAnalysisCallCount();
-      
-      await summaryHandler.handle(mockMessage as unknown as Message, '770478489203507241', ['refresh'], 'Asia/Tokyo');
+      await summaryHandler.handle(mockMessage as unknown as Message, '770478489203507241', ['2025-06-29'], 'Asia/Tokyo');
       
       expect(mockMessage.replies.length).toBeGreaterThan(0);
       expect(mockMessage.edits.length).toBeGreaterThan(0);
-      expect(mockUnifiedAnalysisService.getAnalysisCallCount()).toBe(initialCallCount + 1);
+      expect(mockMessage.edits[0]).toContain('活動サマリー');
+      expect(mockMessage.edits[0]).toContain('2025/06/29');
     });
 
-    test('通常のサマリーではキャッシュが使用される', async () => {
-      mockUnifiedAnalysisService.setShouldUseCache(true);
-      const mockMessage = new MockMessage('!summary');
+    test('不正な引数でもエラーハンドリングされる', async () => {
+      const mockMessage = new MockMessage('!summary unknown_arg');
       
-      const initialCallCount = mockUnifiedAnalysisService.getAnalysisCallCount();
+      await summaryHandler.handle(mockMessage as unknown as Message, '770478489203507241', ['unknown_arg'], 'Asia/Tokyo');
       
-      await summaryHandler.handle(mockMessage as unknown as Message, '770478489203507241', [], 'Asia/Tokyo');
-      
-      expect(mockMessage.edits[0]).toContain('活動サマリー');
-      // キャッシュが使用される場合でも分析は1回実行される（getCachedAnalysisの実装による）
-      expect(mockUnifiedAnalysisService.getAnalysisCallCount()).toBe(initialCallCount + 1);
+      expect(mockMessage.replies.length).toBeGreaterThan(0);
+      // 不正な引数の場合はエラーメッセージが返される
+      expect(mockMessage.replies[0]).toContain('❌');
     });
   });
 
@@ -202,6 +178,8 @@ describe('SummaryHandler', () => {
       
       await summaryHandler.handle(mockMessage as unknown as Message, '770478489203507241', ['yesterday'], 'Asia/Tokyo');
       
+      expect(mockMessage.replies.length).toBeGreaterThan(0);
+      expect(mockMessage.edits.length).toBeGreaterThan(0);
       expect(mockMessage.edits[0]).toContain('活動サマリー');
     });
 
@@ -210,6 +188,8 @@ describe('SummaryHandler', () => {
       
       await summaryHandler.handle(mockMessage as unknown as Message, '770478489203507241', ['-1'], 'Asia/Tokyo');
       
+      expect(mockMessage.replies.length).toBeGreaterThan(0);
+      expect(mockMessage.edits.length).toBeGreaterThan(0);
       expect(mockMessage.edits[0]).toContain('活動サマリー');
     });
   });
