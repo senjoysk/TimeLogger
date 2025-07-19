@@ -175,11 +175,8 @@ export class SummaryHandler implements ISummaryHandler {
       });
 
       for (const log of sortedLogs) {
-        const logTime = new Date(log.inputTimestamp);
-        const localTime = toZonedTime(logTime, timezone);
-        const timeStr = format(localTime, 'HH:mm', { timeZone: timezone });
-        
-        sections.push(`• ${timeStr}: ${log.content}`);
+        const displayEntry = this.formatActivityLogEntry(log, timezone);
+        sections.push(`• ${displayEntry}`);
       }
     } else {
       sections.push('• 活動ログはありません');
@@ -196,6 +193,76 @@ export class SummaryHandler implements ISummaryHandler {
   }
 
 
+
+  /**
+   * 活動ログエントリーをフォーマット（starttime - endtime : 活動内容 形式）
+   */
+  private formatActivityLogEntry(log: ActivityLog, timezone: string): string {
+    // AI分析済みの場合は start_time, end_time を使用
+    if (log.startTime && log.endTime) {
+      const startTime = new Date(log.startTime);
+      const endTime = new Date(log.endTime);
+      const localStartTime = toZonedTime(startTime, timezone);
+      const localEndTime = toZonedTime(endTime, timezone);
+      const startStr = format(localStartTime, 'HH:mm', { timeZone: timezone });
+      const endStr = format(localEndTime, 'HH:mm', { timeZone: timezone });
+      
+      // contentから時刻情報を除去
+      const cleanContent = this.removeTimeFromContent(log.content);
+      return `${startStr} - ${endStr} : ${cleanContent}`;
+    }
+    
+    // 開始時刻のみ
+    if (log.startTime && !log.endTime) {
+      const startTime = new Date(log.startTime);
+      const localStartTime = toZonedTime(startTime, timezone);
+      const startStr = format(localStartTime, 'HH:mm', { timeZone: timezone });
+      
+      const cleanContent = this.removeTimeFromContent(log.content);
+      return `${startStr} - : ${cleanContent}`;
+    }
+    
+    // 終了時刻のみ
+    if (!log.startTime && log.endTime) {
+      const endTime = new Date(log.endTime);
+      const localEndTime = toZonedTime(endTime, timezone);
+      const endStr = format(localEndTime, 'HH:mm', { timeZone: timezone });
+      
+      const cleanContent = this.removeTimeFromContent(log.content);
+      return `- ${endStr} : ${cleanContent}`;
+    }
+    
+    // 未分析（時刻情報なし）の場合は活動内容のみ
+    return log.content;
+  }
+
+  /**
+   * contentから時刻情報を除去
+   */
+  private removeTimeFromContent(content: string): string {
+    // 様々な時刻表記パターンを除去
+    let cleanContent = content;
+    
+    // HH:MM-HH:MM形式（例: 10:00-10:30, 9:15-11:45）
+    cleanContent = cleanContent.replace(/^\d{1,2}:\d{2}-\d{1,2}:\d{2}\s*/, '');
+    
+    // HH:MM〜HH:MM形式（例: 10:00〜10:30）
+    cleanContent = cleanContent.replace(/^\d{1,2}:\d{2}〜\d{1,2}:\d{2}\s*/, '');
+    
+    // HH:MM ~ HH:MM形式（例: 10:00 ~ 10:30）
+    cleanContent = cleanContent.replace(/^\d{1,2}:\d{2}\s*~\s*\d{1,2}:\d{2}\s*/, '');
+    
+    // HH:MM to HH:MM形式（例: 10:00 to 10:30）
+    cleanContent = cleanContent.replace(/^\d{1,2}:\d{2}\s*to\s*\d{1,2}:\d{2}\s*/, '');
+    
+    // HH:MM-形式（開始時刻のみ、例: 10:00-）
+    cleanContent = cleanContent.replace(/^\d{1,2}:\d{2}-\s*/, '');
+    
+    // -HH:MM形式（終了時刻のみ、例: -10:30）
+    cleanContent = cleanContent.replace(/^-\d{1,2}:\d{2}\s*/, '');
+    
+    return cleanContent.trim();
+  }
 
   /**
    * 業務日をユーザーフレンドリーにフォーマット

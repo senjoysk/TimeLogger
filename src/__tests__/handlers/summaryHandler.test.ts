@@ -44,22 +44,38 @@ class MockRepository {
       {
         id: 'log1',
         userId,
-        content: 'プログラミング作業を開始',
-        inputTimestamp: `${businessDate}T09:00:00.000Z`,
+        content: '10:00-12:00 プログラミング作業',
+        inputTimestamp: `${businessDate}T01:05:00.000Z`,
         businessDate,
         isDeleted: false,
-        createdAt: `${businessDate}T09:00:00.000Z`,
-        updatedAt: `${businessDate}T09:00:00.000Z`
+        createdAt: `${businessDate}T01:05:00.000Z`,
+        updatedAt: `${businessDate}T01:05:00.000Z`,
+        startTime: `${businessDate}T01:00:00.000Z`,  // 10:00 JST
+        endTime: `${businessDate}T03:00:00.000Z`,    // 12:00 JST
+        totalMinutes: 120
       },
       {
         id: 'log2',
         userId,
-        content: 'デバッグ作業',
-        inputTimestamp: `${businessDate}T10:30:00.000Z`,
+        content: 'デバッグ作業（時刻未分析）',
+        inputTimestamp: `${businessDate}T02:30:00.000Z`,
         businessDate,
         isDeleted: false,
-        createdAt: `${businessDate}T10:30:00.000Z`,
-        updatedAt: `${businessDate}T10:30:00.000Z`
+        createdAt: `${businessDate}T02:30:00.000Z`,
+        updatedAt: `${businessDate}T02:30:00.000Z`
+        // startTime, endTime なし（未分析ログ）
+      },
+      {
+        id: 'log3',
+        userId,
+        content: '14:00- 会議開始',
+        inputTimestamp: `${businessDate}T03:30:00.000Z`,
+        businessDate,
+        isDeleted: false,
+        createdAt: `${businessDate}T03:30:00.000Z`,
+        updatedAt: `${businessDate}T03:30:00.000Z`,
+        startTime: `${businessDate}T05:00:00.000Z`  // 14:00 JST
+        // endTime なし（開始時刻のみ）
       }
     ];
   }
@@ -215,6 +231,57 @@ describe('SummaryHandler', () => {
       expect(mockMessage.replies.length).toBeGreaterThan(0);
       expect(mockMessage.edits.length).toBeGreaterThan(0);
       expect(mockMessage.edits[0]).toContain('活動サマリー');
+    });
+  });
+
+  describe('活動ログ表示形式', () => {
+    test('AI分析済みログが "starttime - endtime : 活動内容" 形式で表示される', async () => {
+      const mockMessage = new MockMessage('!summary');
+      
+      await summaryHandler.handle(mockMessage as unknown as Message, '770478489203507241', [], 'Asia/Tokyo');
+      
+      expect(mockMessage.edits.length).toBeGreaterThan(0);
+      const summary = mockMessage.edits[0];
+      
+      // AI分析済みログ（完全な時刻情報）
+      expect(summary).toContain('10:00 - 12:00 : プログラミング作業');
+      
+      // 開始時刻のみのログ
+      expect(summary).toContain('14:00 - : 会議開始');
+      
+      // 未分析ログ（時刻情報なし）
+      expect(summary).toContain('デバッグ作業（時刻未分析）');
+    });
+
+    test('時刻情報がcontentから正しく除去される', async () => {
+      const mockMessage = new MockMessage('!summary');
+      
+      await summaryHandler.handle(mockMessage as unknown as Message, '770478489203507241', [], 'Asia/Tokyo');
+      
+      expect(mockMessage.edits.length).toBeGreaterThan(0);
+      const summary = mockMessage.edits[0];
+      
+      // 元のcontent: "10:00-12:00 プログラミング作業" → 表示: "10:00 - 12:00 : プログラミング作業"
+      expect(summary).toContain('10:00 - 12:00 : プログラミング作業');
+      expect(summary).not.toContain('10:00-12:00 プログラミング作業'); // 元の形式は表示されない
+      
+      // 元のcontent: "14:00- 会議開始" → 表示: "14:00 - : 会議開始"  
+      expect(summary).toContain('14:00 - : 会議開始');
+      expect(summary).not.toContain('14:00- 会議開始'); // 元の形式は表示されない
+    });
+
+    test('入力時刻（inputTimestamp）が表示されないことを確認', async () => {
+      const mockMessage = new MockMessage('!summary');
+      
+      await summaryHandler.handle(mockMessage as unknown as Message, '770478489203507241', [], 'Asia/Tokyo');
+      
+      expect(mockMessage.edits.length).toBeGreaterThan(0);
+      const summary = mockMessage.edits[0];
+      
+      // 入力時刻（01:05, 02:30, 03:30）が表示されていないことを確認
+      expect(summary).not.toContain('01:05');
+      expect(summary).not.toContain('02:30');
+      expect(summary).not.toContain('03:30');
     });
   });
 
