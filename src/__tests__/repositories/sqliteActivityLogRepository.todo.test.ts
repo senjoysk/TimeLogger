@@ -5,8 +5,7 @@
 
 import { SqliteActivityLogRepository } from '../../repositories/sqliteActivityLogRepository';
 import { CreateTodoRequest, TodoStatus, Todo } from '../../types/todo';
-import * as fs from 'fs';
-import * as path from 'path';
+import { getTestDbPath, cleanupTestDatabase } from '../../utils/testDatabasePath';
 
 describe('SqliteActivityLogRepository TODO機能', () => {
   let repository: SqliteActivityLogRepository;
@@ -14,13 +13,8 @@ describe('SqliteActivityLogRepository TODO機能', () => {
 
   beforeEach(async () => {
     // テスト用一時データベースファイル
-    testDbPath = path.join(__dirname, '../../../test-data', `test-todos-${Date.now()}.db`);
-    
-    // テストディレクトリ作成
-    const testDir = path.dirname(testDbPath);
-    if (!fs.existsSync(testDir)) {
-      fs.mkdirSync(testDir, { recursive: true });
-    }
+    testDbPath = getTestDbPath(__filename);
+    cleanupTestDatabase(testDbPath);
 
     repository = new SqliteActivityLogRepository(testDbPath);
     
@@ -51,9 +45,7 @@ describe('SqliteActivityLogRepository TODO機能', () => {
     await repository.close();
     
     // テストファイルを削除
-    if (fs.existsSync(testDbPath)) {
-      fs.unlinkSync(testDbPath);
-    }
+    cleanupTestDatabase(testDbPath);
   });
 
   describe('createTodo', () => {

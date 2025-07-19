@@ -6,11 +6,10 @@
 import request from 'supertest';
 import { IntegratedServer } from '../../../server';
 import { AdminServer } from '../../../web-admin/server';
-import path from 'path';
-import fs from 'fs';
+import { getTestDbPath, cleanupTestDatabase } from '../../../utils/testDatabasePath';
 
 describe('basePath統合テスト', () => {
-  const testDbPath = path.join(__dirname, '../../../../test-basepath.db');
+  const testDbPath = getTestDbPath(__filename);
   let adminServer: AdminServer;
   let integratedServer: IntegratedServer;
 
@@ -22,9 +21,7 @@ describe('basePath統合テスト', () => {
     process.env.SKIP_MIGRATIONS = 'true';
     
     // テストDBクリーンアップ
-    if (fs.existsSync(testDbPath)) {
-      fs.unlinkSync(testDbPath);
-    }
+    cleanupTestDatabase(testDbPath);
   });
 
   afterAll(async () => {
@@ -58,9 +55,7 @@ describe('basePath統合テスト', () => {
     await new Promise(resolve => setTimeout(resolve, 100));
     
     // テストDBクリーンアップ
-    if (fs.existsSync(testDbPath)) {
-      fs.unlinkSync(testDbPath);
-    }
+    cleanupTestDatabase(testDbPath);
   });
 
   describe('AdminServer単体（basePath = ""）', () => {

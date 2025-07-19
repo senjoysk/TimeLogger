@@ -1,7 +1,7 @@
 import { BackupManager } from '../../database/backupManager';
 import { Database } from 'sqlite3';
 import * as fs from 'fs';
-import * as path from 'path';
+import { getTestDbPath, cleanupTestDatabase } from '../../utils/testDatabasePath';
 
 describe('BackupManager', () => {
   let db: Database;
@@ -11,13 +11,11 @@ describe('BackupManager', () => {
 
   beforeAll(() => {
     // テスト用のディレクトリを作成
-    testDbPath = path.join(__dirname, 'test.db');
-    testBackupDir = path.join(__dirname, 'test_backups');
+    testDbPath = getTestDbPath(__filename);
+    testBackupDir = getTestDbPath(__filename).replace('.db', '_backups');
     
     // クリーンアップ
-    if (fs.existsSync(testDbPath)) {
-      fs.unlinkSync(testDbPath);
-    }
+    cleanupTestDatabase(testDbPath);
     if (fs.existsSync(testBackupDir)) {
       fs.rmSync(testBackupDir, { recursive: true, force: true });
     }
@@ -52,9 +50,7 @@ describe('BackupManager', () => {
       }
       
       // テストファイルをクリーンアップ
-      if (fs.existsSync(testDbPath)) {
-        fs.unlinkSync(testDbPath);
-      }
+      cleanupTestDatabase(testDbPath);
       if (fs.existsSync(testBackupDir)) {
         fs.rmSync(testBackupDir, { recursive: true, force: true });
       }

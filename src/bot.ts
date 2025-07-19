@@ -1,7 +1,17 @@
 import { Client, GatewayIntentBits, Partials } from 'discord.js';
 import { config } from './config';
-import { BotStatus } from './types';
 import { ActivityLoggingIntegration, createDefaultConfig } from './integration';
+
+/**
+ * Bot の動作状態
+ */
+interface BotStatus {
+  isRunning: boolean;
+  lastPromptTime?: Date;
+  lastSummaryTime?: Date;
+  scheduledJobs: string[];
+  timezone?: string;
+}
 import { 
   IClientFactory, 
   IConfigService, 

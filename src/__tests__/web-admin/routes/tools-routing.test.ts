@@ -9,11 +9,10 @@
 
 import request from 'supertest';
 import { AdminServer } from '../../../web-admin/server';
-import path from 'path';
-import fs from 'fs';
+import { getTestDbPath, cleanupTestDatabase } from '../../../utils/testDatabasePath';
 
 describe('/tools/パスのルーティングテスト', () => {
-  const testDbPath = path.join(__dirname, '../../../../test-tools-routing.db');
+  const testDbPath = getTestDbPath(__filename);
   let adminServer: AdminServer;
 
   beforeAll(async () => {
@@ -24,16 +23,12 @@ describe('/tools/パスのルーティングテスト', () => {
     process.env.SKIP_MIGRATIONS = 'true';
     
     // テストDBクリーンアップ
-    if (fs.existsSync(testDbPath)) {
-      fs.unlinkSync(testDbPath);
-    }
+    cleanupTestDatabase(testDbPath);
   });
 
   afterAll(async () => {
     // テストDBクリーンアップ
-    if (fs.existsSync(testDbPath)) {
-      fs.unlinkSync(testDbPath);
-    }
+    cleanupTestDatabase(testDbPath);
   });
 
   beforeEach(async () => {

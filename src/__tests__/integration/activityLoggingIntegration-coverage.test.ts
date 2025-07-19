@@ -5,8 +5,7 @@
 
 import { ActivityLoggingIntegration, createDefaultConfig } from '../../integration';
 import { Message } from 'discord.js';
-import * as fs from 'fs';
-import * as path from 'path';
+import { getTestDbPath, cleanupTestDatabase } from '../../utils/testDatabasePath';
 
 // Discordメッセージのモック（既存のものを拡張）
 class ExtendedMockMessage {
@@ -42,14 +41,8 @@ describe('ActivityLoggingIntegration Coverage Tests', () => {
 
   beforeAll(async () => {
     // テスト用データベース設定
-    testDbPath = './test-data/integration-coverage-test.db';
-    const testDir = path.dirname(testDbPath);
-    if (!fs.existsSync(testDir)) {
-      fs.mkdirSync(testDir, { recursive: true });
-    }
-    if (fs.existsSync(testDbPath)) {
-      fs.unlinkSync(testDbPath);
-    }
+    testDbPath = getTestDbPath(__filename);
+    cleanupTestDatabase(testDbPath);
 
     const config = createDefaultConfig(testDbPath, 'test-api-key');
     config.debugMode = true;

@@ -7,11 +7,12 @@ import request from 'supertest';
 import { IntegratedServer } from '../server';
 import path from 'path';
 import fs from 'fs';
+import { getTestDbPath, cleanupTestDatabase } from '../utils/testDatabasePath';
 
 describe('IntegratedServer Tests', () => {
   let server: IntegratedServer;
   let app: any;
-  const testDbPath = path.join(__dirname, '../../test-integrated.db');
+  const testDbPath = getTestDbPath(__filename);
 
   beforeAll(async () => {
     // テスト用の環境変数を設定
@@ -22,9 +23,7 @@ describe('IntegratedServer Tests', () => {
     process.env.PORT = '3003'; // テスト用ポート
     
     // テスト用データベースが存在する場合は削除
-    if (fs.existsSync(testDbPath)) {
-      fs.unlinkSync(testDbPath);
-    }
+    cleanupTestDatabase(testDbPath);
     
     // IntegratedServerを初期化
     server = new IntegratedServer(testDbPath);
@@ -36,9 +35,7 @@ describe('IntegratedServer Tests', () => {
 
   afterAll(async () => {
     // テスト用データベースをクリーンアップ
-    if (fs.existsSync(testDbPath)) {
-      fs.unlinkSync(testDbPath);
-    }
+    cleanupTestDatabase(testDbPath);
   });
 
   describe('Admin App Mount', () => {

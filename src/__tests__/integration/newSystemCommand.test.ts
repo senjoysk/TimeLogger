@@ -4,18 +4,15 @@
  */
 
 import { ActivityLoggingIntegration, createDefaultConfig } from '../../integration/activityLoggingIntegration';
-import fs from 'fs';
-import path from 'path';
+import { getTestDbPath, cleanupTestDatabase } from '../../utils/testDatabasePath';
 
 describe('新システム統合コマンド', () => {
   let integration: ActivityLoggingIntegration;
-  const testDbPath = path.join(__dirname, '../../../test_integration.db');
+  const testDbPath = getTestDbPath(__filename);
 
   beforeAll(async () => {
     // テスト用データベースファイルを削除（既存の場合）
-    if (fs.existsSync(testDbPath)) {
-      fs.unlinkSync(testDbPath);
-    }
+    cleanupTestDatabase(testDbPath);
 
     // 統合システムを初期化
     const config = createDefaultConfig(
@@ -33,9 +30,7 @@ describe('新システム統合コマンド', () => {
     }
     
     // テスト用データベースファイルを削除
-    if (fs.existsSync(testDbPath)) {
-      fs.unlinkSync(testDbPath);
-    }
+    cleanupTestDatabase(testDbPath);
   });
 
   test('detectGapsFromAnalysisメソッドが正しく実装されている', async () => {

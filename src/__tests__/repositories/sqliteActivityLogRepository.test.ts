@@ -11,19 +11,17 @@ import {
   ActivityLogError 
 } from '../../types/activityLog';
 import * as fs from 'fs';
-import * as path from 'path';
+import { getTestDbPath, cleanupTestDatabase } from '../../utils/testDatabasePath';
 
 describe('SqliteActivityLogRepository', () => {
   let repository: SqliteActivityLogRepository;
-  const testDbPath = path.join(__dirname, 'test-activity-logs.db');
+  const testDbPath = getTestDbPath(__filename);
   const mockUserId = 'test-user-123';
   const mockTimezone = 'Asia/Tokyo';
 
   beforeAll(async () => {
     // テスト用データベースが存在する場合は削除
-    if (fs.existsSync(testDbPath)) {
-      fs.unlinkSync(testDbPath);
-    }
+    cleanupTestDatabase(testDbPath);
   });
 
   beforeEach(async () => {
@@ -33,16 +31,12 @@ describe('SqliteActivityLogRepository', () => {
 
   afterEach(async () => {
     await repository.close();
-    if (fs.existsSync(testDbPath)) {
-      fs.unlinkSync(testDbPath);
-    }
+    cleanupTestDatabase(testDbPath);
   });
 
   afterAll(async () => {
     // クリーンアップ
-    if (fs.existsSync(testDbPath)) {
-      fs.unlinkSync(testDbPath);
-    }
+    cleanupTestDatabase(testDbPath);
   });
 
   describe('活動ログ機能', () => {

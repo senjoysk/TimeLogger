@@ -7,10 +7,9 @@ import { describe, test, expect, beforeEach, afterEach } from '@jest/globals';
 import { SqliteActivityLogRepository } from '../../repositories/sqliteActivityLogRepository';
 import { UserInfo, UserStats } from '../../repositories/interfaces';
 import { Database } from 'sqlite3';
-import * as path from 'path';
-import * as fs from 'fs';
 import { format } from 'date-fns-tz';
 import { ConfigService } from '../../services/configService';
+import { getTestDbPath, cleanupTestDatabase } from '../../utils/testDatabasePath';
 
 describe('Phase 3: ユーザー管理機能テスト', () => {
   let repository: SqliteActivityLogRepository;
@@ -19,10 +18,8 @@ describe('Phase 3: ユーザー管理機能テスト', () => {
 
   beforeEach(async () => {
     // テスト用データベースを作成
-    testDbPath = path.join(__dirname, 'test-user-management.db');
-    if (fs.existsSync(testDbPath)) {
-      fs.unlinkSync(testDbPath);
-    }
+    testDbPath = getTestDbPath(__filename);
+    cleanupTestDatabase(testDbPath);
     
     // ConfigServiceを初期化
     configService = new ConfigService();
@@ -33,9 +30,7 @@ describe('Phase 3: ユーザー管理機能テスト', () => {
 
   afterEach(async () => {
     await repository.close();
-    if (fs.existsSync(testDbPath)) {
-      fs.unlinkSync(testDbPath);
-    }
+    cleanupTestDatabase(testDbPath);
   });
 
   describe('🔴 Red Phase: getAllUsers メソッド', () => {

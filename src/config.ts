@@ -33,6 +33,7 @@ export const config = {
   // Google Gemini API設定
   gemini: {
     apiKey: process.env.GOOGLE_API_KEY || '',
+    model: process.env.GOOGLE_MODEL || 'gemini-2.0-flash-exp',
   },
   
   // データベース設定（統一パス管理）
