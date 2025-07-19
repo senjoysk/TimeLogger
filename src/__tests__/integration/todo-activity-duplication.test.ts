@@ -8,8 +8,9 @@ import { SqliteActivityLogRepository } from '../../repositories/sqliteActivityLo
 import { Message, ButtonInteraction } from 'discord.js';
 import { Todo } from '../../types/todo';
 import { MockGeminiService } from '../mocks/mockGeminiService';
-import fs from 'fs';
-import path from 'path';
+import { getTestDbPath, cleanupTestDatabase } from '../../utils/testDatabasePath';
+import * as fs from 'fs';
+import * as path from 'path';
 
 // Discordメッセージのモック
 class MockMessage {
@@ -109,16 +110,8 @@ describe('TODO・活動ログ重複登録防止テスト', () => {
     consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
 
     // テスト用データベースの準備
-    testDbPath = path.join(__dirname, '../../../test-data/duplication-test.db');
-    const testDir = path.dirname(testDbPath);
-    
-    if (!fs.existsSync(testDir)) {
-      fs.mkdirSync(testDir, { recursive: true });
-    }
-    
-    if (fs.existsSync(testDbPath)) {
-      fs.unlinkSync(testDbPath);
-    }
+    testDbPath = getTestDbPath(__filename);
+    cleanupTestDatabase(testDbPath);
 
     // 統合システムの初期化
     const config: ActivityLoggingConfig = {
@@ -141,7 +134,7 @@ describe('TODO・活動ログ重複登録防止テスト', () => {
       console.log('エラーの詳細:', JSON.stringify(error, null, 2));
       console.log('設定:', JSON.stringify(config, null, 2));
       console.log('データベースパス:', testDbPath);
-      console.log('テストディレクトリ存在:', fs.existsSync(testDir));
+      console.log('テストディレクトリ存在:', fs.existsSync(path.dirname(testDbPath)));
       
       // より詳細なエラー情報を提供
       if (error instanceof Error) {
@@ -190,9 +183,7 @@ describe('TODO・活動ログ重複登録防止テスト', () => {
     }
     
     // テストデータベースファイルを削除
-    if (fs.existsSync(testDbPath)) {
-      fs.unlinkSync(testDbPath);
-    }
+    cleanupTestDatabase(testDbPath);
   });
 
   test('通常メッセージはAI分類のみ実行され、活動ログに自動登録されない', async () => {

@@ -5,13 +5,12 @@
 
 import request from 'supertest';
 import { AdminServer } from '../../../web-admin/server';
-import path from 'path';
-import fs from 'fs';
+import { getTestDbPath, cleanupTestDatabase } from '../../../utils/testDatabasePath';
 
 describe('AdminServer Integration Tests', () => {
   let adminServer: AdminServer;
   let app: any;
-  const testDbPath = path.join(__dirname, '../../../../test-admin.db');
+  const testDbPath = getTestDbPath(__filename);
 
   beforeAll(async () => {
     // テスト用の環境変数を設定
@@ -21,9 +20,7 @@ describe('AdminServer Integration Tests', () => {
     process.env.SKIP_MIGRATIONS = 'true';
     
     // テスト用データベースが存在する場合は削除
-    if (fs.existsSync(testDbPath)) {
-      fs.unlinkSync(testDbPath);
-    }
+    cleanupTestDatabase(testDbPath);
     
     // AdminServerを初期化
     adminServer = new AdminServer(testDbPath, 3002);
@@ -36,9 +33,7 @@ describe('AdminServer Integration Tests', () => {
 
   afterAll(async () => {
     // テスト用データベースをクリーンアップ
-    if (fs.existsSync(testDbPath)) {
-      fs.unlinkSync(testDbPath);
-    }
+    cleanupTestDatabase(testDbPath);
   });
 
   describe('Basic Auth', () => {

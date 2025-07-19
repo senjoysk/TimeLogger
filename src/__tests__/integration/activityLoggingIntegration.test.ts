@@ -8,6 +8,7 @@ import { Message } from 'discord.js';
 import { DATABASE_PATHS } from '../../database/simplePathConfig';
 import * as fs from 'fs';
 import * as path from 'path';
+import { getTestDbPath, cleanupTestDatabase } from '../../utils/testDatabasePath';
 
 // Discordメッセージのモック
 class MockMessage {
@@ -33,20 +34,18 @@ class MockMessage {
 
 describe('活動記録システム統合テスト', () => {
   let integration: ActivityLoggingIntegration;
+  const testDbPath = getTestDbPath(__filename);
 
   beforeAll(async () => {
     // 環境変数を明示的に設定
     process.env.USER_TIMEZONE = 'Asia/Tokyo';
     
     // テストデータディレクトリ作成とDBファイル削除
-    const testDbPath = './test-data/integration-test.db';
     const testDir = path.dirname(testDbPath);
     if (!fs.existsSync(testDir)) {
       fs.mkdirSync(testDir, { recursive: true });
     }
-    if (fs.existsSync(testDbPath)) {
-      fs.unlinkSync(testDbPath);
-    }
+    cleanupTestDatabase(testDbPath);
     
     const config = createDefaultConfig(
       testDbPath, // テスト用一時ファイルDB
@@ -70,6 +69,9 @@ describe('活動記録システム統合テスト', () => {
     } catch (error) {
       console.error('❌ 統合システムシャットダウンエラー:', error);
     }
+    
+    // テストデータベースのクリーンアップ
+    cleanupTestDatabase(testDbPath);
     
     // 未完了の非同期処理を待つ
     await new Promise(resolve => setImmediate(resolve));

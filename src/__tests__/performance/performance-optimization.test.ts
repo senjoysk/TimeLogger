@@ -6,19 +6,16 @@
 import { SqliteActivityLogRepository } from '../../repositories/sqliteActivityLogRepository';
 import { CreateTodoRequest, TodoStatus } from '../../types/todo';
 import { performance } from 'perf_hooks';
-import * as fs from 'fs';
-import * as path from 'path';
+import { getTestDbPath, cleanupTestDatabase } from '../../utils/testDatabasePath';
 
 describe('パフォーマンス最適化テスト', () => {
   let repository: SqliteActivityLogRepository;
-  const TEST_DB_PATH = path.join(__dirname, '../../../test-performance.db');
+  const TEST_DB_PATH = getTestDbPath(__filename);
   const TEST_USER_ID = 'perf-test-user';
 
   beforeAll(async () => {
     // テスト用データベース初期化
-    if (fs.existsSync(TEST_DB_PATH)) {
-      fs.unlinkSync(TEST_DB_PATH);
-    }
+    cleanupTestDatabase(TEST_DB_PATH);
     
     repository = new SqliteActivityLogRepository(TEST_DB_PATH);
     await repository.initializeDatabase();
@@ -29,9 +26,7 @@ describe('パフォーマンス最適化テスト', () => {
 
   afterAll(async () => {
     await repository.close();
-    if (fs.existsSync(TEST_DB_PATH)) {
-      fs.unlinkSync(TEST_DB_PATH);
-    }
+    cleanupTestDatabase(TEST_DB_PATH);
   });
 
   /**

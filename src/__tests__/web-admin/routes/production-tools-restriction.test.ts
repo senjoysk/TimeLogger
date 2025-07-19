@@ -12,11 +12,10 @@
 
 import request from 'supertest';
 import { AdminServer } from '../../../web-admin/server';
-import path from 'path';
-import fs from 'fs';
+import { getTestDbPath, cleanupTestDatabase } from '../../../utils/testDatabasePath';
 
 describe('Production環境での開発ツールアクセス制限', () => {
-  const testDbPath = path.join(__dirname, '../../../../test-production-restriction.db');
+  const testDbPath = getTestDbPath(__filename);
   let adminServer: AdminServer;
   let originalNodeEnv: string | undefined;
 
@@ -30,9 +29,7 @@ describe('Production環境での開発ツールアクセス制限', () => {
     process.env.SKIP_MIGRATIONS = 'true';
     
     // テストDBクリーンアップ
-    if (fs.existsSync(testDbPath)) {
-      fs.unlinkSync(testDbPath);
-    }
+    cleanupTestDatabase(testDbPath);
   });
 
   afterAll(async () => {
@@ -44,9 +41,7 @@ describe('Production環境での開発ツールアクセス制限', () => {
     }
     
     // テストDBクリーンアップ
-    if (fs.existsSync(testDbPath)) {
-      fs.unlinkSync(testDbPath);
-    }
+    cleanupTestDatabase(testDbPath);
   });
 
   // adminServerの初期化は各テストグループ内で行う

@@ -4,8 +4,8 @@
  */
 
 import { SqliteActivityLogRepository } from '../../repositories/sqliteActivityLogRepository';
+import { getTestDbPath, cleanupTestDatabase } from '../../utils/testDatabasePath';
 import * as fs from 'fs';
-import * as path from 'path';
 
 describe('Database Initialization', () => {
   let testDbPath: string;
@@ -13,18 +13,10 @@ describe('Database Initialization', () => {
 
   beforeEach(() => {
     // テスト用データベースパスを設定
-    testDbPath = path.join(__dirname, '../../../test-data/database-test.db');
-    const testDir = path.dirname(testDbPath);
-    
-    // テストディレクトリ作成
-    if (!fs.existsSync(testDir)) {
-      fs.mkdirSync(testDir, { recursive: true });
-    }
+    testDbPath = getTestDbPath(__filename);
     
     // 既存のテストDBを削除
-    if (fs.existsSync(testDbPath)) {
-      fs.unlinkSync(testDbPath);
-    }
+    cleanupTestDatabase(testDbPath);
   });
 
   afterEach(async () => {
@@ -34,9 +26,7 @@ describe('Database Initialization', () => {
     }
     
     // テストDBファイルを削除
-    if (fs.existsSync(testDbPath)) {
-      fs.unlinkSync(testDbPath);
-    }
+    cleanupTestDatabase(testDbPath);
   });
 
   describe('データベース初期化', () => {

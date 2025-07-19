@@ -11,8 +11,7 @@ import { Message, ButtonInteraction, User, TextChannel } from 'discord.js';
 import { ActivityLog } from '../../types/activityLog';
 import { Todo } from '../../types/todo';
 import { MockGeminiService } from '../mocks/mockGeminiService';
-import fs from 'fs';
-import path from 'path';
+import { getTestDbPath, cleanupTestDatabase } from '../../utils/testDatabasePath';
 
 // E2Eテスト用のモッククラス
 class MockDiscordMessage {
@@ -88,18 +87,10 @@ describe('TODO機能 End-to-End テスト', () => {
 
   beforeAll(async () => {
     // テスト用データベースパスを設定
-    testDatabasePath = path.join(__dirname, '../../../test-data/e2e-test.db');
+    testDatabasePath = getTestDbPath(__filename);
     
-    // テスト用ディレクトリを作成
-    const testDir = path.dirname(testDatabasePath);
-    if (!fs.existsSync(testDir)) {
-      fs.mkdirSync(testDir, { recursive: true });
-    }
-
     // 既存のテストDBを削除
-    if (fs.existsSync(testDatabasePath)) {
-      fs.unlinkSync(testDatabasePath);
-    }
+    cleanupTestDatabase(testDatabasePath);
 
     config = {
       databasePath: testDatabasePath,
@@ -169,9 +160,7 @@ describe('TODO機能 End-to-End テスト', () => {
 
   afterAll(() => {
     // テストDB削除
-    if (fs.existsSync(testDatabasePath)) {
-      fs.unlinkSync(testDatabasePath);
-    }
+    cleanupTestDatabase(testDatabasePath);
   });
 
   describe('メッセージ分類からTODO作成までの統合フロー', () => {

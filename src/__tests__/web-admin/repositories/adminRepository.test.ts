@@ -6,18 +6,16 @@
 import { AdminRepository } from '../../../web-admin/repositories/adminRepository';
 import { SqliteActivityLogRepository } from '../../../repositories/sqliteActivityLogRepository';
 import { TodoTask, TodoStatus, TodoPriority } from '../../../types/todo';
-import path from 'path';
+import { getTestDbPath, cleanupTestDatabase } from '../../../utils/testDatabasePath';
 
 describe('AdminRepository TODO管理機能拡張', () => {
   let repository: AdminRepository;
   let sqliteRepo: SqliteActivityLogRepository;
-  const testDbPath = path.join(__dirname, '../../../../test-admin-todo.db');
+  const testDbPath = getTestDbPath(__filename);
 
   beforeEach(async () => {
     // テスト用DBファイルが存在する場合は削除して新規作成
-    if (require('fs').existsSync(testDbPath)) {
-      require('fs').unlinkSync(testDbPath);
-    }
+    cleanupTestDatabase(testDbPath);
     
     sqliteRepo = new SqliteActivityLogRepository(testDbPath);
     // 軽量なスキーマ初期化を確実に実行

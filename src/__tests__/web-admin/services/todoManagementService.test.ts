@@ -7,6 +7,7 @@ import { TodoManagementService } from '../../../web-admin/services/todoManagemen
 import { AdminRepository } from '../../../web-admin/repositories/adminRepository';
 import { SqliteActivityLogRepository } from '../../../repositories/sqliteActivityLogRepository';
 import { TodoTask, TodoStatus, TodoPriority } from '../../../types/todo';
+import { getTestDbPath } from '../../../utils/testDatabasePath';
 
 // モック
 jest.mock('../../../web-admin/repositories/adminRepository');
@@ -19,7 +20,8 @@ describe('TodoManagementService', () => {
   let mockRepository: jest.Mocked<AdminRepository>;
 
   beforeEach(async () => {
-    const mockSqliteInstance = new mockSqliteRepo('test-db.db') as jest.Mocked<SqliteActivityLogRepository>;
+    const testDbPath = getTestDbPath(__filename);
+    const mockSqliteInstance = new mockSqliteRepo(testDbPath) as jest.Mocked<SqliteActivityLogRepository>;
     // モックのメソッドを設定
     mockSqliteInstance.initializeDatabase = jest.fn().mockResolvedValue(undefined);
     
