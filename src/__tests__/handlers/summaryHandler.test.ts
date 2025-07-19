@@ -203,7 +203,18 @@ describe('SummaryHandler', () => {
       expect(mockMessage.replies.length).toBeGreaterThan(0);
       expect(mockMessage.replies[0]).toContain('サマリーコマンド');
       expect(mockMessage.replies[0]).toContain('refresh');
-      expect(mockMessage.replies[0]).toContain('キャッシュを無視して再分析');
+      expect(mockMessage.replies[0]).toContain('完了したTODO一覧');
+      expect(mockMessage.replies[0]).toContain('活動ログ一覧');
+    });
+
+    test('refreshコマンドが正しく処理される', async () => {
+      const mockMessage = new MockMessage('!summary refresh');
+      
+      await summaryHandler.handle(mockMessage as unknown as Message, '770478489203507241', ['refresh'], 'Asia/Tokyo');
+      
+      expect(mockMessage.replies.length).toBeGreaterThan(0);
+      expect(mockMessage.edits.length).toBeGreaterThan(0);
+      expect(mockMessage.edits[0]).toContain('活動サマリー');
     });
   });
 

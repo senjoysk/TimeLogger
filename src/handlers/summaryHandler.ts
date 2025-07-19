@@ -196,27 +196,6 @@ export class SummaryHandler implements ISummaryHandler {
   }
 
 
-  /**
-   * 信頼度に基づく絵文字を取得
-   */
-  private getConfidenceEmoji(confidence: number): string {
-    if (confidence >= 0.8) return '🎯'; // 高信頼度
-    if (confidence >= 0.6) return '✅'; // 中信頼度
-    if (confidence >= 0.4) return '📝'; // 低信頼度
-    return '❓'; // 不明
-  }
-
-  /**
-   * 生産性スコアに基づく絵文字を取得
-   */
-  private getProductivityEmoji(score: number): string {
-    if (score >= 90) return '🚀'; // 非常に高い
-    if (score >= 80) return '⭐'; // 高い
-    if (score >= 70) return '👍'; // 良い
-    if (score >= 60) return '📈'; // 普通
-    if (score >= 50) return '📊'; // やや低い
-    return '💤'; // 低い
-  }
 
   /**
    * 業務日をユーザーフレンドリーにフォーマット
@@ -242,33 +221,24 @@ export class SummaryHandler implements ISummaryHandler {
 
 **基本的な使い方:**
 \`!summary\` - 今日の活動サマリーを表示
-\`!summary integrated\` - TODO統合サマリーを表示
 \`!summary <日付>\` - 指定日のサマリーを表示
 \`!summary refresh\` - キャッシュを無視して再分析
 
-**サマリータイプ:**
-📝 **基本サマリー** - 活動ログのみの分析
-📊 **統合サマリー** - 活動ログ + TODO基本統計
-
 **使用例:**
-\`!summary\` → 今日の基本サマリー
-\`!summary integrated\` → 今日の統合サマリー
-\`!summary todo 2025-06-27\` → 6月27日の統合サマリー
+\`!summary\` → 今日のサマリー
+\`!summary refresh\` → 今日のサマリー（再分析）
 \`!summary yesterday\` → 昨日のサマリー
-
-**統合サマリーの内容:**
-📝 TODO概要（完了率・進行状況）
-⏱️ 活動時間の詳細分析
+\`!summary 2025-06-27\` → 6月27日のサマリー
+\`!summary -3\` → 3日前のサマリー
 
 **日付指定方法:**
 • \`YYYY-MM-DD\` 形式 (例: 2025-06-27)
 • \`today\` / \`今日\` / \`yesterday\` / \`昨日\`
 • 相対指定: \`-1\` (1日前), \`-2\` (2日前)
 
-**注意事項:**
-• 統合サマリーはTODO機能利用時により詳細になります
-• 初回分析は時間がかかる場合があります
-• 分析結果はキャッシュされ、高速表示されます`;
+**サマリー内容:**
+📝 完了したTODO一覧
+📊 活動ログ一覧`;
 
     await message.reply(helpMessage);
   }
@@ -289,6 +259,10 @@ export class SummaryHandler implements ISummaryHandler {
       return { type: 'help' };
     }
 
+    // リフレッシュ（キャッシュ無視）
+    if (firstArg === 'refresh') {
+      return { type: 'today', forceRefresh: true };
+    }
 
     // 今日
     if (firstArg === 'today' || firstArg === '今日') {
