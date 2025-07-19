@@ -42,6 +42,46 @@ export function createRoutes(adminService: AdminService, securityService: Securi
     router.get('/tools/summary-test', (req, res) => {
       res.render('summary-test', { title: 'サマリーテスト' });
     });
+  } else {
+    // Production環境では開発ツールのルートに対して明示的に404を返す
+    // 時刻シミュレーションAPI関連のルート
+    router.all('/tools/api/time-simulation/current', (_req, res) => {
+      res.status(404).json({ error: 'Not Found' });
+    });
+    router.all('/tools/api/time-simulation/set', (_req, res) => {
+      res.status(404).json({ error: 'Not Found' });
+    });
+    router.all('/tools/api/time-simulation/preset', (_req, res) => {
+      res.status(404).json({ error: 'Not Found' });
+    });
+    router.all('/tools/api/time-simulation/reset', (_req, res) => {
+      res.status(404).json({ error: 'Not Found' });
+    });
+    router.all('/tools/api/time-simulation/presets', (_req, res) => {
+      res.status(404).json({ error: 'Not Found' });
+    });
+    router.all('/tools/api/time-simulation/timezones', (_req, res) => {
+      res.status(404).json({ error: 'Not Found' });
+    });
+    
+    // サマリーテストAPI関連のルート
+    router.all('/tools/api/summary-test/status', (_req, res) => {
+      res.status(404).json({ error: 'Not Found' });
+    });
+    
+    // 開発ツール管理画面
+    router.get('/tools/time-simulation', (_req, res) => {
+      res.status(404).json({ 
+        error: 'Not Found',
+        message: 'このページは見つかりません'
+      });
+    });
+    router.get('/tools/summary-test', (_req, res) => {
+      res.status(404).json({ 
+        error: 'Not Found',
+        message: 'このページは見つかりません'
+      });
+    });
   }
 
   // ヘルスチェック
