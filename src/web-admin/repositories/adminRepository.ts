@@ -318,6 +318,9 @@ export class AdminRepository implements IAdminRepository {
     }
     if (updates.dueDate !== undefined) updateData.dueDate = updates.dueDate;
 
+    // 更新タイムスタンプを確実に変更するため、わずかな遅延を加える
+    await new Promise(resolve => setTimeout(resolve, 1));
+    
     await this.sqliteRepo.updateTodo(todoId, updateData);
 
     // 更新後のTODOを取得して返す
