@@ -6,8 +6,9 @@ import { Router, Request, Response } from 'express';
 import 'express-session';
 // Express Request型の拡張を読み込み
 import '../middleware/timezoneMiddleware';
+import { ITimezoneService } from '../../services/interfaces/ITimezoneService';
 
-export function createTimezoneRouter(): Router {
+export function createTimezoneRouter(timezoneService: ITimezoneService): Router {
   const router = Router();
 
   /**
@@ -26,7 +27,7 @@ export function createTimezoneRouter(): Router {
       }
 
       // タイムゾーンの妥当性を検証
-      if (!req.timezoneService?.validateTimezone(timezone)) {
+      if (!timezoneService.validateTimezone(timezone)) {
         return res.status(400).json({
           success: false,
           error: '無効なタイムゾーンです'
@@ -58,7 +59,7 @@ export function createTimezoneRouter(): Router {
     res.json({
       success: true,
       timezone: req.adminTimezone,
-      supportedTimezones: req.timezoneService?.getSupportedTimezones()
+      supportedTimezones: timezoneService.getSupportedTimezones()
     });
   });
 

@@ -32,6 +32,11 @@
                     <h1 class="text-xl font-semibold text-gray-900">TimeLogger Admin</h1>
                 </div>
                 <div class="flex items-center space-x-4">
+                    <!-- Timezone Selector -->
+                    <% if (typeof supportedTimezones !== 'undefined' && typeof adminTimezone !== 'undefined') { %>
+                        <%- include('partials/timezone-selector') %>
+                    <% } %>
+                    
                     <!-- Environment Badge -->
                     <span class="environment-badge environment-<%= environment.env %>">
                         <i class="fas fa-server mr-1"></i>

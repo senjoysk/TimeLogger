@@ -10,8 +10,10 @@ import { createDashboardRoutes } from './dashboard';
 import { createTodoRouter } from './todos';
 import { createTimeSimulationRouter } from './timeSimulation';
 import { createSummaryTestRouter } from './summaryTest';
+import { createTimezoneRouter } from './timezone';
+import { TimezoneService } from '../../services/timezoneService';
 
-export function createRoutes(adminService: AdminService, securityService: SecurityService, databasePath: string, bot?: any): Router {
+export function createRoutes(adminService: AdminService, securityService: SecurityService, databasePath: string, bot?: any, timezoneService?: TimezoneService): Router {
   const router = Router();
 
   // すべてのレスポンスにbasePathを追加するミドルウェア
@@ -28,6 +30,11 @@ export function createRoutes(adminService: AdminService, securityService: Securi
   
   // TODO管理
   router.use('/todos', createTodoRouter(databasePath));
+
+  // タイムゾーンAPI
+  if (timezoneService) {
+    router.use('/api', createTimezoneRouter(timezoneService));
+  }
 
   // 開発ツール（GitHub Issue #37）- Production環境では無効化
   if (securityService.getEnvironment().env !== 'production') {
