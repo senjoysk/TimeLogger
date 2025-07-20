@@ -127,14 +127,15 @@ export class TimeSimulationService {
   /**
    * 現在の設定時刻を取得
    */
-  getCurrentTime(): { year: number; month: number; day: number; hour: number; minute: number } {
+  getCurrentTime(): { year: number; month: number; day: number; hour: number; minute: number; timezone: string } {
     const currentTime = this.timeProvider.now();
     return {
       year: currentTime.getUTCFullYear(),
       month: currentTime.getUTCMonth() + 1,
       day: currentTime.getUTCDate(),
       hour: currentTime.getUTCHours(),
-      minute: currentTime.getUTCMinutes()
+      minute: currentTime.getUTCMinutes(),
+      timezone: 'UTC'
     };
   }
 
