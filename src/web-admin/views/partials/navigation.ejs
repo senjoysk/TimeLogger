@@ -23,10 +23,8 @@ const activePage = typeof localCurrentPage !== 'undefined' ? localCurrentPage : 
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div class="flex space-x-8">
 <%
-// ベースパスを正規化（/admin部分のみ）
-const adminBasePath = typeof basePath === 'string' ? 
-    (basePath.includes('/admin') ? basePath.split('/admin')[0] + '/admin' : '/admin') : 
-    '/admin';
+// ベースパスを取得（basePathが設定されている場合は使用、そうでなければ空文字列）
+const adminBasePath = typeof basePath === 'string' ? basePath : '';
 %>
             <a href="<%= adminBasePath %>/" 
                class="px-3 py-4 text-sm font-medium hover:bg-gray-700 transition-colors <%= activePage === 'dashboard' ? 'bg-gray-700' : '' %>">
@@ -52,11 +50,6 @@ const adminBasePath = typeof basePath === 'string' ?
                class="px-3 py-4 text-sm font-medium hover:bg-gray-700 transition-colors <%= activePage === 'summary-test' ? 'bg-gray-700' : '' %>">
                 <i class="fas fa-vial mr-2"></i>
                 サマリーテスト
-            </a>
-            <a href="<%= adminBasePath %>/health" 
-               class="px-3 py-4 text-sm font-medium hover:bg-gray-700 transition-colors <%= activePage === 'health' ? 'bg-gray-700' : '' %>">
-                <i class="fas fa-heartbeat mr-2"></i>
-                Health
             </a>
         </div>
     </div>

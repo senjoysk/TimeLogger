@@ -61,9 +61,6 @@
     "prod:status": "./scripts/production/status.sh",
     "prod:backup": "./scripts/production/backup.sh",
     "prod:secrets": "./scripts/production/secrets-update.sh",
-    "admin:dev": "NODE_ENV=development ts-node src/web-admin/start.ts",
-    "admin:start": "NODE_ENV=production node dist/web-admin/start.js",
-    "admin:staging": "NODE_ENV=staging ts-node src/web-admin/start.ts",
     "admin:build": "npm run build && npm run admin:copy-views",
     "admin:copy-views": "mkdir -p dist/web-admin/views && cp -r src/web-admin/views/* dist/web-admin/views/ && mkdir -p dist/web-admin/public && cp -r src/web-admin/public/* dist/web-admin/public/ 2>/dev/null || true"
   },

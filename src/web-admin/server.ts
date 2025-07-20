@@ -149,27 +149,5 @@ export class AdminServer {
     return this.app;
   }
 
-  public async start(): Promise<void> {
-    try {
-      // まずデータベースを初期化
-      await this.initializeDatabase();
-      
-      return new Promise((resolve, reject) => {
-        try {
-          this.app.listen(this.port, () => {
-            console.log(`Admin Web App started on port ${this.port}`);
-            console.log(`Environment: ${this.securityService.getEnvironment().env}`);
-            console.log(`Read-only mode: ${this.securityService.getEnvironment().isReadOnly}`);
-            resolve();
-          });
-        } catch (error) {
-          reject(error);
-        }
-      });
-    } catch (error) {
-      console.error('❌ Failed to initialize database before starting server:', error);
-      throw error;
-    }
-  }
 
 }

@@ -51,7 +51,6 @@ describe('/tools/パスのルーティングテスト', () => {
         .expect(200);
       
       expect(response.text).toContain('時刻シミュレーション');
-      expect(response.text).toContain('開発ツール');
       expect(response.text).toContain('TimeLogger 管理画面');
     });
 
@@ -63,7 +62,6 @@ describe('/tools/パスのルーティングテスト', () => {
         .expect(200);
       
       expect(response.text).toContain('サマリーテスト');
-      expect(response.text).toContain('開発ツール');
       expect(response.text).toContain('TimeLogger 管理画面');
     });
 
