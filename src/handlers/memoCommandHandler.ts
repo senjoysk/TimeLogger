@@ -8,6 +8,7 @@ import { IMemoRepository } from '../repositories/interfaces';
 import { ICommandHandler } from './interfaces';
 import { Memo, CreateMemoRequest, UpdateMemoRequest, MemoError } from '../types/memo';
 import { withErrorHandling } from '../utils/errorHandler';
+import { ITimezoneService } from '../services/interfaces/ITimezoneService';
 
 /**
  * メモコマンドの種類
@@ -29,7 +30,10 @@ export interface ParsedMemoCommand {
  * メモコマンドハンドラーの実装
  */
 export class MemoCommandHandler implements ICommandHandler {
-  constructor(private memoRepository: IMemoRepository) {}
+  constructor(
+    private memoRepository: IMemoRepository,
+    private timezoneService?: ITimezoneService
+  ) {}
 
   /**
    * メモコマンドを処理
@@ -37,7 +41,10 @@ export class MemoCommandHandler implements ICommandHandler {
   async handleCommand(message: Message, args: string[]): Promise<void> {
     try {
       const userId = message.author.id;
-      const timezone = 'Asia/Tokyo'; // デフォルトのタイムゾーン
+      // ユーザーのタイムゾーンを取得
+      const timezone = this.timezoneService 
+        ? await this.timezoneService.getUserTimezone(userId)
+        : this.getDefaultTimezone();
       
       console.log(`📝 メモコマンド処理開始: ${userId} ${args.join(' ')}`);
 
@@ -265,5 +272,12 @@ export class MemoCommandHandler implements ICommandHandler {
       default:
         return { type: 'help', error: `未知のコマンド「${command}」です。` };
     }
+  }
+
+  /**
+   * デフォルトタイムゾーンを取得
+   */
+  private getDefaultTimezone(): string {
+    return this.timezoneService?.getSystemTimezone() || 'Asia/Tokyo';
   }
 }

@@ -233,7 +233,7 @@ export class SummaryTestService {
    */
   private createTestSettings(request: SummaryTestRequest, targetUserCount?: number) {
     const testDateTime = request.testDateTime || this.timeProvider.now().toISOString();
-    const testTimezone = request.testTimezone || 'Asia/Tokyo';
+    const testTimezone = request.testTimezone || this.getDefaultTimezone();
     
     return {
       dryRun: request.dryRun,
@@ -281,5 +281,12 @@ export class SummaryTestService {
     
     // フォールバック：何もしない
     this.logger.info('サマリー送信をシミュレート', { userId, timezone });
+  }
+
+  /**
+   * デフォルトタイムゾーンを取得
+   */
+  private getDefaultTimezone(): string {
+    return 'Asia/Tokyo'; // Web管理機能ではシンプルなフォールバック
   }
 }

@@ -23,6 +23,7 @@ import {
   RecentActivityContext 
 } from '../types/realTimeAnalysis';
 import { ActivityLogMatchingService } from './activityLogMatchingService';
+import { ITimezoneService } from './interfaces/ITimezoneService';
 
 /**
  * 活動ログサービスインターフェース
@@ -151,7 +152,8 @@ export class ActivityLogService implements IActivityLogService {
   
   constructor(
     private repository: IActivityLogRepository,
-    geminiService: GeminiService
+    geminiService: GeminiService,
+    private timezoneService?: ITimezoneService
   ) {
     // リアルタイム分析システムを初期化
     this.realTimeAnalyzer = new RealTimeActivityAnalyzer(geminiService);
@@ -430,7 +432,7 @@ export class ActivityLogService implements IActivityLogService {
       const totalLogs = await this.repository.getLogCount(userId);
       
       // 今日のログ数
-      const today = this.calculateBusinessDate('Asia/Tokyo'); // デフォルトタイムゾーン
+      const today = this.calculateBusinessDate(this.getDefaultTimezone());
       const todayLogs = await this.repository.getLogCountByDate(userId, today.businessDate);
       
       // 過去7日のログ数（簡易計算）
@@ -738,5 +740,12 @@ export class ActivityLogService implements IActivityLogService {
       // エラー時は空のコンテキストを返す
       return { recentLogs: [] };
     }
+  }
+
+  /**
+   * デフォルトタイムゾーンを取得
+   */
+  private getDefaultTimezone(): string {
+    return this.timezoneService?.getSystemTimezone() || 'Asia/Tokyo';
   }
 }

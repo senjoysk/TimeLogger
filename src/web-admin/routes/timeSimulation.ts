@@ -29,7 +29,7 @@ export function createTimeSimulationRouter(): Router {
       const currentTime = timeSimulationService.getCurrentTime();
       const timezoneDisplays = await timeSimulationService.setTime({
         ...currentTime,
-        timezone: 'Asia/Tokyo'
+        timezone: req.adminTimezone || 'Asia/Tokyo'
       });
 
       res.json({

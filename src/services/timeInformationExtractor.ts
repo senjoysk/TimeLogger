@@ -16,6 +16,7 @@ import {
 } from '../types/realTimeAnalysis';
 import { TimePatternMatcher, TIME_EXPRESSION_NORMALIZER } from '../utils/timePatterns';
 import { GeminiService } from './geminiService';
+import { ITimezoneService } from './interfaces/ITimezoneService';
 
 /**
  * 時刻情報抽出クラス
@@ -23,7 +24,10 @@ import { GeminiService } from './geminiService';
 export class TimeInformationExtractor {
   private patternMatcher: TimePatternMatcher;
 
-  constructor(private geminiService: GeminiService) {
+  constructor(
+    private geminiService: GeminiService,
+    private timezoneService?: ITimezoneService
+  ) {
     this.patternMatcher = new TimePatternMatcher();
   }
 
@@ -495,7 +499,7 @@ JSON形式のみで回答してください。説明文は不要です。
         endTime: endTime || new Date().toISOString(),
         confidence: geminiResult.confidence || basicAnalysis.confidence || 0.5,
         method: geminiResult.method || basicAnalysis.method || 'inferred',
-        timezone: basicAnalysis.timezone || 'Asia/Tokyo'
+        timezone: basicAnalysis.timezone || this.getDefaultTimezone()
       },
       activities: [{
         content: geminiResult.structuredContent || '',
@@ -528,7 +532,7 @@ JSON形式のみで回答してください。説明文は不要です。
         endTime: basicAnalysis.endTime || now.toISOString(),
         confidence: basicAnalysis.confidence || 0.3,
         method: basicAnalysis.method || 'inferred',
-        timezone: basicAnalysis.timezone || 'Asia/Tokyo'
+        timezone: basicAnalysis.timezone || this.getDefaultTimezone()
       },
       activities: [{
         content: '活動記録',
@@ -651,5 +655,12 @@ JSON形式のみで回答してください。説明文は不要です。
     const start = new Date(startTime);
     const end = new Date(endTime);
     return Math.round((end.getTime() - start.getTime()) / (1000 * 60));
+  }
+
+  /**
+   * デフォルトタイムゾーンを取得
+   */
+  private getDefaultTimezone(): string {
+    return this.timezoneService?.getSystemTimezone() || 'Asia/Tokyo';
   }
 }

@@ -6,6 +6,7 @@
 import { Message } from 'discord.js';
 import { IActivityLogRepository } from '../repositories/activityLogRepository';
 import { ActivityLogError } from '../types/activityLog';
+import { ITimezoneService } from '../services/interfaces/ITimezoneService';
 
 /**
  * タイムゾーンコマンドの種類
@@ -56,7 +57,8 @@ export class TimezoneHandler implements ITimezoneHandler {
   private onTimezoneChanged?: (userId: string, oldTimezone: string | null, newTimezone: string) => Promise<void>;
 
   constructor(
-    private repository: IActivityLogRepository
+    private repository: IActivityLogRepository,
+    private timezoneService?: ITimezoneService
   ) {}
 
   /**
@@ -118,20 +120,19 @@ export class TimezoneHandler implements ITimezoneHandler {
    */
   private async showCurrentTimezone(message: Message, userId: string): Promise<void> {
     try {
-      // データベースからユーザーのタイムゾーンを取得
-      let currentTimezone = 'Asia/Tokyo'; // デフォルト
+      // TimezoneServiceを使用してユーザーのタイムゾーンを取得
+      let currentTimezone: string;
       
-      if ('getUserTimezone' in this.repository) {
-        const dbTimezone = await (this.repository as any).getUserTimezone(userId);
-        if (dbTimezone) {
-          currentTimezone = dbTimezone;
-        } else {
-          // 環境変数をフォールバックとして使用
-          currentTimezone = process.env.USER_TIMEZONE || 'Asia/Tokyo';
-        }
+      if (this.timezoneService) {
+        currentTimezone = await this.timezoneService.getUserTimezone(userId);
       } else {
-        // 古いリポジトリの場合は環境変数を使用
-        currentTimezone = process.env.USER_TIMEZONE || 'Asia/Tokyo';
+        // フォールバック: 従来の方法
+        if ('getUserTimezone' in this.repository) {
+          const dbTimezone = await (this.repository as any).getUserTimezone(userId);
+          currentTimezone = dbTimezone || this.getSystemDefaultTimezone();
+        } else {
+          currentTimezone = this.getSystemDefaultTimezone();
+        }
       }
       
       const now = new Date();
@@ -205,7 +206,9 @@ export class TimezoneHandler implements ITimezoneHandler {
       
       // タイムゾーンの妥当性を検証
       if (!this.isValidTimezone(timezone)) {
-        await message.reply(`❌ 無効なタイムゾーン: \`${timezone}\`\n\n**有効な形式:**\n• IANA タイムゾーン名（例: Asia/Tokyo, America/New_York）\n• \`!timezone search <都市名>\` で利用可能なタイムゾーンを検索してください。`);
+        const supportedTimezones = this.timezoneService?.getSupportedTimezones() || ['Asia/Tokyo', 'Asia/Kolkata', 'UTC'];
+        const exampleTimezone = supportedTimezones[0];
+        await message.reply(`❌ 無効なタイムゾーン: \`${timezone}\`\n\n**有効な形式:**\n• IANA タイムゾーン名（例: ${exampleTimezone}, UTC）\n• \`!timezone search <都市名>\` で利用可能なタイムゾーンを検索してください。`);
         return;
       }
 
@@ -353,7 +356,7 @@ Botの再起動は不要で、即座に全機能に反映されます。
       if (args.length < 2) {
         return { 
           type: 'set', 
-          error: 'タイムゾーンを指定してください。例: `!timezone set Asia/Tokyo`' 
+          error: `タイムゾーンを指定してください。例: \`!timezone set ${this.getExampleTimezone()}\``
         };
       }
 
@@ -441,12 +444,32 @@ Botの再起動は不要で、即座に全機能に反映されます。
    * タイムゾーンの妥当性を検証
    */
   private isValidTimezone(timezone: string): boolean {
+    // TimezoneServiceが利用可能な場合はそれを使用
+    if (this.timezoneService) {
+      return this.timezoneService.validateTimezone(timezone);
+    }
+    
+    // フォールバック: 直接検証
     try {
-      // 実際にDate.toLocaleStringでタイムゾーンを使用して検証
       new Date().toLocaleString('en-US', { timeZone: timezone });
       return true;
     } catch (error) {
       return false;
     }
+  }
+
+  /**
+   * システムデフォルトタイムゾーンを取得
+   */
+  private getSystemDefaultTimezone(): string {
+    return this.timezoneService?.getSystemTimezone() || 'Asia/Tokyo';
+  }
+
+  /**
+   * 例として使用するタイムゾーンを取得
+   */
+  private getExampleTimezone(): string {
+    const supportedTimezones = this.timezoneService?.getSupportedTimezones() || ['Asia/Tokyo'];
+    return supportedTimezones[0];
   }
 }

@@ -49,7 +49,7 @@ export function createSummaryTestRouter(bot: TaskLoggerBot | null): Router {
         testRequest.testDateTime = new Date().toISOString();
       }
       if (!testRequest.testTimezone) {
-        testRequest.testTimezone = 'Asia/Tokyo';
+        testRequest.testTimezone = req.adminTimezone || 'Asia/Tokyo';
       }
 
       const result = await summaryTestService.executeTest(testRequest);

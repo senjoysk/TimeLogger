@@ -21,15 +21,8 @@ export class TimeSimulationService {
   private readonly timeProvider: MockTimeProvider;
   private readonly supportedTimezones: string[] = [
     'Asia/Tokyo',
-    'America/New_York',
-    'Europe/London',
     'Asia/Kolkata',
-    'America/Los_Angeles',
-    'Europe/Paris',
-    'Asia/Shanghai',
-    'Australia/Sydney',
-    'America/Chicago',
-    'Europe/Berlin'
+    'UTC'
   ];
 
   constructor(timeProvider: MockTimeProvider) {
@@ -180,28 +173,28 @@ export class TimeSimulationService {
         description: '日次サマリーが送信される18:30',
         hour: 18,
         minute: 30,
-        defaultTimezone: 'Asia/Tokyo'
+        defaultTimezone: this.supportedTimezones[0]
       },
       {
         name: '朝の開始時刻',
         description: '一般的な業務開始時刻',
         hour: 9,
         minute: 0,
-        defaultTimezone: 'Asia/Tokyo'
+        defaultTimezone: this.supportedTimezones[0]
       },
       {
         name: '昼休み時刻',
         description: '昼休み開始時刻',
         hour: 12,
         minute: 0,
-        defaultTimezone: 'Asia/Tokyo'
+        defaultTimezone: this.supportedTimezones[0]
       },
       {
         name: '終業時刻',
         description: '一般的な業務終了時刻',
         hour: 18,
         minute: 0,
-        defaultTimezone: 'Asia/Tokyo'
+        defaultTimezone: this.supportedTimezones[0]
       },
       {
         name: 'NY営業開始',
@@ -290,11 +283,8 @@ export class TimeSimulationService {
   private getTimezoneDisplayName(timezone: string): string {
     const displayNames: { [key: string]: string } = {
       'Asia/Tokyo': '日本 (JST)',
-      'America/New_York': '米国東部 (EST/EDT)',
-      'Europe/London': '英国 (GMT/BST)',
       'Asia/Kolkata': 'インド (IST)',
-      'America/Los_Angeles': '米国西部 (PST/PDT)',
-      'Europe/Paris': 'フランス (CET/CEST)',
+      'UTC': '世界標準時 (UTC)',
       'Asia/Shanghai': '中国 (CST)',
       'Australia/Sydney': 'オーストラリア東部 (AEST/AEDT)',
       'America/Chicago': '米国中部 (CST/CDT)',

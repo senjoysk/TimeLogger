@@ -8,12 +8,18 @@ import { SearchFilters, PaginationOptions } from '../types/admin';
 import { SqliteActivityLogRepository } from '../../repositories/sqliteActivityLogRepository';
 import { TodoTask, TodoStatus, TodoPriority, Todo } from '../../types/todo';
 import { v4 as uuidv4 } from 'uuid';
+import { ITimezoneService } from '../../services/interfaces/ITimezoneService';
 
 export class AdminRepository implements IAdminRepository {
   private sqliteRepo: SqliteActivityLogRepository;
+  private timezoneService?: ITimezoneService;
 
-  constructor(sqliteRepo: SqliteActivityLogRepository) {
+  constructor(
+    sqliteRepo: SqliteActivityLogRepository,
+    timezoneService?: ITimezoneService
+  ) {
     this.sqliteRepo = sqliteRepo;
+    this.timezoneService = timezoneService;
   }
 
   /**
@@ -83,7 +89,7 @@ export class AdminRepository implements IAdminRepository {
         const users = await this.sqliteRepo.getAllUsers();
         let totalLogs = 0;
         for (const user of users) {
-          const logs = await this.sqliteRepo.getActivityRecords(user.userId, 'Asia/Tokyo');
+          const logs = await this.sqliteRepo.getActivityRecords(user.userId, this.getDefaultTimezone());
           totalLogs += logs.length;
         }
         return totalLogs;
@@ -173,7 +179,7 @@ export class AdminRepository implements IAdminRepository {
         const users = await this.sqliteRepo.getAllUsers();
         const allLogs = [];
         for (const user of users) {
-          const logs = await this.sqliteRepo.getActivityRecords(user.userId, 'Asia/Tokyo');
+          const logs = await this.sqliteRepo.getActivityRecords(user.userId, this.getDefaultTimezone());
           allLogs.push(...logs);
         }
         allLogs.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
@@ -209,7 +215,7 @@ export class AdminRepository implements IAdminRepository {
     switch (tableName) {
       case 'activity_logs':
         if (filters.userId && filters.userId !== 'all') {
-          const logs = await this.sqliteRepo.getActivityRecords(filters.userId, 'Asia/Tokyo');
+          const logs = await this.sqliteRepo.getActivityRecords(filters.userId, this.getDefaultTimezone());
           return this.paginate(logs, page, limit);
         }
         return this.getTableData(tableName, options);
@@ -459,5 +465,12 @@ export class AdminRepository implements IAdminRepository {
     } catch (error) {
       return [];
     }
+  }
+
+  /**
+   * デフォルトタイムゾーンを取得
+   */
+  private getDefaultTimezone(): string {
+    return this.timezoneService?.getSystemTimezone() || 'Asia/Tokyo';
   }
 }
