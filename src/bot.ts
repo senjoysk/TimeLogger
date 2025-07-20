@@ -24,6 +24,7 @@ import {
   ConsoleLogger 
 } from './factories';
 import { ConfigService } from './services/configService';
+import { ITimezoneService } from './services/interfaces/ITimezoneService';
 
 /**
  * DI依存関係オプション
@@ -33,6 +34,7 @@ export interface TaskLoggerBotDependencies {
   configService?: IConfigService;
   logger?: ILogger;
   timeProvider?: ITimeProvider;
+  timezoneService?: ITimezoneService;
 }
 
 /**
@@ -53,6 +55,7 @@ export class TaskLoggerBot {
   private readonly configService: IConfigService;
   private readonly logger: ILogger;
   private readonly timeProvider: ITimeProvider;
+  private timezoneService?: ITimezoneService;
 
   constructor(dependencies?: TaskLoggerBotDependencies) {
     // DI依存関係の初期化（デフォルトまたは注入された実装を使用）
@@ -60,6 +63,7 @@ export class TaskLoggerBot {
     this.configService = dependencies?.configService || new ConfigService();
     this.logger = dependencies?.logger || new ConsoleLogger();
     this.timeProvider = dependencies?.timeProvider || new RealTimeProvider();
+    this.timezoneService = dependencies?.timezoneService;
 
     // Discord クライアントの初期化（ファクトリー使用）
     this.client = this.clientFactory.create({
@@ -437,13 +441,8 @@ export class TaskLoggerBot {
     try {
       // デフォルトタイムゾーンを取得
       const repository = this.activityLoggingIntegration?.getRepository();
-      if (repository && repository.getUserSettings) {
-        const userSettings = await repository.getUserSettings(userId);
-        const timezone = userSettings?.timezone || 'Asia/Tokyo';
-        await this.sendDailySummaryToUser(userId, timezone);
-      } else {
-        await this.sendDailySummaryToUser(userId, 'Asia/Tokyo');
-      }
+      const timezone = await this.getUserTimezone(userId);
+      await this.sendDailySummaryToUser(userId, timezone);
     } catch (error) {
       console.error(`❌ ユーザー ${userId} への日次サマリー送信エラー:`, error);
     }
@@ -623,17 +622,30 @@ export class TaskLoggerBot {
    */
   private async getUserTimezone(userId: string): Promise<string> {
     try {
+      // TimezoneServiceが利用可能な場合は優先して使用
+      if (this.timezoneService) {
+        return await this.timezoneService.getUserTimezone(userId);
+      }
+      
+      // フォールバック: ActivityLoggingIntegrationから取得
       if (!this.activityLoggingIntegration) {
-        return 'Asia/Tokyo'; // デフォルト
+        return this.getSystemDefaultTimezone();
       }
       
       const users = await this.activityLoggingIntegration.getAllUserTimezones();
       const user = users.find(u => u.user_id === userId);
-      return user?.timezone || 'Asia/Tokyo';
+      return user?.timezone || this.getSystemDefaultTimezone();
     } catch (error) {
       console.error(`❌ ${userId} のタイムゾーン取得エラー:`, error);
-      return 'Asia/Tokyo';
+      return this.getSystemDefaultTimezone();
     }
+  }
+
+  /**
+   * システムデフォルトタイムゾーンを取得
+   */
+  private getSystemDefaultTimezone(): string {
+    return this.timezoneService?.getSystemTimezone() || 'Asia/Tokyo';
   }
 
   /**

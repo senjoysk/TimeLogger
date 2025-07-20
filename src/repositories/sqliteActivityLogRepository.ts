@@ -34,6 +34,7 @@ import {
 } from '../types/todo';
 import * as fs from 'fs';
 import * as path from 'path';
+import { ITimezoneService } from '../services/interfaces/ITimezoneService';
 
 /**
  * SQLite実装クラス
@@ -43,8 +44,10 @@ export class SqliteActivityLogRepository implements IActivityLogRepository, IApi
   private db: Database;
   private connected: boolean = false;
   private migrationManager: MigrationManager;
+  private timezoneService?: ITimezoneService;
 
-  constructor(databasePath: string) {
+  constructor(databasePath: string, timezoneService?: ITimezoneService) {
+    this.timezoneService = timezoneService;
     // データベースディレクトリの作成
     const dir = path.dirname(databasePath);
     if (!fs.existsSync(dir)) {
@@ -54,6 +57,14 @@ export class SqliteActivityLogRepository implements IActivityLogRepository, IApi
     this.db = new Database(databasePath);
     this.migrationManager = new MigrationManager(this.db, databasePath);
     // 初期化は非同期で行うため、ここでは実行しない
+  }
+
+  /**
+   * デフォルトタイムゾーンを取得
+   * TimezoneServiceが利用可能な場合はそれを使用し、そうでなければAsia/Tokyoにフォールバック
+   */
+  private getDefaultTimezone(): string {
+    return this.timezoneService?.getSystemTimezone() || 'Asia/Tokyo';
   }
 
   /**
@@ -944,7 +955,7 @@ export class SqliteActivityLogRepository implements IActivityLogRepository, IApi
   /**
    * 今日の統計を取得
    */
-  async getTodayStats(timezone: string = 'Asia/Tokyo'): Promise<{
+  async getTodayStats(timezone?: string): Promise<{
     totalCalls: number;
     totalInputTokens: number;
     totalOutputTokens: number;
@@ -1024,9 +1035,10 @@ export class SqliteActivityLogRepository implements IActivityLogRepository, IApi
   /**
    * コスト警告をチェック
    */
-  async checkCostAlerts(timezone: string = 'Asia/Tokyo'): Promise<{ message: string; level: 'warning' | 'critical' } | null> {
+  async checkCostAlerts(timezone?: string): Promise<{ message: string; level: 'warning' | 'critical' } | null> {
     try {
-      const stats = await this.getTodayStats(timezone);
+      const resolvedTimezone = timezone || this.getDefaultTimezone();
+      const stats = await this.getTodayStats(resolvedTimezone);
       
       // 警告しきい値（設定可能にすべきだが、現在は固定値）
       const warningCost = 1.0;  // $1.00
@@ -1239,7 +1251,7 @@ export class SqliteActivityLogRepository implements IActivityLogRepository, IApi
       console.log(`📍 タイムゾーン変更取得: ${rows.length}件 (since: ${since?.toISOString() || 'all'})`);
       return rows.map(row => ({
         user_id: row.user_id,
-        old_timezone: row.old_timezone || 'Asia/Tokyo',
+        old_timezone: row.old_timezone || this.getDefaultTimezone(),
         new_timezone: row.new_timezone,
         updated_at: row.updated_at
       }));
@@ -2108,7 +2120,7 @@ export class SqliteActivityLogRepository implements IActivityLogRepository, IApi
       await this.runQuery(`
         INSERT INTO user_settings (user_id, username, timezone, first_seen, last_seen, is_active, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-      `, [userId, username, 'Asia/Tokyo', now, now, true, now, now]);
+      `, [userId, username, this.getDefaultTimezone(), now, now, true, now, now]);
       
       console.log(`✅ 新規ユーザー登録完了: ${userId} (${username})`);
     } catch (error) {
@@ -2192,7 +2204,7 @@ export class SqliteActivityLogRepository implements IActivityLogRepository, IApi
       
       return rows.map(row => ({
         user_id: row.user_id,
-        timezone: row.timezone || 'Asia/Tokyo'
+        timezone: row.timezone || this.getDefaultTimezone()
       }));
     } catch (error) {
       console.error('❌ スケジューラー用タイムゾーン取得エラー:', error);
@@ -2356,20 +2368,21 @@ export class SqliteActivityLogRepository implements IActivityLogRepository, IApi
   private async getLogsCountByPeriod(userId: string, period: 'month' | 'week' | 'today'): Promise<number> {
     let dateCondition = '';
     const now = new Date();
+    const defaultTimezone = this.getDefaultTimezone();
     
     switch (period) {
       case 'today':
-        const today = format(now, 'yyyy-MM-dd', { timeZone: 'Asia/Tokyo' });
+        const today = format(now, 'yyyy-MM-dd', { timeZone: defaultTimezone });
         dateCondition = `AND business_date = '${today}'`;
         break;
       case 'week':
         const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-        const weekAgoStr = format(weekAgo, 'yyyy-MM-dd', { timeZone: 'Asia/Tokyo' });
+        const weekAgoStr = format(weekAgo, 'yyyy-MM-dd', { timeZone: defaultTimezone });
         dateCondition = `AND business_date >= '${weekAgoStr}'`;
         break;
       case 'month':
         const monthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-        const monthAgoStr = format(monthAgo, 'yyyy-MM-dd', { timeZone: 'Asia/Tokyo' });
+        const monthAgoStr = format(monthAgo, 'yyyy-MM-dd', { timeZone: defaultTimezone });
         dateCondition = `AND business_date >= '${monthAgoStr}'`;
         break;
     }

@@ -103,8 +103,16 @@ export class ActivityLoggingIntegration {
         this.repository = this.config.repository;
         console.log('✅ 外部リポジトリを使用（テスト用）');
       } else {
-        // 通常の場合は新しいリポジトリを作成
-        this.repository = new SqliteActivityLogRepository(this.config.databasePath);
+        // ConfigServiceとTimezoneServiceの事前初期化
+        this.configService = new ConfigService();
+        this.timezoneService = new TimezoneService(this.configService, undefined!); // 一時的なundefined
+        
+        // 通常の場合は新しいリポジトリを作成（TimezoneServiceを注入）
+        this.repository = new SqliteActivityLogRepository(this.config.databasePath, this.timezoneService);
+        
+        // TimezoneServiceにリポジトリを再設定
+        this.timezoneService = new TimezoneService(this.configService, this.repository);
+        
         // リポジトリの初期化を明示的に実行
         await this.repository.initializeDatabase();
         console.log('✅ データベース接続・初期化完了');
@@ -114,10 +122,12 @@ export class ActivityLoggingIntegration {
       this.memoRepository = new SqliteMemoRepository(this.config.databasePath);
       console.log('✅ メモリポジトリ初期化完了');
 
-      // ConfigServiceとTimezoneServiceの初期化
-      this.configService = new ConfigService();
-      this.timezoneService = new TimezoneService(this.configService, this.repository);
-      console.log('✅ ConfigService・TimezoneService初期化完了');
+      // 外部リポジトリの場合のConfigServiceとTimezoneService初期化
+      if (this.config.repository) {
+        this.configService = new ConfigService();
+        this.timezoneService = new TimezoneService(this.configService, this.repository);
+        console.log('✅ ConfigService・TimezoneService初期化完了（外部リポジトリ用）');
+      }
 
       // 2. サービス層の初期化
       // コスト管理機能の初期化（統合版）
