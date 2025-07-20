@@ -43,13 +43,12 @@ COPY src/database/newSchema.sql ./dist/database/
 
 # マイグレーションスクリプトをコピー（現在必要なファイルのみ）
 COPY scripts/production/safe-unified-migration.js ./scripts/production/
-COPY scripts/integrated-server.js ./scripts/
 
 # データディレクトリを作成
 RUN mkdir -p /app/data
 
 # スクリプトに実行権限を付与
-RUN chmod +x scripts/production/safe-unified-migration.js scripts/integrated-server.js
+RUN chmod +x scripts/production/safe-unified-migration.js
 
 # 非rootユーザーで実行
 USER node
