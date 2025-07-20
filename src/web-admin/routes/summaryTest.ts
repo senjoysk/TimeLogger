@@ -10,6 +10,8 @@ import { SummaryTestService } from '../services/summaryTestService';
 import { TaskLoggerBot } from '../../bot';
 import { MockTimeProvider, MockLogger } from '../../factories';
 import { SummaryTestRequest } from '../types/testing';
+// Express Request型の拡張を読み込み
+import '../middleware/timezoneMiddleware';
 
 /**
  * サマリーテスト用ルーター作成

@@ -20,6 +20,7 @@ import { TimeInformationExtractor } from './timeInformationExtractor';
 import { ActivityContentAnalyzer } from './activityContentAnalyzer';
 import { TimeConsistencyValidator } from './timeConsistencyValidator';
 import { GeminiService } from './geminiService';
+import { ITimezoneService } from './interfaces/ITimezoneService';
 
 /**
  * リアルタイム活動分析統合クラス
@@ -30,8 +31,11 @@ export class RealTimeActivityAnalyzer {
   private activityAnalyzer: ActivityContentAnalyzer;
   private consistencyValidator: TimeConsistencyValidator;
   
-  constructor(geminiService: GeminiService) {
-    this.timeExtractor = new TimeInformationExtractor(geminiService);
+  constructor(
+    geminiService: GeminiService,
+    private timezoneService?: ITimezoneService
+  ) {
+    this.timeExtractor = new TimeInformationExtractor(geminiService, timezoneService);
     this.activityAnalyzer = new ActivityContentAnalyzer(geminiService);
     this.consistencyValidator = new TimeConsistencyValidator();
   }
@@ -40,14 +44,14 @@ export class RealTimeActivityAnalyzer {
    * メイン分析メソッド - 完全な活動記録分析
    * 
    * @param input - ユーザーの活動記録入力
-   * @param timezone - タイムゾーン (デフォルト: Asia/Tokyo)
+   * @param timezone - タイムゾーン
    * @param inputTimestamp - 入力タイムスタンプ (デフォルト: 現在時刻)
    * @param context - 最近の活動コンテキスト
    * @returns 詳細な活動分析結果
    */
   async analyzeActivity(
     input: string,
-    timezone: string = 'Asia/Tokyo',
+    timezone?: string,
     inputTimestamp: Date = new Date(),
     context: RecentActivityContext = { recentLogs: [] }
   ): Promise<DetailedActivityAnalysis> {
@@ -72,7 +76,7 @@ export class RealTimeActivityAnalyzer {
       console.log('⏰ Phase 1: 時刻情報抽出開始...');
       const timeAnalysis = await this.timeExtractor.extractTimeInformation(
         input,
-        timezone,
+        timezone || this.getDefaultTimezone(),
         normalizedTimestamp,
         context
       );
@@ -100,7 +104,7 @@ export class RealTimeActivityAnalyzer {
         activities,
         validationResult,
         input,
-        timezone,
+        timezone || this.getDefaultTimezone(),
         normalizedTimestamp,
         analysisStartTime
       );
@@ -117,7 +121,7 @@ export class RealTimeActivityAnalyzer {
       // エラー時のフォールバック分析
       return this.createFallbackAnalysis(
         input,
-        timezone,
+        timezone || this.getDefaultTimezone(),
         normalizedTimestamp,
         error,
         analysisStartTime
@@ -252,7 +256,7 @@ export class RealTimeActivityAnalyzer {
       totalMinutes: 30,
       confidence: 0.3,
       method: TimeExtractionMethod.INFERRED,
-      timezone,
+      timezone: timezone || this.getDefaultTimezone(),
       extractedComponents: [],
       debugInfo: {
         detectedPatterns: [],
@@ -323,13 +327,13 @@ export class RealTimeActivityAnalyzer {
    */
   async quickTimeExtraction(
     input: string,
-    timezone: string = 'Asia/Tokyo',
+    timezone?: string,
     inputTimestamp: Date = new Date()
   ): Promise<TimeAnalysisResult> {
     try {
       return await this.timeExtractor.extractTimeInformation(
         input,
-        timezone,
+        timezone || this.getDefaultTimezone(),
         inputTimestamp,
         { recentLogs: [] }
       );
@@ -374,5 +378,12 @@ export class RealTimeActivityAnalyzer {
       console.error('分析結果妥当性チェックエラー:', error);
       return false;
     }
+  }
+
+  /**
+   * デフォルトタイムゾーンを取得
+   */
+  private getDefaultTimezone(): string {
+    return this.timezoneService?.getSystemTimezone() || 'Asia/Tokyo';
   }
 }

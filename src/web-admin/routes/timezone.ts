@@ -4,6 +4,8 @@
 
 import { Router, Request, Response } from 'express';
 import 'express-session';
+// Express Request型の拡張を読み込み
+import '../middleware/timezoneMiddleware';
 
 export function createTimezoneRouter(): Router {
   const router = Router();

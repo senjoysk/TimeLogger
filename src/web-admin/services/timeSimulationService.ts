@@ -197,18 +197,18 @@ export class TimeSimulationService {
         defaultTimezone: this.supportedTimezones[0]
       },
       {
-        name: 'NY営業開始',
-        description: 'ニューヨーク営業開始時刻',
+        name: 'インド営業開始',
+        description: 'インド営業開始時刻（Asia/Kolkata）',
         hour: 9,
         minute: 0,
-        defaultTimezone: 'America/New_York'
+        defaultTimezone: 'Asia/Kolkata'
       },
       {
-        name: 'ロンドン営業開始',
-        description: 'ロンドン営業開始時刻',
-        hour: 9,
-        minute: 0,
-        defaultTimezone: 'Europe/London'
+        name: 'UTC標準時刻',
+        description: 'UTC標準時刻での18:30',
+        hour: 18,
+        minute: 30,
+        defaultTimezone: 'UTC'
       }
     ];
   }

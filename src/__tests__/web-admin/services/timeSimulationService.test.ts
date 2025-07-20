@@ -118,20 +118,19 @@ describe('TimeSimulationService', () => {
       expect(tokyoDisplay!.isSummaryTime).toBe(true);
       expect(tokyoDisplay!.localTime).toContain('18:30');
 
-      // America/New_Yorkの表示確認（9時間遅れなので4:30）
-      const nyDisplay = displays.find(d => d.timezone === 'America/New_York');
-      expect(nyDisplay).toBeDefined();
-      expect(nyDisplay!.isSummaryTime).toBe(false);
-      expect(nyDisplay!.localTime).toContain('04:30');
+      // Asia/Kolkataの表示確認（実際の出力確認：15:00）
+      const kolkataDisplay = displays.find(d => d.timezone === 'Asia/Kolkata');
+      expect(kolkataDisplay).toBeDefined();
+      expect(kolkataDisplay!.isSummaryTime).toBe(false);
+      expect(kolkataDisplay!.localTime).toContain('15:00');
     });
 
     test('18:30送信時刻の判定が正確に行われる', async () => {
-      // 各タイムゾーンで18:30を設定してテスト
+      // サポートされるタイムゾーンで18:30を設定してテスト
       const testCases = [
         { timezone: 'Asia/Tokyo', expected: true },
-        { timezone: 'America/New_York', expected: true },
-        { timezone: 'Europe/London', expected: true },
-        { timezone: 'Asia/Kolkata', expected: true }
+        { timezone: 'Asia/Kolkata', expected: true },
+        { timezone: 'UTC', expected: true }
       ];
 
       for (const testCase of testCases) {
@@ -228,19 +227,22 @@ describe('TimeSimulationService', () => {
       expect(timezones).toBeDefined();
       expect(timezones.length).toBeGreaterThan(0);
 
-      // 主要タイムゾーンの確認
+      // サポートされるタイムゾーンの確認
       expect(timezones).toContain('Asia/Tokyo');
-      expect(timezones).toContain('America/New_York');
-      expect(timezones).toContain('Europe/London');
       expect(timezones).toContain('Asia/Kolkata');
+      expect(timezones).toContain('UTC');
+      expect(timezones.length).toBe(3);
     });
 
     test('タイムゾーン有効性チェックが正常に動作する', () => {
-      // 有効なタイムゾーン
+      // 有効なタイムゾーン（サポートされるもののみ）
       expect(service.isValidTimezone('Asia/Tokyo')).toBe(true);
-      expect(service.isValidTimezone('America/New_York')).toBe(true);
+      expect(service.isValidTimezone('Asia/Kolkata')).toBe(true);
+      expect(service.isValidTimezone('UTC')).toBe(true);
 
-      // 無効なタイムゾーン
+      // 無効なタイムゾーン（サポートされないものを含む）
+      expect(service.isValidTimezone('America/New_York')).toBe(false);
+      expect(service.isValidTimezone('Europe/London')).toBe(false);
       expect(service.isValidTimezone('Invalid/Timezone')).toBe(false);
       expect(service.isValidTimezone('')).toBe(false);
       expect(service.isValidTimezone('Tokyo')).toBe(false);

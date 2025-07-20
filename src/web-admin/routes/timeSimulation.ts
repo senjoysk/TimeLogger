@@ -9,6 +9,8 @@ import { Router, Request, Response } from 'express';
 import { TimeSimulationService } from '../services/timeSimulationService';
 import { MockTimeProvider } from '../../factories';
 import { TimeSetRequest, TimePreset } from '../types/testing';
+// Express Request型の拡張を読み込み
+import '../middleware/timezoneMiddleware';
 
 /**
  * 時刻シミュレーション用ルーター作成

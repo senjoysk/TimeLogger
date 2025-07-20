@@ -38,7 +38,7 @@ export class ApiCostMonitor {
   /**
    * 本日の統計を取得
    */
-  public async getTodayStats(timezone: string = 'Asia/Tokyo'): Promise<{
+  public async getTodayStats(timezone?: string): Promise<{
     totalCalls: number;
     analyzeActivityCalls: number;
     generateSummaryCalls: number;
@@ -61,7 +61,7 @@ export class ApiCostMonitor {
   /**
    * 月間推定コストを計算
    */
-  public async getMonthlyEstimate(timezone: string = 'Asia/Tokyo', workingDaysPerMonth: number = 20): Promise<{
+  public async getMonthlyEstimate(timezone?: string, workingDaysPerMonth: number = 20): Promise<{
     estimatedMonthlyCost: number;
     estimatedMonthlyCalls: number;
   }> {
@@ -76,14 +76,14 @@ export class ApiCostMonitor {
   /**
    * 日次レポートを生成
    */
-  public async generateDailyReport(timezone: string = 'Asia/Tokyo'): Promise<string> {
-    return await this.repository.generateDailyReport(timezone);
+  public async generateDailyReport(timezone?: string): Promise<string> {
+    return await this.repository.generateDailyReport(timezone || 'Asia/Tokyo');
   }
 
   /**
    * 警告レベルのチェック
    */
-  public async checkCostAlerts(timezone: string = 'Asia/Tokyo'): Promise<{ level: 'info' | 'warning' | 'critical', message: string } | null> {
+  public async checkCostAlerts(timezone?: string): Promise<{ level: 'info' | 'warning' | 'critical', message: string } | null> {
     const alert = await this.repository.checkCostAlerts(timezone);
     return alert ? { level: alert.level, message: alert.message } : null;
   }

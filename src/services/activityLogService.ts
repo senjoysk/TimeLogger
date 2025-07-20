@@ -156,7 +156,7 @@ export class ActivityLogService implements IActivityLogService {
     private timezoneService?: ITimezoneService
   ) {
     // リアルタイム分析システムを初期化
-    this.realTimeAnalyzer = new RealTimeActivityAnalyzer(geminiService);
+    this.realTimeAnalyzer = new RealTimeActivityAnalyzer(geminiService, timezoneService);
     
     // マッチングサービスを初期化
     const defaultStrategy = {
