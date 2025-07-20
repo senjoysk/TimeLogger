@@ -1,14 +1,15 @@
+import { config } from '../config';
+import { toZonedTime, fromZonedTime } from 'date-fns-tz';
+import { addMinutes, setMinutes, setHours, setSeconds, getHours, getMinutes, getDay, subMinutes, subDays, format } from 'date-fns';
+
 /**
  * 時間枠の定義
  */
-interface TimeSlot {
+export interface TimeSlot {
   start: Date;
   end: Date;
   label: string;
 }
-import { config } from '../config';
-import { toZonedTime, fromZonedTime } from 'date-fns-tz';
-import { addMinutes, setMinutes, setHours, setSeconds, getHours, getMinutes, getDay, subMinutes, subDays, format } from 'date-fns';
 
 /**
  * 指定されたタイムゾーンで現在時刻のタイムスロットを取得

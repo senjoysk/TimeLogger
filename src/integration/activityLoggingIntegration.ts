@@ -24,6 +24,9 @@ import { DailyReportSender } from '../services/dailyReportSender';
 import { ActivityLogError } from '../types/activityLog';
 import { GapHandler } from '../handlers/gapHandler';
 import { MessageSelectionHandler } from '../handlers/messageSelectionHandler';
+import { TimezoneService } from '../services/timezoneService';
+import { ITimezoneService } from '../services/interfaces/ITimezoneService';
+import { ConfigService } from '../services/configService';
 
 /**
  * 活動記録システム統合設定インターフェース
@@ -60,6 +63,8 @@ export class ActivityLoggingIntegration {
   private gapDetectionService!: GapDetectionService;
   private dynamicReportScheduler!: DynamicReportScheduler;
   private dailyReportSender!: DailyReportSender;
+  private configService!: ConfigService;
+  private timezoneService!: ITimezoneService;
 
   // ハンドラー層
   private editHandler!: EditCommandHandler;
@@ -108,6 +113,11 @@ export class ActivityLoggingIntegration {
       // メモリポジトリの初期化
       this.memoRepository = new SqliteMemoRepository(this.config.databasePath);
       console.log('✅ メモリポジトリ初期化完了');
+
+      // ConfigServiceとTimezoneServiceの初期化
+      this.configService = new ConfigService();
+      this.timezoneService = new TimezoneService(this.configService, this.repository);
+      console.log('✅ ConfigService・TimezoneService初期化完了');
 
       // 2. サービス層の初期化
       // コスト管理機能の初期化（統合版）
@@ -600,6 +610,13 @@ export class ActivityLoggingIntegration {
    */
   getRepository(): any {
     return this.repository;
+  }
+
+  /**
+   * TimezoneServiceインスタンスを取得
+   */
+  getTimezoneService(): ITimezoneService {
+    return this.timezoneService;
   }
 
   /**

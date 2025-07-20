@@ -1,0 +1,77 @@
+<!-- タイムゾーン選択コンポーネント -->
+<div class="timezone-selector">
+  <div class="flex items-center space-x-2">
+    <label for="timezone-select" class="text-sm font-medium text-gray-700">
+      表示タイムゾーン:
+    </label>
+    <select 
+      id="timezone-select" 
+      class="text-sm border-gray-300 rounded-md shadow-sm focus:border-blue-500 focus:ring-blue-500"
+      onchange="changeTimezone(this.value)"
+    >
+      <% 
+      function getTimezoneDisplay(timezone) {
+        const timezoneNames = {
+          'Asia/Tokyo': '日本 (JST)',
+          'Asia/Kolkata': 'インド (IST)', 
+          'UTC': '協定世界時 (UTC)'
+        };
+        return timezoneNames[timezone] || timezone;
+      }
+      
+      supportedTimezones.forEach(function(tz) { %>
+        <option value="<%= tz %>" <%= tz === adminTimezone ? 'selected' : '' %>>
+          <%= getTimezoneDisplay(tz) %>
+        </option>
+      <% }); %>
+    </select>
+    <span id="current-time" class="text-sm text-gray-600">
+      <!-- JavaScriptで更新 -->
+    </span>
+  </div>
+</div>
+
+<script>
+// タイムゾーン変更処理
+function changeTimezone(newTimezone) {
+  fetch('/admin/api/timezone', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ timezone: newTimezone })
+  })
+  .then(response => response.json())
+  .then(data => {
+    if (data.success) {
+      // ページを再読み込みして新しいタイムゾーンを反映
+      window.location.reload();
+    } else {
+      alert('タイムゾーンの変更に失敗しました: ' + data.error);
+    }
+  })
+  .catch(error => {
+    console.error('Error:', error);
+    alert('タイムゾーンの変更中にエラーが発生しました');
+  });
+}
+
+// 現在時刻の表示更新
+function updateCurrentTime() {
+  const now = new Date();
+  const timeString = now.toLocaleString('ja-JP', {
+    timeZone: '<%= adminTimezone %>',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit'
+  });
+  document.getElementById('current-time').textContent = timeString;
+}
+
+// 1秒ごとに現在時刻を更新
+setInterval(updateCurrentTime, 1000);
+updateCurrentTime(); // 初回実行
+</script>
