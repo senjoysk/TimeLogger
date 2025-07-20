@@ -43,11 +43,23 @@ export function createRoutes(adminService: AdminService, securityService: Securi
 
     // 開発ツール管理画面
     router.get('/tools/time-simulation', (req, res) => {
-      res.render('time-simulation', { title: '時刻シミュレーション' });
+      res.render('time-simulation', { 
+        title: '時刻シミュレーション',
+        environment: securityService.getEnvironment(),
+        basePath: req.baseUrl || '',
+        supportedTimezones: ['Asia/Tokyo', 'Asia/Kolkata', 'UTC'],
+        adminTimezone: 'Asia/Tokyo'
+      });
     });
 
     router.get('/tools/summary-test', (req, res) => {
-      res.render('summary-test', { title: 'サマリーテスト' });
+      res.render('summary-test', { 
+        title: 'サマリーテスト',
+        environment: securityService.getEnvironment(),
+        basePath: req.baseUrl || '',
+        supportedTimezones: ['Asia/Tokyo', 'Asia/Kolkata', 'UTC'],
+        adminTimezone: 'Asia/Tokyo'
+      });
     });
   } else {
     // Production環境では開発ツールのルートに対して明示的に404を返す

@@ -38,7 +38,10 @@ export function createDashboardRoutes(adminService: AdminService, securityServic
       res.render('dashboard', {
         title: 'TimeLogger Admin Dashboard',
         tables: tableSummaries,
-        environment
+        environment,
+        basePath: req.baseUrl || '',
+        supportedTimezones: ['Asia/Tokyo', 'Asia/Kolkata', 'UTC'],
+        adminTimezone: 'Asia/Tokyo'
       });
     } catch (error) {
       console.error('Dashboard error:', error);

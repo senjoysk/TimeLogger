@@ -1,0 +1,57 @@
+<%
+// 環境別背景色の設定
+let navBgColor;
+switch(environment.env) {
+    case 'production':
+        navBgColor = 'bg-red-800';
+        break;
+    case 'staging':
+        navBgColor = 'bg-blue-800';
+        break;
+    case 'development':
+    default:
+        navBgColor = 'bg-gray-800';
+        break;
+}
+
+// 現在ページの判定（localCurrentPageパラメータがある場合は使用、なければ空文字列）
+const activePage = typeof localCurrentPage !== 'undefined' ? localCurrentPage : '';
+%>
+
+<!-- 環境別背景色ナビゲーション -->
+<nav class="<%= navBgColor %> text-white">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div class="flex space-x-8">
+            <a href="<%= basePath %>/" 
+               class="px-3 py-4 text-sm font-medium hover:bg-gray-700 transition-colors <%= activePage === 'dashboard' ? 'bg-gray-700' : '' %>">
+                <i class="fas fa-home mr-2"></i>
+                Dashboard
+            </a>
+            <a href="<%= basePath %>/tables" 
+               class="px-3 py-4 text-sm font-medium hover:bg-gray-700 transition-colors <%= activePage === 'tables' ? 'bg-gray-700' : '' %>">
+                <i class="fas fa-table mr-2"></i>
+                Tables
+            </a>
+            <a href="<%= basePath %>/todos" 
+               class="px-3 py-4 text-sm font-medium hover:bg-gray-700 transition-colors <%= activePage === 'todos' ? 'bg-gray-700' : '' %>">
+                <i class="fas fa-check-square mr-2"></i>
+                TODO管理
+            </a>
+            <a href="<%= basePath %>/tools/time-simulation" 
+               class="px-3 py-4 text-sm font-medium hover:bg-gray-700 transition-colors <%= activePage === 'time-simulation' ? 'bg-gray-700' : '' %>">
+                <i class="fas fa-clock mr-2"></i>
+                時刻シミュレーション
+            </a>
+            <a href="<%= basePath %>/tools/summary-test" 
+               class="px-3 py-4 text-sm font-medium hover:bg-gray-700 transition-colors <%= activePage === 'summary-test' ? 'bg-gray-700' : '' %>">
+                <i class="fas fa-vial mr-2"></i>
+                サマリーテスト
+            </a>
+            <a href="<%= basePath %>/health" 
+               class="px-3 py-4 text-sm font-medium hover:bg-gray-700 transition-colors <%= activePage === 'health' ? 'bg-gray-700' : '' %>">
+                <i class="fas fa-heartbeat mr-2"></i>
+                Health
+            </a>
+        </div>
+    </div>
+</nav>

@@ -1,0 +1,31 @@
+<!-- 共通ヘッダー -->
+<header class="bg-white shadow-sm border-b">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div class="flex justify-between items-center h-16">
+            <div class="flex items-center">
+                <i class="fas fa-cog text-blue-600 text-xl mr-3"></i>
+                <h1 class="text-xl font-semibold text-gray-900">TimeLogger Admin</h1>
+            </div>
+            <div class="flex items-center space-x-4">
+                <!-- Timezone Selector -->
+                <% if (typeof supportedTimezones !== 'undefined' && typeof adminTimezone !== 'undefined') { %>
+                    <%- include('timezone-selector') %>
+                <% } %>
+                
+                <!-- Environment Badge -->
+                <span class="environment-badge environment-<%= environment.env %>">
+                    <i class="fas fa-server mr-1"></i>
+                    <%= environment.env.toUpperCase() %>
+                </span>
+                
+                <!-- Read-only indicator -->
+                <% if (environment.isReadOnly) { %>
+                    <span class="px-2 py-1 bg-gray-100 text-gray-600 text-xs font-medium rounded-full">
+                        <i class="fas fa-lock mr-1"></i>
+                        READ ONLY
+                    </span>
+                <% } %>
+            </div>
+        </div>
+    </div>
+</header>
