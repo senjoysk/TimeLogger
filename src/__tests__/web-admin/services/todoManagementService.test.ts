@@ -268,4 +268,207 @@ describe('TodoManagementService', () => {
       await expect(service.updateTodo(todoId, invalidUpdates)).rejects.toThrow('Invalid TODO status');
     });
   });
+
+  describe('🔴 Red Phase: TODO一括作成機能', () => {
+    test('連番付きTODOを一括作成できる', async () => {
+      // Arrange
+      const request = {
+        userId: 'test-user-123',
+        baseName: 'テストタスク',
+        count: 5,
+        priority: 'medium' as TodoPriority
+      };
+
+      const expectedTodos: TodoTask[] = [
+        {
+          id: 'todo-bulk-1',
+          userId: 'test-user-123',
+          title: 'テストタスク001',
+          description: '',
+          status: 'pending',
+          priority: 'medium',
+          createdAt: '2024-01-01T00:00:00.000Z',
+          updatedAt: '2024-01-01T00:00:00.000Z'
+        },
+        {
+          id: 'todo-bulk-2',
+          userId: 'test-user-123',
+          title: 'テストタスク002',
+          description: '',
+          status: 'pending',
+          priority: 'medium',
+          createdAt: '2024-01-01T00:00:00.000Z',
+          updatedAt: '2024-01-01T00:00:00.000Z'
+        },
+        {
+          id: 'todo-bulk-3',
+          userId: 'test-user-123',
+          title: 'テストタスク003',
+          description: '',
+          status: 'pending',
+          priority: 'medium',
+          createdAt: '2024-01-01T00:00:00.000Z',
+          updatedAt: '2024-01-01T00:00:00.000Z'
+        },
+        {
+          id: 'todo-bulk-4',
+          userId: 'test-user-123',
+          title: 'テストタスク004',
+          description: '',
+          status: 'pending',
+          priority: 'medium',
+          createdAt: '2024-01-01T00:00:00.000Z',
+          updatedAt: '2024-01-01T00:00:00.000Z'
+        },
+        {
+          id: 'todo-bulk-5',
+          userId: 'test-user-123',
+          title: 'テストタスク005',
+          description: '',
+          status: 'pending',
+          priority: 'medium',
+          createdAt: '2024-01-01T00:00:00.000Z',
+          updatedAt: '2024-01-01T00:00:00.000Z'
+        }
+      ];
+
+      mockRepository.bulkCreateTodos.mockResolvedValue(expectedTodos);
+
+      // Act
+      const result = await service.bulkCreateTodos(request);
+
+      // Assert
+      expect(result).toEqual(expectedTodos);
+      expect(result).toHaveLength(5);
+      expect(result[0].title).toBe('テストタスク001');
+      expect(result[4].title).toBe('テストタスク005');
+      expect(mockRepository.bulkCreateTodos).toHaveBeenCalledWith(expect.arrayContaining([
+        expect.objectContaining({
+          userId: 'test-user-123',
+          title: 'テストタスク001',
+          priority: 'medium'
+        }),
+        expect.objectContaining({
+          userId: 'test-user-123',
+          title: 'テストタスク002',
+          priority: 'medium'
+        }),
+        expect.objectContaining({
+          userId: 'test-user-123',
+          title: 'テストタスク003',
+          priority: 'medium'
+        }),
+        expect.objectContaining({
+          userId: 'test-user-123',
+          title: 'テストタスク004',
+          priority: 'medium'
+        }),
+        expect.objectContaining({
+          userId: 'test-user-123',
+          title: 'テストタスク005',
+          priority: 'medium'
+        })
+      ]));
+    });
+
+    test('一括作成時のバリデーション - userIdが空の場合エラー', async () => {
+      // Arrange
+      const request = {
+        userId: '',
+        baseName: 'テストタスク',
+        count: 5,
+        priority: 'medium' as TodoPriority
+      };
+
+      // Act & Assert
+      await expect(service.bulkCreateTodos(request)).rejects.toThrow('Invalid bulk create request: userId is required');
+    });
+
+    test('一括作成時のバリデーション - baseNameが空の場合エラー', async () => {
+      // Arrange
+      const request = {
+        userId: 'test-user-123',
+        baseName: '',
+        count: 5,
+        priority: 'medium' as TodoPriority
+      };
+
+      // Act & Assert
+      await expect(service.bulkCreateTodos(request)).rejects.toThrow('Invalid bulk create request: baseName is required');
+    });
+
+    test('一括作成時のバリデーション - countが0以下の場合エラー', async () => {
+      // Arrange
+      const request = {
+        userId: 'test-user-123',
+        baseName: 'テストタスク',
+        count: 0,
+        priority: 'medium' as TodoPriority
+      };
+
+      // Act & Assert
+      await expect(service.bulkCreateTodos(request)).rejects.toThrow('Invalid bulk create request: count must be between 1 and 100');
+    });
+
+    test('一括作成時のバリデーション - countが100を超える場合エラー', async () => {
+      // Arrange
+      const request = {
+        userId: 'test-user-123',
+        baseName: 'テストタスク',
+        count: 101,
+        priority: 'medium' as TodoPriority
+      };
+
+      // Act & Assert
+      await expect(service.bulkCreateTodos(request)).rejects.toThrow('Invalid bulk create request: count must be between 1 and 100');
+    });
+
+    test('一括作成時のバリデーション - 無効なpriorityの場合エラー', async () => {
+      // Arrange
+      const request = {
+        userId: 'test-user-123',
+        baseName: 'テストタスク',
+        count: 5,
+        priority: 'invalid' as TodoPriority
+      };
+
+      // Act & Assert
+      await expect(service.bulkCreateTodos(request)).rejects.toThrow('Invalid bulk create request: invalid priority');
+    });
+
+    test('10個以上のTODO作成時も正しく連番が生成される', async () => {
+      // Arrange
+      const request = {
+        userId: 'test-user-123',
+        baseName: 'タスク',
+        count: 15,
+        priority: 'low' as TodoPriority
+      };
+
+      const expectedTodos: TodoTask[] = [];
+      for (let i = 1; i <= 15; i++) {
+        expectedTodos.push({
+          id: `todo-bulk-${i}`,
+          userId: 'test-user-123',
+          title: `タスク${String(i).padStart(3, '0')}`,
+          description: '',
+          status: 'pending',
+          priority: 'low',
+          createdAt: '2024-01-01T00:00:00.000Z',
+          updatedAt: '2024-01-01T00:00:00.000Z'
+        });
+      }
+
+      mockRepository.bulkCreateTodos.mockResolvedValue(expectedTodos);
+
+      // Act
+      const result = await service.bulkCreateTodos(request);
+
+      // Assert
+      expect(result).toHaveLength(15);
+      expect(result[0].title).toBe('タスク001');
+      expect(result[9].title).toBe('タスク010');
+      expect(result[14].title).toBe('タスク015');
+    });
+  });
 });

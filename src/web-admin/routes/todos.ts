@@ -4,7 +4,7 @@
  */
 
 import { Router } from 'express';
-import { TodoManagementService } from '../services/todoManagementService';
+import { TodoManagementService, BulkCreateTodoRequest } from '../services/todoManagementService';
 import { SecurityService } from '../services/securityService';
 import { AdminRepository } from '../repositories/adminRepository';
 import { SqliteActivityLogRepository } from '../../repositories/sqliteActivityLogRepository';
@@ -322,6 +322,42 @@ router.post('/bulk/delete', async (req, res, next) => {
     const deletedCount = await todoService.bulkDelete(ids);
 
     res.json({ success: true, deletedCount });
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * TODO一括作成（開発環境限定）
+ */
+router.post('/bulk/create', async (req, res, next) => {
+  try {
+    if (!isInitialized) {
+      initializeServices(req.app.get('databasePath'));
+    }
+    const environment = securityService.getEnvironment();
+    
+    if (environment.isReadOnly) {
+      return res.status(403).json({ error: 'この機能は開発環境でのみ利用可能です' });
+    }
+
+    // production環境では機能を無効化
+    if (process.env.NODE_ENV === 'production') {
+      return res.status(403).json({ error: 'この機能は開発環境でのみ利用可能です' });
+    }
+
+    const { userId, baseName, count, priority } = req.body;
+
+    const request: BulkCreateTodoRequest = {
+      userId,
+      baseName,
+      count: parseInt(count, 10),
+      priority
+    };
+
+    const createdTodos = await todoService.bulkCreateTodos(request);
+
+    res.redirect(`${req.app.locals.basePath || ''}/todos`);
   } catch (error) {
     next(error);
   }

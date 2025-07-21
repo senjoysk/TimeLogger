@@ -33,6 +33,13 @@ export interface PaginationOptions {
   limit?: number;
 }
 
+export interface BulkCreateTodoRequest {
+  userId: string;
+  baseName: string;
+  count: number;
+  priority: TodoPriority;
+}
+
 export class TodoManagementService {
   constructor(private repository: AdminRepository) {}
 
@@ -108,5 +115,59 @@ export class TodoManagementService {
    */
   async getOverdueTodos(): Promise<TodoTask[]> {
     return await this.repository.getOverdueTodos();
+  }
+
+  /**
+   * 連番付きTODOを一括作成
+   * 開発環境でのテストデータ作成に使用
+   */
+  async bulkCreateTodos(request: BulkCreateTodoRequest): Promise<TodoTask[]> {
+    // バリデーション
+    this.validateBulkCreateRequest(request);
+
+    // 連番付きTODOデータを生成
+    const todoRequests: CreateTodoRequest[] = this.generateSequentialTodos(request);
+
+    return await this.repository.bulkCreateTodos(todoRequests);
+  }
+
+  /**
+   * 一括作成リクエストのバリデーション
+   */
+  private validateBulkCreateRequest(request: BulkCreateTodoRequest): void {
+    if (!request.userId || request.userId.trim().length === 0) {
+      throw new Error('Invalid bulk create request: userId is required');
+    }
+
+    if (!request.baseName || request.baseName.trim().length === 0) {
+      throw new Error('Invalid bulk create request: baseName is required');
+    }
+
+    if (!Number.isInteger(request.count) || request.count < 1 || request.count > 100) {
+      throw new Error('Invalid bulk create request: count must be between 1 and 100');
+    }
+
+    if (!['low', 'medium', 'high'].includes(request.priority)) {
+      throw new Error('Invalid bulk create request: invalid priority');
+    }
+  }
+
+  /**
+   * 連番付きTODOデータの生成
+   */
+  private generateSequentialTodos(request: BulkCreateTodoRequest): CreateTodoRequest[] {
+    const todoRequests: CreateTodoRequest[] = [];
+    
+    for (let i = 1; i <= request.count; i++) {
+      const sequentialNumber = String(i).padStart(3, '0');
+      todoRequests.push({
+        userId: request.userId,
+        title: `${request.baseName}${sequentialNumber}`,
+        description: '',
+        priority: request.priority
+      });
+    }
+    
+    return todoRequests;
   }
 }
