@@ -42,6 +42,7 @@ export function createTableRoutes(adminService: AdminService, securityService: S
       const userId = req.query.userId as string;
       const dateFrom = req.query.dateFrom as string;
       const dateTo = req.query.dateTo as string;
+      const status = req.query.status as string;
 
       if (!securityService.validateTableName(tableName)) {
         return res.status(400).render('error', {
@@ -54,14 +55,15 @@ export function createTableRoutes(adminService: AdminService, securityService: S
       const environment = securityService.getEnvironment();
       
       // 検索条件があれば検索、なければ通常取得
-      const hasFilters = userId || dateFrom || dateTo;
+      const hasFilters = userId || dateFrom || dateTo || status;
       let result;
 
       if (hasFilters) {
         const filters = {
           userId: userId ? securityService.sanitizeInput(userId) : undefined,
           dateFrom: dateFrom ? securityService.sanitizeInput(dateFrom) : undefined,
-          dateTo: dateTo ? securityService.sanitizeInput(dateTo) : undefined
+          dateTo: dateTo ? securityService.sanitizeInput(dateTo) : undefined,
+          status: status ? securityService.sanitizeInput(status) : undefined
         };
         result = await adminService.searchTableData(tableName, filters, { page, limit });
       } else {
@@ -84,7 +86,8 @@ export function createTableRoutes(adminService: AdminService, securityService: S
         filters: {
           userId: userId || '',
           dateFrom: dateFrom || '',
-          dateTo: dateTo || ''
+          dateTo: dateTo || '',
+          status: status || ''
         }
       });
     } catch (error) {

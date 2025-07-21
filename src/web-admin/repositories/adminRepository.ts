@@ -220,11 +220,35 @@ export class AdminRepository implements IAdminRepository {
         }
         return this.getTableData(tableName, options);
       case 'todo_tasks':
-        if (filters.userId && filters.userId !== 'all') {
-          const todos = await this.sqliteRepo.getTodosByUserId(filters.userId);
-          return this.paginate(todos, page, limit);
+        // todo_tasksの場合、userIdとstatusフィルターを適用
+        const allUsers = filters.userId && filters.userId !== 'all' 
+          ? [{ userId: filters.userId }]
+          : await this.sqliteRepo.getAllUsers();
+        
+        const allTodos = [];
+        for (const user of allUsers) {
+          const todos = await this.sqliteRepo.getTodosByUserId(user.userId);
+          // statusフィルターを適用
+          const filteredTodos = filters.status 
+            ? todos.filter(todo => todo.status === filters.status)
+            : todos;
+          allTodos.push(...filteredTodos);
         }
-        return this.getTableData(tableName, options);
+        
+        // 日付フィルターを適用
+        let finalTodos = allTodos;
+        if (filters.dateFrom || filters.dateTo) {
+          finalTodos = allTodos.filter(todo => {
+            const todoDate = new Date(todo.createdAt).toISOString().split('T')[0];
+            if (filters.dateFrom && todoDate < filters.dateFrom) return false;
+            if (filters.dateTo && todoDate > filters.dateTo) return false;
+            return true;
+          });
+        }
+        
+        // ソートとページネーション
+        finalTodos.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+        return this.paginate(finalTodos, page, limit);
       default:
         return this.getTableData(tableName, options);
     }

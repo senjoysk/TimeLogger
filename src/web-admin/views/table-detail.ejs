@@ -60,13 +60,25 @@
                         検索・フィルター
                     </h3>
                     <form method="GET" class="mt-4 space-y-4">
-                        <div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                        <div class="grid grid-cols-1 gap-4 sm:grid-cols-<%= tableName === 'todo_tasks' ? '4' : '3' %>">
                             <div>
                                 <label for="userId" class="block text-sm font-medium text-gray-700">ユーザーID</label>
                                 <input type="text" id="userId" name="userId" value="<%= filters.userId %>" 
                                        class="mt-1 focus:ring-blue-500 focus:border-blue-500 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md"
                                        placeholder="ユーザーIDで検索">
                             </div>
+                            <% if (tableName === 'todo_tasks') { %>
+                            <div>
+                                <label for="status" class="block text-sm font-medium text-gray-700">ステータス</label>
+                                <select id="status" name="status" 
+                                        class="mt-1 focus:ring-blue-500 focus:border-blue-500 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md">
+                                    <option value="">全て</option>
+                                    <option value="pending" <%= filters.status === 'pending' ? 'selected' : '' %>>pending</option>
+                                    <option value="in_progress" <%= filters.status === 'in_progress' ? 'selected' : '' %>>in_progress</option>
+                                    <option value="completed" <%= filters.status === 'completed' ? 'selected' : '' %>>completed</option>
+                                </select>
+                            </div>
+                            <% } %>
                             <div>
                                 <label for="dateFrom" class="block text-sm font-medium text-gray-700">開始日</label>
                                 <input type="date" id="dateFrom" name="dateFrom" value="<%= filters.dateFrom %>" 
@@ -123,9 +135,33 @@
                                 <tbody class="bg-white divide-y divide-gray-200">
                                     <% data.forEach((row, index) => { %>
                                         <tr class="<%= index % 2 === 0 ? 'bg-white' : 'bg-gray-50' %>">
-                                            <% Object.values(row).forEach(value => { %>
+                                            <% Object.entries(row).forEach(([key, value]) => { %>
                                                 <td class="px-6 py-4 whitespace-nowrap text-sm">
-                                                    <% if (typeof value === 'string' && value.length > 50) { %>
+                                                    <% if (key === 'status' && tableName === 'todo_tasks') { %>
+                                                        <% let statusClass = '';
+                                                           let statusIcon = '';
+                                                           switch(value) {
+                                                             case 'pending':
+                                                               statusClass = 'bg-yellow-100 text-yellow-800';
+                                                               statusIcon = 'clock';
+                                                               break;
+                                                             case 'in_progress':
+                                                               statusClass = 'bg-blue-100 text-blue-800';
+                                                               statusIcon = 'play';
+                                                               break;
+                                                             case 'completed':
+                                                               statusClass = 'bg-green-100 text-green-800';
+                                                               statusIcon = 'check';
+                                                               break;
+                                                             default:
+                                                               statusClass = 'bg-gray-100 text-gray-800';
+                                                               statusIcon = 'question';
+                                                           } %>
+                                                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium <%= statusClass %>">
+                                                            <i class="fas fa-<%= statusIcon %> mr-1"></i>
+                                                            <%= value %>
+                                                        </span>
+                                                    <% } else if (typeof value === 'string' && value.length > 50) { %>
                                                         <div class="text-gray-900 truncate max-w-xs" title="<%= value %>">
                                                             <%= value %>
                                                         </div>
@@ -162,13 +198,25 @@
             <% if (pagination.totalPages > 1) { %>
                 <div class="mt-6 flex items-center justify-between">
                     <div class="flex-1 flex justify-between sm:hidden">
+                        <% 
+                           // クエリパラメータ構築用関数
+                           function buildQueryParams(page) {
+                             const params = new URLSearchParams();
+                             params.set('page', page);
+                             if (filters.userId) params.set('userId', filters.userId);
+                             if (filters.dateFrom) params.set('dateFrom', filters.dateFrom);
+                             if (filters.dateTo) params.set('dateTo', filters.dateTo);
+                             if (filters.status) params.set('status', filters.status);
+                             return params.toString();
+                           }
+                        %>
                         <% if (pagination.hasPrev) { %>
-                            <a href="?page=<%= pagination.page - 1 %>" class="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
+                            <a href="?<%= buildQueryParams(pagination.page - 1) %>" class="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
                                 前へ
                             </a>
                         <% } %>
                         <% if (pagination.hasNext) { %>
-                            <a href="?page=<%= pagination.page + 1 %>" class="ml-3 relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
+                            <a href="?<%= buildQueryParams(pagination.page + 1) %>" class="ml-3 relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
                                 次へ
                             </a>
                         <% } %>
@@ -185,19 +233,19 @@
                         <div>
                             <nav class="relative z-0 inline-flex rounded-md shadow-sm -space-x-px">
                                 <% if (pagination.hasPrev) { %>
-                                    <a href="?page=<%= pagination.page - 1 %>" class="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50">
+                                    <a href="?<%= buildQueryParams(pagination.page - 1) %>" class="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50">
                                         <i class="fas fa-chevron-left"></i>
                                     </a>
                                 <% } %>
                                 
                                 <% for (let i = Math.max(1, pagination.page - 2); i <= Math.min(pagination.totalPages, pagination.page + 2); i++) { %>
-                                    <a href="?page=<%= i %>" class="relative inline-flex items-center px-4 py-2 border text-sm font-medium <%= i === pagination.page ? 'z-10 bg-blue-50 border-blue-500 text-blue-600' : 'border-gray-300 bg-white text-gray-500 hover:bg-gray-50' %>">
+                                    <a href="?<%= buildQueryParams(i) %>" class="relative inline-flex items-center px-4 py-2 border text-sm font-medium <%= i === pagination.page ? 'z-10 bg-blue-50 border-blue-500 text-blue-600' : 'border-gray-300 bg-white text-gray-500 hover:bg-gray-50' %>">
                                         <%= i %>
                                     </a>
                                 <% } %>
                                 
                                 <% if (pagination.hasNext) { %>
-                                    <a href="?page=<%= pagination.page + 1 %>" class="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50">
+                                    <a href="?<%= buildQueryParams(pagination.page + 1) %>" class="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50">
                                         <i class="fas fa-chevron-right"></i>
                                     </a>
                                 <% } %>
