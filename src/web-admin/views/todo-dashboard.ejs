@@ -361,7 +361,6 @@
                 if (!response.ok) {
                     // エラーレスポンスの内容を確認
                     const responseText = await response.text();
-                    console.error('サーバーレスポンス:', responseText);
                     
                     // HTMLレスポンスの場合（認証エラーなど）
                     if (responseText.includes('<!DOCTYPE')) {
@@ -387,7 +386,6 @@
                 }
             })
             .catch(error => {
-                console.error('ステータス更新エラー:', error);
                 alert(`ステータス更新に失敗しました: ${error.message}`);
                 updateButton.innerHTML = originalText;
                 updateButton.disabled = false;
@@ -397,7 +395,6 @@
         // 一括削除
         function bulkDelete() {
             const selectedIds = getSelectedTodoIds();
-            console.log('[DEBUG] 選択されたTODO IDs:', selectedIds);
 
             if (selectedIds.length === 0) {
                 alert('TODOを選択してください');
@@ -417,7 +414,6 @@
             const requestData = {
                 todoIds: selectedIds
             };
-            console.log('[DEBUG] 送信データ:', requestData);
             
             fetch('<%= basePath %>/todos/bulk/delete', {
                 method: 'POST',
@@ -430,7 +426,6 @@
                 if (!response.ok) {
                     // エラーレスポンスの内容を確認
                     const responseText = await response.text();
-                    console.error('サーバーレスポンス:', responseText);
                     
                     // HTMLレスポンスの場合（認証エラーなど）
                     if (responseText.includes('<!DOCTYPE')) {
@@ -456,7 +451,6 @@
                 }
             })
             .catch(error => {
-                console.error('一括削除エラー:', error);
                 alert(`削除に失敗しました: ${error.message}`);
                 deleteButton.innerHTML = originalText;
                 deleteButton.disabled = false;

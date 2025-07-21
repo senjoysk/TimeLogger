@@ -38,9 +38,6 @@ router.get('/', async (req, res, next) => {
     }
     const environment = securityService.getEnvironment();
     
-    // デバッグ情報を追加
-    console.log('[DEBUG] /todos route accessed');
-    console.log('[DEBUG] Environment:', environment);
     const userId = req.query.userId as string || 'all';
     const page = parseInt(req.query.page as string) || 1;
     const limit = parseInt(req.query.limit as string) || 20;
@@ -56,7 +53,6 @@ router.get('/', async (req, res, next) => {
         try {
           const userTodos = await todoService.getTodosByUser(user.userId, {}, { page, limit });
           todos.push(...userTodos);
-          console.log(`[DEBUG] User ${user.userId}: ${userTodos.length} todos found`);
         } catch (error) {
           console.error(`[ERROR] Failed to get todos for user ${user.userId}:`, error);
         }
@@ -64,25 +60,20 @@ router.get('/', async (req, res, next) => {
     } else if (userId !== 'all') {
       try {
         todos = await todoService.getTodosByUser(userId, {}, { page, limit });
-        console.log(`[DEBUG] User ${userId}: ${todos.length} todos found`);
       } catch (error) {
         console.error(`[ERROR] Failed to get todos for user ${userId}:`, error);
       }
     }
     
-    console.log(`[DEBUG] Total todos found: ${todos.length}`);
-
+    
     // 期限切れTODOの取得
     let overdueTodos: TodoTask[] = [];
     try {
       overdueTodos = await todoService.getOverdueTodos();
-      console.log(`[DEBUG] Overdue todos found: ${overdueTodos.length}`);
     } catch (error) {
       console.error(`[ERROR] Failed to get overdue todos:`, error);
     }
 
-    console.log(`[DEBUG] Rendering todo-dashboard with ${todos.length} todos and ${users.length} users`);
-    
     res.render('todo-dashboard', {
       title: 'TODO管理',
       environment,
@@ -101,7 +92,6 @@ router.get('/', async (req, res, next) => {
       }
     });
     
-    console.log(`[DEBUG] Response sent successfully`);
   } catch (error) {
     next(error);
   }
@@ -295,45 +285,29 @@ router.post('/bulk/status', async (req, res, next) => {
  */
 router.post('/bulk/delete', async (req, res, next) => {
   try {
-    console.log('[DEBUG] 一括削除リクエスト開始:', req.body);
-    
     if (!isInitialized) {
-      console.log('[DEBUG] サービス初期化中...');
       initializeServices(req.app.get('databasePath'));
     }
     const environment = securityService.getEnvironment();
-    console.log('[DEBUG] 環境設定:', environment);
     
     if (environment.isReadOnly) {
-      console.log('[DEBUG] 読み取り専用環境のため拒否');
       return res.status(403).json({ error: 'Production環境では削除操作は許可されていません' });
     }
 
     const { todoIds } = req.body;
-    console.log('[DEBUG] 削除対象ID:', todoIds);
     
     // バリデーション
     if (!todoIds || (!Array.isArray(todoIds) && typeof todoIds !== 'string')) {
-      console.log('[DEBUG] バリデーションエラー: todoIds無効');
       return res.status(400).json({ error: 'todoIds is required and must be an array or string' });
     }
     
     const ids = Array.isArray(todoIds) ? todoIds : [todoIds];
-    console.log('[DEBUG] 正規化後のID配列:', ids);
-    
-    console.log('[DEBUG] bulkDelete呼び出し前...');
     const deletedCount = await todoService.bulkDelete(ids);
-    console.log('[DEBUG] bulkDelete完了:', deletedCount);
 
-    const response = { success: true, deletedCount };
-    console.log('[DEBUG] レスポンス送信:', response);
-    res.json(response);
+    res.json({ success: true, deletedCount });
   } catch (error) {
-    console.error('[ERROR] 一括削除エラー:', error);
-    console.error('[ERROR] エラースタック:', error instanceof Error ? error.stack : 'No stack');
-    const errorResponse = { error: error instanceof Error ? error.message : '一括削除に失敗しました' };
-    console.log('[DEBUG] エラーレスポンス送信:', errorResponse);
-    res.status(500).json(errorResponse);
+    console.error('一括削除エラー:', error);
+    res.status(500).json({ error: error instanceof Error ? error.message : '一括削除に失敗しました' });
   }
 });
 
@@ -389,12 +363,10 @@ router.post('/:id/delete', async (req, res, next) => {
     }
 
     const todoId = req.params.id;
-    console.log('[DEBUG] 個別削除処理:', todoId);
     await todoService.deleteTodo(todoId);
 
     res.redirect(`${req.app.locals.basePath || ''}/todos`);
   } catch (error) {
-    console.error('[ERROR] 個別削除エラー:', error);
     next(error);
   }
 });
