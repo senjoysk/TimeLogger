@@ -39,7 +39,7 @@ export function createDashboardRoutes(adminService: AdminService, securityServic
         title: 'TimeLogger Admin Dashboard',
         tables: tableSummaries,
         environment,
-        basePath: req.baseUrl || '',
+        basePath: req.app.locals.basePath || '',
         supportedTimezones: ['Asia/Tokyo', 'Asia/Kolkata', 'UTC'],
         adminTimezone: 'Asia/Tokyo'
       });

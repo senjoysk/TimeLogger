@@ -46,7 +46,7 @@ export function createRoutes(adminService: AdminService, securityService: Securi
       res.render('time-simulation', { 
         title: '時刻シミュレーション',
         environment: securityService.getEnvironment(),
-        basePath: req.baseUrl || '',
+        basePath: req.app.locals.basePath || '',
         supportedTimezones: ['Asia/Tokyo', 'Asia/Kolkata', 'UTC'],
         adminTimezone: 'Asia/Tokyo'
       });
@@ -56,7 +56,7 @@ export function createRoutes(adminService: AdminService, securityService: Securi
       res.render('summary-test', { 
         title: 'サマリーテスト',
         environment: securityService.getEnvironment(),
-        basePath: req.baseUrl || '',
+        basePath: req.app.locals.basePath || '',
         supportedTimezones: ['Asia/Tokyo', 'Asia/Kolkata', 'UTC'],
         adminTimezone: 'Asia/Tokyo'
       });

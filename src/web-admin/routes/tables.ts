@@ -19,7 +19,7 @@ export function createTableRoutes(adminService: AdminService, securityService: S
         title: 'Table List',
         tables,
         environment,
-        basePath: req.baseUrl || '',
+        basePath: req.app.locals.basePath || '',
         supportedTimezones: ['Asia/Tokyo', 'Asia/Kolkata', 'UTC'],
         adminTimezone: 'Asia/Tokyo'
       });
@@ -78,7 +78,7 @@ export function createTableRoutes(adminService: AdminService, securityService: S
         count: result.count,
         pagination: result.pagination,
         environment,
-        basePath: req.baseUrl || '',
+        basePath: req.app.locals.basePath || '',
         supportedTimezones: ['Asia/Tokyo', 'Asia/Kolkata', 'UTC'],
         adminTimezone: 'Asia/Tokyo',
         filters: {

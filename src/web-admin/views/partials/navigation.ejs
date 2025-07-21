@@ -23,8 +23,8 @@ const activePage = typeof localCurrentPage !== 'undefined' ? localCurrentPage : 
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div class="flex space-x-8">
 <%
-// ベースパスを取得（basePathが設定されている場合は使用、そうでなければ空文字列）
-const adminBasePath = typeof basePath === 'string' ? basePath : '';
+// ベースパスを取得（res.locals.basePathを使用）
+const adminBasePath = basePath || '';
 %>
             <a href="<%= adminBasePath %>/" 
                class="px-3 py-4 text-sm font-medium hover:bg-gray-700 transition-colors <%= activePage === 'dashboard' ? 'bg-gray-700' : '' %>">
