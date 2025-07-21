@@ -145,7 +145,7 @@ describe('TodoManagementService', () => {
     });
   });
 
-  describe('🔴 Red Phase 2-2: TODO一括操作', () => {
+  describe('TODO一括操作機能のテスト（修正・追加）', () => {
     test('複数のTODOタスクのステータスを一括変更できる', async () => {
       // Arrange
       const todoIds = ['todo-1', 'todo-2', 'todo-3'];
@@ -174,6 +174,105 @@ describe('TodoManagementService', () => {
 
       // Assert
       expect(result).toBe(expectedCount);
+      expect(mockRepository.bulkDeleteTodos).toHaveBeenCalledWith(todoIds);
+    });
+
+    test('存在しないTODO IDが含まれていても正常動作する - 一括ステータス更新', async () => {
+      // Arrange
+      const todoIds = ['todo-1', 'todo-2', 'invalid-id'];
+      const newStatus: TodoStatus = 'in_progress';
+      const expectedCount = 2; // 存在する2件のみ更新
+
+      mockRepository.bulkUpdateTodoStatus.mockResolvedValue(expectedCount);
+
+      // Act
+      const result = await service.bulkUpdateStatus(todoIds, newStatus);
+
+      // Assert
+      expect(result).toBe(expectedCount);
+      expect(mockRepository.bulkUpdateTodoStatus).toHaveBeenCalledWith(todoIds, newStatus);
+    });
+
+    test('存在しないTODO IDが含まれていても正常動作する - 一括削除', async () => {
+      // Arrange
+      const todoIds = ['todo-1', 'todo-2', 'invalid-id'];
+      const expectedCount = 2; // 存在する2件のみ削除
+
+      mockRepository.bulkDeleteTodos.mockResolvedValue(expectedCount);
+
+      // Act
+      const result = await service.bulkDelete(todoIds);
+
+      // Assert
+      expect(result).toBe(expectedCount);
+      expect(mockRepository.bulkDeleteTodos).toHaveBeenCalledWith(todoIds);
+    });
+
+    test('空の配列で一括ステータス更新を実行すると0件更新される', async () => {
+      // Arrange
+      const todoIds: string[] = [];
+      const newStatus: TodoStatus = 'completed';
+      const expectedCount = 0;
+
+      mockRepository.bulkUpdateTodoStatus.mockResolvedValue(expectedCount);
+
+      // Act
+      const result = await service.bulkUpdateStatus(todoIds, newStatus);
+
+      // Assert
+      expect(result).toBe(expectedCount);
+      expect(mockRepository.bulkUpdateTodoStatus).toHaveBeenCalledWith(todoIds, newStatus);
+    });
+
+    test('空の配列で一括削除を実行すると0件削除される', async () => {
+      // Arrange
+      const todoIds: string[] = [];
+      const expectedCount = 0;
+
+      mockRepository.bulkDeleteTodos.mockResolvedValue(expectedCount);
+
+      // Act
+      const result = await service.bulkDelete(todoIds);
+
+      // Assert
+      expect(result).toBe(expectedCount);
+      expect(mockRepository.bulkDeleteTodos).toHaveBeenCalledWith(todoIds);
+    });
+
+    test('異なるステータスへの一括更新が正常動作する', async () => {
+      // Arrange
+      const todoIds = ['todo-1', 'todo-2'];
+      const statuses: TodoStatus[] = ['pending', 'in_progress', 'completed'];
+      
+      // 各ステータスについてテスト
+      for (const status of statuses) {
+        mockRepository.bulkUpdateTodoStatus.mockResolvedValue(todoIds.length);
+
+        // Act
+        const result = await service.bulkUpdateStatus(todoIds, status);
+
+        // Assert
+        expect(result).toBe(todoIds.length);
+        expect(mockRepository.bulkUpdateTodoStatus).toHaveBeenCalledWith(todoIds, status);
+      }
+    });
+
+    test('一括操作の統合テスト - ステータス更新後に削除', async () => {
+      // Arrange
+      const todoIds = ['todo-1', 'todo-2', 'todo-3'];
+      
+      // 最初にステータス更新
+      mockRepository.bulkUpdateTodoStatus.mockResolvedValue(3);
+      const updateResult = await service.bulkUpdateStatus(todoIds, 'completed');
+      expect(updateResult).toBe(3);
+
+      // 次に一括削除
+      mockRepository.bulkDeleteTodos.mockResolvedValue(3);
+      const deleteResult = await service.bulkDelete(todoIds);
+      expect(deleteResult).toBe(3);
+
+      // Assert
+      expect(mockRepository.bulkUpdateTodoStatus).toHaveBeenCalledWith(todoIds, 'completed');
       expect(mockRepository.bulkDeleteTodos).toHaveBeenCalledWith(todoIds);
     });
   });

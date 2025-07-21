@@ -193,6 +193,18 @@
             <!-- TODO List -->
             <div class="bg-white shadow overflow-hidden sm:rounded-md">
                 <% if (todos && todos.length > 0) { %>
+                    <!-- Table Header -->
+                    <div class="bg-gray-50 px-4 py-3 sm:px-6 border-b border-gray-200">
+                        <div class="flex items-center">
+                            <% if (!environment.isReadOnly) { %>
+                                <input type="checkbox" id="selectAll" class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded" onchange="toggleAllCheckboxes()">
+                                <label for="selectAll" class="ml-2 text-sm font-medium text-gray-700">全選択</label>
+                            <% } %>
+                            <span class="ml-auto text-sm text-gray-500">
+                                <%= todos.length %>件のTODO
+                            </span>
+                        </div>
+                    </div>
                     <ul class="divide-y divide-gray-200">
                         <% todos.forEach(todo => { %>
                             <li class="hover:bg-gray-50">
@@ -200,8 +212,10 @@
                                     <div class="flex items-center justify-between">
                                         <div class="flex-1">
                                             <div class="flex items-center">
-                                                <input type="checkbox" class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded" data-todo-id="<%= todo.id %>">
-                                                <div class="ml-3">
+                                                <% if (!environment.isReadOnly) { %>
+                                                    <input type="checkbox" class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded" data-todo-id="<%= todo.id %>">
+                                                <% } %>
+                                                <div class="<%= environment.isReadOnly ? '' : 'ml-3' %>">
                                                     <p class="text-sm font-medium text-gray-900">
                                                         <%= todo.title %>
                                                     </p>
@@ -327,6 +341,12 @@
                 return;
             }
 
+            // 処理中の表示
+            const updateButton = document.querySelector('[onclick="bulkUpdateStatus()"]');
+            const originalText = updateButton.innerHTML;
+            updateButton.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i>更新中...';
+            updateButton.disabled = true;
+
             fetch('<%= basePath %>/todos/bulk/status', {
                 method: 'POST',
                 headers: {
@@ -337,17 +357,47 @@
                     status: newStatus
                 })
             })
-            .then(response => response.json())
+            .then(async response => {
+                if (!response.ok) {
+                    // エラーレスポンスの内容を確認
+                    const responseText = await response.text();
+                    console.error('サーバーレスポンス:', responseText);
+                    
+                    // HTMLレスポンスの場合（認証エラーなど）
+                    if (responseText.includes('<!DOCTYPE')) {
+                        throw new Error('認証エラーまたはサーバーエラーが発生しました');
+                    }
+                    
+                    // JSONエラーレスポンスを試行
+                    try {
+                        const errorData = JSON.parse(responseText);
+                        throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+                    } catch (parseError) {
+                        throw new Error(`サーバーエラー (${response.status}): ${responseText.substring(0, 100)}`);
+                    }
+                }
+                return response.json();
+            })
             .then(data => {
                 if (data.success) {
+                    alert(`${data.updatedCount}件のTODOのステータスを更新しました`);
                     window.location.reload();
+                } else {
+                    throw new Error(data.error || 'ステータス更新に失敗しました');
                 }
+            })
+            .catch(error => {
+                console.error('ステータス更新エラー:', error);
+                alert(`ステータス更新に失敗しました: ${error.message}`);
+                updateButton.innerHTML = originalText;
+                updateButton.disabled = false;
             });
         }
 
         // 一括削除
         function bulkDelete() {
             const selectedIds = getSelectedTodoIds();
+            console.log('[DEBUG] 選択されたTODO IDs:', selectedIds);
 
             if (selectedIds.length === 0) {
                 alert('TODOを選択してください');
@@ -358,20 +408,58 @@
                 return;
             }
 
+            // 処理中の表示
+            const deleteButton = document.querySelector('[onclick="bulkDelete()"]');
+            const originalText = deleteButton.innerHTML;
+            deleteButton.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i>削除中...';
+            deleteButton.disabled = true;
+
+            const requestData = {
+                todoIds: selectedIds
+            };
+            console.log('[DEBUG] 送信データ:', requestData);
+            
             fetch('<%= basePath %>/todos/bulk/delete', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify({
-                    todoIds: selectedIds
-                })
+                body: JSON.stringify(requestData)
             })
-            .then(response => response.json())
+            .then(async response => {
+                if (!response.ok) {
+                    // エラーレスポンスの内容を確認
+                    const responseText = await response.text();
+                    console.error('サーバーレスポンス:', responseText);
+                    
+                    // HTMLレスポンスの場合（認証エラーなど）
+                    if (responseText.includes('<!DOCTYPE')) {
+                        throw new Error('認証エラーまたはサーバーエラーが発生しました');
+                    }
+                    
+                    // JSONエラーレスポンスを試行
+                    try {
+                        const errorData = JSON.parse(responseText);
+                        throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+                    } catch (parseError) {
+                        throw new Error(`サーバーエラー (${response.status}): ${responseText.substring(0, 100)}`);
+                    }
+                }
+                return response.json();
+            })
             .then(data => {
                 if (data.success) {
+                    alert(`${data.deletedCount}件のTODOを削除しました`);
                     window.location.reload();
+                } else {
+                    throw new Error(data.error || '削除に失敗しました');
                 }
+            })
+            .catch(error => {
+                console.error('一括削除エラー:', error);
+                alert(`削除に失敗しました: ${error.message}`);
+                deleteButton.innerHTML = originalText;
+                deleteButton.disabled = false;
             });
         }
 
@@ -380,6 +468,33 @@
             const checkboxes = document.querySelectorAll('input[data-todo-id]:checked');
             return Array.from(checkboxes).map(cb => cb.getAttribute('data-todo-id'));
         }
+
+        // 全選択/全解除機能
+        function toggleAllCheckboxes() {
+            const allCheckboxes = document.querySelectorAll('input[data-todo-id]');
+            const masterCheckbox = document.getElementById('selectAll');
+            
+            allCheckboxes.forEach(checkbox => {
+                checkbox.checked = masterCheckbox.checked;
+            });
+        }
+
+        // ページ読み込み時にイベントリスナーを設定
+        document.addEventListener('DOMContentLoaded', function() {
+            // 個別チェックボックスの状態変更時に全選択チェックボックスの状態を更新
+            const todoCheckboxes = document.querySelectorAll('input[data-todo-id]');
+            const masterCheckbox = document.getElementById('selectAll');
+            
+            if (masterCheckbox && todoCheckboxes.length > 0) {
+                todoCheckboxes.forEach(checkbox => {
+                    checkbox.addEventListener('change', function() {
+                        const checkedCount = document.querySelectorAll('input[data-todo-id]:checked').length;
+                        masterCheckbox.checked = checkedCount === todoCheckboxes.length;
+                        masterCheckbox.indeterminate = checkedCount > 0 && checkedCount < todoCheckboxes.length;
+                    });
+                });
+            }
+        });
     </script>
 </body>
 </html>

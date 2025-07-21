@@ -368,9 +368,12 @@ export class AdminRepository implements IAdminRepository {
    */
   async deleteTodoTask(todoId: string): Promise<boolean> {
     try {
+      console.log('[DEBUG] AdminRepository.deleteTodoTask呼び出し:', todoId);
       await this.sqliteRepo.deleteTodo(todoId);
+      console.log('[DEBUG] AdminRepository.deleteTodoTask成功:', todoId);
       return true;
     } catch (error) {
+      console.error('[ERROR] AdminRepository.deleteTodoTask失敗:', todoId, error);
       return false;
     }
   }
@@ -410,20 +413,25 @@ export class AdminRepository implements IAdminRepository {
    * 複数のTODOタスクを一括削除
    */
   async bulkDeleteTodos(todoIds: string[]): Promise<number> {
+    console.log('[DEBUG] AdminRepository.bulkDeleteTodos呼び出し:', todoIds);
     let deletedCount = 0;
     
     for (const todoId of todoIds) {
       try {
+        console.log('[DEBUG] 削除処理開始:', todoId);
         const success = await this.deleteTodoTask(todoId);
+        console.log('[DEBUG] 削除結果:', todoId, success);
         if (success) {
           deletedCount++;
         }
       } catch (error) {
+        console.error('[ERROR] 個別削除エラー:', todoId, error);
         // エラーが発生した場合はスキップ
         continue;
       }
     }
     
+    console.log('[DEBUG] AdminRepository.bulkDeleteTodos完了:', deletedCount);
     return deletedCount;
   }
 

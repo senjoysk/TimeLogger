@@ -96,7 +96,15 @@ export class TodoManagementService {
    * 複数のTODOタスクを一括削除
    */
   async bulkDelete(todoIds: string[]): Promise<number> {
-    return await this.repository.bulkDeleteTodos(todoIds);
+    console.log('[DEBUG] TodoManagementService.bulkDelete呼び出し:', todoIds);
+    try {
+      const result = await this.repository.bulkDeleteTodos(todoIds);
+      console.log('[DEBUG] TodoManagementService.bulkDelete完了:', result);
+      return result;
+    } catch (error) {
+      console.error('[ERROR] TodoManagementService.bulkDelete失敗:', error);
+      throw error;
+    }
   }
 
   /**
