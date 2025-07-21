@@ -9,6 +9,7 @@ import { SqliteActivityLogRepository } from '../../repositories/sqliteActivityLo
 import { TodoTask, TodoStatus, TodoPriority, Todo } from '../../types/todo';
 import { v4 as uuidv4 } from 'uuid';
 import { ITimezoneService } from '../../services/interfaces/ITimezoneService';
+import { CreateTodoRequest } from '../services/todoManagementService';
 
 export class AdminRepository implements IAdminRepository {
   private sqliteRepo: SqliteActivityLogRepository;
@@ -465,6 +466,34 @@ export class AdminRepository implements IAdminRepository {
     } catch (error) {
       return [];
     }
+  }
+
+  /**
+   * 複数のTODOタスクを一括作成
+   * トランザクションで実行し、一部失敗時もロールバックしない
+   */
+  async bulkCreateTodos(todoRequests: CreateTodoRequest[]): Promise<TodoTask[]> {
+    const createdTodos: TodoTask[] = [];
+    const errors: string[] = [];
+    
+    for (const request of todoRequests) {
+      try {
+        const createdTodo = await this.createTodoTask(request);
+        createdTodos.push(createdTodo);
+      } catch (error) {
+        // エラーログを記録（本番環境での問題特定用）
+        const errorMsg = error instanceof Error ? error.message : 'Unknown error';
+        errors.push(`Failed to create TODO "${request.title}": ${errorMsg}`);
+        continue;
+      }
+    }
+    
+    // エラーがあった場合のログ出力（デバッグ用）
+    if (errors.length > 0 && process.env.NODE_ENV !== 'production') {
+      console.warn(`[Bulk Create] ${errors.length} TODOs failed to create:`, errors);
+    }
+    
+    return createdTodos;
   }
 
   /**

@@ -90,6 +90,75 @@
                 </div>
             <% } %>
 
+            <!-- Bulk Create Section (Development Environment Only) -->
+            <% if (!environment.isReadOnly && environment.env !== 'production') { %>
+                <div class="mb-6 bg-yellow-50 border border-yellow-200 rounded-lg p-6">
+                    <div class="flex items-center mb-4">
+                        <div class="flex-shrink-0">
+                            <i class="fas fa-exclamation-triangle text-yellow-600 text-xl"></i>
+                        </div>
+                        <div class="ml-3">
+                            <h3 class="text-lg font-medium text-yellow-800">
+                                開発環境限定機能: TODO一括作成
+                            </h3>
+                            <p class="text-sm text-yellow-700 mt-1">
+                                テストデータ作成のため、連番付きTODOを一括で作成できます。
+                            </p>
+                        </div>
+                    </div>
+                    
+                    <form method="POST" action="<%= basePath %>/todos/bulk/create" class="space-y-4">
+                        <div class="grid grid-cols-1 gap-4 sm:grid-cols-4">
+                            <div>
+                                <label for="bulkUserId" class="block text-sm font-medium text-gray-700">ユーザー</label>
+                                <select id="bulkUserId" name="userId" required class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-yellow-500 focus:border-yellow-500 sm:text-sm rounded-md">
+                                    <option value="">ユーザーを選択...</option>
+                                    <% users.forEach(user => { %>
+                                        <option value="<%= user.userId %>"><%= user.userId %></option>
+                                    <% }) %>
+                                </select>
+                            </div>
+                            
+                            <div>
+                                <label for="bulkBaseName" class="block text-sm font-medium text-gray-700">ベースTODO名</label>
+                                <input type="text" id="bulkBaseName" name="baseName" required
+                                       placeholder="テストタスク"
+                                       class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-yellow-500 focus:border-yellow-500 sm:text-sm">
+                            </div>
+                            
+                            <div>
+                                <label for="bulkCount" class="block text-sm font-medium text-gray-700">作成個数</label>
+                                <input type="number" id="bulkCount" name="count" required min="1" max="100" value="5"
+                                       class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-yellow-500 focus:border-yellow-500 sm:text-sm">
+                                <p class="mt-1 text-xs text-gray-500">1〜100個まで</p>
+                            </div>
+                            
+                            <div>
+                                <label for="bulkPriority" class="block text-sm font-medium text-gray-700">優先度</label>
+                                <select id="bulkPriority" name="priority" required class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-yellow-500 focus:border-yellow-500 sm:text-sm rounded-md">
+                                    <option value="low">Low</option>
+                                    <option value="medium" selected>Medium</option>
+                                    <option value="high">High</option>
+                                </select>
+                            </div>
+                        </div>
+                        
+                        <div class="flex items-center justify-between">
+                            <div class="text-sm text-gray-600">
+                                <strong>例:</strong> ベース名「テストタスク」、個数5で作成すると<br>
+                                テストタスク001、テストタスク002、テストタスク003、テストタスク004、テストタスク005
+                            </div>
+                            <button type="submit" 
+                                    onclick="return confirm('指定した条件でTODOを一括作成しますか？')"
+                                    class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-yellow-600 hover:bg-yellow-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-yellow-500">
+                                <i class="fas fa-plus-square mr-2"></i>
+                                一括作成
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            <% } %>
+
             <!-- Filter Section -->
             <div class="mb-6 bg-white shadow sm:rounded-lg">
                 <div class="px-4 py-5 sm:p-6">
