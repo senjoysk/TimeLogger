@@ -885,7 +885,7 @@ export class TaskLoggerBot {
       const message = ACTIVITY_PROMPT_VALIDATION.MESSAGES.DEFAULT_PROMPT;
       
       await user.send({
-        content: `🤖 **活動記録のお時間です！**\n\n${message}\n\n💡 記録方法: このメッセージに返信するか、サーバーでメッセージを送信してください。`
+        content: `🤖 **活動記録のお時間です！**\n\n${message}`
       });
 
       this.logger.info(`📢 活動促し通知送信完了: ${userId} (${timezone})`);
