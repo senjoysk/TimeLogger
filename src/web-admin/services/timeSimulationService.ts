@@ -10,7 +10,6 @@ import {
   TimeSetRequest, 
   TimeSetResponse, 
   TimezoneDisplay, 
-  TimePreset,
   ApiResponse 
 } from '../types/testing';
 import { toZonedTime, format, fromZonedTime } from 'date-fns-tz';
@@ -107,24 +106,6 @@ export class TimeSimulationService {
     }
   }
 
-  /**
-   * プリセット時刻を適用する
-   */
-  async applyPreset(preset: TimePreset, timezone: string): Promise<TimeSetResponse> {
-    const today = new Date();
-    const request: TimeSetRequest = {
-      year: today.getFullYear(),
-      month: today.getMonth() + 1,
-      day: today.getDate(),
-      hour: preset.hour,
-      minute: preset.minute,
-      second: 0,
-      timezone,
-      enableProgression: true
-    };
-
-    return this.setTime(request);
-  }
 
   /**
    * 時刻設定をリセットして実時刻に戻す
@@ -205,55 +186,6 @@ export class TimeSimulationService {
     return this.calculateTimezoneDisplays(baseDate);
   }
 
-  /**
-   * プリセット時刻一覧を取得
-   */
-  getTimePresets(): TimePreset[] {
-    return [
-      {
-        name: 'サマリー送信時刻',
-        description: '日次サマリーが送信される18:30',
-        hour: 18,
-        minute: 30,
-        defaultTimezone: this.supportedTimezones[0]
-      },
-      {
-        name: '朝の開始時刻',
-        description: '一般的な業務開始時刻',
-        hour: 9,
-        minute: 0,
-        defaultTimezone: this.supportedTimezones[0]
-      },
-      {
-        name: '昼休み時刻',
-        description: '昼休み開始時刻',
-        hour: 12,
-        minute: 0,
-        defaultTimezone: this.supportedTimezones[0]
-      },
-      {
-        name: '終業時刻',
-        description: '一般的な業務終了時刻',
-        hour: 18,
-        minute: 0,
-        defaultTimezone: this.supportedTimezones[0]
-      },
-      {
-        name: 'インド営業開始',
-        description: 'インド営業開始時刻（Asia/Kolkata）',
-        hour: 9,
-        minute: 0,
-        defaultTimezone: 'Asia/Kolkata'
-      },
-      {
-        name: 'UTC標準時刻',
-        description: 'UTC標準時刻での18:30',
-        hour: 18,
-        minute: 30,
-        defaultTimezone: 'UTC'
-      }
-    ];
-  }
 
   /**
    * 入力検証

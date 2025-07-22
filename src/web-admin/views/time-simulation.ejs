@@ -203,26 +203,6 @@
             </form>
         </div>
 
-        <!-- プリセット時刻 -->
-        <div class="bg-white rounded-lg shadow-md p-6 mb-8">
-            <h2 class="text-xl font-semibold text-gray-900 mb-4">🎯 プリセット時刻</h2>
-            
-            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                <template x-for="preset in presets" :key="preset.name">
-                    <div class="border rounded-lg p-4 hover:bg-gray-50 cursor-pointer transition-colors"
-                         @click="applyPreset(preset)">
-                        <div class="font-medium text-gray-900" x-text="preset.name"></div>
-                        <div class="text-sm text-gray-600" x-text="preset.description"></div>
-                        <div class="mt-2">
-                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                                <span x-text="formatTime(preset.hour, preset.minute)"></span>
-                            </span>
-                            <span class="ml-2 text-xs text-gray-500" x-text="preset.defaultTimezone"></span>
-                        </div>
-                    </div>
-                </template>
-            </div>
-        </div>
 
         <!-- タイムゾーン表示 -->
         <div class="bg-white rounded-lg shadow-md p-6" x-show="timezoneDisplays.length > 0">
@@ -382,7 +362,6 @@
             return {
                 currentTime: null,
                 timezones: [],
-                presets: [],
                 timezoneDisplays: [],
                 isLoading: false,
                 timeForm: {
@@ -422,12 +401,6 @@
                             this.timezones = timezonesData.timezones;
                         }
 
-                        // プリセット一覧を取得
-                        const presetsResponse = await fetch(`${basePath}/tools/api/time-simulation/presets`);
-                        const presetsData = await presetsResponse.json();
-                        if (presetsData.success) {
-                            this.presets = presetsData.presets;
-                        }
                     } catch (error) {
                         this.showAlert('error', 'データの読み込みに失敗しました');
                     }
@@ -474,42 +447,6 @@
                     }
                 },
 
-                async applyPreset(preset) {
-                    if (this.isLoading) return;
-                    
-                    this.isLoading = true;
-                    try {
-                        const response = await fetch(`${basePath}/tools/api/time-simulation/preset`, {
-                            method: 'POST',
-                            headers: {
-                                'Content-Type': 'application/json'
-                            },
-                            body: JSON.stringify({
-                                presetName: preset.name,
-                                timezone: preset.defaultTimezone
-                            })
-                        });
-                        
-                        const data = await response.json();
-                        if (data.success) {
-                            this.timezoneDisplays = data.timezoneDisplays || [];
-                            await this.loadCurrentTime();
-                            this.showAlert('success', `プリセット「${preset.name}」が適用されました`);
-                            
-                            // フォームも更新
-                            this.timeForm.hour = preset.hour;
-                            this.timeForm.minute = preset.minute;
-                            this.timeForm.second = 0;
-                            this.timeForm.timezone = preset.defaultTimezone;
-                        } else {
-                            this.showAlert('error', data.error || 'プリセットの適用に失敗しました');
-                        }
-                    } catch (error) {
-                        this.showAlert('error', 'サーバーエラーが発生しました');
-                    } finally {
-                        this.isLoading = false;
-                    }
-                },
 
                 async resetTime() {
                     if (this.isLoading) return;

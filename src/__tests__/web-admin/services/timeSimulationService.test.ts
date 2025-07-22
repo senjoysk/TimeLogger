@@ -7,7 +7,6 @@
  * - MockTimeProviderの時刻設定制御
  * - タイムゾーン変換と表示
  * - 18:30送信時刻判定
- * - プリセット時刻機能
  * - エラーハンドリング
  */
 
@@ -158,36 +157,6 @@ describe('TimeSimulationService', () => {
     });
   });
 
-  describe('プリセット時刻機能テスト', () => {
-    test('プリセット時刻一覧が取得できる', () => {
-      // プリセット取得テスト
-      const presets = service.getTimePresets();
-
-      expect(presets).toBeDefined();
-      expect(presets.length).toBeGreaterThan(0);
-      
-      // 必須プリセットの確認
-      const summaryPreset = presets.find(p => p.name === 'サマリー送信時刻');
-      expect(summaryPreset).toBeDefined();
-      expect(summaryPreset!.hour).toBe(18);
-      expect(summaryPreset!.minute).toBe(30);
-    });
-
-    test('プリセット時刻で正しく設定される', async () => {
-      // プリセット適用テスト
-      const presets = service.getTimePresets();
-      const summaryPreset = presets.find(p => p.name === 'サマリー送信時刻')!;
-
-      const result = await service.applyPreset(summaryPreset, 'Asia/Tokyo');
-
-      expect(result.success).toBe(true);
-      expect(result.timezone).toBe('Asia/Tokyo');
-
-      // 設定された時刻がプリセットと一致することを確認
-      const tokyoDisplay = result.timezoneDisplays!.find(d => d.timezone === 'Asia/Tokyo');
-      expect(tokyoDisplay!.isSummaryTime).toBe(true);
-    });
-  });
 
   describe('現在時刻取得機能テスト', () => {
     test('設定された仮想時刻が取得できる', async () => {

@@ -8,7 +8,7 @@
 import { Router, Request, Response } from 'express';
 import { TimeSimulationService } from '../services/timeSimulationService';
 import { MockTimeProvider } from '../../factories';
-import { TimeSetRequest, TimePreset } from '../types/testing';
+import { TimeSetRequest } from '../types/testing';
 import { ActivityPromptRepository } from '../../repositories/activityPromptRepository';
 import { SqliteActivityLogRepository } from '../../repositories/sqliteActivityLogRepository';
 import { TaskLoggerBot } from '../../bot';
@@ -95,45 +95,6 @@ export function createTimeSimulationRouter(bot: TaskLoggerBot | null = null): Ro
     }
   });
 
-  /**
-   * プリセット時刻を適用
-   * POST /api/time-simulation/preset
-   */
-  router.post('/preset', async (req: Request, res: Response) => {
-    try {
-      const { presetName, timezone } = req.body;
-      
-      if (!presetName || !timezone) {
-        return res.status(400).json({
-          success: false,
-          error: 'プリセット名とタイムゾーンが必要です'
-        });
-      }
-
-      const presets = timeSimulationService.getTimePresets();
-      const preset = presets.find(p => p.name === presetName);
-      
-      if (!preset) {
-        return res.status(400).json({
-          success: false,
-          error: `プリセット「${presetName}」が見つかりません`
-        });
-      }
-
-      const result = await timeSimulationService.applyPreset(preset, timezone);
-      
-      if (result.success) {
-        res.json(result);
-      } else {
-        res.status(400).json(result);
-      }
-    } catch (error) {
-      res.status(500).json({
-        success: false,
-        error: error instanceof Error ? error.message : String(error)
-      });
-    }
-  });
 
   /**
    * 時刻設定をリセット（実時刻に戻す）
@@ -156,24 +117,6 @@ export function createTimeSimulationRouter(bot: TaskLoggerBot | null = null): Ro
     }
   });
 
-  /**
-   * プリセット時刻一覧を取得
-   * GET /api/time-simulation/presets
-   */
-  router.get('/presets', async (req: Request, res: Response) => {
-    try {
-      const presets = timeSimulationService.getTimePresets();
-      res.json({
-        success: true,
-        presets
-      });
-    } catch (error) {
-      res.status(500).json({
-        success: false,
-        error: error instanceof Error ? error.message : String(error)
-      });
-    }
-  });
 
   /**
    * サポートされるタイムゾーン一覧を取得
