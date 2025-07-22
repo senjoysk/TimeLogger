@@ -21,24 +21,25 @@ describe('🔴 Red Phase: ActivityPromptRepository', () => {
     // インメモリデータベースでテスト環境構築
     db = new Database(':memory:');
     
-    // マイグレーション実行
+    // マイグレーション実行（user_settingsテーブルに変更）
     const migrationSql = `
-      CREATE TABLE activity_prompt_settings (
+      CREATE TABLE user_settings (
         user_id TEXT PRIMARY KEY,
-        is_enabled BOOLEAN NOT NULL DEFAULT FALSE,
-        start_hour INTEGER NOT NULL DEFAULT 8,
-        start_minute INTEGER NOT NULL DEFAULT 30,
-        end_hour INTEGER NOT NULL DEFAULT 18,
-        end_minute INTEGER NOT NULL DEFAULT 0,
+        timezone TEXT NOT NULL DEFAULT 'Asia/Tokyo',
+        prompt_enabled BOOLEAN DEFAULT FALSE,
+        prompt_start_hour INTEGER DEFAULT 8,
+        prompt_start_minute INTEGER DEFAULT 30,
+        prompt_end_hour INTEGER DEFAULT 18,
+        prompt_end_minute INTEGER DEFAULT 0,
         created_at TEXT NOT NULL DEFAULT (datetime('now', 'utc')),
         updated_at TEXT NOT NULL DEFAULT (datetime('now', 'utc')),
-        CHECK (start_minute IN (0, 30)),
-        CHECK (end_minute IN (0, 30)),
-        CHECK (start_hour >= 0 AND start_hour <= 23),
-        CHECK (end_hour >= 0 AND end_hour <= 23),
+        CHECK (prompt_start_minute IN (0, 30)),
+        CHECK (prompt_end_minute IN (0, 30)),
+        CHECK (prompt_start_hour >= 0 AND prompt_start_hour <= 23),
+        CHECK (prompt_end_hour >= 0 AND prompt_end_hour <= 23),
         CHECK (
-          (end_hour > start_hour) OR 
-          (end_hour = start_hour AND end_minute > start_minute)
+          (prompt_end_hour > prompt_start_hour) OR 
+          (prompt_end_hour = prompt_start_hour AND prompt_end_minute > prompt_start_minute)
         )
       );
     `;
@@ -122,12 +123,23 @@ describe('🔴 Red Phase: ActivityPromptRepository', () => {
       expect(settings!.endHour).toBe(16);
     });
 
-    test('設定を削除できる', async () => {
-      await repository.createSettings({ userId: testUserId });
+    test('設定を削除できる（デフォルト値にリセット）', async () => {
+      await repository.createSettings({ 
+        userId: testUserId,
+        isEnabled: true,
+        startHour: 10,
+        endHour: 16
+      });
+      
       await repository.deleteSettings(testUserId);
       
       const settings = await repository.getSettings(testUserId);
-      expect(settings).toBeNull();
+      expect(settings).not.toBeNull();
+      expect(settings!.isEnabled).toBe(false);
+      expect(settings!.startHour).toBe(8);
+      expect(settings!.startMinute).toBe(30);
+      expect(settings!.endHour).toBe(18);
+      expect(settings!.endMinute).toBe(0);
     });
   });
 

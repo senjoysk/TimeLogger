@@ -25,25 +25,42 @@ export class ActivityPromptRepository implements IActivityPromptRepository {
   }
 
   /**
-   * 設定を作成
+   * 設定を作成（user_settingsテーブルに活動促し設定を挿入またはUPSERT）
    */
   async createSettings(request: CreateActivityPromptSettingsRequest): Promise<ActivityPromptSettings> {
     // バリデーション
     this.validateRequest(request);
 
+    // user_settingsテーブルにUPSERT（INSERT OR REPLACE）
     const sql = `
-      INSERT INTO activity_prompt_settings (
-        user_id, is_enabled, start_hour, start_minute, end_hour, end_minute
-      ) VALUES (?, ?, ?, ?, ?, ?)
+      INSERT OR REPLACE INTO user_settings (
+        user_id, 
+        timezone,
+        prompt_enabled, 
+        prompt_start_hour, 
+        prompt_start_minute, 
+        prompt_end_hour, 
+        prompt_end_minute,
+        created_at,
+        updated_at
+      ) VALUES (
+        ?, 
+        COALESCE((SELECT timezone FROM user_settings WHERE user_id = ?), 'Asia/Tokyo'),
+        ?, ?, ?, ?, ?,
+        COALESCE((SELECT created_at FROM user_settings WHERE user_id = ?), datetime('now', 'utc')),
+        datetime('now', 'utc')
+      )
     `;
 
     const values = [
       request.userId,
+      request.userId, // timezone取得用
       request.isEnabled ?? false,
       request.startHour ?? 8,
       request.startMinute ?? 30,
       request.endHour ?? 18,
-      request.endMinute ?? 0
+      request.endMinute ?? 0,
+      request.userId  // created_at取得用
     ];
 
     await this.runQuery(sql, values);
@@ -58,13 +75,13 @@ export class ActivityPromptRepository implements IActivityPromptRepository {
   }
 
   /**
-   * 設定を取得
+   * 設定を取得（user_settingsテーブルから）
    */
   async getSettings(userId: string): Promise<ActivityPromptSettings | null> {
     const sql = `
-      SELECT user_id, is_enabled, start_hour, start_minute, end_hour, end_minute,
-             created_at, updated_at
-      FROM activity_prompt_settings 
+      SELECT user_id, prompt_enabled, prompt_start_hour, prompt_start_minute, 
+             prompt_end_hour, prompt_end_minute, created_at, updated_at
+      FROM user_settings 
       WHERE user_id = ?
     `;
 
@@ -73,11 +90,11 @@ export class ActivityPromptRepository implements IActivityPromptRepository {
 
     return {
       userId: row.user_id,
-      isEnabled: Boolean(row.is_enabled),
-      startHour: row.start_hour,
-      startMinute: row.start_minute,
-      endHour: row.end_hour,
-      endMinute: row.end_minute,
+      isEnabled: Boolean(row.prompt_enabled),
+      startHour: row.prompt_start_hour,
+      startMinute: row.prompt_start_minute,
+      endHour: row.prompt_end_hour,
+      endMinute: row.prompt_end_minute,
       createdAt: row.created_at,
       updatedAt: row.updated_at
     };
@@ -91,31 +108,31 @@ export class ActivityPromptRepository implements IActivityPromptRepository {
     const values: any[] = [];
 
     if (update.isEnabled !== undefined) {
-      setParts.push('is_enabled = ?');
+      setParts.push('prompt_enabled = ?');
       values.push(update.isEnabled);
     }
 
     if (update.startHour !== undefined) {
       this.validateHour(update.startHour);
-      setParts.push('start_hour = ?');
+      setParts.push('prompt_start_hour = ?');
       values.push(update.startHour);
     }
 
     if (update.startMinute !== undefined) {
       this.validateMinute(update.startMinute);
-      setParts.push('start_minute = ?');
+      setParts.push('prompt_start_minute = ?');
       values.push(update.startMinute);
     }
 
     if (update.endHour !== undefined) {
       this.validateHour(update.endHour);
-      setParts.push('end_hour = ?');
+      setParts.push('prompt_end_hour = ?');
       values.push(update.endHour);
     }
 
     if (update.endMinute !== undefined) {
       this.validateMinute(update.endMinute);
-      setParts.push('end_minute = ?');
+      setParts.push('prompt_end_minute = ?');
       values.push(update.endMinute);
     }
 
@@ -127,7 +144,7 @@ export class ActivityPromptRepository implements IActivityPromptRepository {
     values.push(userId);
 
     const sql = `
-      UPDATE activity_prompt_settings 
+      UPDATE user_settings 
       SET ${setParts.join(', ')}
       WHERE user_id = ?
     `;
@@ -136,10 +153,19 @@ export class ActivityPromptRepository implements IActivityPromptRepository {
   }
 
   /**
-   * 設定を削除
+   * 設定を削除（活動促し設定をデフォルト値にリセット）
    */
   async deleteSettings(userId: string): Promise<void> {
-    const sql = `DELETE FROM activity_prompt_settings WHERE user_id = ?`;
+    const sql = `
+      UPDATE user_settings 
+      SET prompt_enabled = FALSE,
+          prompt_start_hour = 8,
+          prompt_start_minute = 30,
+          prompt_end_hour = 18,
+          prompt_end_minute = 0,
+          updated_at = datetime('now', 'utc')
+      WHERE user_id = ?
+    `;
     await this.runQuery(sql, [userId]);
   }
 
@@ -148,21 +174,21 @@ export class ActivityPromptRepository implements IActivityPromptRepository {
    */
   async getEnabledSettings(): Promise<ActivityPromptSettings[]> {
     const sql = `
-      SELECT user_id, is_enabled, start_hour, start_minute, end_hour, end_minute,
-             created_at, updated_at
-      FROM activity_prompt_settings 
-      WHERE is_enabled = TRUE
+      SELECT user_id, prompt_enabled, prompt_start_hour, prompt_start_minute, 
+             prompt_end_hour, prompt_end_minute, created_at, updated_at
+      FROM user_settings 
+      WHERE prompt_enabled = TRUE
       ORDER BY user_id
     `;
 
     const rows = await this.allQuery(sql, []);
     return rows.map(row => ({
       userId: row.user_id,
-      isEnabled: Boolean(row.is_enabled),
-      startHour: row.start_hour,
-      startMinute: row.start_minute,
-      endHour: row.end_hour,
-      endMinute: row.end_minute,
+      isEnabled: Boolean(row.prompt_enabled),
+      startHour: row.prompt_start_hour,
+      startMinute: row.prompt_start_minute,
+      endHour: row.prompt_end_hour,
+      endMinute: row.prompt_end_minute,
       createdAt: row.created_at,
       updatedAt: row.updated_at
     }));
@@ -174,12 +200,12 @@ export class ActivityPromptRepository implements IActivityPromptRepository {
   async getUsersToPromptAt(hour: number, minute: number): Promise<string[]> {
     const sql = `
       SELECT user_id
-      FROM activity_prompt_settings
-      WHERE is_enabled = TRUE
+      FROM user_settings
+      WHERE prompt_enabled = TRUE
         AND (
-          (start_hour < ? OR (start_hour = ? AND start_minute <= ?))
+          (prompt_start_hour < ? OR (prompt_start_hour = ? AND prompt_start_minute <= ?))
           AND
-          (end_hour > ? OR (end_hour = ? AND end_minute >= ?))
+          (prompt_end_hour > ? OR (prompt_end_hour = ? AND prompt_end_minute >= ?))
         )
       ORDER BY user_id
     `;
@@ -207,10 +233,10 @@ export class ActivityPromptRepository implements IActivityPromptRepository {
   }
 
   /**
-   * 設定存在確認
+   * 設定存在確認（user_settingsテーブルでユーザーが存在するかチェック）
    */
   async settingsExists(userId: string): Promise<boolean> {
-    const sql = `SELECT 1 FROM activity_prompt_settings WHERE user_id = ?`;
+    const sql = `SELECT 1 FROM user_settings WHERE user_id = ?`;
     const row = await this.getQuery(sql, [userId]);
     return row !== null;
   }
