@@ -16,8 +16,12 @@ export interface TimeSetRequest {
   hour: number;
   /** 分（0-59） */
   minute: number;
+  /** 秒（0-59） */
+  second: number;
   /** タイムゾーン */
   timezone: string;
+  /** 時間進行を有効化するか（デフォルト: true） */
+  enableProgression?: boolean;
 }
 
 /**

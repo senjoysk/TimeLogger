@@ -88,6 +88,38 @@ export class TimeProviderService {
   }
 
   /**
+   * 時間進行を開始（MockTimeProviderの場合のみ）
+   */
+  startTimeProgression(): void {
+    if (this.timeProvider instanceof MockTimeProvider) {
+      this.timeProvider.startTimeProgression();
+    } else {
+      console.warn('⚠️ TimeProviderService: 実時刻モードでは時間進行機能は使用できません');
+    }
+  }
+
+  /**
+   * 時間進行を停止（MockTimeProviderの場合のみ）
+   */
+  stopTimeProgression(): void {
+    if (this.timeProvider instanceof MockTimeProvider) {
+      this.timeProvider.stopTimeProgression();
+    } else {
+      console.warn('⚠️ TimeProviderService: 実時刻モードでは時間進行機能は使用できません');
+    }
+  }
+
+  /**
+   * 時間進行状態を確認（MockTimeProviderの場合のみ）
+   */
+  isTimeProgressing(): boolean {
+    if (this.timeProvider instanceof MockTimeProvider) {
+      return this.timeProvider.isTimeProgressing();
+    }
+    return false;
+  }
+
+  /**
    * テスト用：インスタンスをリセット
    */
   static resetForTesting(): void {

@@ -56,21 +56,23 @@ export class TimeSimulationService {
       const day = parseInt(String(request.day), 10);
       const hour = parseInt(String(request.hour), 10);
       const minute = parseInt(String(request.minute), 10);
+      const second = parseInt(String(request.second || 0), 10);
       
       // 指定されたタイムゾーンでの時刻を作成
-      // ローカル時刻として指定された日時を作成
-      const localDate = new Date(year, month - 1, day, hour, minute, 0, 0);
+      // ローカル時刻として指定された日時を作成（秒も含む）
+      const localDate = new Date(year, month - 1, day, hour, minute, second, 0);
       
       // 指定されたタイムゾーンでの時刻としてUTCに変換
       const targetDate = fromZonedTime(localDate, request.timezone);
       
       // 日付の妥当性チェック（例：2月30日など）
-      const checkDate = new Date(year, month - 1, day, hour, minute, 0, 0);
+      const checkDate = new Date(year, month - 1, day, hour, minute, second, 0);
       if (checkDate.getFullYear() !== year ||
           checkDate.getMonth() !== month - 1 ||
           checkDate.getDate() !== day ||
           checkDate.getHours() !== hour ||
-          checkDate.getMinutes() !== minute) {
+          checkDate.getMinutes() !== minute ||
+          checkDate.getSeconds() !== second) {
         return {
           success: false,
           error: '無効な日付または時刻が指定されました'
@@ -79,6 +81,13 @@ export class TimeSimulationService {
 
       // TimeProviderService経由で時刻を設定
       this.timeProviderService.setSimulatedTime(targetDate);
+
+      // 時間進行を開始（デフォルトで有効、明示的に無効にされた場合のみ停止）
+      if (request.enableProgression !== false) {
+        this.timeProviderService.startTimeProgression();
+      } else {
+        this.timeProviderService.stopTimeProgression();
+      }
 
       // 各タイムゾーンでの表示時刻を計算
       const timezoneDisplays = this.calculateTimezoneDisplays(targetDate);
@@ -109,7 +118,9 @@ export class TimeSimulationService {
       day: today.getDate(),
       hour: preset.hour,
       minute: preset.minute,
-      timezone
+      second: 0,
+      timezone,
+      enableProgression: true
     };
 
     return this.setTime(request);
@@ -120,6 +131,9 @@ export class TimeSimulationService {
    */
   resetTime(): ApiResponse {
     try {
+      // 時間進行を停止
+      this.timeProviderService.stopTimeProgression();
+      
       // シミュレーションモードを無効化（実時刻に戻す）
       this.timeProviderService.disableSimulationMode();
       
@@ -139,7 +153,7 @@ export class TimeSimulationService {
   /**
    * 現在の設定時刻を取得
    */
-  getCurrentTime(): { year: number; month: number; day: number; hour: number; minute: number; timezone: string } {
+  getCurrentTime(): { year: number; month: number; day: number; hour: number; minute: number; second: number; timezone: string } {
     const currentTime = this.timeProviderService.now();
     return {
       year: currentTime.getUTCFullYear(),
@@ -147,6 +161,7 @@ export class TimeSimulationService {
       day: currentTime.getUTCDate(),
       hour: currentTime.getUTCHours(),
       minute: currentTime.getUTCMinutes(),
+      second: currentTime.getUTCSeconds(),
       timezone: 'UTC'
     };
   }
@@ -250,9 +265,10 @@ export class TimeSimulationService {
     const day = parseInt(String(request.day), 10);
     const hour = parseInt(String(request.hour), 10);
     const minute = parseInt(String(request.minute), 10);
+    const second = parseInt(String(request.second || 0), 10);
 
     // 変換失敗チェック
-    if (isNaN(year) || isNaN(month) || isNaN(day) || isNaN(hour) || isNaN(minute)) {
+    if (isNaN(year) || isNaN(month) || isNaN(day) || isNaN(hour) || isNaN(minute) || isNaN(second)) {
       return '数値形式が正しくありません';
     }
 
@@ -279,6 +295,11 @@ export class TimeSimulationService {
     // 分の検証
     if (minute < 0 || minute > 59) {
       return '無効な時刻が指定されました（分は0-59）';
+    }
+
+    // 秒の検証
+    if (second < 0 || second > 59) {
+      return '無効な時刻が指定されました（秒は0-59）';
     }
 
     // タイムゾーンの検証

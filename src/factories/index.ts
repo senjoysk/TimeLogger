@@ -84,9 +84,14 @@ export class RealTimeProvider implements ITimeProvider {
 /**
  * テスト用時間プロバイダー実装
  * テスト時に任意の時間を設定可能
+ * 時間進行機能付き
  */
 export class MockTimeProvider implements ITimeProvider {
   private mockDate: Date = new Date();
+  private progressionStartTime?: Date;
+  private progressionStartRealTime?: Date;
+  private progressionTimer?: NodeJS.Timeout;
+  private isProgressing: boolean = false;
 
   constructor(initialDate?: Date) {
     if (initialDate) {
@@ -95,7 +100,14 @@ export class MockTimeProvider implements ITimeProvider {
   }
 
   now(): Date {
-    return new Date(this.mockDate);
+    if (this.isProgressing && this.progressionStartTime && this.progressionStartRealTime) {
+      // 進行モード：開始時刻からの実経過時間を加算
+      const realElapsed = Date.now() - this.progressionStartRealTime.getTime();
+      return new Date(this.progressionStartTime.getTime() + realElapsed);
+    } else {
+      // 固定モード：設定された時刻をそのまま返す
+      return new Date(this.mockDate);
+    }
   }
 
   format(date: Date, timezone: string): string {
@@ -116,13 +128,66 @@ export class MockTimeProvider implements ITimeProvider {
    */
   setMockDate(date: Date): void {
     this.mockDate = date;
+    
+    // 進行モードの場合、新しい開始点として設定
+    if (this.isProgressing) {
+      this.progressionStartTime = new Date(date);
+      this.progressionStartRealTime = new Date();
+    }
   }
 
   /**
-   * 時間を進める（テスト用）
+   * 時間を進める（テスト用・従来互換）
    */
   advanceTime(milliseconds: number): void {
-    this.mockDate = new Date(this.mockDate.getTime() + milliseconds);
+    if (this.isProgressing) {
+      // 進行モード中は進行開始時刻を調整
+      if (this.progressionStartTime) {
+        this.progressionStartTime = new Date(this.progressionStartTime.getTime() + milliseconds);
+      }
+    } else {
+      // 固定モードでは従来通り
+      this.mockDate = new Date(this.mockDate.getTime() + milliseconds);
+    }
+  }
+
+  /**
+   * 時間進行を開始
+   */
+  startTimeProgression(): void {
+    if (!this.isProgressing) {
+      this.progressionStartTime = new Date(this.mockDate);
+      this.progressionStartRealTime = new Date();
+      this.isProgressing = true;
+      console.log(`⏰ MockTimeProvider: 時間進行開始 - ${this.progressionStartTime.toISOString()}`);
+    }
+  }
+
+  /**
+   * 時間進行を停止
+   */
+  stopTimeProgression(): void {
+    if (this.isProgressing) {
+      // 現在の進行時刻を固定時刻として保存
+      this.mockDate = this.now();
+      this.isProgressing = false;
+      this.progressionStartTime = undefined;
+      this.progressionStartRealTime = undefined;
+      
+      if (this.progressionTimer) {
+        clearInterval(this.progressionTimer);
+        this.progressionTimer = undefined;
+      }
+      
+      console.log(`⏰ MockTimeProvider: 時間進行停止 - ${this.mockDate.toISOString()}`);
+    }
+  }
+
+  /**
+   * 進行状態を確認
+   */
+  isTimeProgressing(): boolean {
+    return this.isProgressing;
   }
 }
 

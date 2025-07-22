@@ -57,10 +57,10 @@ export function createTimeSimulationRouter(): Router {
       // 入力検証
       if (!timeRequest.year || !timeRequest.month || !timeRequest.day || 
           timeRequest.hour === undefined || timeRequest.minute === undefined || 
-          !timeRequest.timezone) {
+          timeRequest.second === undefined || !timeRequest.timezone) {
         return res.status(400).json({
           success: false,
-          error: '必須パラメータが不足しています'
+          error: '必須パラメータが不足しています（year, month, day, hour, minute, second, timezone）'
         });
       }
 
