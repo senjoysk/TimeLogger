@@ -37,6 +37,75 @@
     <!-- メインコンテンツ -->
     <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8" x-data="timeSimulation()">
         
+        <!-- 機能説明セクション -->
+        <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-6 mb-8">
+            <h2 class="text-lg font-semibold text-yellow-800 mb-3">
+                ⚠️ 時刻シミュレーション機能について
+            </h2>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                    <h3 class="font-medium text-yellow-800 mb-2">✅ テストできること:</h3>
+                    <ul class="list-disc list-inside text-yellow-700 space-y-1">
+                        <li>Discord !timezone コマンドでの時刻表示確認</li>
+                        <li>タイムゾーン計算の正確性検証</li>
+                        <li>時刻関連UI表示の確認</li>
+                    </ul>
+                </div>
+                
+                <div>
+                    <h3 class="font-medium text-yellow-800 mb-2">❌ テストできないこと:</h3>
+                    <ul class="list-disc list-inside text-yellow-700 space-y-1">
+                        <li>30分リマインダーの自動送信</li>
+                        <li>日次サマリーの自動送信</li>
+                        <li>cronジョブとの統合動作</li>
+                    </ul>
+                </div>
+            </div>
+            
+            <div class="mt-4 bg-yellow-100 rounded p-3">
+                <p class="text-sm text-yellow-800">
+                    <strong>理由:</strong> リマインダーとサマリーはcronジョブで実時刻に基づいて動作するため、
+                    シミュレーション時刻では自動発火しません。
+                </p>
+            </div>
+        </div>
+
+        <!-- 手動テスト機能案内 -->
+        <div class="bg-blue-50 border border-blue-200 rounded-lg p-6 mb-8">
+            <h2 class="text-lg font-semibold text-blue-800 mb-3">
+                🔧 手動テスト機能
+            </h2>
+            
+            <p class="text-blue-700 mb-4">
+                cronジョブ機能（リマインダー・サマリー）のテストは、以下の専用機能をご利用ください：
+            </p>
+            
+            <div class="space-y-3">
+                <div class="flex items-center justify-between bg-white rounded p-3 border">
+                    <div>
+                        <h4 class="font-medium text-gray-900">📊 サマリー送信テスト</h4>
+                        <p class="text-sm text-gray-600">ドライラン・実際送信・プレビュー機能</p>
+                    </div>
+                    <a href="<%= basePath %>/tools/summary-test" 
+                       class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">
+                        テストページへ
+                    </a>
+                </div>
+                
+                <div class="flex items-center justify-between bg-white rounded p-3 border">
+                    <div>
+                        <h4 class="font-medium text-gray-900">🔔 30分リマインダーテスト</h4>
+                        <p class="text-sm text-gray-600">活動促し通知の手動送信テスト</p>
+                    </div>
+                    <button onclick="document.getElementById('reminder-test').scrollIntoView()" 
+                            class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700">
+                        下記セクションへ
+                    </button>
+                </div>
+            </div>
+        </div>
+        
         <!-- 現在の設定時刻表示 -->
         <div class="bg-white rounded-lg shadow-md p-6 mb-8">
             <h2 class="text-xl font-semibold text-gray-900 mb-4">📅 現在の設定時刻</h2>
@@ -176,6 +245,107 @@
             </div>
         </div>
 
+        <!-- 30分リマインダー手動テスト -->
+        <div id="reminder-test" class="bg-white rounded-lg shadow-md p-6 mb-8">
+            <h2 class="text-xl font-semibold text-gray-900 mb-4">
+                🔔 30分リマインダー手動テスト
+            </h2>
+            
+            <div class="space-y-6">
+                <!-- 説明 -->
+                <div class="bg-green-50 border border-green-200 rounded p-4">
+                    <p class="text-sm text-green-800">
+                        <strong>説明:</strong> 
+                        活動促し通知設定が有効なユーザーに、手動でリマインダーを送信します。
+                        実際のcron動作とは独立して実行されます。
+                    </p>
+                </div>
+
+                <!-- 送信設定 -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">送信対象</label>
+                        <select x-model="reminderForm.targetUser" 
+                                class="w-full border border-gray-300 rounded-md p-2 focus:border-blue-500 focus:ring-blue-500">
+                            <option value="all">全対象ユーザー（設定有効者のみ）</option>
+                            <template x-for="user in reminderUsers" :key="user.userId">
+                                <option :value="user.userId" x-text="`${user.userId} (${user.startHour}:${user.startMinute.toString().padStart(2,'0')}-${user.endHour}:${user.endMinute.toString().padStart(2,'0')})`"></option>
+                            </template>
+                        </select>
+                    </div>
+
+                    <div class="flex items-end">
+                        <div class="flex space-x-2">
+                            <button @click="sendReminder()" 
+                                    :disabled="isReminderLoading"
+                                    class="bg-green-600 text-white px-6 py-2 rounded-md hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed">
+                                <span x-show="!isReminderLoading">🔔 リマインダー送信</span>
+                                <span x-show="isReminderLoading">送信中...</span>
+                            </button>
+                            
+                            <button @click="loadReminderUsers()" 
+                                    class="bg-gray-600 text-white px-4 py-2 rounded-md hover:bg-gray-700">
+                                対象ユーザー更新
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 対象ユーザー一覧 -->
+                <div x-show="reminderUsers.length > 0" class="bg-gray-50 rounded-lg p-4">
+                    <h4 class="font-medium text-gray-900 mb-3">📋 リマインダー設定有効ユーザー</h4>
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                        <template x-for="user in reminderUsers" :key="user.userId">
+                            <div class="bg-white rounded p-3 border border-gray-200">
+                                <div class="font-medium text-sm" x-text="user.userId"></div>
+                                <div class="text-xs text-gray-600">
+                                    <span x-text="`時間帯: ${user.startHour}:${user.startMinute.toString().padStart(2,'0')}-${user.endHour}:${user.endMinute.toString().padStart(2,'0')}`"></span>
+                                </div>
+                                <div class="text-xs text-gray-500">
+                                    <span x-text="`作成: ${new Date(user.createdAt).toLocaleDateString()}`"></span>
+                                </div>
+                            </div>
+                        </template>
+                    </div>
+                </div>
+
+                <!-- 実行結果 -->
+                <div x-show="reminderResult" class="bg-gray-50 rounded-lg p-4">
+                    <h4 class="font-medium text-gray-900 mb-3">📊 実行結果</h4>
+                    <div x-show="reminderResult && reminderResult.success" class="space-y-2">
+                        <div class="text-sm">
+                            <span class="font-medium">実行時刻:</span>
+                            <span x-text="reminderResult.timestamp"></span>
+                        </div>
+                        <div class="text-sm">
+                            <span class="font-medium">送信結果:</span>
+                            <span x-text="reminderResult.message"></span>
+                        </div>
+                        <div x-show="reminderResult.results && reminderResult.results.length > 0" class="mt-3">
+                            <div class="space-y-2">
+                                <template x-for="result in reminderResult.results" :key="result.userId">
+                                    <div class="flex items-center justify-between bg-white rounded p-2 border">
+                                        <div class="flex items-center space-x-2">
+                                            <span class="text-sm font-medium" x-text="result.userId"></span>
+                                            <span class="text-xs text-gray-500" x-text="result.timezone"></span>
+                                        </div>
+                                        <div class="flex items-center space-x-2">
+                                            <span class="text-xs px-2 py-1 rounded-full"
+                                                  :class="result.status === 'sent' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'"
+                                                  x-text="result.status === 'sent' ? '送信済み' : 'エラー'"></span>
+                                        </div>
+                                    </div>
+                                </template>
+                            </div>
+                        </div>
+                    </div>
+                    <div x-show="reminderResult && !reminderResult.success" class="text-red-600 text-sm">
+                        <strong>エラー:</strong> <span x-text="reminderResult.error"></span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <!-- アラート表示 -->
         <div x-show="alert.show" 
              class="fixed bottom-4 right-4 max-w-sm bg-white rounded-lg shadow-lg p-4 border-l-4"
@@ -229,10 +399,18 @@
                     type: 'success',
                     message: ''
                 },
+                // 手動リマインダー機能
+                reminderUsers: [],
+                isReminderLoading: false,
+                reminderForm: {
+                    targetUser: 'all'
+                },
+                reminderResult: null,
 
                 async init() {
                     await this.loadInitialData();
                     await this.loadCurrentTime();
+                    await this.loadReminderUsers();
                 },
 
                 async loadInitialData() {
@@ -364,6 +542,63 @@
                         return `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}:${second.toString().padStart(2, '0')}`;
                     }
                     return `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
+                },
+
+                // 手動リマインダー機能のメソッド
+                async loadReminderUsers() {
+                    try {
+                        const response = await fetch(`${basePath}/tools/api/time-simulation/reminder-test/users`);
+                        const data = await response.json();
+                        if (data.success) {
+                            this.reminderUsers = data.users;
+                        } else {
+                            console.warn('リマインダーユーザーの取得に失敗:', data.error);
+                        }
+                    } catch (error) {
+                        console.warn('リマインダーユーザーの取得に失敗:', error);
+                    }
+                },
+
+                async sendReminder() {
+                    if (this.isReminderLoading) return;
+                    
+                    this.isReminderLoading = true;
+                    this.reminderResult = null;
+                    
+                    try {
+                        const requestData = {
+                            userId: this.reminderForm.targetUser === 'all' ? undefined : this.reminderForm.targetUser
+                        };
+
+                        const response = await fetch(`${basePath}/tools/api/time-simulation/reminder-test/send`, {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify(requestData)
+                        });
+                        
+                        const data = await response.json();
+                        this.reminderResult = {
+                            ...data,
+                            timestamp: new Date().toLocaleString()
+                        };
+                        
+                        if (data.success) {
+                            this.showAlert('success', 'リマインダーの送信が完了しました');
+                        } else {
+                            this.showAlert('error', data.error || 'リマインダーの送信に失敗しました');
+                        }
+                    } catch (error) {
+                        this.reminderResult = {
+                            success: false,
+                            error: 'サーバーエラーが発生しました',
+                            timestamp: new Date().toLocaleString()
+                        };
+                        this.showAlert('error', 'サーバーエラーが発生しました');
+                    } finally {
+                        this.isReminderLoading = false;
+                    }
                 },
 
                 showAlert(type, message) {

@@ -27,6 +27,21 @@ describe('/tools/パスのルーティングテスト', () => {
   });
 
   afterAll(async () => {
+    // サーバーインスタンスのクリーンアップ
+    if (adminServer) {
+      const repo = (adminServer as any).sqliteRepo;
+      if (repo && typeof repo.close === 'function') {
+        try {
+          await repo.close();
+        } catch (error) {
+          // クリーンアップエラーは無視
+        }
+      }
+    }
+    
+    // 短い待機でリソース解放を確実にする
+    await new Promise(resolve => setTimeout(resolve, 100));
+    
     // テストDBクリーンアップ
     cleanupTestDatabase(testDbPath);
   });
@@ -37,9 +52,7 @@ describe('/tools/パスのルーティングテスト', () => {
   });
 
   afterEach(async () => {
-    if (adminServer) {
-      // サーバーのクリーンアップ（必要に応じて）
-    }
+    // 各テスト後のクリーンアップは最小限に
   });
 
   describe('開発ツール画面のルーティング', () => {

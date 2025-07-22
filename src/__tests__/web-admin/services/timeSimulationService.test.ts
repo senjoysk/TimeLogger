@@ -33,6 +33,7 @@ describe('TimeSimulationService', () => {
         day: 15,
         hour: 18,
         minute: 30,
+        second: 0,
         timezone: 'Asia/Tokyo'
       };
 
@@ -53,6 +54,7 @@ describe('TimeSimulationService', () => {
         day: 30, // 2月30日は存在しない
         hour: 18,
         minute: 30,
+        second: 0,
         timezone: 'Asia/Tokyo'
       };
 
@@ -70,6 +72,7 @@ describe('TimeSimulationService', () => {
         day: 15,
         hour: 25, // 25時は存在しない
         minute: 30,
+        second: 0,
         timezone: 'Asia/Tokyo'
       };
 
@@ -87,6 +90,7 @@ describe('TimeSimulationService', () => {
         day: 15,
         hour: 18,
         minute: 30,
+        second: 0,
         timezone: 'Invalid/Timezone'
       };
 
@@ -106,6 +110,7 @@ describe('TimeSimulationService', () => {
         day: 15,
         hour: 18,
         minute: 30,
+        second: 0,
         timezone: 'Asia/Tokyo'
       };
 
@@ -140,6 +145,7 @@ describe('TimeSimulationService', () => {
           day: 15,
           hour: 18,
           minute: 30,
+          second: 0,
           timezone: testCase.timezone
         };
 
@@ -192,6 +198,7 @@ describe('TimeSimulationService', () => {
         day: 15,
         hour: 18,
         minute: 30,
+        second: 0,
         timezone: 'Asia/Tokyo'
       };
 
@@ -258,6 +265,7 @@ describe('TimeSimulationService', () => {
         day: 15,
         hour: 18,
         minute: 30,
+        second: 0,
         timezone: 'Asia/Tokyo'
       };
 

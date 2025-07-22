@@ -38,7 +38,7 @@ export function createRoutes(adminService: AdminService, securityService: Securi
 
   // 開発ツール（GitHub Issue #37）- Production環境では無効化
   if (securityService.getEnvironment().env !== 'production') {
-    router.use('/tools/api/time-simulation', createTimeSimulationRouter());
+    router.use('/tools/api/time-simulation', createTimeSimulationRouter(bot));
     router.use('/tools/api/summary-test', createSummaryTestRouter(bot));
 
     // 開発ツール管理画面
@@ -80,6 +80,12 @@ export function createRoutes(adminService: AdminService, securityService: Securi
       res.status(404).json({ error: 'Not Found' });
     });
     router.all('/tools/api/time-simulation/timezones', (_req, res) => {
+      res.status(404).json({ error: 'Not Found' });
+    });
+    router.all('/tools/api/time-simulation/reminder-test/users', (_req, res) => {
+      res.status(404).json({ error: 'Not Found' });
+    });
+    router.all('/tools/api/time-simulation/reminder-test/send', (_req, res) => {
       res.status(404).json({ error: 'Not Found' });
     });
     

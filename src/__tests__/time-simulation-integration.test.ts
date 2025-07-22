@@ -69,6 +69,7 @@ describe('Time Simulation Integration Tests', () => {
         day: 22,
         hour: 15,
         minute: 59,
+        second: 0,
         timezone: 'Asia/Kolkata'
       };
 
@@ -162,6 +163,7 @@ describe('Time Simulation Integration Tests', () => {
         day: 22,
         hour: 15,
         minute: 59,
+        second: 0,
         timezone: 'Asia/Kolkata'
       };
 
@@ -187,6 +189,7 @@ describe('Time Simulation Integration Tests', () => {
         day: 22,
         hour: 18,
         minute: 30,
+        second: 0,
         timezone: 'UTC'
       };
 
@@ -213,6 +216,7 @@ describe('Time Simulation Integration Tests', () => {
         day: 30, // 2月30日は存在しない
         hour: 15,
         minute: 59,
+        second: 0,
         timezone: 'Asia/Tokyo'
       };
 
@@ -230,6 +234,7 @@ describe('Time Simulation Integration Tests', () => {
         day: 22,
         hour: 15,
         minute: 59,
+        second: 0,
         timezone: 'Invalid/Timezone'
       };
 
