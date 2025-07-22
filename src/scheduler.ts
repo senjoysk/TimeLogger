@@ -15,6 +15,8 @@ import {
   RealTimeProvider 
 } from './factories';
 import { ConfigService } from './services/configService';
+import { IActivityPromptRepository } from './repositories/interfaces';
+import { ActivityPromptRepository } from './repositories/activityPromptRepository';
 
 /**
  * Scheduler DI依存関係オプション
@@ -24,6 +26,7 @@ export interface SchedulerDependencies {
   logger?: ILogger;
   timeProvider?: ITimeProvider;
   configService?: IConfigService;
+  activityPromptRepository?: IActivityPromptRepository;
 }
 
 /**
@@ -41,6 +44,7 @@ export class Scheduler {
   private readonly logger: ILogger;
   private readonly timeProvider: ITimeProvider;
   private readonly configService: IConfigService;
+  private readonly activityPromptRepository: IActivityPromptRepository;
 
   constructor(
     bot: TaskLoggerBot, 
@@ -55,6 +59,8 @@ export class Scheduler {
     this.logger = dependencies?.logger || new ConsoleLogger();
     this.timeProvider = dependencies?.timeProvider || new RealTimeProvider();
     this.configService = dependencies?.configService || new ConfigService();
+    this.activityPromptRepository = dependencies?.activityPromptRepository || 
+      new ActivityPromptRepository(this.repository.getDatabase());
   }
 
   /**
@@ -66,8 +72,7 @@ export class Scheduler {
     // ユーザーのタイムゾーンを取得
     await this.loadUserTimezones();
     
-    // 活動促し機能は削除
-    // this.startActivityPromptSchedule();
+    this.startActivityPromptSchedule();
     this.startDailySummarySchedule();
     this.startApiCostReportSchedule();
     
@@ -91,11 +96,28 @@ export class Scheduler {
   }
 
   /**
-   * 活動促し機能は削除済み（新システムでは自然言語でいつでも記録可能）
+   * 活動促しスケジュールを開始
+   * 毎分実行し、各ユーザーのタイムゾーンで0分・30分かつ設定時間内の場合に通知
    */
   private startActivityPromptSchedule(): void {
-    // 活動促し機能は削除（マルチユーザー対応のため）
-    console.log('  ✅ 活動促し機能は削除済み（自然言語でいつでも記録可能）');
+    // 毎分実行（各ユーザーのタイムゾーンで判定）
+    const cronPattern = '* * * * *';
+    
+    const job = this.schedulerService.schedule(cronPattern, async () => {
+      try {
+        const now = this.timeProvider.now();
+        this.logger.debug(`🔔 活動促し通知チェック (UTC: ${now.toISOString()})`);
+        
+        // 各ユーザーのタイムゾーンで現在時刻をチェック
+        await this.checkAndSendActivityPrompts(now);
+        
+      } catch (error) {
+        this.logger.error('❌ 活動促し通知エラー:', error as Error);
+      }
+    });
+
+    this.jobs.set('activityPrompt', job);
+    this.logger.info(`  ✅ 活動促しスケジュール (${cronPattern}) を開始しました`);
   }
 
   /**
@@ -145,11 +167,55 @@ export class Scheduler {
   }
 
   /**
+   * 活動促し通知チェックと送信
+   */
+  private async checkAndSendActivityPrompts(now: Date): Promise<void> {
+    try {
+      // 全ユーザーのタイムゾーン情報を取得
+      const repository = this.bot.getRepository();
+      if (!repository || !repository.getAllUsers) {
+        this.logger.warn('ユーザー情報が取得できません');
+        return;
+      }
+
+      const users = await repository.getAllUsers();
+      
+      for (const user of users) {
+        try {
+          // ユーザーのタイムゾーンで現在時刻を取得
+          const localTime = toZonedTime(now, user.timezone);
+          const localHour = localTime.getHours();
+          const localMinute = localTime.getMinutes();
+          
+          // 0分または30分でない場合はスキップ
+          if (localMinute !== 0 && localMinute !== 30) {
+            continue;
+          }
+          
+          // 該当時刻に通知すべきユーザーかチェック
+          const usersToPrompt = await this.activityPromptRepository.getUsersToPromptAt(localHour, localMinute);
+          
+          if (usersToPrompt.includes(user.userId)) {
+            this.logger.info(`📢 活動促し通知送信: ${user.userId} (${user.timezone} ${localHour}:${localMinute.toString().padStart(2, '0')})`);
+            await this.bot.sendActivityPromptToUser(user.userId, user.timezone);
+          }
+          
+        } catch (userError) {
+          this.logger.error(`❌ ユーザー ${user.userId} の活動促し通知エラー:`, userError as Error);
+          // 個別ユーザーのエラーは継続
+        }
+      }
+    } catch (error) {
+      this.logger.error('❌ 活動促し通知チェックエラー:', error as Error);
+    }
+  }
+
+  /**
    * スケジュール情報をログ出力
    */
   private logScheduleInfo(): void {
     console.log('\n📅 スケジュール情報:');
-    console.log(`  🔔 活動促し機能: 削除済み（マルチユーザー対応）`);
+    console.log(`  🔔 活動促し機能: 有効（毎分チェック、0分・30分に実行）`);
     console.log(`  📊 サマリー時間: 毎日 ${config.app.summaryTime.hour}:00`);
     console.log(`  🌍 対応ユーザー数: ${this.userTimezones.size}`);
     
@@ -214,12 +280,12 @@ export class Scheduler {
    * @param scheduleName スケジュール名
    */
   public async executeManually(scheduleName: string): Promise<void> {
-    console.log(`🔧 手動実行: ${scheduleName}`);
+    this.logger.info(`🔧 手動実行: ${scheduleName}`);
     
     try {
       switch (scheduleName) {
         case 'activityPrompt':
-          console.log('⏰ 活動促し機能は削除済み（マルチユーザー対応）');
+          await this.checkAndSendActivityPrompts(this.timeProvider.now());
           break;
         case 'dailySummary':
           await this.bot.sendDailySummaryForAllUsers();
@@ -228,9 +294,9 @@ export class Scheduler {
           throw new Error(`未知のスケジュール名: ${scheduleName}`);
       }
       
-      console.log(`✅ ${scheduleName} の手動実行が完了しました`);
+      this.logger.info(`✅ ${scheduleName} の手動実行が完了しました`);
     } catch (error) {
-      console.error(`❌ ${scheduleName} の手動実行に失敗しました:`, error);
+      this.logger.error(`❌ ${scheduleName} の手動実行に失敗しました:`, error as Error);
     }
   }
 }

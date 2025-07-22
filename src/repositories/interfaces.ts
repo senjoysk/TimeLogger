@@ -1,5 +1,10 @@
 import { Todo, CreateTodoRequest, UpdateTodoRequest, GetTodosOptions, TodoStats, TodoStatus, MessageClassificationHistory, ClassificationResult, MessageClassification } from '../types/todo';
 import { Memo, CreateMemoRequest, UpdateMemoRequest } from '../types/memo';
+import { 
+  ActivityPromptSettings, 
+  CreateActivityPromptSettingsRequest, 
+  UpdateActivityPromptSettingsRequest 
+} from '../types/activityPrompt';
 
 /**
  * ユーザー情報
@@ -151,4 +156,28 @@ export interface IUserRepository {
   
   // 最終利用日時更新
   updateLastSeen(userId: string): Promise<void>;
+}
+
+/**
+ * 活動促し通知設定の抽象化インターフェース
+ */
+export interface IActivityPromptRepository {
+  // 基本操作
+  createSettings(request: CreateActivityPromptSettingsRequest): Promise<ActivityPromptSettings>;
+  getSettings(userId: string): Promise<ActivityPromptSettings | null>;
+  updateSettings(userId: string, update: UpdateActivityPromptSettingsRequest): Promise<void>;
+  deleteSettings(userId: string): Promise<void>;
+  
+  // 有効な設定の取得
+  getEnabledSettings(): Promise<ActivityPromptSettings[]>;
+  
+  // 特定時刻に通知すべきユーザーの取得
+  getUsersToPromptAt(hour: number, minute: number): Promise<string[]>;
+  
+  // 設定の有効/無効切り替え
+  enablePrompt(userId: string): Promise<void>;
+  disablePrompt(userId: string): Promise<void>;
+  
+  // 設定存在確認
+  settingsExists(userId: string): Promise<boolean>;
 }

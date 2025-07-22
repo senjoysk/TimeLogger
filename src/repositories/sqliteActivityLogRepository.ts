@@ -2451,5 +2451,15 @@ export class SqliteActivityLogRepository implements IActivityLogRepository, IApi
     } : null;
   }
 
+  /**
+   * データベース接続を取得（他のリポジトリで使用）
+   */
+  getDatabase(): Database {
+    if (!this.connected || !this.db) {
+      throw new ActivityLogError('データベースが接続されていません', 'DB_NOT_CONNECTED');
+    }
+    return this.db;
+  }
+
   // ================================================================
 }

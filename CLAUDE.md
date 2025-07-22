@@ -374,6 +374,7 @@ npm run test:coverage
 # TDDサイクル完了後の確認
 npm run build              # TypeScriptコンパイルエラーチェック
 npm test                   # 全テスト実行（必須）
+npm run test:integration   # 統合テスト実行（必須追加）
 npm run test:coverage      # カバレッジ確認（45.5%以上維持）
 ```
 
@@ -386,10 +387,10 @@ npm run test:coverage      # カバレッジ確認（45.5%以上維持）
 # 1. ビルド確認
 npm run build
 
-# 2. 単体テスト確認  
+# 2. 全テスト実行（統合テスト含む）
 npm test
 
-# 3. 統合テスト確認（必須追加）
+# 3. 統合テスト確認（追加確認）
 npm run test:integration
 
 # 4. 全テスト成功を確認してから完了報告

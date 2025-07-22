@@ -82,6 +82,9 @@ export class ActivityLoggingIntegration {
   private config: ActivityLoggingConfig;
   private isInitialized: boolean = false;
   
+  // Bot インスタンス（コマンド処理用）
+  private botInstance?: any;
+  
   // 非同期処理の管理
   private pendingAnalysisTasks: Set<NodeJS.Immediate> = new Set();
   private isShuttingDown: boolean = false;
@@ -225,6 +228,9 @@ export class ActivityLoggingIntegration {
     }
 
     console.log('🔗 Discord Botへの統合を開始...');
+
+    // Botインスタンスを保存
+    this.botInstance = bot;
 
     // DailyReportSenderの初期化（Botが提供された場合）
     if (bot) {
@@ -427,6 +433,13 @@ export class ActivityLoggingIntegration {
         await this.memoHandler.handleCommand(message, args);
         break;
 
+      case 'prompt':
+      case 'プロンプト':
+      case '通知':
+        console.log(`📢 promptコマンド実行: ユーザー=${userId}, タイムゾーン=${timezone}`);
+        await this.botInstance?.handlePromptCommand(message, args, userId, timezone);
+        break;
+
       default:
         // 他のコマンドは既存システムに委譲または無視
         console.log(`📝 未対応コマンド: ${command}`);
@@ -555,6 +568,7 @@ export class ActivityLoggingIntegration {
 \`!gap\` - 未記録時間の検出・記録
 \`!cost\` - API使用コスト確認
 \`!timezone\` - タイムゾーン表示・検索・設定
+\`!prompt\` - 活動促し通知の設定・管理
 \`!status\` - システム状態確認
 
 **📊 分析機能**

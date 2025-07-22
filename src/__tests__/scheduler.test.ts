@@ -39,7 +39,8 @@ jest.mock('../repositories/sqliteActivityLogRepository', () => ({
       timezone: 'Asia/Tokyo'
     }),
     getApiCosts: jest.fn().mockResolvedValue([]),
-    close: jest.fn().mockResolvedValue(undefined)
+    close: jest.fn().mockResolvedValue(undefined),
+    getDatabase: jest.fn().mockReturnValue({})
   }))
 }));
 
@@ -64,7 +65,8 @@ describe('Scheduler', () => {
         timezone: 'Asia/Tokyo'
       }),
       getApiCosts: jest.fn().mockResolvedValue([]),
-      close: jest.fn().mockResolvedValue(undefined)
+      close: jest.fn().mockResolvedValue(undefined),
+      getDatabase: jest.fn().mockReturnValue({})
     } as any;
     
     // BotのgetRepositoryメソッドがmockRepositoryを返すよう設定
@@ -173,7 +175,7 @@ describe('Scheduler', () => {
       
       // startApiCostReportScheduleメソッドが内部で呼ばれることで
       // cron.scheduleが複数回実行されることを確認
-      expect(cron.schedule).toHaveBeenCalledTimes(2); // 日次サマリー + APIコストレポート
+      expect(cron.schedule).toHaveBeenCalledTimes(3); // 日次サマリー + APIコストレポート + 活動促し
     });
   });
 

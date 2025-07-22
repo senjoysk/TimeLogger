@@ -62,12 +62,14 @@ describe('Scheduler DI対応テスト', () => {
         getAllUsers: jest.fn().mockResolvedValue([
           { userId: 'user1', timezone: 'Asia/Tokyo' },
           { userId: 'user2', timezone: 'America/New_York' }
-        ])
+        ]),
+        getDatabase: jest.fn().mockReturnValue({})
       })
     };
 
     mockRepository = {
-      getAllUsers: jest.fn().mockResolvedValue([])
+      getAllUsers: jest.fn().mockResolvedValue([]),
+      getDatabase: jest.fn().mockReturnValue({})
     };
 
     mockSchedulerService = createMockSchedulerService();
@@ -103,8 +105,8 @@ describe('Scheduler DI対応テスト', () => {
       // startメソッドを呼ぶとschedulerServiceのscheduleが呼ばれることを確認
       await scheduler.start();
       
-      // 2回呼ばれる（dailySummary + apiCostReport）
-      expect(mockSchedulerService.schedule).toHaveBeenCalledTimes(2);
+      // 3回呼ばれる（dailySummary + apiCostReport + activityPrompt）
+      expect(mockSchedulerService.schedule).toHaveBeenCalledTimes(3);
     });
 
     test('DIによってLoggerが使用される', async () => {

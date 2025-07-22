@@ -25,6 +25,9 @@ import {
 } from './factories';
 import { ConfigService } from './services/configService';
 import { ITimezoneService } from './services/interfaces/ITimezoneService';
+import { PromptCommandHandler } from './handlers/promptCommandHandler';
+import { ActivityPromptRepository } from './repositories/activityPromptRepository';
+import { ACTIVITY_PROMPT_VALIDATION } from './types/activityPrompt';
 
 /**
  * DI依存関係オプション
@@ -49,6 +52,8 @@ export class TaskLoggerBot {
   // HTTPサーバーはIntegratedServerに統合済み
   // エラー発生回数トラッキング
   private errorCounters: Map<string, number> = new Map();
+  // 活動促しコマンドハンドラー
+  private promptCommandHandler?: PromptCommandHandler;
   
   // DI依存関係
   private readonly clientFactory: IClientFactory;
@@ -319,6 +324,9 @@ export class TaskLoggerBot {
       
       // Discord Clientに統合（自身のBotインスタンスを渡す）
       this.activityLoggingIntegration.integrateWithBot(this.client, this);
+      
+      // 活動促しコマンドハンドラーを初期化
+      await this.initializePromptCommandHandler();
       
       console.log('✅ 活動記録システム統合完了！');
       console.log('💡 機能が利用可能:');
@@ -827,6 +835,77 @@ export class TaskLoggerBot {
       }
       await new Promise(resolve => setTimeout(resolve, 100));
     }
+  }
+
+  /**
+   * 活動促しコマンドハンドラーを初期化
+   */
+  private async initializePromptCommandHandler(): Promise<void> {
+    try {
+      if (!this.activityLoggingIntegration) {
+        throw new Error('ActivityLoggingIntegrationが初期化されていません');
+      }
+
+      const repository = this.activityLoggingIntegration.getRepository();
+      if (!repository) {
+        throw new Error('Repositoryが取得できません');
+      }
+
+      // ActivityPromptRepositoryを初期化
+      const activityPromptRepository = new ActivityPromptRepository(repository.getDatabase());
+      
+      // PromptCommandHandlerを初期化
+      this.promptCommandHandler = new PromptCommandHandler(activityPromptRepository);
+      
+      console.log('✅ 活動促しコマンドハンドラーを初期化しました');
+    } catch (error) {
+      console.error('❌ 活動促しコマンドハンドラーの初期化に失敗:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * 特定ユーザーに活動促し通知を送信
+   */
+  public async sendActivityPromptToUser(userId: string, timezone: string): Promise<void> {
+    try {
+      if (!this.client.isReady()) {
+        this.logger.error('Discord Clientが準備できていません');
+        return;
+      }
+
+      // ユーザーを取得
+      const user = await this.client.users.fetch(userId).catch(() => null);
+      if (!user) {
+        this.logger.warn(`ユーザーが見つかりません: ${userId}`);
+        return;
+      }
+
+      // 活動促しメッセージを送信
+      const message = ACTIVITY_PROMPT_VALIDATION.MESSAGES.DEFAULT_PROMPT;
+      
+      await user.send({
+        content: `🤖 **活動記録のお時間です！**\n\n${message}\n\n💡 記録方法: このメッセージに返信するか、サーバーでメッセージを送信してください。`
+      });
+
+      this.logger.info(`📢 活動促し通知送信完了: ${userId} (${timezone})`);
+      
+    } catch (error) {
+      this.logger.error(`❌ 活動促し通知送信失敗: ${userId}`, error as Error);
+      throw error;
+    }
+  }
+
+  /**
+   * promptコマンドを処理（統合システムから呼び出される）
+   */
+  public async handlePromptCommand(message: any, args: string[], userId: string, timezone: string): Promise<void> {
+    if (!this.promptCommandHandler) {
+      await message.reply('❌ 活動促し機能が初期化されていません。');
+      return;
+    }
+
+    await this.promptCommandHandler.handleCommand(message, args, userId, timezone);
   }
 
 }
