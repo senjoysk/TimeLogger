@@ -18,9 +18,8 @@ import '../middleware/timezoneMiddleware';
 export function createTimeSimulationRouter(): Router {
   const router = Router();
   
-  // MockTimeProviderのシングルトンインスタンス
-  const mockTimeProvider = new MockTimeProvider();
-  const timeSimulationService = new TimeSimulationService(mockTimeProvider);
+  // TimeSimulationServiceはシングルトンのTimeProviderServiceを使用
+  const timeSimulationService = new TimeSimulationService();
 
   /**
    * 現在の設定時刻を取得
@@ -29,15 +28,15 @@ export function createTimeSimulationRouter(): Router {
   router.get('/current', async (req: Request, res: Response) => {
     try {
       const currentTime = timeSimulationService.getCurrentTime();
-      const timezoneDisplays = await timeSimulationService.setTime({
-        ...currentTime,
-        timezone: req.adminTimezone || 'Asia/Tokyo'
-      });
+      
+      // 現在時刻のタイムゾーン表示を計算（時刻設定は行わない）
+      const now = timeSimulationService.getTimeProviderService().now();
+      const timezoneDisplays = timeSimulationService.calculateTimezoneDisplaysPublic(now);
 
       res.json({
         success: true,
         currentTime,
-        timezoneDisplays: timezoneDisplays.timezoneDisplays || []
+        timezoneDisplays
       });
     } catch (error) {
       res.status(500).json({

@@ -7,6 +7,8 @@ import { Message } from 'discord.js';
 import { IActivityLogRepository } from '../repositories/activityLogRepository';
 import { ActivityLogError } from '../types/activityLog';
 import { ITimezoneService } from '../services/interfaces/ITimezoneService';
+import { ITimeProvider } from '../interfaces/dependencies';
+import { TimeProviderService } from '../services/timeProviderService';
 
 /**
  * タイムゾーンコマンドの種類
@@ -55,11 +57,16 @@ export interface ITimezoneHandler {
  */
 export class TimezoneHandler implements ITimezoneHandler {
   private onTimezoneChanged?: (userId: string, oldTimezone: string | null, newTimezone: string) => Promise<void>;
+  private timeProvider: ITimeProvider;
 
   constructor(
     private repository: IActivityLogRepository,
-    private timezoneService?: ITimezoneService
-  ) {}
+    private timezoneService?: ITimezoneService,
+    timeProvider?: ITimeProvider
+  ) {
+    // TimeProviderが注入されない場合は、シングルトンから取得
+    this.timeProvider = timeProvider || TimeProviderService.getInstance().getTimeProvider();
+  }
 
   /**
    * タイムゾーン変更時のコールバックを設定（EnhancedScheduler連携用）
@@ -135,7 +142,7 @@ export class TimezoneHandler implements ITimezoneHandler {
         }
       }
       
-      const now = new Date();
+      const now = TimeProviderService.getInstance().now();
       const localTime = now.toLocaleString('ja-JP', { 
         timeZone: currentTimezone,
         year: 'numeric',
@@ -233,7 +240,7 @@ export class TimezoneHandler implements ITimezoneHandler {
         }
         
         // 現在時刻を新しいタイムゾーンで表示
-        const now = new Date();
+        const now = TimeProviderService.getInstance().now();
         const localTime = now.toLocaleString('ja-JP', { 
           timeZone: timezone,
           year: 'numeric',
@@ -451,7 +458,7 @@ Botの再起動は不要で、即座に全機能に反映されます。
     
     // フォールバック: 直接検証
     try {
-      new Date().toLocaleString('en-US', { timeZone: timezone });
+      TimeProviderService.getInstance().now().toLocaleString('en-US', { timeZone: timezone });
       return true;
     } catch (error) {
       return false;

@@ -5,6 +5,7 @@
  */
 
 import { MockTimeProvider } from '../../factories';
+import { TimeProviderService } from '../../services/timeProviderService';
 import { 
   TimeSetRequest, 
   TimeSetResponse, 
@@ -12,21 +13,27 @@ import {
   TimePreset,
   ApiResponse 
 } from '../types/testing';
-import { toZonedTime, format } from 'date-fns-tz';
+import { toZonedTime, format, fromZonedTime } from 'date-fns-tz';
 
 /**
  * 時刻シミュレーションサービス
  */
 export class TimeSimulationService {
-  private readonly timeProvider: MockTimeProvider;
   private readonly supportedTimezones: string[] = [
     'Asia/Tokyo',
     'Asia/Kolkata',
     'UTC'
   ];
+  private readonly timeProviderService: TimeProviderService;
 
-  constructor(timeProvider: MockTimeProvider) {
-    this.timeProvider = timeProvider;
+  constructor(timeProvider?: MockTimeProvider) {
+    // TimeProviderServiceシングルトンを使用
+    this.timeProviderService = TimeProviderService.getInstance();
+    
+    // シミュレーションモードを有効化
+    if (!this.timeProviderService.isInSimulationMode()) {
+      this.timeProviderService.enableSimulationMode();
+    }
   }
 
   /**
@@ -43,30 +50,35 @@ export class TimeSimulationService {
         };
       }
 
-      // 指定されたタイムゾーンでのDateオブジェクト作成
-      // まずUTCベースの日付を作成し、指定されたタイムゾーンでの時刻として解釈
-      const utcDate = new Date(Date.UTC(request.year, request.month - 1, request.day, request.hour, request.minute, 0, 0));
+      // 数値変換（バリデーション済みだが念のため）
+      const year = parseInt(String(request.year), 10);
+      const month = parseInt(String(request.month), 10);
+      const day = parseInt(String(request.day), 10);
+      const hour = parseInt(String(request.hour), 10);
+      const minute = parseInt(String(request.minute), 10);
       
-      // 指定されたタイムゾーンでの時刻として解釈するため、タイムゾーンオフセットを調整
-      const { getTimezoneOffset } = require('date-fns-tz');
-      const timezoneOffset = getTimezoneOffset(request.timezone, utcDate);
-      const targetDate = new Date(utcDate.getTime() - timezoneOffset);
+      // 指定されたタイムゾーンでの時刻を作成
+      // ローカル時刻として指定された日時を作成
+      const localDate = new Date(year, month - 1, day, hour, minute, 0, 0);
+      
+      // 指定されたタイムゾーンでの時刻としてUTCに変換
+      const targetDate = fromZonedTime(localDate, request.timezone);
       
       // 日付の妥当性チェック（例：2月30日など）
-      const checkDate = new Date(request.year, request.month - 1, request.day, request.hour, request.minute, 0, 0);
-      if (checkDate.getFullYear() !== request.year ||
-          checkDate.getMonth() !== request.month - 1 ||
-          checkDate.getDate() !== request.day ||
-          checkDate.getHours() !== request.hour ||
-          checkDate.getMinutes() !== request.minute) {
+      const checkDate = new Date(year, month - 1, day, hour, minute, 0, 0);
+      if (checkDate.getFullYear() !== year ||
+          checkDate.getMonth() !== month - 1 ||
+          checkDate.getDate() !== day ||
+          checkDate.getHours() !== hour ||
+          checkDate.getMinutes() !== minute) {
         return {
           success: false,
           error: '無効な日付または時刻が指定されました'
         };
       }
 
-      // MockTimeProviderに設定
-      this.timeProvider.setMockDate(targetDate);
+      // TimeProviderService経由で時刻を設定
+      this.timeProviderService.setSimulatedTime(targetDate);
 
       // 各タイムゾーンでの表示時刻を計算
       const timezoneDisplays = this.calculateTimezoneDisplays(targetDate);
@@ -108,8 +120,8 @@ export class TimeSimulationService {
    */
   resetTime(): ApiResponse {
     try {
-      // 現在の実時刻に設定
-      this.timeProvider.setMockDate(new Date());
+      // シミュレーションモードを無効化（実時刻に戻す）
+      this.timeProviderService.disableSimulationMode();
       
       return {
         success: true,
@@ -128,7 +140,7 @@ export class TimeSimulationService {
    * 現在の設定時刻を取得
    */
   getCurrentTime(): { year: number; month: number; day: number; hour: number; minute: number; timezone: string } {
-    const currentTime = this.timeProvider.now();
+    const currentTime = this.timeProviderService.now();
     return {
       year: currentTime.getUTCFullYear(),
       month: currentTime.getUTCMonth() + 1,
@@ -162,6 +174,20 @@ export class TimeSimulationService {
     } catch {
       return false;
     }
+  }
+
+  /**
+   * TimeProviderServiceインスタンスを取得
+   */
+  getTimeProviderService(): TimeProviderService {
+    return this.timeProviderService;
+  }
+
+  /**
+   * タイムゾーン表示を計算（パブリック版）
+   */
+  calculateTimezoneDisplaysPublic(baseDate: Date): TimezoneDisplay[] {
+    return this.calculateTimezoneDisplays(baseDate);
   }
 
   /**
@@ -218,28 +244,40 @@ export class TimeSimulationService {
    * 入力検証
    */
   private validateTimeRequest(request: TimeSetRequest): string | null {
+    // 数値変換（文字列として受信される可能性があるため）
+    const year = parseInt(String(request.year), 10);
+    const month = parseInt(String(request.month), 10);
+    const day = parseInt(String(request.day), 10);
+    const hour = parseInt(String(request.hour), 10);
+    const minute = parseInt(String(request.minute), 10);
+
+    // 変換失敗チェック
+    if (isNaN(year) || isNaN(month) || isNaN(day) || isNaN(hour) || isNaN(minute)) {
+      return '数値形式が正しくありません';
+    }
+
     // 年の検証
-    if (!Number.isInteger(request.year) || request.year < 2020 || request.year > 2030) {
+    if (year < 2020 || year > 2030) {
       return '年は2020-2030の範囲で指定してください';
     }
 
     // 月の検証
-    if (!Number.isInteger(request.month) || request.month < 1 || request.month > 12) {
+    if (month < 1 || month > 12) {
       return '月は1-12の範囲で指定してください';
     }
 
     // 日の検証
-    if (!Number.isInteger(request.day) || request.day < 1 || request.day > 31) {
+    if (day < 1 || day > 31) {
       return '日は1-31の範囲で指定してください';
     }
 
     // 時間の検証
-    if (!Number.isInteger(request.hour) || request.hour < 0 || request.hour > 23) {
+    if (hour < 0 || hour > 23) {
       return '無効な時刻が指定されました（時間は0-23）';
     }
 
     // 分の検証
-    if (!Number.isInteger(request.minute) || request.minute < 0 || request.minute > 59) {
+    if (minute < 0 || minute > 59) {
       return '無効な時刻が指定されました（分は0-59）';
     }
 

@@ -27,6 +27,8 @@ import { MessageSelectionHandler } from '../handlers/messageSelectionHandler';
 import { TimezoneService } from '../services/timezoneService';
 import { ITimezoneService } from '../services/interfaces/ITimezoneService';
 import { ConfigService } from '../services/configService';
+import { ITimeProvider } from '../interfaces/dependencies';
+import { TimeProviderService } from '../services/timeProviderService';
 
 /**
  * 活動記録システム統合設定インターフェース
@@ -48,6 +50,8 @@ export interface ActivityLoggingConfig {
   targetUserId: string;
   /** 外部リポジトリの注入（テスト用） */
   repository?: SqliteActivityLogRepository;
+  /** 外部時刻プロバイダーの注入（テスト・シミュレーション用） */
+  timeProvider?: ITimeProvider;
 }
 
 /**
@@ -81,6 +85,7 @@ export class ActivityLoggingIntegration {
   // 設定
   private config: ActivityLoggingConfig;
   private isInitialized: boolean = false;
+  private timeProvider: ITimeProvider;
   
   // Bot インスタンス（コマンド処理用）
   private botInstance?: any;
@@ -91,6 +96,8 @@ export class ActivityLoggingIntegration {
 
   constructor(config: ActivityLoggingConfig) {
     this.config = config;
+    // TimeProviderの設定（注入された場合はそれを使用、そうでなければシングルトンから取得）
+    this.timeProvider = config.timeProvider || TimeProviderService.getInstance().getTimeProvider();
   }
 
   /**
@@ -161,7 +168,7 @@ export class ActivityLoggingIntegration {
         this.repository
       );
       this.logsHandler = new LogsCommandHandler(this.activityLogService);
-      this.timezoneHandler = new TimezoneHandler(this.repository);
+      this.timezoneHandler = new TimezoneHandler(this.repository, this.timezoneService, this.timeProvider);
       this.gapHandler = new GapHandler(
         this.gapDetectionService,
         this.activityLogService
