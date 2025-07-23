@@ -276,10 +276,7 @@ describe('AnalysisCacheService', () => {
         warnings: []
       };
 
-      await cacheService.setCache(userId, businessDate, analysisResult, 1);
-
-      // キャッシュが存在することを確認、ただしgetCacheはログ数をチェックするので、
-      // ログを1を追加しておく
+      // まずテストログを追加（ログ数を1にする）
       mockRepository.addTestLog({
         id: 'log-invalidate',
         userId,
@@ -290,6 +287,9 @@ describe('AnalysisCacheService', () => {
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString()
       });
+
+      // ログ数1でキャッシュを保存
+      await cacheService.setCache(userId, businessDate, analysisResult, 1);
       
       let cachedResult = await cacheService.getCache(userId, businessDate);
       expect(cachedResult).not.toBeNull();
