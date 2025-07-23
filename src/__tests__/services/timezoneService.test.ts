@@ -3,66 +3,25 @@
  */
 
 import { TimezoneService } from '../../services/timezoneService';
-import { IConfigService } from '../../interfaces/dependencies';
-import { IActivityLogRepository } from '../../repositories/activityLogRepository';
 
-describe('🔴 Red Phase: TimezoneServiceのテスト', () => {
+describe('TimezoneServiceのテスト', () => {
   let timezoneService: TimezoneService;
-  let mockConfigService: jest.Mocked<IConfigService>;
-  let mockRepository: any;
 
   beforeEach(() => {
-    mockConfigService = {
-      getDefaultTimezone: jest.fn().mockReturnValue('Asia/Tokyo'),
-      getDiscordToken: jest.fn(),
-      getGeminiApiKey: jest.fn(),
-      getDatabasePath: jest.fn(),
-      isDebugMode: jest.fn(),
-      getServerPort: jest.fn(),
-      validate: jest.fn()
-    };
+    // Cookieベースの実装のため、引数なしでインスタンス化
+    timezoneService = new TimezoneService();
+    
+    // 環境変数をテスト用に設定
+    process.env.TZ = 'Asia/Tokyo';
+  });
 
-    // モックリポジトリ（any型でgetUserTimezoneメソッドを追加）
-    mockRepository = {
-      saveLog: jest.fn(),
-      getLogsByBusinessDate: jest.fn(),
-      getBusinessDateInfo: jest.fn(),
-      saveAnalysisCache: jest.fn(),
-      getAnalysisCache: jest.fn(),
-      getDailyAnalysisResult: jest.fn(),
-      // 追加のメソッド（SqliteActivityLogRepositoryにのみ存在）
-      getUserTimezone: jest.fn(),
-      saveUserTimezone: jest.fn()
-    } as any;
-
-    timezoneService = new TimezoneService(mockConfigService, mockRepository);
+  afterEach(() => {
+    // 環境変数のクリーンアップ
+    delete process.env.ADMIN_DISPLAY_TIMEZONE;
   });
 
   describe('getUserTimezone', () => {
-    test('ユーザー設定が存在する場合はそれを返す', async () => {
-      // ユーザー設定でAsia/Kolkataが設定されている場合
-      (mockRepository as any).getUserTimezone.mockResolvedValue('Asia/Kolkata');
-
-      const result = await timezoneService.getUserTimezone('user123');
-
-      expect(result).toBe('Asia/Kolkata');
-      expect(mockRepository.getUserTimezone).toHaveBeenCalledWith('user123');
-    });
-
-    test('ユーザー設定が存在しない場合はシステムデフォルトを返す', async () => {
-      // ユーザー設定が存在しない場合
-      (mockRepository as any).getUserTimezone.mockResolvedValue(null);
-
-      const result = await timezoneService.getUserTimezone('user123');
-
-      expect(result).toBe('Asia/Tokyo');
-      expect(mockConfigService.getDefaultTimezone).toHaveBeenCalled();
-    });
-
-    test('リポジトリエラー時はシステムデフォルトを返す', async () => {
-      // データベースエラーが発生した場合
-      (mockRepository as any).getUserTimezone.mockRejectedValue(new Error('DB Error'));
-
+    test('常にシステムデフォルトを返す（現在未使用機能）', async () => {
       const result = await timezoneService.getUserTimezone('user123');
 
       expect(result).toBe('Asia/Tokyo');
@@ -70,28 +29,45 @@ describe('🔴 Red Phase: TimezoneServiceのテスト', () => {
   });
 
   describe('getSystemTimezone', () => {
-    test('ConfigServiceからデフォルトタイムゾーンを取得する', () => {
+    test('環境変数TZからタイムゾーンを取得する', () => {
       const result = timezoneService.getSystemTimezone();
 
       expect(result).toBe('Asia/Tokyo');
-      expect(mockConfigService.getDefaultTimezone).toHaveBeenCalled();
+    });
+
+    test('環境変数が未設定の場合はデフォルトを返す', () => {
+      delete process.env.TZ;
+      
+      const result = timezoneService.getSystemTimezone();
+
+      expect(result).toBe('Asia/Tokyo');
     });
   });
 
   describe('getAdminDisplayTimezone', () => {
-    test('セッションタイムゾーンが有効な場合はそれを返す', () => {
+    test('Cookieタイムゾーンが有効な場合はそれを返す', () => {
       const result = timezoneService.getAdminDisplayTimezone('UTC');
 
       expect(result).toBe('UTC');
     });
 
-    test('セッションタイムゾーンが無効な場合はシステムデフォルトを返す', () => {
+    test('Cookieタイムゾーンが無効な場合はシステムデフォルトを返す', () => {
       const result = timezoneService.getAdminDisplayTimezone('Invalid/Timezone');
 
       expect(result).toBe('Asia/Tokyo');
     });
 
-    test('セッションタイムゾーンがない場合はシステムデフォルトを返す', () => {
+    test('Cookieタイムゾーンがない場合は環境変数を確認する', () => {
+      process.env.ADMIN_DISPLAY_TIMEZONE = 'Asia/Kolkata';
+
+      const result = timezoneService.getAdminDisplayTimezone();
+
+      expect(result).toBe('Asia/Kolkata');
+    });
+
+    test('Cookie・環境変数ともにない場合はシステムデフォルトを返す', () => {
+      delete process.env.ADMIN_DISPLAY_TIMEZONE;
+
       const result = timezoneService.getAdminDisplayTimezone();
 
       expect(result).toBe('Asia/Tokyo');

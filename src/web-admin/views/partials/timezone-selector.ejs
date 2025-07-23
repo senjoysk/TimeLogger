@@ -1,4 +1,5 @@
 <!-- タイムゾーン選択コンポーネント -->
+<!-- Debug: adminTimezone = <%= adminTimezone %> -->
 <div class="timezone-selector">
   <div class="flex items-center space-x-2">
     <label for="timezone-select" class="text-sm font-medium text-gray-700">
@@ -19,8 +20,11 @@
         return timezoneNames[timezone] || timezone;
       }
       
-      supportedTimezones.forEach(function(tz) { %>
-        <option value="<%= tz %>" <%= tz === adminTimezone ? 'selected' : '' %>>
+      supportedTimezones.forEach(function(tz) { 
+        const isSelected = tz === adminTimezone;
+      %>
+        <!-- Debug: tz=<%= tz %>, adminTimezone=<%= adminTimezone %>, selected=<%= isSelected %> -->
+        <option value="<%= tz %>" <%= isSelected ? 'selected' : '' %>>
           <%= getTimezoneDisplay(tz) %>
         </option>
       <% }); %>
@@ -32,9 +36,14 @@
 </div>
 
 <script>
-// タイムゾーン変更処理
+// タイムゾーン変更処理（Cookieベース）
 function changeTimezone(newTimezone) {
-  fetch('/admin/api/timezone', {
+  const selector = document.getElementById('timezone-select');
+  const originalValue = selector.value;
+  selector.disabled = true;
+  
+  // 1. サーバーAPIで検証とCookie保存
+  fetch('/admin/timezone', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -44,23 +53,74 @@ function changeTimezone(newTimezone) {
   .then(response => response.json())
   .then(data => {
     if (data.success) {
-      // ページを再読み込みして新しいタイムゾーンを反映
-      window.location.reload();
+      // 2. JavaScriptでもCookieを設定（即座反映用）
+      document.cookie = `adminTimezone=${newTimezone}; path=/admin; max-age=${365*24*60*60}`;
+      
+      // 3. UI更新
+      selector.disabled = false;
+      updateCurrentTime();
+      showTimezoneUpdateFeedback('success', 'タイムゾーンが変更されました');
+      
+      console.log(`✅ タイムゾーン変更成功: ${originalValue} → ${newTimezone}`);
     } else {
-      alert('タイムゾーンの変更に失敗しました: ' + data.error);
+      // エラー時: 元の値に戻す
+      selector.value = originalValue;
+      selector.disabled = false;
+      showTimezoneUpdateFeedback('error', 'タイムゾーンの変更に失敗しました: ' + data.error);
     }
   })
   .catch(error => {
-    console.error('Error:', error);
-    alert('タイムゾーンの変更中にエラーが発生しました');
+    console.error('タイムゾーン変更エラー:', error);
+    selector.value = originalValue;
+    selector.disabled = false;
+    showTimezoneUpdateFeedback('error', 'タイムゾーンの変更中にエラーが発生しました');
   });
+}
+
+// タイムゾーン更新フィードバック表示
+function showTimezoneUpdateFeedback(type, message) {
+  // 既存のフィードバック要素を削除
+  const existingFeedback = document.getElementById('timezone-feedback');
+  if (existingFeedback) {
+    existingFeedback.remove();
+  }
+  
+  // 新しいフィードバック要素を作成
+  const feedback = document.createElement('div');
+  feedback.id = 'timezone-feedback';
+  feedback.className = `fixed top-4 right-4 p-3 rounded-md shadow-lg z-50 ${
+    type === 'success' 
+      ? 'bg-green-100 border border-green-400 text-green-700' 
+      : 'bg-red-100 border border-red-400 text-red-700'
+  }`;
+  feedback.textContent = message;
+  
+  document.body.appendChild(feedback);
+  
+  // 3秒後に自動削除
+  setTimeout(() => {
+    if (document.getElementById('timezone-feedback')) {
+      feedback.remove();
+    }
+  }, 3000);
 }
 
 // 現在時刻の表示更新
 function updateCurrentTime() {
   const now = new Date();
+  // 現在選択されているタイムゾーンを取得
+  const selector = document.getElementById('timezone-select');
+  let currentTimezone = '<%= adminTimezone %>';
+  
+  // セレクターが存在し、valueが設定されている場合のみ使用
+  if (selector && selector.value) {
+    currentTimezone = selector.value;
+  }
+  
+  console.log('[updateCurrentTime] Using timezone:', currentTimezone);
+  
   const timeString = now.toLocaleString('ja-JP', {
-    timeZone: '<%= adminTimezone %>',
+    timeZone: currentTimezone,
     year: 'numeric',
     month: '2-digit',
     day: '2-digit',
@@ -68,8 +128,68 @@ function updateCurrentTime() {
     minute: '2-digit',
     second: '2-digit'
   });
-  document.getElementById('current-time').textContent = timeString;
+  
+  const timeElement = document.getElementById('current-time');
+  if (timeElement) {
+    timeElement.textContent = timeString;
+  }
 }
+
+// ページ読み込み時のデバッグと修正
+document.addEventListener('DOMContentLoaded', function() {
+  const selector = document.getElementById('timezone-select');
+  console.log('[DOMContentLoaded] Initial selector value:', selector ? selector.value : 'selector not found');
+  console.log('[DOMContentLoaded] adminTimezone from server:', '<%= adminTimezone %>');
+  
+  // セレクターの各オプションをチェック
+  if (selector) {
+    const options = selector.options;
+    for (let i = 0; i < options.length; i++) {
+      console.log(`[DOMContentLoaded] Option ${i}: value="${options[i].value}" selected="${options[i].selected}"`);
+    }
+    
+    // APIから現在のタイムゾーン設定を取得して修正
+    console.log('[DOMContentLoaded] Fetching timezone from API...');
+    const basePath = window.location.pathname.startsWith('/admin') ? '/admin' : '';
+    const apiUrl = `${basePath}/timezone`; // 正しいパス構造
+    console.log('[DOMContentLoaded] API URL:', apiUrl);
+    fetch(apiUrl)
+      .then(response => {
+        console.log('[DOMContentLoaded] API response status:', response.status);
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        return response.json();
+      })
+      .then(data => {
+        console.log('[DOMContentLoaded] API response data:', JSON.stringify(data, null, 2));
+        if (data.success) {
+          const currentValue = selector.value;
+          const correctValue = data.timezone;
+          console.log(`[DOMContentLoaded] Timezone comparison: current="${currentValue}" correct="${correctValue}"`);
+          
+          if (correctValue !== currentValue) {
+            console.log(`[DOMContentLoaded] ✅ Correcting timezone from ${currentValue} to ${correctValue}`);
+            selector.value = correctValue;
+            updateCurrentTime();
+            
+            // セレクターの状態を再度確認
+            console.log(`[DOMContentLoaded] After correction: selector.value="${selector.value}"`);
+          } else {
+            console.log('[DOMContentLoaded] ✅ Timezone is already correct');
+          }
+        } else {
+          console.error('[DOMContentLoaded] ❌ API request failed:', data.error || 'Unknown error');
+        }
+      })
+      .catch(error => {
+        console.error('[DOMContentLoaded] ❌ Failed to fetch current timezone:');
+        console.error('  Error type:', error.constructor.name);
+        console.error('  Error message:', error.message);
+        console.error('  Stack trace:', error.stack);
+      });
+  }
+});
 
 // 1秒ごとに現在時刻を更新
 setInterval(updateCurrentTime, 1000);

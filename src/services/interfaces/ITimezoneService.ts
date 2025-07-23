@@ -1,6 +1,6 @@
 /**
- * タイムゾーンサービスインターフェース
- * ユーザー個別タイムゾーン管理とシステムデフォルト管理を抽象化
+ * タイムゾーンサービスインターフェース（Cookieベース）
+ * Web管理画面用の表示タイムゾーン管理を抽象化
  */
 
 export interface ITimezoneService {
@@ -19,12 +19,12 @@ export interface ITimezoneService {
   getSystemTimezone(): string;
 
   /**
-   * Web管理画面表示用タイムゾーンを取得
-   * セッションまたはデフォルト設定を返す
-   * @param sessionTimezone セッションで設定されたタイムゾーン（オプション）
+   * Web管理画面表示用タイムゾーンを取得（Cookieベース）
+   * 優先順位: Cookie設定 > 環境変数 > システムデフォルト
+   * @param cookieTimezone Cookieで設定されたタイムゾーン（オプション）
    * @returns 表示用タイムゾーン文字列
    */
-  getAdminDisplayTimezone(sessionTimezone?: string): string;
+  getAdminDisplayTimezone(cookieTimezone?: string): string;
 
   /**
    * サポートされるタイムゾーン一覧を取得

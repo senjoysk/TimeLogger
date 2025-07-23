@@ -20,8 +20,8 @@ export function createTableRoutes(adminService: AdminService, securityService: S
         tables,
         environment,
         basePath: req.app.locals.basePath || '',
-        supportedTimezones: ['Asia/Tokyo', 'Asia/Kolkata', 'UTC'],
-        adminTimezone: 'Asia/Tokyo'
+        supportedTimezones: res.locals.supportedTimezones,
+        adminTimezone: res.locals.adminTimezone
       });
     } catch (error) {
       console.error('Table list error:', error);
@@ -81,8 +81,8 @@ export function createTableRoutes(adminService: AdminService, securityService: S
         pagination: result.pagination,
         environment,
         basePath: req.app.locals.basePath || '',
-        supportedTimezones: ['Asia/Tokyo', 'Asia/Kolkata', 'UTC'],
-        adminTimezone: 'Asia/Tokyo',
+        supportedTimezones: res.locals.supportedTimezones,
+        adminTimezone: res.locals.adminTimezone,
         filters: {
           userId: userId || '',
           dateFrom: dateFrom || '',

@@ -11,9 +11,7 @@ import { createTodoRouter } from './todos';
 import { createTimeSimulationRouter } from './timeSimulation';
 import { createSummaryTestRouter } from './summaryTest';
 import { createTimezoneRouter } from './timezone';
-import { TimezoneService } from '../../services/timezoneService';
-
-export function createRoutes(adminService: AdminService, securityService: SecurityService, databasePath: string, bot?: any, timezoneService?: TimezoneService): Router {
+export function createRoutes(adminService: AdminService, securityService: SecurityService, databasePath: string, bot?: any): Router {
   const router = Router();
 
   // すべてのレスポンスにbasePathを追加するミドルウェア
@@ -31,10 +29,8 @@ export function createRoutes(adminService: AdminService, securityService: Securi
   // TODO管理
   router.use('/todos', createTodoRouter(databasePath));
 
-  // タイムゾーンAPI
-  if (timezoneService) {
-    router.use('/api', createTimezoneRouter(timezoneService));
-  }
+  // タイムゾーンAPI（Cookieベース）
+  router.use('/', createTimezoneRouter());
 
   // 開発ツール（GitHub Issue #37）- Production環境では無効化
   if (securityService.getEnvironment().env !== 'production') {
@@ -47,8 +43,8 @@ export function createRoutes(adminService: AdminService, securityService: Securi
         title: '時刻シミュレーション',
         environment: securityService.getEnvironment(),
         basePath: req.app.locals.basePath || '',
-        supportedTimezones: ['Asia/Tokyo', 'Asia/Kolkata', 'UTC'],
-        adminTimezone: 'Asia/Tokyo'
+        supportedTimezones: res.locals.supportedTimezones,
+        adminTimezone: res.locals.adminTimezone
       });
     });
 
@@ -57,8 +53,8 @@ export function createRoutes(adminService: AdminService, securityService: Securi
         title: 'サマリーテスト',
         environment: securityService.getEnvironment(),
         basePath: req.app.locals.basePath || '',
-        supportedTimezones: ['Asia/Tokyo', 'Asia/Kolkata', 'UTC'],
-        adminTimezone: 'Asia/Tokyo'
+        supportedTimezones: res.locals.supportedTimezones,
+        adminTimezone: res.locals.adminTimezone
       });
     });
   } else {

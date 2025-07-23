@@ -1,68 +1,54 @@
 /**
- * タイムゾーンサービス実装
- * ユーザー個別タイムゾーン管理とシステムデフォルト管理を提供
+ * タイムゾーン管理サービス（Cookieベース）
+ * 
+ * Web管理画面用のタイムゾーン表示設定を管理
+ * Cookieベースの実装により、DBアクセスは不要
  */
 
 import { ITimezoneService } from './interfaces/ITimezoneService';
-import { IConfigService } from '../interfaces/dependencies';
-import { IActivityLogRepository } from '../repositories/activityLogRepository';
 
 export class TimezoneService implements ITimezoneService {
-  constructor(
-    private configService: IConfigService,
-    private repository: IActivityLogRepository
-  ) {}
+  constructor() {
+    // Cookieベースなので設定は不要
+  }
 
   /**
-   * ユーザーのタイムゾーンを取得
-   * 優先順位: ユーザー設定 > システムデフォルト
+   * ユーザーのタイムゾーンを取得（継承用メソッド）
    */
   async getUserTimezone(userId: string): Promise<string> {
-    try {
-      // 1. データベースからユーザー設定取得
-      // SqliteActivityLogRepositoryには getUserTimezone メソッドが存在するため型チェック
-      if (this.repository && 'getUserTimezone' in this.repository) {
-        const repositoryWithTimezone = this.repository as any;
-        const userTimezone = await repositoryWithTimezone.getUserTimezone(userId);
-        if (userTimezone) {
-          return userTimezone;
-        }
-      }
-
-      // 2. システムデフォルト
-      return this.getSystemTimezone();
-
-    } catch (error) {
-      console.warn(`ユーザータイムゾーン取得エラー (${userId}):`, error);
-      return this.getSystemTimezone();
-    }
+    // 現在はメイン機能で使用されていないため、デフォルト値を返す
+    return 'Asia/Tokyo';
   }
 
   /**
-   * システムデフォルトタイムゾーンを取得
+   * システムタイムゾーンを取得
    */
   getSystemTimezone(): string {
-    return this.configService.getDefaultTimezone();
+    return process.env.TZ || 'Asia/Tokyo';
   }
 
   /**
-   * Web管理画面表示用タイムゾーンを取得
-   * セッションまたはデフォルト設定を返す
+   * Web管理画面表示用タイムゾーンを取得（Cookieベース）
+   * 優先順：1. Cookie値 → 2. 環境変数 → 3. システムデフォルト
    */
-  getAdminDisplayTimezone(sessionTimezone?: string): string {
-    // 1. セッション設定が優先
-    if (sessionTimezone && this.validateTimezone(sessionTimezone)) {
-      return sessionTimezone;
+  getAdminDisplayTimezone(cookieTimezone?: string): string {
+    // 1. Cookie設定が優先
+    if (cookieTimezone && this.validateTimezone(cookieTimezone)) {
+      console.log(`[TimezoneService] Cookieタイムゾーンを使用: ${cookieTimezone}`);
+      return cookieTimezone;
     }
 
     // 2. 環境変数設定
     const adminTimezone = process.env.ADMIN_DISPLAY_TIMEZONE;
     if (adminTimezone && this.validateTimezone(adminTimezone)) {
+      console.log(`[TimezoneService] 環境変数タイムゾーンを使用: ${adminTimezone}`);
       return adminTimezone;
     }
 
     // 3. システムデフォルト
-    return this.getSystemTimezone();
+    const systemTimezone = this.getSystemTimezone();
+    console.log(`[TimezoneService] システムデフォルトを使用: ${systemTimezone}`);
+    return systemTimezone;
   }
 
   /**

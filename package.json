@@ -79,7 +79,9 @@
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",
+    "@types/cookie-parser": "^1.4.9",
     "@types/supertest": "^6.0.3",
+    "cookie-parser": "^1.4.7",
     "date-fns": "^4.1.0",
     "date-fns-tz": "^3.2.0",
     "discord.js": "^14.14.1",
@@ -87,7 +89,6 @@
     "ejs": "^3.1.10",
     "express": "^5.1.0",
     "express-basic-auth": "^1.2.1",
-    "express-session": "^1.18.2",
     "http-proxy-middleware": "^3.0.5",
     "node-cron": "^3.0.3",
     "sqlite3": "^5.1.6",

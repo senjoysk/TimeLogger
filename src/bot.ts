@@ -820,7 +820,8 @@ export class TaskLoggerBot {
    * システム初期化が完了しているかチェック
    */
   public isSystemInitialized(): boolean {
-    return this.activityLoggingIntegration !== undefined;
+    return this.activityLoggingIntegration !== undefined && 
+           this.activityLoggingIntegration.getRepository() !== undefined;
   }
 
   /**

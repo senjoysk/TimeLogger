@@ -5,13 +5,11 @@
 
 import express from 'express';
 import basicAuth from 'express-basic-auth';
-const session = require('express-session');
 import path from 'path';
 import { AdminService } from './services/adminService';
 import { SecurityService } from './services/securityService';
 import { AdminRepository } from './repositories/adminRepository';
 import { SqliteActivityLogRepository } from '../repositories/sqliteActivityLogRepository';
-import { TimezoneService } from '../services/timezoneService';
 import { createTimezoneMiddleware } from './middleware/timezoneMiddleware';
 import { createRoutes } from './routes';
 import { errorHandler } from './middleware/errorHandler';
@@ -20,7 +18,6 @@ export class AdminServer {
   private app: express.Application;
   private adminService: AdminService;
   private securityService: SecurityService;
-  private timezoneService: TimezoneService;
   private port: number;
   private databasePath: string;
   private sqliteRepo: SqliteActivityLogRepository;
@@ -32,24 +29,10 @@ export class AdminServer {
     
     // サービスの初期化
     this.sqliteRepo = new SqliteActivityLogRepository(databasePath);
+    console.log(`[AdminServer] Repository created for: ${databasePath}`);
     const adminRepo = new AdminRepository(this.sqliteRepo);
     this.adminService = new AdminService(adminRepo);
     this.securityService = new SecurityService();
-    
-    // TimezoneServiceの初期化に必要な依存関係を提供
-    const configService = {
-      getSystemTimezone: () => process.env.TZ || 'Asia/Tokyo',
-      getDefaultTimezone: () => 'Asia/Tokyo',
-      getDiscordToken: () => process.env.DISCORD_TOKEN || '',
-      getGeminiApiKey: () => process.env.GEMINI_API_KEY || '',
-      getDatabasePath: () => this.databasePath,
-      getServerPort: () => this.port,
-      isDebugMode: () => process.env.NODE_ENV === 'development',
-      getEnvironment: () => process.env.NODE_ENV || 'development',
-      getLogLevel: () => process.env.LOG_LEVEL || 'info',
-      validate: () => true
-    };
-    this.timezoneService = new TimezoneService(configService, this.sqliteRepo);
     
     this.setupMiddleware();
     this.setupRoutes();
@@ -102,19 +85,11 @@ export class AdminServer {
     this.app.use(express.json());
     this.app.use(express.urlencoded({ extended: true }));
 
-    // セッション設定
-    this.app.use(session({
-      secret: process.env.SESSION_SECRET || 'timelogger-admin-secret-key',
-      resave: false,
-      saveUninitialized: false,
-      cookie: {
-        secure: false, // HTTP環境でも動作するよう設定
-        maxAge: 24 * 60 * 60 * 1000 // 24時間
-      }
-    }));
-
-    // タイムゾーンミドルウェア
-    this.app.use(createTimezoneMiddleware(this.timezoneService));
+    // Cookie解析（タイムゾーン設定用）
+    this.app.use(require('cookie-parser')());
+    
+    // タイムゾーンミドルウェア（Cookieベース）
+    this.app.use(createTimezoneMiddleware());
 
     // セキュリティヘッダー
     this.app.use((req, res, next) => {
@@ -122,7 +97,11 @@ export class AdminServer {
         'X-Content-Type-Options': 'nosniff',
         'X-Frame-Options': 'DENY',
         'X-XSS-Protection': '1; mode=block',
-        'Strict-Transport-Security': 'max-age=31536000; includeSubDomains'
+        'Strict-Transport-Security': 'max-age=31536000; includeSubDomains',
+        // キャッシュ無効化（開発環境のみ）
+        'Cache-Control': process.env.NODE_ENV === 'development' ? 'no-store, no-cache, must-revalidate' : 'private',
+        'Pragma': process.env.NODE_ENV === 'development' ? 'no-cache' : undefined,
+        'Expires': process.env.NODE_ENV === 'development' ? '0' : undefined
       });
       next();
     });
@@ -139,7 +118,7 @@ export class AdminServer {
     this.app.set('databasePath', this.databasePath);
     
     // ルーティング設定
-    this.app.use('/', createRoutes(this.adminService, this.securityService, this.databasePath, this.bot, this.timezoneService));
+    this.app.use('/', createRoutes(this.adminService, this.securityService, this.databasePath, this.bot));
     
     // エラーハンドラー（最後に設定）
     this.app.use(errorHandler);

@@ -40,8 +40,8 @@ export function createDashboardRoutes(adminService: AdminService, securityServic
         tables: tableSummaries,
         environment,
         basePath: req.app.locals.basePath || '',
-        supportedTimezones: ['Asia/Tokyo', 'Asia/Kolkata', 'UTC'],
-        adminTimezone: 'Asia/Tokyo'
+        supportedTimezones: res.locals.supportedTimezones,
+        adminTimezone: res.locals.adminTimezone
       });
     } catch (error) {
       console.error('Dashboard error:', error);

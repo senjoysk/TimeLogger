@@ -44,7 +44,7 @@ export class Scheduler {
   private readonly logger: ILogger;
   private readonly timeProvider: ITimeProvider;
   private readonly configService: IConfigService;
-  private readonly activityPromptRepository: IActivityPromptRepository;
+  private readonly activityPromptRepository: IActivityPromptRepository | undefined;
 
   constructor(
     bot: TaskLoggerBot, 
@@ -59,8 +59,21 @@ export class Scheduler {
     this.logger = dependencies?.logger || new ConsoleLogger();
     this.timeProvider = dependencies?.timeProvider || new RealTimeProvider();
     this.configService = dependencies?.configService || new ConfigService();
-    this.activityPromptRepository = dependencies?.activityPromptRepository || 
-      new ActivityPromptRepository(this.repository.getDatabase());
+    
+    // リポジトリが有効な場合のみActivityPromptRepositoryを初期化
+    if (this.repository && typeof this.repository.getDatabase === 'function') {
+      try {
+        this.activityPromptRepository = dependencies?.activityPromptRepository || 
+          new ActivityPromptRepository(this.repository.getDatabase());
+      } catch (error) {
+        console.warn('⚠️ ActivityPromptRepository初期化に失敗しました:', error);
+        // デフォルトのダミー実装で継続
+        this.activityPromptRepository = dependencies?.activityPromptRepository;
+      }
+    } else {
+      console.warn('⚠️ リポジトリが利用できないため、ActivityPromptRepositoryは後で初期化されます');
+      this.activityPromptRepository = dependencies?.activityPromptRepository;
+    }
   }
 
   /**
@@ -193,6 +206,10 @@ export class Scheduler {
           }
           
           // 該当時刻に通知すべきユーザーかチェック
+          if (!this.activityPromptRepository) {
+            // ActivityPromptRepositoryが未初期化の場合はスキップ
+            continue;
+          }
           const usersToPrompt = await this.activityPromptRepository.getUsersToPromptAt(localHour, localMinute);
           
           if (usersToPrompt.includes(user.userId)) {

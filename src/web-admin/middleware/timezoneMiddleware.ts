@@ -1,37 +1,46 @@
 /**
- * Web管理アプリ用タイムゾーンミドルウェア
+ * Web管理アプリ用タイムゾーンミドルウェア（Cookieベース）
  */
 
 import { Request, Response, NextFunction } from 'express';
-import { ITimezoneService } from '../../services/interfaces/ITimezoneService';
-import 'express-session';
 
 // Expressのリクエストオブジェクトを拡張
 declare global {
   namespace Express {
     interface Request {
       adminTimezone?: string;
-      timezoneService?: ITimezoneService;
     }
   }
 }
 
 /**
- * Web管理アプリ用タイムゾーンミドルウェア
+ * Cookieベースのタイムゾーンミドルウェア
+ * シンプルにCookieから値を取得し、res.localsに設定
  */
-export function createTimezoneMiddleware(timezoneService: ITimezoneService) {
+export function createTimezoneMiddleware() {
   return (req: Request, res: Response, next: NextFunction) => {
-    // セッションからタイムゾーン設定を取得
-    const sessionTimezone = (req as any).session?.adminTimezone as string;
-    
-    // 管理者表示用タイムゾーンを解決
-    req.adminTimezone = timezoneService.getAdminDisplayTimezone(sessionTimezone);
-    req.timezoneService = timezoneService;
-    
-    // EJSテンプレート用のローカル変数を設定
-    res.locals.adminTimezone = req.adminTimezone;
-    res.locals.supportedTimezones = timezoneService.getSupportedTimezones();
-    
-    next();
+    try {
+      // Cookieからタイムゾーンを取得（デフォルト: Asia/Tokyo）
+      const adminTimezone = req.cookies.adminTimezone || 'Asia/Tokyo';
+      
+      console.log(`[TimezoneMiddleware] Cookie timezone: ${adminTimezone}`);
+      
+      // リクエストとレスポンスローカル変数に設定
+      req.adminTimezone = adminTimezone;
+      res.locals.adminTimezone = adminTimezone;
+      res.locals.supportedTimezones = ['Asia/Tokyo', 'Asia/Kolkata', 'UTC'];
+      
+      next();
+    } catch (error) {
+      console.error('タイムゾーンミドルウェアエラー:', error);
+      
+      // エラー時のフォールバック
+      const fallbackTimezone = 'Asia/Tokyo';
+      req.adminTimezone = fallbackTimezone;
+      res.locals.adminTimezone = fallbackTimezone;
+      res.locals.supportedTimezones = ['Asia/Tokyo', 'Asia/Kolkata', 'UTC'];
+      
+      next();
+    }
   };
 }

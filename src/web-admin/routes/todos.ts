@@ -78,8 +78,8 @@ router.get('/', async (req, res, next) => {
       title: 'TODO管理',
       environment,
       basePath: req.app.locals.basePath || '',
-      supportedTimezones: ['Asia/Tokyo', 'Asia/Kolkata', 'UTC'],
-      adminTimezone: 'Asia/Tokyo',
+      supportedTimezones: res.locals.supportedTimezones,
+      adminTimezone: res.locals.adminTimezone,
       todos,
       overdueTodos,
       users,
@@ -123,8 +123,8 @@ router.get('/new', async (req, res, next) => {
       title: '新規TODO作成',
       environment,
       basePath: req.app.locals.basePath || '',
-      supportedTimezones: ['Asia/Tokyo', 'Asia/Kolkata', 'UTC'],
-      adminTimezone: 'Asia/Tokyo',
+      supportedTimezones: res.locals.supportedTimezones,
+      adminTimezone: res.locals.adminTimezone,
       users,
       todo: null, // 新規作成の場合
       action: `${req.app.locals.basePath || ''}/todos`
@@ -202,8 +202,8 @@ router.get('/:id/edit', async (req, res, next) => {
       title: 'TODO編集',
       environment,
       basePath: req.app.locals.basePath || '',
-      supportedTimezones: ['Asia/Tokyo', 'Asia/Kolkata', 'UTC'],
-      adminTimezone: 'Asia/Tokyo',
+      supportedTimezones: res.locals.supportedTimezones,
+      adminTimezone: res.locals.adminTimezone,
       users,
       todo,
       action: `${req.app.locals.basePath || ''}/todos/${todoId}`

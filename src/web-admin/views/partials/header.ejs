@@ -9,7 +9,7 @@
             <div class="flex items-center space-x-4">
                 <!-- Timezone Selector -->
                 <% if (typeof supportedTimezones !== 'undefined' && typeof adminTimezone !== 'undefined') { %>
-                    <%- include('timezone-selector') %>
+                    <%- include('timezone-selector', { adminTimezone: adminTimezone, supportedTimezones: supportedTimezones }) %>
                 <% } %>
                 
                 <!-- Environment Badge -->

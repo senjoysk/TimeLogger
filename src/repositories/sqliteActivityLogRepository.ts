@@ -155,6 +155,10 @@ export class SqliteActivityLogRepository implements IActivityLogRepository, IApi
       
       if (isUnifiedDbReady) {
         console.log('✅ 統一データベースが既に存在、マイグレーション処理をスキップ');
+        
+        // 新しいテーブルが追加された場合のための追加処理
+        await this.ensureNewTablesExist();
+        
         this.connected = true;
         return;
       }
@@ -2061,6 +2065,16 @@ export class SqliteActivityLogRepository implements IActivityLogRepository, IApi
       console.error('❌ 統一DB状態チェックエラー:', error);
       return false;
     }
+  }
+
+  /**
+   * 新しく追加されたテーブルの存在を確認し、必要に応じて作成
+   * 注意: web_admin_preferences テーブルはCookieベース実装により廃止済み
+   */
+  private async ensureNewTablesExist(): Promise<void> {
+    // 現在は新しいテーブルの作成は不要
+    // 将来的に新しいテーブルが必要になった場合はここに追加
+    console.log('✅ 新テーブル確認完了（現在は追加テーブルなし）');
   }
 
   /**
