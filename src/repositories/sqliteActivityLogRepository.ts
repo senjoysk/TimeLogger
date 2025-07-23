@@ -159,8 +159,9 @@ export class SqliteActivityLogRepository implements IActivityLogRepository, IApi
     try {
       // 統一データベースが既に作成済みかチェック
       const isUnifiedDbReady = await this.checkUnifiedDatabaseReady();
+      const forceMigrations = process.env.FORCE_MIGRATIONS === 'true';
       
-      if (isUnifiedDbReady) {
+      if (isUnifiedDbReady && !forceMigrations) {
         console.log('✅ 統一データベースが既に存在、マイグレーション処理をスキップ');
         
         // 新しいテーブルが追加された場合のための追加処理
@@ -168,6 +169,10 @@ export class SqliteActivityLogRepository implements IActivityLogRepository, IApi
         
         this.connected = true;
         return;
+      }
+      
+      if (forceMigrations) {
+        console.log('⚠️ FORCE_MIGRATIONS=true: マイグレーションを強制実行します');
       }
       
       console.log('🔧 統一データベースが未作成、通常の初期化処理を実行');
