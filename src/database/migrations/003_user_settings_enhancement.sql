@@ -6,16 +6,24 @@
 -- user_settingsテーブルの拡張
 -- ユーザー名、初回・最終利用日時、アクティブ状態フラグを追加
 
--- Step 1: username カラムを追加
+-- 冪等性のため、user_settingsテーブルが存在しない場合は作成
+CREATE TABLE IF NOT EXISTS user_settings (
+    user_id TEXT PRIMARY KEY,
+    timezone TEXT NOT NULL DEFAULT 'Asia/Tokyo',
+    created_at TEXT NOT NULL DEFAULT (datetime('now', 'utc')),
+    updated_at TEXT NOT NULL DEFAULT (datetime('now', 'utc'))
+);
+
+-- Step 1: username カラムを追加（既に存在する場合はエラーを無視）
+-- SQLiteはALTER TABLE ADD COLUMN IF NOT EXISTSをサポートしていないため、
+-- エラーが発生する可能性があるが、新マイグレーションシステムで適切に処理される
+
+-- 以下のカラムが存在しない場合のみ追加を試行
+-- （SQLiteの制限により、カラム存在チェックはアプリケーション層で行う）
+
 ALTER TABLE user_settings ADD COLUMN username TEXT;
-
--- Step 2: first_seen カラムを追加（初回利用日時）
 ALTER TABLE user_settings ADD COLUMN first_seen TEXT;
-
--- Step 3: last_seen カラムを追加（最終利用日時）
 ALTER TABLE user_settings ADD COLUMN last_seen TEXT;
-
--- Step 4: is_active フラグを追加（アクティブ状態）
 ALTER TABLE user_settings ADD COLUMN is_active BOOLEAN DEFAULT TRUE;
 
 -- Step 5: パフォーマンス最適化のためのインデックス作成

@@ -11,7 +11,7 @@ import {
   IActivityLogRepository,
   LogSearchCriteria
 } from './activityLogRepository';
-import { IApiCostRepository, ITodoRepository, IMessageClassificationRepository, IUserRepository, UserInfo, UserStats } from './interfaces';
+import { IApiCostRepository, ITodoRepository, IMessageClassificationRepository, IUserRepository, IActivityPromptRepository, UserInfo, UserStats } from './interfaces';
 import {
   ActivityLog,
   CreateActivityLogRequest,
@@ -32,6 +32,7 @@ import {
   MessageClassification,
   TodoError
 } from '../types/todo';
+import { ActivityPromptSettings, CreateActivityPromptSettingsRequest, UpdateActivityPromptSettingsRequest } from '../types/activityPrompt';
 import * as fs from 'fs';
 import * as path from 'path';
 import { ITimezoneService } from '../services/interfaces/ITimezoneService';
@@ -40,7 +41,7 @@ import { ITimezoneService } from '../services/interfaces/ITimezoneService';
  * SQLite実装クラス
  * 活動ログ、APIコストモニタリング、TODO管理、メッセージ分類の統合実装
  */
-export class SqliteActivityLogRepository implements IActivityLogRepository, IApiCostRepository, ITodoRepository, IMessageClassificationRepository, IUserRepository {
+export class SqliteActivityLogRepository implements IActivityLogRepository, IApiCostRepository, ITodoRepository, IMessageClassificationRepository, IUserRepository, IActivityPromptRepository {
   private db: Database;
   private connected: boolean = false;
   private migrationManager: MigrationManager;
@@ -184,13 +185,17 @@ export class SqliteActivityLogRepository implements IActivityLogRepository, IApi
         console.log(`  環境: NODE_ENV=${process.env.NODE_ENV}`);
         
         try {
-          // マイグレーションシステムを初期化
+          // 1. 基本スキーマを最初に作成（マイグレーションの前提条件）
+          console.log('📝 基本スキーマから基本テーブルを作成中...');
+          await this.createBasicTablesFromSchema();
+          
+          // 2. マイグレーションシステムを初期化
           await this.migrationManager.initialize();
           
-          // 未実行のマイグレーションを実行
+          // 3. 未実行のマイグレーションを実行（基本テーブルが存在する状態で）
           await this.migrationManager.runMigrations();
           
-          // マイグレーション成功後も、念のためフォールバック処理を実行
+          // 4. マイグレーション成功後も、念のためフォールバック処理を実行
           // （既存カラムはスキップされるため安全）
           await this.ensureUserSettingsColumns();
           
@@ -2490,6 +2495,308 @@ export class SqliteActivityLogRepository implements IActivityLogRepository, IApi
       throw new ActivityLogError('データベースが接続されていません', 'DB_NOT_CONNECTED');
     }
     return this.db;
+  }
+
+  /**
+   * 基本スキーマから基本テーブルを作成（マイグレーション前の前提条件）
+   */
+  private async createBasicTablesFromSchema(): Promise<void> {
+    try {
+      console.log('📋 基本テーブルの作成を開始...');
+      
+      // 基本テーブル作成SQL（マイグレーション実行の前提となるテーブル）
+      const basicTables = [
+        // activity_logs テーブル
+        `CREATE TABLE IF NOT EXISTS activity_logs (
+          id TEXT PRIMARY KEY,
+          user_id TEXT NOT NULL,
+          content TEXT NOT NULL,
+          input_timestamp TEXT NOT NULL,
+          business_date TEXT NOT NULL,
+          is_deleted BOOLEAN DEFAULT FALSE,
+          created_at TEXT NOT NULL DEFAULT (datetime('now', 'utc')),
+          updated_at TEXT NOT NULL DEFAULT (datetime('now', 'utc')),
+          start_time TEXT,
+          end_time TEXT,
+          total_minutes INTEGER,
+          confidence REAL,
+          analysis_method TEXT,
+          categories TEXT,
+          analysis_warnings TEXT,
+          log_type TEXT DEFAULT 'complete' CHECK (log_type IN ('complete', 'start_only', 'end_only')),
+          match_status TEXT DEFAULT 'unmatched' CHECK (match_status IN ('unmatched', 'matched', 'ignored')),
+          matched_log_id TEXT,
+          activity_key TEXT,
+          similarity_score REAL
+        )`,
+        
+        // daily_analysis_cache テーブル
+        `CREATE TABLE IF NOT EXISTS daily_analysis_cache (
+          id TEXT PRIMARY KEY,
+          user_id TEXT NOT NULL,
+          business_date TEXT NOT NULL,
+          analysis_result TEXT NOT NULL,
+          log_count INTEGER NOT NULL,
+          generated_at TEXT NOT NULL DEFAULT (datetime('now', 'utc')),
+          UNIQUE(user_id, business_date)
+        )`,
+        
+        // user_settings テーブル（基本カラムのみ、追加カラムはマイグレーションで）
+        `CREATE TABLE IF NOT EXISTS user_settings (
+          user_id TEXT PRIMARY KEY,
+          timezone TEXT NOT NULL DEFAULT 'Asia/Tokyo',
+          username TEXT,
+          first_seen TEXT,
+          last_seen TEXT,
+          is_active BOOLEAN DEFAULT TRUE,
+          created_at TEXT NOT NULL DEFAULT (datetime('now', 'utc')),
+          updated_at TEXT NOT NULL DEFAULT (datetime('now', 'utc'))
+        )`,
+        
+        // api_costs テーブル（マイグレーション001の前提条件）
+        `CREATE TABLE IF NOT EXISTS api_costs (
+          id TEXT PRIMARY KEY,
+          timestamp TEXT NOT NULL,
+          service TEXT NOT NULL,
+          operation TEXT NOT NULL,
+          cost_usd REAL NOT NULL,
+          tokens_input INTEGER,
+          tokens_output INTEGER,
+          user_id TEXT,
+          created_at TEXT NOT NULL DEFAULT (datetime('now', 'utc'))
+        )`
+      ];
+      
+      // 各テーブルを作成
+      for (const sql of basicTables) {
+        await this.runQuery(sql);
+        console.log(`✅ 基本テーブル作成完了`);
+      }
+      
+      console.log('✅ 全ての基本テーブル作成完了');
+      
+    } catch (error) {
+      console.error('❌ 基本テーブル作成失敗:', error);
+      throw error;
+    }
+  }
+
+  // ================================================================
+  // IActivityPromptRepository の実装
+  // ================================================================
+
+  /**
+   * 活動促し通知設定を作成
+   */
+  async createSettings(request: CreateActivityPromptSettingsRequest): Promise<ActivityPromptSettings> {
+    const sql = `
+      INSERT OR REPLACE INTO user_settings (
+        user_id, 
+        prompt_enabled, 
+        prompt_start_hour, 
+        prompt_start_minute, 
+        prompt_end_hour, 
+        prompt_end_minute,
+        timezone
+      ) VALUES (?, ?, ?, ?, ?, ?, ?)
+    `;
+    
+    await this.runQuery(sql, [
+      request.userId,
+      request.isEnabled ? 1 : 0,
+      request.startHour || 8,
+      request.startMinute || 30,
+      request.endHour || 18,
+      request.endMinute || 0,
+      'Asia/Tokyo' // デフォルトタイムゾーン
+    ]);
+
+    const settings = await this.getSettings(request.userId);
+    if (!settings) {
+      throw new Error('Failed to create activity prompt settings');
+    }
+    return settings;
+  }
+
+  /**
+   * 活動促し通知設定を取得
+   */
+  async getSettings(userId: string): Promise<ActivityPromptSettings | null> {
+    const sql = `
+      SELECT 
+        user_id,
+        COALESCE(prompt_enabled, 0) as prompt_enabled,
+        COALESCE(prompt_start_hour, 8) as prompt_start_hour,
+        COALESCE(prompt_start_minute, 30) as prompt_start_minute,
+        COALESCE(prompt_end_hour, 18) as prompt_end_hour,
+        COALESCE(prompt_end_minute, 0) as prompt_end_minute,
+        created_at,
+        updated_at
+      FROM user_settings 
+      WHERE user_id = ?
+    `;
+    
+    const result = await this.allQuery(sql, [userId]);
+    if (result.length === 0) {
+      return null;
+    }
+
+    const row = result[0];
+    // デバッグログ
+    console.log('🔍 getSettings result:', { userId, result, row });
+    return {
+      userId: row.user_id,
+      isEnabled: Boolean(row.prompt_enabled),
+      startHour: row.prompt_start_hour,
+      startMinute: row.prompt_start_minute,
+      endHour: row.prompt_end_hour,
+      endMinute: row.prompt_end_minute,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at
+    };
+  }
+
+  /**
+   * 活動促し通知設定を更新
+   */
+  async updateSettings(userId: string, update: UpdateActivityPromptSettingsRequest): Promise<void> {
+    const setParts: string[] = [];
+    const values: any[] = [];
+
+    if (update.isEnabled !== undefined) {
+      setParts.push('prompt_enabled = ?');
+      values.push(update.isEnabled ? 1 : 0);
+    }
+    if (update.startHour !== undefined) {
+      setParts.push('prompt_start_hour = ?');
+      values.push(update.startHour);
+    }
+    if (update.startMinute !== undefined) {
+      setParts.push('prompt_start_minute = ?');
+      values.push(update.startMinute);
+    }
+    if (update.endHour !== undefined) {
+      setParts.push('prompt_end_hour = ?');
+      values.push(update.endHour);
+    }
+    if (update.endMinute !== undefined) {
+      setParts.push('prompt_end_minute = ?');
+      values.push(update.endMinute);
+    }
+
+    if (setParts.length === 0) {
+      return; // 更新する項目がない
+    }
+
+    const sql = `UPDATE user_settings SET ${setParts.join(', ')} WHERE user_id = ?`;
+    values.push(userId);
+
+    await this.runQuery(sql, values);
+  }
+
+  /**
+   * 活動促し通知設定を削除
+   */
+  async deleteSettings(userId: string): Promise<void> {
+    const sql = `
+      UPDATE user_settings 
+      SET prompt_enabled = 0 
+      WHERE user_id = ?
+    `;
+    await this.runQuery(sql, [userId]);
+  }
+
+  /**
+   * 有効な活動促し通知設定を取得
+   */
+  async getEnabledSettings(): Promise<ActivityPromptSettings[]> {
+    const sql = `
+      SELECT 
+        user_id,
+        prompt_enabled,
+        prompt_start_hour,
+        prompt_start_minute,
+        prompt_end_hour,
+        prompt_end_minute,
+        created_at,
+        updated_at
+      FROM user_settings 
+      WHERE prompt_enabled = 1
+    `;
+    
+    const results = await this.allQuery(sql);
+    return results.map((row: any) => ({
+      userId: row.user_id,
+      isEnabled: Boolean(row.prompt_enabled),
+      startHour: row.prompt_start_hour,
+      startMinute: row.prompt_start_minute,
+      endHour: row.prompt_end_hour,
+      endMinute: row.prompt_end_minute,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at
+    }));
+  }
+
+  /**
+   * 指定時刻に通知すべきユーザーを取得
+   */
+  async getUsersToPromptAt(hour: number, minute: number): Promise<string[]> {
+    const sql = `
+      SELECT user_id 
+      FROM user_settings 
+      WHERE prompt_enabled = 1 
+        AND prompt_start_hour <= ? 
+        AND prompt_end_hour >= ?
+        AND (
+          (prompt_start_minute <= ? AND prompt_end_minute >= ?) OR
+          (prompt_start_minute = ? OR prompt_end_minute = ?)
+        )
+    `;
+    
+    const results = await this.allQuery(sql, [hour, hour, minute, minute, minute, minute]);
+    return results.map((row: any) => row.user_id);
+  }
+
+  /**
+   * 活動促し通知を有効化
+   */
+  async enablePrompt(userId: string): Promise<void> {
+    const sql = `
+      INSERT OR REPLACE INTO user_settings (
+        user_id, 
+        prompt_enabled, 
+        prompt_start_hour, 
+        prompt_start_minute, 
+        prompt_end_hour, 
+        prompt_end_minute,
+        timezone
+      ) VALUES (
+        ?, 1, 
+        COALESCE((SELECT prompt_start_hour FROM user_settings WHERE user_id = ?), 8),
+        COALESCE((SELECT prompt_start_minute FROM user_settings WHERE user_id = ?), 30),
+        COALESCE((SELECT prompt_end_hour FROM user_settings WHERE user_id = ?), 18),
+        COALESCE((SELECT prompt_end_minute FROM user_settings WHERE user_id = ?), 0),
+        COALESCE((SELECT timezone FROM user_settings WHERE user_id = ?), 'Asia/Tokyo')
+      )
+    `;
+    await this.runQuery(sql, [userId, userId, userId, userId, userId, userId]);
+  }
+
+  /**
+   * 活動促し通知を無効化
+   */
+  async disablePrompt(userId: string): Promise<void> {
+    const sql = `UPDATE user_settings SET prompt_enabled = 0 WHERE user_id = ?`;
+    await this.runQuery(sql, [userId]);
+  }
+
+  /**
+   * 活動促し通知設定の存在確認
+   */
+  async settingsExists(userId: string): Promise<boolean> {
+    const sql = `SELECT COUNT(*) as count FROM user_settings WHERE user_id = ?`;
+    const result = await this.allQuery(sql, [userId]);
+    return result[0].count > 0;
   }
 
   // ================================================================
