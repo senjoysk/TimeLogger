@@ -47,7 +47,18 @@ CREATE TABLE IF NOT EXISTS user_settings (
     last_seen TEXT,                              -- 最終利用日時
     is_active BOOLEAN DEFAULT TRUE,              -- アクティブ状態
     created_at TEXT NOT NULL DEFAULT (datetime('now', 'utc')),
-    updated_at TEXT NOT NULL DEFAULT (datetime('now', 'utc'))
+    updated_at TEXT NOT NULL DEFAULT (datetime('now', 'utc')),
+    -- 活動促し通知設定
+    prompt_enabled BOOLEAN DEFAULT FALSE,        -- 通知有効/無効
+    prompt_start_hour INTEGER DEFAULT 8,         -- 開始時刻（時）0-23
+    prompt_start_minute INTEGER DEFAULT 30,      -- 開始時刻（分）0,30のみ
+    prompt_end_hour INTEGER DEFAULT 18,          -- 終了時刻（時）0-23
+    prompt_end_minute INTEGER DEFAULT 0,         -- 終了時刻（分）0,30のみ
+    -- 制約
+    CHECK (prompt_start_minute IN (0, 30)),
+    CHECK (prompt_end_minute IN (0, 30)),
+    CHECK (prompt_start_hour >= 0 AND prompt_start_hour <= 23),
+    CHECK (prompt_end_hour >= 0 AND prompt_end_hour <= 23)
 );
 
 -- インデックスの作成（パフォーマンス最適化）
@@ -83,6 +94,14 @@ ON user_settings(is_active);
 
 CREATE INDEX IF NOT EXISTS idx_user_settings_active_last_seen 
 ON user_settings(is_active, last_seen);
+
+-- 活動促し通知用インデックス
+CREATE INDEX IF NOT EXISTS idx_user_settings_prompt_enabled 
+ON user_settings(prompt_enabled) WHERE prompt_enabled = TRUE;
+
+CREATE INDEX IF NOT EXISTS idx_user_settings_prompt_schedule 
+ON user_settings(prompt_start_hour, prompt_start_minute, prompt_end_hour, prompt_end_minute) 
+WHERE prompt_enabled = TRUE;
 
 
 -- 開始・終了ログマッチング機能用インデックス（Phase 2）
