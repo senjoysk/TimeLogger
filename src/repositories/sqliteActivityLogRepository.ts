@@ -128,7 +128,13 @@ export class SqliteActivityLogRepository implements IActivityLogRepository, IApi
         'ALTER TABLE user_settings ADD COLUMN username TEXT',
         'ALTER TABLE user_settings ADD COLUMN first_seen TEXT',
         'ALTER TABLE user_settings ADD COLUMN last_seen TEXT',
-        'ALTER TABLE user_settings ADD COLUMN is_active BOOLEAN DEFAULT TRUE'
+        'ALTER TABLE user_settings ADD COLUMN is_active BOOLEAN DEFAULT TRUE',
+        // 活動促し通知機能のカラム（マイグレーション005の内容）
+        'ALTER TABLE user_settings ADD COLUMN prompt_enabled BOOLEAN DEFAULT FALSE',
+        'ALTER TABLE user_settings ADD COLUMN prompt_start_hour INTEGER DEFAULT 8',
+        'ALTER TABLE user_settings ADD COLUMN prompt_start_minute INTEGER DEFAULT 30',
+        'ALTER TABLE user_settings ADD COLUMN prompt_end_hour INTEGER DEFAULT 18',
+        'ALTER TABLE user_settings ADD COLUMN prompt_end_minute INTEGER DEFAULT 0'
       ];
       
       for (const sql of columnsToAdd) {
@@ -165,22 +171,33 @@ export class SqliteActivityLogRepository implements IActivityLogRepository, IApi
       
       console.log('🔧 統一データベースが未作成、通常の初期化処理を実行');
       
-      // マイグレーション処理の制御（環境変数で制御可能）
-      if (process.env.SKIP_MIGRATIONS === 'true' || process.env.NODE_ENV === 'test') {
+      // マイグレーション処理の制御（より堅牢な条件）
+      const shouldSkipMigrations = process.env.SKIP_MIGRATIONS === 'true' || process.env.NODE_ENV === 'test';
+      
+      if (shouldSkipMigrations) {
         console.log('⚠️ マイグレーション処理をスキップ - 直接スキーマ作成を実行');
-        // 必要に応じて手動でuser_settingsテーブルにカラムを追加
+        console.log(`  理由: SKIP_MIGRATIONS=${process.env.SKIP_MIGRATIONS}, NODE_ENV=${process.env.NODE_ENV}`);
+        // フォールバック処理で必要なカラムを確実に追加
         await this.ensureUserSettingsColumns();
       } else {
         console.log('🔄 マイグレーション処理を実行');
+        console.log(`  環境: NODE_ENV=${process.env.NODE_ENV}`);
+        
         try {
           // マイグレーションシステムを初期化
           await this.migrationManager.initialize();
           
           // 未実行のマイグレーションを実行
           await this.migrationManager.runMigrations();
+          
+          // マイグレーション成功後も、念のためフォールバック処理を実行
+          // （既存カラムはスキップされるため安全）
+          await this.ensureUserSettingsColumns();
+          
         } catch (error) {
           console.error('❌ マイグレーション実行エラー:', error);
           console.log('🔄 フォールバック: 直接スキーマ作成を実行');
+          // マイグレーション失敗時のフォールバック処理
           await this.ensureUserSettingsColumns();
         }
       }
