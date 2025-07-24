@@ -1,22 +1,36 @@
 /**
- * タイムゾーン管理サービス（Cookieベース）
+ * タイムゾーン管理サービス
  * 
- * Web管理画面用のタイムゾーン表示設定を管理
- * Cookieベースの実装により、DBアクセスは不要
+ * ユーザーのタイムゾーン設定を管理（データベース + Cookieベース）
  */
 
 import { ITimezoneService } from './interfaces/ITimezoneService';
+import { IActivityLogRepository } from '../repositories/activityLogRepository';
 
 export class TimezoneService implements ITimezoneService {
-  constructor() {
-    // Cookieベースなので設定は不要
+  constructor(private repository?: IActivityLogRepository) {
+    // リポジトリが注入された場合はデータベースからタイムゾーンを取得可能
   }
 
   /**
-   * ユーザーのタイムゾーンを取得（継承用メソッド）
+   * ユーザーのタイムゾーンを取得
    */
   async getUserTimezone(userId: string): Promise<string> {
-    // 現在はメイン機能で使用されていないため、デフォルト値を返す
+    // リポジトリが利用可能な場合はデータベースから取得
+    if (this.repository) {
+      try {
+        const dbTimezone = await this.repository.getUserTimezone(userId);
+        if (dbTimezone) {
+          console.log(`[TimezoneService] ユーザー${userId}のDBタイムゾーン: ${dbTimezone}`);
+          return dbTimezone;
+        }
+      } catch (error) {
+        console.warn(`[TimezoneService] DB取得エラー: ${error}`);
+      }
+    }
+    
+    // デフォルト値を返す
+    console.log(`[TimezoneService] デフォルトタイムゾーンを使用: Asia/Tokyo`);
     return 'Asia/Tokyo';
   }
 

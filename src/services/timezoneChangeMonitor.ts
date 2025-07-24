@@ -37,8 +37,8 @@ interface Repository {
   getUserTimezoneChanges(since?: Date): Promise<TimezoneChange[]>;
   getUnprocessedNotifications(): Promise<TimezoneNotification[]>;
   markNotificationAsProcessed(notificationId: string): Promise<void>;
-  getUserSettings(userId: string): Promise<UserSettings | null>;
-  updateTimezone(userId: string, timezone: string): Promise<void>;
+  getUserTimezone(userId: string): Promise<string | null>;
+  saveUserTimezone(userId: string, timezone: string): Promise<void>;
 }
 
 interface MonitorStatus {
@@ -254,9 +254,8 @@ export class TimezoneChangeMonitor {
         throw new Error('Repository or Scheduler not set');
       }
 
-      // 現在の設定を取得
-      const currentSettings = await this.repository.getUserSettings(userId);
-      const oldTimezone = currentSettings?.timezone || null;
+      // 現在のタイムゾーンを取得
+      const oldTimezone = await this.repository.getUserTimezone(userId);
 
       // 同じタイムゾーンの場合はスキップ
       if (oldTimezone === newTimezone) {
@@ -265,7 +264,7 @@ export class TimezoneChangeMonitor {
       }
 
       // データベース更新
-      await this.repository.updateTimezone(userId, newTimezone);
+      await this.repository.saveUserTimezone(userId, newTimezone);
 
       // スケジューラーに通知
       await this.scheduler.onTimezoneChanged(userId, oldTimezone, newTimezone);

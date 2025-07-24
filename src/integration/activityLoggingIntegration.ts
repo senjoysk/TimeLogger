@@ -113,15 +113,15 @@ export class ActivityLoggingIntegration {
         this.repository = this.config.repository;
         console.log('✅ 外部リポジトリを使用（テスト用）');
       } else {
-        // ConfigServiceとTimezoneServiceの初期化（Cookieベース）
-        this.configService = new ConfigService();
-        this.timezoneService = new TimezoneService();
-        
         // 通常の場合は新しいリポジトリを作成
         this.repository = new SqliteActivityLogRepository(this.config.databasePath);
         
         // リポジトリの初期化を明示的に実行
         await this.repository.initializeDatabase();
+        
+        // ConfigServiceとTimezoneServiceの初期化（リポジトリを注入）
+        this.configService = new ConfigService();
+        this.timezoneService = new TimezoneService(this.repository);
         console.log('✅ データベース接続・初期化完了');
       }
 
@@ -132,7 +132,7 @@ export class ActivityLoggingIntegration {
       // 外部リポジトリの場合のConfigServiceとTimezoneService初期化
       if (this.config.repository) {
         this.configService = new ConfigService();
-        this.timezoneService = new TimezoneService();
+        this.timezoneService = new TimezoneService(this.repository);
         console.log('✅ ConfigService・TimezoneService初期化完了（外部リポジトリ用）');
       }
 

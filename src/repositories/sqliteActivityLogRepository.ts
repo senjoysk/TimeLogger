@@ -1257,14 +1257,14 @@ export class SqliteActivityLogRepository implements IActivityLogRepository, IApi
    * 指定時刻以降のタイムゾーン変更を取得
    */
   async getUserTimezoneChanges(since?: Date): Promise<Array<{
-    user_id: string;
-    old_timezone: string;
-    new_timezone: string;
-    updated_at: string;
+    userId: string;
+    oldTimezone: string | null;
+    newTimezone: string;
+    changedAt: Date;
   }>> {
     try {
       let sql = `
-        SELECT user_id, old_timezone, new_timezone, changed_at as updated_at
+        SELECT user_id, old_timezone, new_timezone, changed_at
         FROM timezone_change_notifications
         WHERE processed = 0
       `;
@@ -1281,10 +1281,10 @@ export class SqliteActivityLogRepository implements IActivityLogRepository, IApi
       
       console.log(`📍 タイムゾーン変更取得: ${rows.length}件 (since: ${since?.toISOString() || 'all'})`);
       return rows.map(row => ({
-        user_id: row.user_id,
-        old_timezone: row.old_timezone || this.getDefaultTimezone(),
-        new_timezone: row.new_timezone,
-        updated_at: row.updated_at
+        userId: row.user_id,
+        oldTimezone: row.old_timezone || null,
+        newTimezone: row.new_timezone,
+        changedAt: new Date(row.changed_at)
       }));
     } catch (error) {
       console.error('❌ タイムゾーン変更取得エラー:', error);

@@ -33,8 +33,8 @@ describe('TimezoneChangeMonitor', () => {
       getUserTimezoneChanges: jest.fn(),
       getUnprocessedNotifications: jest.fn(),
       markNotificationAsProcessed: jest.fn(),
-      getUserSettings: jest.fn(),
-      updateTimezone: jest.fn(),
+      getUserTimezone: jest.fn(),
+      saveUserTimezone: jest.fn(),
     };
 
     monitor = new TimezoneChangeMonitor();
@@ -263,16 +263,13 @@ describe('TimezoneChangeMonitor', () => {
       // コマンドハンドラー統合テスト
 
       // 既存設定の模擬
-      mockRepository.getUserSettings.mockResolvedValue({
-        user_id: 'user1',
-        timezone: 'Asia/Tokyo'
-      });
+      mockRepository.getUserTimezone.mockResolvedValue('Asia/Tokyo');
 
       // タイムゾーン変更コマンド
       await monitor.onTimezoneCommandUpdate('user1', 'Europe/London');
 
       // データベース更新
-      expect(mockRepository.updateTimezone).toHaveBeenCalledWith(
+      expect(mockRepository.saveUserTimezone).toHaveBeenCalledWith(
         'user1', 'Europe/London'
       );
 
@@ -285,16 +282,13 @@ describe('TimezoneChangeMonitor', () => {
     test('should handle command with same timezone gracefully', async () => {
       // 同一タイムゾーン設定時の処理テスト
 
-      mockRepository.getUserSettings.mockResolvedValue({
-        user_id: 'user1',
-        timezone: 'Asia/Tokyo'
-      });
+      mockRepository.getUserTimezone.mockResolvedValue('Asia/Tokyo');
 
       // 同じタイムゾーンを設定
       await monitor.onTimezoneCommandUpdate('user1', 'Asia/Tokyo');
 
       // データベース更新はスキップ
-      expect(mockRepository.updateTimezone).not.toHaveBeenCalled();
+      expect(mockRepository.saveUserTimezone).not.toHaveBeenCalled();
       
       // スケジューラー通知もスキップ
       expect(mockScheduler.onTimezoneChanged).not.toHaveBeenCalled();
@@ -303,12 +297,12 @@ describe('TimezoneChangeMonitor', () => {
     test('should handle command for new user', async () => {
       // 新規ユーザーのタイムゾーン設定テスト
 
-      mockRepository.getUserSettings.mockResolvedValue(null);
+      mockRepository.getUserTimezone.mockResolvedValue(null);
 
       await monitor.onTimezoneCommandUpdate('user1', 'Asia/Tokyo');
 
       // 新規作成として処理
-      expect(mockRepository.updateTimezone).toHaveBeenCalledWith(
+      expect(mockRepository.saveUserTimezone).toHaveBeenCalledWith(
         'user1', 'Asia/Tokyo'
       );
 
@@ -478,8 +472,8 @@ describe('TimezoneChangeMonitor', () => {
         // getUserTimezoneChanges: jest.fn(), // このメソッドを削除
         getUnprocessedNotifications: jest.fn().mockResolvedValue([]),
         markNotificationAsProcessed: jest.fn().mockResolvedValue(undefined),
-        getUserSettings: jest.fn().mockResolvedValue({ user_id: 'test', timezone: 'Asia/Tokyo' }),
-        updateTimezone: jest.fn().mockResolvedValue(undefined)
+        getUserTimezone: jest.fn().mockResolvedValue('Asia/Tokyo'),
+        saveUserTimezone: jest.fn().mockResolvedValue(undefined)
       } as any;
       
       monitor.setRepository(incompleteRepository);
@@ -515,8 +509,8 @@ describe('TimezoneChangeMonitor', () => {
         getUserTimezoneChanges: jest.fn().mockResolvedValue([]),
         // getUnprocessedNotifications: jest.fn(), // このメソッドを削除
         // markNotificationAsProcessed: jest.fn(), // このメソッドを削除
-        getUserSettings: jest.fn().mockResolvedValue({ user_id: 'test', timezone: 'Asia/Tokyo' }),
-        updateTimezone: jest.fn().mockResolvedValue(undefined)
+        getUserTimezone: jest.fn().mockResolvedValue('Asia/Tokyo'),
+        saveUserTimezone: jest.fn().mockResolvedValue(undefined)
       } as any;
       
       monitor.setRepository(incompleteRepository);
@@ -552,8 +546,8 @@ describe('TimezoneChangeMonitor', () => {
         getUserTimezoneChanges: jest.fn().mockResolvedValue("not an array"), // 配列でない
         getUnprocessedNotifications: jest.fn().mockResolvedValue(null), // null
         markNotificationAsProcessed: jest.fn().mockResolvedValue(undefined),
-        getUserSettings: jest.fn().mockResolvedValue({ user_id: 'test', timezone: 'Asia/Tokyo' }),
-        updateTimezone: jest.fn().mockResolvedValue(undefined)
+        getUserTimezone: jest.fn().mockResolvedValue('Asia/Tokyo'),
+        saveUserTimezone: jest.fn().mockResolvedValue(undefined)
       };
       
       monitor.setRepository(badRepository);

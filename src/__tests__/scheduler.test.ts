@@ -34,10 +34,7 @@ jest.mock('../repositories/sqliteActivityLogRepository', () => ({
       { user_id: 'user1', timezone: 'Asia/Tokyo' },
       { user_id: 'user2', timezone: 'America/New_York' }
     ]),
-    getUserSettings: jest.fn().mockResolvedValue({
-      user_id: 'test-user',
-      timezone: 'Asia/Tokyo'
-    }),
+    getUserTimezone: jest.fn().mockResolvedValue('Asia/Tokyo'),
     getApiCosts: jest.fn().mockResolvedValue([]),
     close: jest.fn().mockResolvedValue(undefined),
     getDatabase: jest.fn().mockReturnValue({})
@@ -60,10 +57,7 @@ describe('Scheduler', () => {
         { userId: 'user1', timezone: 'Asia/Tokyo' },
         { userId: 'user2', timezone: 'America/New_York' }
       ]),
-      getUserSettings: jest.fn().mockResolvedValue({
-        user_id: 'test-user',
-        timezone: 'Asia/Tokyo'
-      }),
+      getUserTimezone: jest.fn().mockResolvedValue('Asia/Tokyo'),
       getApiCosts: jest.fn().mockResolvedValue([]),
       close: jest.fn().mockResolvedValue(undefined),
       getDatabase: jest.fn().mockReturnValue({})

@@ -133,13 +133,9 @@ export class TimezoneHandler implements ITimezoneHandler {
       if (this.timezoneService) {
         currentTimezone = await this.timezoneService.getUserTimezone(userId);
       } else {
-        // フォールバック: 従来の方法
-        if ('getUserTimezone' in this.repository) {
-          const dbTimezone = await (this.repository as any).getUserTimezone(userId);
-          currentTimezone = dbTimezone || this.getSystemDefaultTimezone();
-        } else {
-          currentTimezone = this.getSystemDefaultTimezone();
-        }
+        // リポジトリから直接取得（型安全）
+        const dbTimezone = await this.repository.getUserTimezone(userId);
+        currentTimezone = dbTimezone || this.getSystemDefaultTimezone();
       }
       
       const now = TimeProviderService.getInstance().now();
@@ -220,56 +216,41 @@ export class TimezoneHandler implements ITimezoneHandler {
       }
 
       // 古いタイムゾーンを取得
-      let oldTimezone: string | null = null;
-      if ('getUserTimezone' in this.repository) {
-        oldTimezone = await (this.repository as any).getUserTimezone(userId);
-      }
+      const oldTimezone = await this.repository.getUserTimezone(userId);
 
       // データベースにユーザーのタイムゾーンを保存
-      if ('saveUserTimezone' in this.repository) {
-        await (this.repository as any).saveUserTimezone(userId, timezone);
-        
-        // EnhancedSchedulerに変更を通知
-        if (this.onTimezoneChanged) {
-          try {
-            await this.onTimezoneChanged(userId, oldTimezone, timezone);
-            console.log(`📅 動的スケジューラーに通知: ${userId} ${oldTimezone} -> ${timezone}`);
-          } catch (error) {
-            console.warn(`⚠️ 動的スケジューラーへの通知に失敗: ${error}`);
-          }
+      await this.repository.saveUserTimezone(userId, timezone);
+      
+      // EnhancedSchedulerに変更を通知
+      if (this.onTimezoneChanged) {
+        try {
+          await this.onTimezoneChanged(userId, oldTimezone, timezone);
+          console.log(`📅 動的スケジューラーに通知: ${userId} ${oldTimezone} -> ${timezone}`);
+        } catch (error) {
+          console.warn(`⚠️ 動的スケジューラーへの通知に失敗: ${error}`);
         }
-        
-        // 現在時刻を新しいタイムゾーンで表示
-        const now = TimeProviderService.getInstance().now();
-        const localTime = now.toLocaleString('ja-JP', { 
-          timeZone: timezone,
-          year: 'numeric',
-          month: '2-digit',
-          day: '2-digit',
-          hour: '2-digit',
-          minute: '2-digit',
-          second: '2-digit'
-        });
-
-        await message.reply(`✅ **タイムゾーン設定完了**\n\n` +
-                           `🎯 新しいタイムゾーン: \`${timezone}\`\n` +
-                           `🕐 現在時刻: ${localTime}\n\n` +
-                           `💡 **即座に適用されました！**\n` +
-                           `• ログ表示: \`!logs\` で新しいタイムゾーンで時刻表示\n` +
-                           `• サマリー: \`!summary\` で新しいタイムゾーンで分析\n` +
-                           `• 今後の記録も新しいタイムゾーンで処理されます\n\n` +
-                           `🔄 設定変更は即座に反映され、Botの再起動は不要です。`);
-      } else {
-        // フォールバック（古いリポジトリの場合）
-        await message.reply(`⚙️ **タイムゾーン設定**\n\n` +
-                           `🎯 設定したいタイムゾーン: \`${timezone}\`\n\n` +
-                           `💡 **現在の設定方法:**\n` +
-                           `環境変数 \`USER_TIMEZONE\` に以下を設定してください:\n` +
-                           `\`\`\`\n` +
-                           `export USER_TIMEZONE="${timezone}"\n` +
-                           `\`\`\`\n\n` +
-                           `🔄 設定後はBotを再起動してください。`);
       }
+      
+      // 現在時刻を新しいタイムゾーンで表示
+      const now = TimeProviderService.getInstance().now();
+      const localTime = now.toLocaleString('ja-JP', { 
+        timeZone: timezone,
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit'
+      });
+
+      await message.reply(`✅ **タイムゾーン設定完了**\n\n` +
+                         `🎯 新しいタイムゾーン: \`${timezone}\`\n` +
+                         `🕐 現在時刻: ${localTime}\n\n` +
+                         `💡 **即座に適用されました！**\n` +
+                         `• ログ表示: \`!logs\` で新しいタイムゾーンで時刻表示\n` +
+                         `• サマリー: \`!summary\` で新しいタイムゾーンで分析\n` +
+                         `• 今後の記録も新しいタイムゾーンで処理されます\n\n` +
+                         `🔄 設定変更は即座に反映され、Botの再起動は不要です。`);
       
       console.log(`⚙️ タイムゾーン設定完了: ${userId} -> ${timezone}`);
     } catch (error) {

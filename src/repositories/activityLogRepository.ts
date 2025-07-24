@@ -210,6 +210,34 @@ export interface IActivityLogRepository {
    * @returns マッチング済みログペア配列
    */
   getMatchedLogPairs(userId: string, businessDate?: string): Promise<{ startLog: ActivityLog; endLog: ActivityLog }[]>;
+
+  // === ユーザータイムゾーン管理 ===
+
+  /**
+   * ユーザーのタイムゾーン設定を保存
+   * @param userId ユーザーID
+   * @param timezone IANA タイムゾーン名
+   */
+  saveUserTimezone(userId: string, timezone: string): Promise<void>;
+
+  /**
+   * ユーザーのタイムゾーン設定を取得
+   * @param userId ユーザーID
+   * @returns タイムゾーン名（設定がない場合はnull）
+   */
+  getUserTimezone(userId: string): Promise<string | null>;
+
+  /**
+   * ユーザーのタイムゾーン変更履歴を取得
+   * @param since 指定時刻以降の変更のみ取得（オプション）
+   * @returns タイムゾーン変更履歴配列
+   */
+  getUserTimezoneChanges(since?: Date): Promise<Array<{
+    userId: string;
+    oldTimezone: string | null;
+    newTimezone: string;
+    changedAt: Date;
+  }>>;
 }
 
 /**

@@ -7,6 +7,9 @@ import { Message } from 'discord.js';
 
 // ActivityLogRepositoryのモック
 const mockRepository = {
+  getUserTimezone: jest.fn(),
+  saveUserTimezone: jest.fn(),
+  getUserTimezoneChanges: jest.fn(),
   // 必要に応じて他のメソッドをモック
 } as any;
 
@@ -36,6 +39,14 @@ describe('TimezoneHandler', () => {
   let handler: TimezoneHandler;
 
   beforeEach(() => {
+    // モックをリセット
+    jest.clearAllMocks();
+    
+    // デフォルトの挙動を設定
+    mockRepository.getUserTimezone.mockResolvedValue(null);
+    mockRepository.saveUserTimezone.mockResolvedValue(undefined);
+    mockRepository.getUserTimezoneChanges.mockResolvedValue([]);
+    
     handler = new TimezoneHandler(mockRepository);
     // 環境変数をクリア
     delete process.env.USER_TIMEZONE;
@@ -143,9 +154,14 @@ describe('TimezoneHandler', () => {
       await handler.handle(mockMessage as unknown as Message, '770478489203507241', ['set', 'Asia/Kolkata']);
       
       expect(mockMessage.replies.length).toBe(1);
-      expect(mockMessage.replies[0]).toContain('タイムゾーン設定');
+      expect(mockMessage.replies[0]).toContain('タイムゾーン設定完了');
       expect(mockMessage.replies[0]).toContain('Asia/Kolkata');
-      expect(mockMessage.replies[0]).toContain('USER_TIMEZONE');
+      expect(mockMessage.replies[0]).toContain('現在時刻');
+      expect(mockMessage.replies[0]).toContain('即座に適用されました');
+      
+      // リポジトリのメソッドが呼ばれたことを確認
+      expect(mockRepository.getUserTimezone).toHaveBeenCalledWith('770478489203507241');
+      expect(mockRepository.saveUserTimezone).toHaveBeenCalledWith('770478489203507241', 'Asia/Kolkata');
     });
 
     test('無効なタイムゾーンの設定', async () => {
@@ -165,6 +181,36 @@ describe('TimezoneHandler', () => {
       
       expect(mockMessage.replies.length).toBe(1);
       expect(mockMessage.replies[0]).toContain('タイムゾーンを指定してください');
+    });
+
+    test('既存のタイムゾーンから変更する場合', async () => {
+      // 既存のタイムゾーンをモック
+      mockRepository.getUserTimezone.mockResolvedValue('Asia/Tokyo');
+      
+      const mockMessage = new MockMessage('!timezone set Asia/Kolkata');
+      const mockCallback = jest.fn();
+      handler.setTimezoneChangeCallback(mockCallback);
+      
+      await handler.handle(mockMessage as unknown as Message, '770478489203507241', ['set', 'Asia/Kolkata']);
+      
+      expect(mockMessage.replies.length).toBe(1);
+      expect(mockMessage.replies[0]).toContain('タイムゾーン設定完了');
+      
+      // タイムゾーン変更コールバックが呼ばれたことを確認
+      expect(mockCallback).toHaveBeenCalledWith('770478489203507241', 'Asia/Tokyo', 'Asia/Kolkata');
+    });
+
+    test('データベースエラーが発生した場合のエラーハンドリング', async () => {
+      // データベースエラーをシミュレート
+      mockRepository.saveUserTimezone.mockRejectedValue(new Error('Database error'));
+      
+      const mockMessage = new MockMessage('!timezone set Asia/Kolkata');
+      
+      await handler.handle(mockMessage as unknown as Message, '770478489203507241', ['set', 'Asia/Kolkata']);
+      
+      expect(mockMessage.replies.length).toBe(1);
+      expect(mockMessage.replies[0]).toContain('❌');
+      expect(mockMessage.replies[0]).toContain('タイムゾーンの設定に失敗しました');
     });
   });
 
