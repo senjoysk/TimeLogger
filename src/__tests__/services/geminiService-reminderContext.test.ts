@@ -1,7 +1,7 @@
 import { GeminiService } from '../../services/geminiService';
 
-// 🟢 Green Phase: GeminiServiceでのリマインダーコンテキスト付きAI分析テスト
-describe('🟢 Green Phase: GeminiService ReminderContext機能', () => {
+// GeminiServiceでのリマインダーコンテキスト付きAI分析テスト（実装済み）
+describe('GeminiService ReminderContext機能（実装済み）', () => {
   let geminiService: GeminiService;
   let mockApiCostRepository: any;
 
@@ -9,7 +9,27 @@ describe('🟢 Green Phase: GeminiService ReminderContext機能', () => {
     mockApiCostRepository = {
       recordApiCall: jest.fn()
     };
+    
+    // console.logをスパイして、ログ出力を確認できるようにする
+    jest.spyOn(console, 'log').mockImplementation(() => {});
+    jest.spyOn(console, 'error').mockImplementation(() => {});
+    
+    // configモックを設定
+    jest.mock('../../config', () => ({
+      config: {
+        gemini: {
+          apiKey: 'test-api-key',
+          model: 'gemini-pro'
+        }
+      }
+    }));
+    
     geminiService = new GeminiService(mockApiCostRepository);
+  });
+
+  afterEach(() => {
+    // console.logのモックをリストア
+    jest.restoreAllMocks();
   });
 
   describe('classifyMessageWithReminderContext', () => {
@@ -24,14 +44,20 @@ describe('🟢 Green Phase: GeminiService ReminderContext機能', () => {
       jest.spyOn(geminiService as any, 'parseClassificationResponse').mockReturnValue({
         classification: 'ACTIVITY_LOG',
         confidence: 0.9,
+        priority: 3,
         reason: 'テスト用の分類',
         analysis: '会議とメール返信を実施'
       });
 
       // Gemini APIをモック（成功パターン）
+      const mockResponseText = '{"classification": "ACTIVITY_LOG", "confidence": 0.9, "priority": 3, "reasoning": "リマインダー時間帯の活動記録", "analysis": "会議とメール返信を実施"}';
       const mockResponse = {
         response: {
-          text: () => '{"classification": "ACTIVITY_LOG", "confidence": 0.9, "analysis": "会議とメール返信を実施"}'
+          text: () => mockResponseText,
+          usageMetadata: {
+            promptTokenCount: 100,
+            candidatesTokenCount: 50
+          }
         }
       };
       jest.spyOn(geminiService['model'], 'generateContent').mockResolvedValue(mockResponse as any);
@@ -45,6 +71,10 @@ describe('🟢 Green Phase: GeminiService ReminderContext機能', () => {
       expect(result.analysis).toContain('会議とメール返信');
       expect(result.analysis).toContain('20:00-20:30'); // JST時刻フォーマット
       expect(result.contextType).toBe('REMINDER_REPLY');
+      
+      // ログ出力が呼ばれたことを確認
+      expect(console.log).toHaveBeenCalledWith('📤 [Gemini API] リマインダーReply分析プロンプト:');
+      expect(console.log).toHaveBeenCalledWith('📥 [Gemini API] リマインダーReply分析レスポンス:');
     });
 
     test('リマインダー直後メッセージを文脈考慮で分析する', async () => {
@@ -56,14 +86,20 @@ describe('🟢 Green Phase: GeminiService ReminderContext機能', () => {
       jest.spyOn(geminiService as any, 'parseClassificationResponse').mockReturnValue({
         classification: 'ACTIVITY_LOG',
         confidence: 0.8,
+        priority: 3,
         reason: 'テスト用の分類',
         analysis: '会議の振り返りコメント'
       });
 
       // Gemini APIをモック
+      const mockResponseText = '{"classification": "ACTIVITY_LOG", "confidence": 0.8, "priority": 3, "reasoning": "リマインダー直後の活動コメント", "analysis": "会議の振り返りコメント"}';
       const mockResponse = {
         response: {
-          text: () => '{"classification": "ACTIVITY_LOG", "confidence": 0.8, "analysis": "会議の振り返りコメント"}'
+          text: () => mockResponseText,
+          usageMetadata: {
+            promptTokenCount: 100,
+            candidatesTokenCount: 50
+          }
         }
       };
       jest.spyOn(geminiService['model'], 'generateContent').mockResolvedValue(mockResponse as any);
@@ -78,6 +114,10 @@ describe('🟢 Green Phase: GeminiService ReminderContext機能', () => {
       expect(result.analysis).toContain('会議の振り返り');
       expect(result.analysis).toContain('3分後の投稿');
       expect(result.contextType).toBe('POST_REMINDER');
+      
+      // ログ出力が呼ばれたことを確認
+      expect(console.log).toHaveBeenCalledWith('📤 [Gemini API] リマインダー直後メッセージ分析プロンプト:');
+      expect(console.log).toHaveBeenCalledWith('📥 [Gemini API] リマインダー直後メッセージ分析レスポンス:');
     });
   });
 
@@ -94,8 +134,8 @@ describe('🟢 Green Phase: GeminiService ReminderContext機能', () => {
 
       expect(prompt).toContain('23:00'); // JST時刻に変換される
       expect(prompt).toContain('23:30'); // JST時刻に変換される
-      expect(prompt).toContain('30分間の活動'); // ❌ 失敗する
-      expect(prompt).toContain('リマインダーへの返信'); // ❌ 失敗する
+      expect(prompt).toContain('30分間の活動');
+      expect(prompt).toContain('リマインダーへの返信');
     });
   });
 });

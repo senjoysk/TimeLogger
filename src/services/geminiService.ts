@@ -68,6 +68,12 @@ export class GeminiService {
 
           const prompt = this.buildClassificationPrompt(message);
           
+          // プロンプトのログ出力
+          console.log('📤 [Gemini API] 通常メッセージ分類プロンプト:');
+          console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+          console.log(prompt);
+          console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+          
           // Gemini API 呼び出し
           const result = await this.model.generateContent(prompt);
           const response = result.response;
@@ -79,6 +85,13 @@ export class GeminiService {
           }
 
           const responseText = response.text();
+          
+          // レスポンスのログ出力
+          console.log('📥 [Gemini API] 通常メッセージ分類レスポンス:');
+          console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+          console.log(responseText);
+          console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+          
           const classification = this.parseClassificationResponse(responseText);
           
           console.log('✅ メッセージ分類完了:', classification);
@@ -244,9 +257,21 @@ export class GeminiService {
   ): Promise<ClassificationResult & { contextType: 'REMINDER_REPLY' }> {
     const prompt = this.buildReminderContextPrompt(messageContent, timeRange);
     
+    // プロンプトのログ出力
+    console.log('📤 [Gemini API] リマインダーReply分析プロンプト:');
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    console.log(prompt);
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    
     try {
       const result = await this.model.generateContent(prompt);
       const responseText = result.response.text();
+      
+      // レスポンスのログ出力
+      console.log('📥 [Gemini API] リマインダーReply分析レスポンス:');
+      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      console.log(responseText);
+      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
       
       // トークン使用量の記録
       const inputTokens = this.estimateTokens(prompt);
@@ -281,9 +306,21 @@ export class GeminiService {
   ): Promise<ClassificationResult & { contextType: 'POST_REMINDER' }> {
     const prompt = this.buildNearbyReminderContextPrompt(messageContent, reminderTime, timeDiff);
     
+    // プロンプトのログ出力
+    console.log('📤 [Gemini API] リマインダー直後メッセージ分析プロンプト:');
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    console.log(prompt);
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    
     try {
       const result = await this.model.generateContent(prompt);
       const responseText = result.response.text();
+      
+      // レスポンスのログ出力
+      console.log('📥 [Gemini API] リマインダー直後メッセージ分析レスポンス:');
+      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      console.log(responseText);
+      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
       
       // トークン使用量の記録
       const inputTokens = this.estimateTokens(prompt);
