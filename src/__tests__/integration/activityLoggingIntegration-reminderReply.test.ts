@@ -1,0 +1,94 @@
+import { ActivityLoggingIntegration } from '../../integration/activityLoggingIntegration';
+import { Message } from 'discord.js';
+import { SqliteActivityLogRepository } from '../../repositories/sqliteActivityLogRepository';
+
+// 🟢 Green Phase: ActivityLoggingIntegrationでのリマインダーReply処理テスト
+describe('🟢 Green Phase: ActivityLoggingIntegration ReminderReply機能', () => {
+  let integration: ActivityLoggingIntegration;
+  let mockRepository: jest.Mocked<SqliteActivityLogRepository>;
+  let mockMessage: any;
+  let mockReferencedMessage: any;
+
+  beforeEach(() => {
+    mockRepository = {
+      saveLog: jest.fn(),
+      getActivityLogs: jest.fn(),
+      updateActivityLog: jest.fn(),
+      deleteActivityLog: jest.fn(),
+      getActivityLogById: jest.fn(),
+      getUserTimezone: jest.fn().mockResolvedValue('Asia/Tokyo'),
+      getUserByUserId: jest.fn().mockResolvedValue(null),
+      saveUser: jest.fn(),
+      initializeDatabase: jest.fn()
+    } as any;
+
+    const config = {
+      databasePath: ':memory:',
+      geminiApiKey: 'test-key',
+      debugMode: false,
+      defaultTimezone: 'Asia/Tokyo',
+      enableAutoAnalysis: false,
+      cacheValidityMinutes: 60,
+      targetUserId: 'test-user',
+      repository: mockRepository
+    };
+
+    integration = new ActivityLoggingIntegration(config);
+
+    // リマインダーメッセージのモック
+    mockReferencedMessage = {
+      id: 'reminder-msg-id',
+      content: '🤖 **活動記録のお時間です！**\n\nこの30分、何してた？',
+      author: { bot: true, id: 'bot-id' },
+      createdAt: new Date('2024-01-15T11:30:00Z')
+    };
+
+    // ユーザーReplyメッセージのモック
+    mockMessage = {
+      id: 'reply-msg-id',
+      content: '会議に参加してプレゼン資料を作成していました',
+      author: { bot: false, id: 'user-123' },
+      createdAt: new Date('2024-01-15T11:32:00Z'),
+      reference: { messageId: 'reminder-msg-id' },
+      channel: {
+        messages: { fetch: jest.fn().mockResolvedValue(mockReferencedMessage) },
+        isDMBased: () => true
+      },
+      guild: null,
+      reply: jest.fn()
+    };
+  });
+
+  test('リマインダーへのreplyは時間範囲付きで活動ログに記録される', async () => {
+    // 初期化
+    await integration.initialize();
+    
+    const result = await integration.handleMessage(mockMessage as Message);
+
+    expect(result).toBe(true); // ❌ 失敗する
+    expect(mockRepository.saveLog).toHaveBeenCalledWith(
+      expect.objectContaining({
+        userId: 'user-123',
+        content: '会議に参加してプレゼン資料を作成していました',
+        isReminderReply: true,
+        timeRangeStart: '2024-01-15T11:00:00.000Z',
+        timeRangeEnd: '2024-01-15T11:30:00.000Z',
+        contextType: 'REMINDER_REPLY'
+      })
+    );
+  });
+
+  test('通常のメッセージは従来通りの処理を行う', async () => {
+    // 初期化
+    await integration.initialize();
+    
+    mockMessage.reference = undefined;
+
+    const result = await integration.handleMessage(mockMessage as Message);
+
+    expect(result).toBe(true); // ❌ 失敗する
+    // 通常のメッセージはMessageSelectionHandlerで処理されるため、
+    // saveLogが直接呼ばれないケースもある
+    expect(result).toBe(true);
+  });
+});

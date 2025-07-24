@@ -159,7 +159,8 @@ export class GeminiService {
         classification: parsed.classification as MessageClassification,
         confidence,
         priority,
-        reason: parsed.reasoning || '分類理由が提供されませんでした'
+        reason: parsed.reasoning || '分類理由が提供されませんでした',
+        analysis: parsed.analysis || parsed.reasoning || '分析結果が取得できませんでした'
       };
 
     } catch (error) {
@@ -171,7 +172,8 @@ export class GeminiService {
         classification: 'UNCERTAIN',
         confidence: 0.3,
         priority: 2,
-        reason: 'レスポンスの解析に失敗したため、デフォルト分類を適用'
+        reason: 'レスポンスの解析に失敗したため、デフォルト分類を適用',
+        analysis: 'レスポンスの解析に失敗したため、分析結果を取得できませんでした'
       };
     }
   }
@@ -197,7 +199,8 @@ export class GeminiService {
         classification: 'TODO',
         confidence: 0.6,
         priority: 3,
-        reason: 'キーワードベース分類（TODO）'
+        reason: 'キーワードベース分類（TODO）',
+        analysis: 'TODOキーワードが検出されたため、タスク作成として分類しました'
       };
     }
     
@@ -207,7 +210,8 @@ export class GeminiService {
         classification: 'MEMO',
         confidence: 0.7,
         priority: 2,
-        reason: 'キーワードベース分類（メモ）'
+        reason: 'キーワードベース分類（メモ）',
+        analysis: 'メモ関連キーワードが検出されたため、メモとして分類しました'
       };
     }
 
@@ -216,7 +220,8 @@ export class GeminiService {
       classification: 'ACTIVITY_LOG',
       confidence: 0.6,
       priority: 2,
-      reason: 'キーワードベース分類（デフォルト：活動ログ）'
+      reason: 'キーワードベース分類（デフォルト：活動ログ）',
+      analysis: '特定のキーワードが検出されなかったため、活動ログとして分類しました'
     };
   }
 
@@ -228,6 +233,142 @@ export class GeminiService {
     const japaneseChars = (text.match(/[\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FAF]/g) || []).length;
     const otherChars = text.length - japaneseChars;
     return Math.ceil(japaneseChars * 1.5 + otherChars / 4);
+  }
+
+  /**
+   * リマインダーReplyメッセージを時間範囲付きで分析
+   */
+  public async classifyMessageWithReminderContext(
+    messageContent: string,
+    timeRange: { start: Date; end: Date }
+  ): Promise<ClassificationResult & { contextType: 'REMINDER_REPLY' }> {
+    const prompt = this.buildReminderContextPrompt(messageContent, timeRange);
+    
+    try {
+      const result = await this.model.generateContent(prompt);
+      const responseText = result.response.text();
+      
+      // トークン使用量の記録
+      const inputTokens = this.estimateTokens(prompt);
+      const outputTokens = this.estimateTokens(responseText);
+      await this.costMonitor.recordApiCall('classifyMessage', inputTokens, outputTokens);
+      
+      // レスポンスをパース
+      const analysis = this.parseClassificationResponse(responseText);
+      
+      return {
+        ...analysis,
+        contextType: 'REMINDER_REPLY',
+        analysis: `${analysis.analysis} (時間範囲: ${this.formatTimeRange(timeRange)})`
+      };
+    } catch (error) {
+      console.error('❌ リマインダーコンテキスト分析エラー:', error);
+      throw new AppError(
+        'リマインダーコンテキスト分析に失敗しました',
+        ErrorType.API,
+        { error, messageContent, timeRange }
+      );
+    }
+  }
+
+  /**
+   * リマインダー直後メッセージを文脈考慮で分析
+   */
+  public async classifyMessageWithNearbyReminderContext(
+    messageContent: string,
+    reminderTime: Date,
+    timeDiff: number
+  ): Promise<ClassificationResult & { contextType: 'POST_REMINDER' }> {
+    const prompt = this.buildNearbyReminderContextPrompt(messageContent, reminderTime, timeDiff);
+    
+    try {
+      const result = await this.model.generateContent(prompt);
+      const responseText = result.response.text();
+      
+      // トークン使用量の記録
+      const inputTokens = this.estimateTokens(prompt);
+      const outputTokens = this.estimateTokens(responseText);
+      await this.costMonitor.recordApiCall('classifyMessage', inputTokens, outputTokens);
+      
+      // レスポンスをパース
+      const analysis = this.parseClassificationResponse(responseText);
+      
+      return {
+        ...analysis,
+        contextType: 'POST_REMINDER',
+        analysis: `${analysis.analysis} (リマインダー${timeDiff}分後の投稿)`
+      };
+    } catch (error) {
+      console.error('❌ リマインダー近接分析エラー:', error);
+      throw new AppError(
+        'リマインダー近接分析に失敗しました',
+        ErrorType.API,
+        { error, messageContent, reminderTime, timeDiff }
+      );
+    }
+  }
+
+  /**
+   * リマインダーReply用のプロンプトを構築
+   */
+  public buildReminderContextPrompt(messageContent: string, timeRange: { start: Date; end: Date }): string {
+    const startTime = timeRange.start.toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' });
+    const endTime = timeRange.end.toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' });
+    
+    return `
+このメッセージは${startTime}から${endTime}までの30分間の活動についてのリマインダーへの返信です。
+
+ユーザーメッセージ: "${messageContent}"
+
+この時間帯の活動内容として記録し、以下の形式で応答してください：
+
+分類: ACTIVITY_LOG | TODO | MEMO | UNCERTAIN
+信頼度: 0.0-1.0の数値
+分析: 活動内容の詳細な説明（時間範囲を考慮して解釈）
+
+リマインダーへの返信であることを踏まえ、指定された時間範囲での活動として解釈してください。
+    `.trim();
+  }
+
+  /**
+   * リマインダー近接メッセージ用のプロンプトを構築
+   */
+  private buildNearbyReminderContextPrompt(messageContent: string, reminderTime: Date, timeDiff: number): string {
+    const reminderTimeStr = reminderTime.toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' });
+    const targetStart = new Date(reminderTime.getTime() - 30 * 60 * 1000);
+    const targetStartStr = targetStart.toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' });
+    
+    return `
+このメッセージは${reminderTimeStr}のリマインダー直後（${timeDiff}分後）の投稿です。
+リマインダーの対象時間帯: ${targetStartStr} - ${reminderTimeStr}
+
+ユーザーメッセージ: "${messageContent}"
+
+文脈から、この投稿がリマインダー対象時間帯の活動について言及している可能性を考慮して分析してください。
+
+分類: ACTIVITY_LOG | TODO | MEMO | UNCERTAIN
+信頼度: 0.0-1.0の数値
+分析: 活動内容の詳細な説明（時間的文脈を考慮）
+
+リマインダー直後の投稿であることを踏まえ、過去の活動への言及である可能性を検討してください。
+    `.trim();
+  }
+
+  /**
+   * 時間範囲をユーザー向けにフォーマット
+   */
+  private formatTimeRange(timeRange: { start: Date; end: Date }): string {
+    const startTime = timeRange.start.toLocaleString('ja-JP', { 
+      timeZone: 'Asia/Tokyo',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+    const endTime = timeRange.end.toLocaleString('ja-JP', { 
+      timeZone: 'Asia/Tokyo',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+    return `${startTime}-${endTime}`;
   }
 
   // 以下は互換性のための古いメソッドスタブ（deprecated）

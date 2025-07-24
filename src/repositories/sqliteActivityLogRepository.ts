@@ -330,8 +330,9 @@ export class SqliteActivityLogRepository implements IActivityLogRepository, IApi
           is_deleted, created_at, updated_at,
           start_time, end_time, total_minutes, confidence, 
           analysis_method, categories, analysis_warnings,
-          log_type, match_status, matched_log_id, activity_key, similarity_score
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          log_type, match_status, matched_log_id, activity_key, similarity_score,
+          is_reminder_reply, time_range_start, time_range_end, context_type
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `;
 
       await this.runQuery(sql, [
@@ -354,7 +355,11 @@ export class SqliteActivityLogRepository implements IActivityLogRepository, IApi
         log.matchStatus || 'unmatched',
         log.matchedLogId || null,
         log.activityKey || null,
-        log.similarityScore || null
+        log.similarityScore || null,
+        log.isReminderReply ? 1 : 0,
+        log.timeRangeStart || null,
+        log.timeRangeEnd || null,
+        log.contextType || 'NORMAL'
       ]);
 
       console.log(`✅ 活動ログを保存しました: ${log.id}`);

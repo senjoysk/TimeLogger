@@ -108,6 +108,7 @@ export interface ClassificationResult {
   classification: MessageClassification;
   confidence: number;
   reason: string;
+  analysis?: string; // 分析結果の詳細（リマインダーコンテキスト用）
   suggestedAction?: string;
   priority?: number;
   dueDateSuggestion?: string;
