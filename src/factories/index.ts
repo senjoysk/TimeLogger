@@ -48,8 +48,13 @@ class CronScheduledTask implements IScheduledTask {
 export class CronSchedulerService implements ISchedulerService {
   schedule(cronExpression: string, callback: () => void): IScheduledTask {
     const task = cron.schedule(cronExpression, callback, {
-      scheduled: false // 手動で開始
+      scheduled: true, // 自動で開始
+      timezone: 'UTC'
     });
+    
+    // 確実に開始するため明示的にstart()を呼び出し
+    task.start();
+    
     return new CronScheduledTask(task);
   }
 

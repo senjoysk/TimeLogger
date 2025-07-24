@@ -200,9 +200,15 @@ export class Scheduler {
           const localHour = localTime.getHours();
           const localMinute = localTime.getMinutes();
           
-          // 0分または30分でない場合はスキップ
-          if (localMinute !== 0 && localMinute !== 30) {
-            continue;
+          // 環境チェック
+          const nodeEnv = process.env.NODE_ENV || 'development';
+          const isDevelopment = nodeEnv === 'development';
+          
+          if (!isDevelopment) {
+            // staging/production環境では0分と30分のみチェック
+            if (localMinute !== 0 && localMinute !== 30) {
+              continue;
+            }
           }
           
           // 該当時刻に通知すべきユーザーかチェック
@@ -213,7 +219,8 @@ export class Scheduler {
           const usersToPrompt = await this.activityPromptRepository.getUsersToPromptAt(localHour, localMinute);
           
           if (usersToPrompt.includes(user.userId)) {
-            this.logger.info(`📢 活動促し通知送信: ${user.userId} (${user.timezone} ${localHour}:${localMinute.toString().padStart(2, '0')})`);
+            const envInfo = isDevelopment ? '[DEV]' : '[STG/PROD]';
+            this.logger.info(`📢 ${envInfo} 活動促し通知送信: ${user.userId} (${user.timezone} ${localHour}:${localMinute.toString().padStart(2, '0')})`);
             await this.bot.sendActivityPromptToUser(user.userId, user.timezone);
           }
           
@@ -231,8 +238,13 @@ export class Scheduler {
    * スケジュール情報をログ出力
    */
   private logScheduleInfo(): void {
+    const nodeEnv = process.env.NODE_ENV || 'development';
+    const scheduleInfo = nodeEnv === 'development'
+      ? '有効（毎分チェック・毎分実行）' 
+      : '有効（毎分チェック、0分・30分に実行）';
+    
     console.log('\n📅 スケジュール情報:');
-    console.log(`  🔔 活動促し機能: 有効（毎分チェック、0分・30分に実行）`);
+    console.log(`  🔔 活動促し機能: ${scheduleInfo}`);
     console.log(`  📊 サマリー時間: 毎日 ${config.app.summaryTime.hour}:00`);
     console.log(`  🌍 対応ユーザー数: ${this.userTimezones.size}`);
     

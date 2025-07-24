@@ -154,7 +154,7 @@ describe('🔴 Red Phase: Scheduler活動促し機能', () => {
       mockTimeProvider.now.mockReturnValue(new Date('2024-01-01T00:00:00Z')); // UTC 00:00 = Asia/Tokyo 09:00
 
       if (scheduleFunction) {
-        await scheduleFunction();
+        await scheduleFunction?.();
       }
 
       expect(mockActivityPromptRepo.getUsersToPromptAt).toHaveBeenCalledWith(9, 0);
@@ -177,7 +177,7 @@ describe('🔴 Red Phase: Scheduler活動促し機能', () => {
       mockTimeProvider.now.mockReturnValue(new Date('2024-01-01T23:15:00Z')); // 対象外時刻
 
       if (scheduleFunction) {
-        await scheduleFunction();
+        await scheduleFunction?.();
       }
 
       expect(mockBot.sendActivityPromptToUser).not.toHaveBeenCalled();
@@ -197,7 +197,7 @@ describe('🔴 Red Phase: Scheduler活動促し機能', () => {
       mockTimeProvider.now.mockReturnValue(new Date('2024-01-01T00:30:00Z')); // UTC 00:30 = Asia/Tokyo 09:30
 
       if (scheduleFunction) {
-        await scheduleFunction();
+        await scheduleFunction?.();
       }
 
       expect(mockActivityPromptRepo.getUsersToPromptAt).toHaveBeenCalledWith(9, 30);
@@ -268,6 +268,164 @@ describe('🔴 Red Phase: Scheduler活動促し機能', () => {
       
       expect(mockLogger.info).toHaveBeenCalledWith(
         expect.stringContaining('手動実行: activityPrompt')
+      );
+    });
+  });
+
+  describe('環境別リマインダー頻度制御', () => {
+    const originalEnv = process.env.NODE_ENV;
+
+    afterEach(() => {
+      process.env.NODE_ENV = originalEnv;
+    });
+
+    describe('development環境', () => {
+      beforeEach(() => {
+        process.env.NODE_ENV = 'development';
+      });
+
+      test('毎分リマインダーが送信される', async () => {
+        mockActivityPromptRepo.getUsersToPromptAt.mockResolvedValue(['user1']);
+        (scheduler as any).activityPromptRepository = mockActivityPromptRepo;
+
+        await scheduler.start();
+
+        const scheduleCall = mockSchedulerService.schedule.mock.calls.find(
+          call => call[0] === '* * * * *'
+        );
+        const scheduleFunction = scheduleCall?.[1];
+
+        // 各種の分で実行をテスト
+        const testMinutes = [0, 15, 30, 45, 59];
+        for (const minute of testMinutes) {
+          const testTime = new Date('2023-01-01T09:00:00Z');
+          testTime.setMinutes(minute);
+          mockTimeProvider.now.mockReturnValue(testTime);
+          
+          await scheduleFunction?.();
+          
+          // getUsersToPromptAtが呼ばれることを確認（分に関係なく）
+          expect(mockActivityPromptRepo.getUsersToPromptAt).toHaveBeenCalled();
+        }
+      });
+    });
+
+    describe('staging環境', () => {
+      beforeEach(() => {
+        process.env.NODE_ENV = 'staging';
+      });
+
+      test('0分と30分のみリマインダーが送信される', async () => {
+        mockActivityPromptRepo.getUsersToPromptAt.mockResolvedValue(['user1']);
+        (scheduler as any).activityPromptRepository = mockActivityPromptRepo;
+
+        await scheduler.start();
+
+        const scheduleCall = mockSchedulerService.schedule.mock.calls.find(
+          call => call[0] === '* * * * *'
+        );
+        const scheduleFunction = scheduleCall?.[1];
+
+        // 0分: 送信される
+        mockTimeProvider.now.mockReturnValue(new Date('2023-01-01T09:00:00Z'));
+        await scheduleFunction?.();
+        expect(mockActivityPromptRepo.getUsersToPromptAt).toHaveBeenCalledWith(18, 0);
+
+        // 15分: 送信されない
+        mockActivityPromptRepo.getUsersToPromptAt.mockClear();
+        mockTimeProvider.now.mockReturnValue(new Date('2023-01-01T09:15:00Z'));
+        await scheduleFunction?.();
+        expect(mockActivityPromptRepo.getUsersToPromptAt).not.toHaveBeenCalled();
+
+        // 30分: 送信される
+        mockTimeProvider.now.mockReturnValue(new Date('2023-01-01T09:30:00Z'));
+        await scheduleFunction?.();
+        expect(mockActivityPromptRepo.getUsersToPromptAt).toHaveBeenCalledWith(18, 30);
+
+        // 45分: 送信されない
+        mockActivityPromptRepo.getUsersToPromptAt.mockClear();
+        mockTimeProvider.now.mockReturnValue(new Date('2023-01-01T09:45:00Z'));
+        await scheduleFunction?.();
+        expect(mockActivityPromptRepo.getUsersToPromptAt).not.toHaveBeenCalled();
+      });
+    });
+
+    describe('production環境', () => {
+      beforeEach(() => {
+        process.env.NODE_ENV = 'production';
+      });
+
+      test('0分と30分のみリマインダーが送信される', async () => {
+        mockActivityPromptRepo.getUsersToPromptAt.mockResolvedValue(['user1']);
+        (scheduler as any).activityPromptRepository = mockActivityPromptRepo;
+
+        await scheduler.start();
+
+        const scheduleCall = mockSchedulerService.schedule.mock.calls.find(
+          call => call[0] === '* * * * *'
+        );
+        const scheduleFunction = scheduleCall?.[1];
+
+        // 0分: 送信される
+        mockTimeProvider.now.mockReturnValue(new Date('2023-01-01T09:00:00Z'));
+        await scheduleFunction?.();
+        expect(mockActivityPromptRepo.getUsersToPromptAt).toHaveBeenCalledWith(18, 0);
+
+        // 30分: 送信される
+        mockActivityPromptRepo.getUsersToPromptAt.mockClear();
+        mockTimeProvider.now.mockReturnValue(new Date('2023-01-01T09:30:00Z'));
+        await scheduleFunction?.();
+        expect(mockActivityPromptRepo.getUsersToPromptAt).toHaveBeenCalledWith(18, 30);
+      });
+    });
+
+    test('環境に応じたログ表示', async () => {
+      mockActivityPromptRepo.getUsersToPromptAt.mockResolvedValue(['user1']);
+      (scheduler as any).activityPromptRepository = mockActivityPromptRepo;
+
+      // development環境
+      process.env.NODE_ENV = 'development';
+      scheduler = new Scheduler(mockBot as any, mockRepository, {
+        schedulerService: mockSchedulerService,
+        logger: mockLogger,
+        timeProvider: mockTimeProvider,
+        configService: mockConfigService,
+        activityPromptRepository: mockActivityPromptRepo as any
+      });
+      
+      await scheduler.start();
+      const scheduleCall = mockSchedulerService.schedule.mock.calls.find(
+        call => call[0] === '* * * * *'
+      );
+      const scheduleFunction = scheduleCall?.[1];
+      
+      mockTimeProvider.now.mockReturnValue(new Date('2023-01-01T09:00:00Z'));
+      await scheduleFunction?.();
+      
+      expect(mockLogger.info).toHaveBeenCalledWith(
+        expect.stringContaining('[DEV] 活動促し通知送信')
+      );
+
+      // staging環境
+      mockLogger.info.mockClear();
+      mockActivityPromptRepo.getUsersToPromptAt.mockClear();
+      mockActivityPromptRepo.getUsersToPromptAt.mockResolvedValue(['user1']);
+      process.env.NODE_ENV = 'staging';
+      await scheduleFunction?.();
+      
+      expect(mockLogger.info).toHaveBeenCalledWith(
+        expect.stringContaining('[STG/PROD] 活動促し通知送信')
+      );
+
+      // production環境  
+      mockLogger.info.mockClear();
+      mockActivityPromptRepo.getUsersToPromptAt.mockClear();
+      mockActivityPromptRepo.getUsersToPromptAt.mockResolvedValue(['user1']);
+      process.env.NODE_ENV = 'production';
+      await scheduleFunction?.();
+      
+      expect(mockLogger.info).toHaveBeenCalledWith(
+        expect.stringContaining('[STG/PROD] 活動促し通知送信')
       );
     });
   });

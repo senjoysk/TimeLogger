@@ -74,6 +74,34 @@ describe('ファクトリークラステスト', () => {
       
       expect(service.validate('0 0 * * *')).toBe(true);
     });
+
+    test('タスクが自動開始される（scheduled: true）', () => {
+      const service = new CronSchedulerService();
+      const callback = jest.fn();
+      const mockTask = {
+        start: jest.fn(),
+        stop: jest.fn()
+      };
+      
+      // node-cronのモックをリセットして設定
+      const cronMock = require('node-cron');
+      cronMock.schedule.mockReturnValue(mockTask);
+      
+      const task = service.schedule('0 0 * * *', callback);
+      
+      // node-cronのscheduleが正しいオプションで呼ばれたことを確認
+      expect(cronMock.schedule).toHaveBeenCalledWith(
+        '0 0 * * *',
+        callback,
+        {
+          scheduled: true,
+          timezone: 'UTC'
+        }
+      );
+      
+      // task.start()が呼ばれたことを確認
+      expect(mockTask.start).toHaveBeenCalled();
+    });
   });
 
   describe('RealTimeProvider', () => {
