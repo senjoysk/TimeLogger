@@ -202,10 +202,10 @@ export class Scheduler {
           
           // 環境チェック
           const nodeEnv = process.env.NODE_ENV || 'development';
-          const isDevelopmentOrStaging = nodeEnv === 'development' || nodeEnv === 'staging';
+          const isDevelopment = nodeEnv === 'development';
           
-          if (!isDevelopmentOrStaging) {
-            // production環境では0分と30分のみチェック
+          if (!isDevelopment) {
+            // staging/production環境では0分と30分のみチェック
             if (localMinute !== 0 && localMinute !== 30) {
               continue;
             }
@@ -219,7 +219,7 @@ export class Scheduler {
           const usersToPrompt = await this.activityPromptRepository.getUsersToPromptAt(localHour, localMinute);
           
           if (usersToPrompt.includes(user.userId)) {
-            const envInfo = isDevelopmentOrStaging ? '[DEV/STG]' : '[PROD]';
+            const envInfo = isDevelopment ? '[DEV]' : '[STG/PROD]';
             this.logger.info(`📢 ${envInfo} 活動促し通知送信: ${user.userId} (${user.timezone} ${localHour}:${localMinute.toString().padStart(2, '0')})`);
             await this.bot.sendActivityPromptToUser(user.userId, user.timezone);
           }
@@ -239,7 +239,7 @@ export class Scheduler {
    */
   private logScheduleInfo(): void {
     const nodeEnv = process.env.NODE_ENV || 'development';
-    const scheduleInfo = nodeEnv === 'development' || nodeEnv === 'staging'
+    const scheduleInfo = nodeEnv === 'development'
       ? '有効（毎分チェック・毎分実行）' 
       : '有効（毎分チェック、0分・30分に実行）';
     
