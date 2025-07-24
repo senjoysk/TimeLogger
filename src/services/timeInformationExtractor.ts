@@ -401,12 +401,12 @@ export class TimeInformationExtractor {
     basicAnalysis: Partial<TimeAnalysisResult>,
     context: RecentActivityContext
   ): Promise<GeminiTimeAnalysisResponse> {
-    // プロンプト構築（将来的にGemini直接呼び出し用）
-    this.buildGeminiPrompt(input, timezone, inputTimestamp, basicAnalysis, context);
+    // プロンプト構築
+    const prompt = this.buildGeminiPrompt(input, timezone, inputTimestamp, basicAnalysis, context);
     
     try {
       console.log('🤖 Gemini解析開始...');
-      const result = await this.geminiService.analyzeActivity(input, '', [], timezone);
+      const result = await this.geminiService.classifyMessageWithAI(input);
       
       // レスポンスを期待する形式に変換
       return this.parseGeminiResponse(result, basicAnalysis);
