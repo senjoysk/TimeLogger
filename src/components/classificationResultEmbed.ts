@@ -268,9 +268,9 @@ function getClassificationLabel(classification: MessageClassification): string {
     case 'MEMO':
       return 'メモ';
     case 'UNCERTAIN':
-      return '不明';
+      return '不明確';
     default:
-      return '不明';
+      return '不明確';
   }
 }
 

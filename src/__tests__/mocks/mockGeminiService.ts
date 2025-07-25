@@ -24,7 +24,7 @@ export class MockGeminiService {
       classification = 'TODO';
       confidence = 0.8;
     } else if (activityKeywords.some(word => message.includes(word))) {
-      classification = 'ACTIVITY_LOG';
+      classification = 'UNCERTAIN';
       confidence = 0.7;
     } else if (memoKeywords.some(word => message.includes(word))) {
       classification = 'MEMO';

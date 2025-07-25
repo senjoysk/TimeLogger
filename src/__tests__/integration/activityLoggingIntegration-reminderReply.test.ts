@@ -26,7 +26,7 @@ describe('🟢 Green Phase: ActivityLoggingIntegration ReminderReply機能', () 
     jest.doMock('../../services/geminiService', () => ({
       GeminiService: jest.fn().mockImplementation(() => ({
         classifyMessageWithReminderContext: jest.fn().mockResolvedValue({
-          classification: 'ACTIVITY_LOG',
+          classification: 'UNCERTAIN',
           confidence: 0.9,
           priority: 3,
           reason: 'リマインダーへの返信として分析',

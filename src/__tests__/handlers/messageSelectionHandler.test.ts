@@ -122,6 +122,49 @@ describe('ボタンインタラクション処理テスト', () => {
   test('🟢 Green Phase: 活動ログ選択時にインタラクションを更新する', async () => {
     // 最小限の実装により、テストが通る
     const handler = new MessageSelectionHandler();
+    
+    // GeminiServiceのモックを設定
+    const mockGeminiService = {
+      analyzeActivityContent: jest.fn().mockResolvedValue({
+        timeEstimation: {
+          startTime: new Date().toISOString(),
+          endTime: new Date(Date.now() + 30 * 60 * 1000).toISOString(),
+          duration: 30,
+          confidence: 0.8,
+          source: 'ai_estimation'
+        },
+        activityContent: {
+          mainActivity: 'テスト活動',
+          subActivities: [],
+          structuredContent: 'テスト活動の詳細内容'
+        },
+        activityCategory: {
+          primaryCategory: 'work',
+          tags: ['test']
+        },
+        analysisMetadata: {
+          confidence: 0.8
+        }
+      })
+    };
+    
+    // ActivityLogServiceのモックを設定
+    const mockActivityLogService = {
+      recordActivity: jest.fn().mockResolvedValue({
+        id: 'log-123',
+        userId: 'test-user-123',
+        content: 'テストメッセージ',
+        timestamp: new Date().toISOString()
+      })
+    };
+    
+    // 依存性を注入
+    handler.setGeminiService(mockGeminiService as any);
+    handler.setActivityLogService(mockActivityLogService as any);
+    
+    // 事前にメッセージを保存
+    await handler.showSelectionUI({ reply: jest.fn() } as any, 'test-user-123', 'テストメッセージ');
+    
     const mockInteraction = { 
       customId: 'select_ACTIVITY_LOG',
       user: { id: 'test-user-123' },
@@ -135,15 +178,33 @@ describe('ボタンインタラクション処理テスト', () => {
     
     // 最初に処理中メッセージが表示される
     expect(mockInteraction.update).toHaveBeenCalledWith({
-      content: '📝 活動ログ記録中...',
+      content: '📝 活動ログを分析中...',
       embeds: [],
       components: []
     });
     
-    // その後、完了メッセージが表示される
-    expect(mockInteraction.editReply).toHaveBeenCalledWith({
-      content: '📝 活動ログとして記録しました！'
-    });
+    // AI分析が呼び出される
+    expect(mockGeminiService.analyzeActivityContent).toHaveBeenCalledWith(
+      'テストメッセージ',
+      expect.any(Date),
+      'Asia/Tokyo'
+    );
+    
+    // 活動ログ記録が呼び出される
+    expect(mockActivityLogService.recordActivity).toHaveBeenCalledWith(
+      'test-user-123',
+      'テストメッセージ',
+      'Asia/Tokyo',
+      undefined,
+      expect.any(Object)
+    );
+    
+    // その後、AI分析結果を含む完了メッセージが表示される
+    expect(mockInteraction.editReply).toHaveBeenCalledWith(
+      expect.objectContaining({
+        content: expect.stringContaining('📝 活動ログとして記録しました！')
+      })
+    );
   });
 
   test('🟢 Green Phase: メモ選択時にインタラクションを更新する', async () => {

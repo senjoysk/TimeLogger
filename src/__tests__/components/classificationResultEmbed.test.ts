@@ -51,9 +51,9 @@ describe('ClassificationResultEmbed', () => {
       expect(todoField?.value).toContain('TODOリストに追加して期日を設定');
     });
 
-    test('ACTIVITY_LOG分類結果のEmbedを正しく生成できる', () => {
+    test('UNCERTAIN分類結果のEmbedを正しく生成できる（活動ログメッセージ）', () => {
       const result: ClassificationResult = {
-        classification: 'ACTIVITY_LOG',
+        classification: 'UNCERTAIN',
         confidence: 0.92,
         reason: '完了した活動の記録として判定されました'
       };
@@ -64,12 +64,12 @@ describe('ClassificationResultEmbed', () => {
         userId: 'test-user-123'
       });
 
-      expect(embed.data.title).toBe('📝 AI分析結果');
-      expect(embed.data.color).toBe(0x0099ff); // 青色 (ACTIVITY_LOG)
+      expect(embed.data.title).toBe('❓ AI分析結果');
+      expect(embed.data.color).toBe(0x888888); // グレー色 (UNCERTAIN)
       expect(embed.data.fields).toHaveLength(3); // AI判定、信頼度、判定理由のみ
       
       const aiField = embed.data.fields?.find(f => f.name === '🤖 AI判定');
-      expect(aiField?.value).toBe('**活動ログ**');
+      expect(aiField?.value).toBe('**不明確**');
     });
 
     test('MEMO分類結果のEmbedを正しく生成できる', () => {
@@ -138,9 +138,9 @@ describe('ClassificationResultEmbed', () => {
       expect(buttons.components[3]).toBeDefined();
     });
 
-    test('ACTIVITY_LOG分類の確認ボタンが正しく生成される', () => {
+    test('UNCERTAIN分類の確認ボタンが正しく生成される', () => {
       const sessionId = 'test-session-456';
-      const buttons = createClassificationButtons(sessionId, 'ACTIVITY_LOG');
+      const buttons = createClassificationButtons(sessionId, 'UNCERTAIN');
 
       expect(buttons.components).toHaveLength(4);
       expect(buttons.components[0]).toBeDefined();
