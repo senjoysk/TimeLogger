@@ -378,7 +378,7 @@ export class GeminiService {
 
 【出力形式】（JSON形式）
 {
-  "classification": "ACTIVITY_LOG|TODO|MEMO|UNCERTAIN",
+  "classification": "TODO|MEMO|UNCERTAIN",
   "confidence": 0.0-1.0の信頼度,
   "priority": 1-5の優先度,
   "reasoning": "分類理由",
@@ -407,7 +407,7 @@ JSON形式のみで回答してください。
 
 文脈から、この投稿がリマインダー対象時間帯の活動について言及している可能性を考慮して分析してください。
 
-分類: ACTIVITY_LOG | TODO | MEMO | UNCERTAIN
+分類: TODO | MEMO | UNCERTAIN
 信頼度: 0.0-1.0の数値
 分析: 活動内容の詳細な説明（時間的文脈を考慮）
 

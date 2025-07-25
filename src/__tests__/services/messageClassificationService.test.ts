@@ -92,7 +92,6 @@ describe('MessageClassificationService', () => {
       const thresholds = await service.getClassificationConfidenceThresholds();
       
       expect(thresholds.todo).toBeGreaterThan(0);
-      expect(thresholds.activityLog).toBeGreaterThan(0);
       expect(thresholds.memo).toBeGreaterThan(0);
       expect(thresholds.uncertain).toBeGreaterThan(0);
     });
