@@ -21,6 +21,20 @@ describe('🟢 Green Phase: ActivityLoggingIntegration ReminderReply機能', () 
       saveUser: jest.fn(),
       initializeDatabase: jest.fn()
     } as any;
+    
+    // GeminiServiceのモックを追加
+    jest.doMock('../../services/geminiService', () => ({
+      GeminiService: jest.fn().mockImplementation(() => ({
+        classifyMessageWithReminderContext: jest.fn().mockResolvedValue({
+          classification: 'ACTIVITY_LOG',
+          confidence: 0.9,
+          priority: 3,
+          reason: 'リマインダーへの返信として分析',
+          analysis: '会議参加とプレゼン資料作成の活動',
+          contextType: 'REMINDER_REPLY'
+        })
+      }))
+    }));
 
     const config = {
       databasePath: ':memory:',
@@ -65,6 +79,9 @@ describe('🟢 Green Phase: ActivityLoggingIntegration ReminderReply機能', () 
     
     const result = await integration.handleMessage(mockMessage as Message);
 
+    console.log('🔍 Test Debug - result:', result);
+    console.log('🔍 Test Debug - mockRepository.saveLog.mock.calls:', mockRepository.saveLog.mock.calls);
+    
     expect(result).toBe(true); // ❌ 失敗する
     expect(mockRepository.saveLog).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -73,7 +90,12 @@ describe('🟢 Green Phase: ActivityLoggingIntegration ReminderReply機能', () 
         isReminderReply: true,
         timeRangeStart: '2024-01-15T11:00:00.000Z',
         timeRangeEnd: '2024-01-15T11:30:00.000Z',
-        contextType: 'REMINDER_REPLY'
+        contextType: 'REMINDER_REPLY',
+        // AI分析結果も含める
+        aiAnalysis: '会議参加とプレゼン資料作成の活動',
+        aiClassification: 'ACTIVITY_LOG',
+        aiConfidence: 0.9,
+        aiReasoning: 'リマインダーへの返信として分析'
       })
     );
   });

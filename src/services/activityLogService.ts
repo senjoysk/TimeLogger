@@ -6,6 +6,7 @@
 import { v4 as uuidv4 } from 'uuid';
 import { toZonedTime, format } from 'date-fns-tz';
 import { IActivityLogRepository } from '../repositories/activityLogRepository';
+import { ActivityAnalysisResult } from '../types/activityAnalysis';
 import {
   ActivityLog,
   CreateActivityLogRequest,
@@ -20,7 +21,11 @@ import { RealTimeActivityAnalyzer } from './realTimeActivityAnalyzer';
 import { GeminiService } from './geminiService';
 import { 
   DetailedActivityAnalysis,
-  RecentActivityContext 
+  RecentActivityContext,
+  WarningType as RealTimeWarningType,
+  WarningLevel as RealTimeWarningLevel,
+  ActivityPriority,
+  TimeExtractionMethod
 } from '../types/realTimeAnalysis';
 import { ActivityLogMatchingService } from './activityLogMatchingService';
 import { ITimezoneService } from './interfaces/ITimezoneService';
@@ -35,9 +40,10 @@ export interface IActivityLogService {
    * @param content 活動内容（自然言語）
    * @param timezone ユーザーのタイムゾーン
    * @param inputTime 記録時刻（省略時は現在時刻）
+   * @param aiAnalysis AI分析結果（オプション）
    * @returns 作成されたActivityLog
    */
-  recordActivity(userId: string, content: string, timezone: string, inputTime?: string): Promise<ActivityLog>;
+  recordActivity(userId: string, content: string, timezone: string, inputTime?: string, aiAnalysis?: ActivityAnalysisResult): Promise<ActivityLog>;
 
   /**
    * 指定日の活動ログを取得
@@ -174,7 +180,7 @@ export class ActivityLogService implements IActivityLogService {
   /**
    * 新しい活動を記録
    */
-  async recordActivity(userId: string, content: string, timezone: string, inputTime?: string): Promise<ActivityLog> {
+  async recordActivity(userId: string, content: string, timezone: string, inputTime?: string, aiAnalysis?: ActivityAnalysisResult): Promise<ActivityLog> {
     try {
       // 入力内容の検証
       if (!content || content.trim().length === 0) {
@@ -196,30 +202,96 @@ export class ActivityLogService implements IActivityLogService {
       // 最近の活動コンテキストを取得
       const recentContext = await this.buildRecentActivityContext(userId, timezone);
       
-      // リアルタイム活動分析を実行
+      // 活動分析を実行（AI分析結果があればそれを使用、なければリアルタイム分析）
       let detailedAnalysis: DetailedActivityAnalysis | null = null;
       let analysisWarnings: string[] = [];
       
-      try {
-        detailedAnalysis = await this.realTimeAnalyzer.analyzeActivity(
-          content.trim(),
-          timezone,
-          new Date(inputTimestamp),
-          recentContext
-        );
+      if (aiAnalysis) {
+        // AI分析結果をDetailedActivityAnalysis形式に変換
+        detailedAnalysis = {
+          summary: aiAnalysis.activityContent.structuredContent,
+          recommendations: [],
+          timeAnalysis: {
+            startTime: aiAnalysis.timeEstimation.startTime || '',
+            endTime: aiAnalysis.timeEstimation.endTime || '',
+            totalMinutes: aiAnalysis.timeEstimation.duration || 30,
+            confidence: aiAnalysis.timeEstimation.confidence,
+            method: aiAnalysis.timeEstimation.source === 'reminder_reply' ? TimeExtractionMethod.EXPLICIT : TimeExtractionMethod.INFERRED,
+            timezone: timezone,
+            extractedComponents: []
+          },
+          activities: [{
+            content: aiAnalysis.activityContent.mainActivity,
+            category: aiAnalysis.activityCategory.primaryCategory,
+            subCategory: aiAnalysis.activityCategory.subCategory,
+            timePercentage: 100,
+            actualMinutes: aiAnalysis.timeEstimation.duration || 30,
+            priority: ActivityPriority.PRIMARY,
+            confidence: aiAnalysis.analysisMetadata.confidence,
+            startTime: aiAnalysis.timeEstimation.startTime,
+            endTime: aiAnalysis.timeEstimation.endTime
+          }],
+          confidence: aiAnalysis.analysisMetadata.confidence,
+          warnings: aiAnalysis.analysisMetadata.warnings?.map(w => ({ 
+            type: RealTimeWarningType.LOW_CONFIDENCE, 
+            level: RealTimeWarningLevel.WARNING, 
+            message: w, 
+            details: {} 
+          })) || [],
+          metadata: {
+            processingTimeMs: 0,
+            analysisMethod: 'gemini_ai_analysis',
+            componentVersions: {
+              timeExtractor: 'gemini-ai-1.0.0',
+              activityAnalyzer: 'gemini-ai-1.0.0',
+              consistencyValidator: 'gemini-ai-1.0.0'
+            },
+            inputCharacteristics: {
+              length: content.length,
+              hasExplicitTime: !!aiAnalysis.timeEstimation.startTime,
+              hasMultipleActivities: aiAnalysis.activityContent.subActivities.length > 0,
+              complexityLevel: content.length > 100 ? 'complex' : 'simple'
+            },
+            qualityMetrics: {
+              timeExtractionConfidence: aiAnalysis.timeEstimation.confidence,
+              averageActivityConfidence: aiAnalysis.analysisMetadata.confidence,
+              validationScore: aiAnalysis.analysisMetadata.confidence,
+              warningCount: aiAnalysis.analysisMetadata.warnings?.length || 0
+            }
+          }
+        };
         
-        // 警告がある場合はログ出力
-        if (detailedAnalysis.warnings.length > 0) {
-          analysisWarnings = detailedAnalysis.warnings.map(w => w.message);
-          console.log(`⚠️ 分析警告 (${detailedAnalysis.warnings.length}件):`, analysisWarnings);
+        if (aiAnalysis.analysisMetadata.warnings && aiAnalysis.analysisMetadata.warnings.length > 0) {
+          analysisWarnings = aiAnalysis.analysisMetadata.warnings;
+          console.log(`⚠️ AI分析警告 (${aiAnalysis.analysisMetadata.warnings.length}件):`, analysisWarnings);
         }
         
-        console.log(`✅ リアルタイム分析完了: 信頼度 ${Math.round(detailedAnalysis.confidence * 100)}%`);
-        console.log(`🕐 分析結果: ${detailedAnalysis.summary}`);
+        console.log(`✅ AI分析結果使用: 信頼度 ${Math.round(aiAnalysis.analysisMetadata.confidence * 100)}%`);
+        console.log(`🕐 分析結果: ${aiAnalysis.activityContent.structuredContent}`);
         
-      } catch (analysisError) {
-        console.error('⚠️ リアルタイム分析に失敗しました。基本記録を続行します:', analysisError);
-        // 分析に失敗しても基本記録は続行
+      } else {
+        // 通常のリアルタイム分析を実行
+        try {
+          detailedAnalysis = await this.realTimeAnalyzer.analyzeActivity(
+            content.trim(),
+            timezone,
+            new Date(inputTimestamp),
+            recentContext
+          );
+          
+          // 警告がある場合はログ出力
+          if (detailedAnalysis.warnings.length > 0) {
+            analysisWarnings = detailedAnalysis.warnings.map(w => w.message);
+            console.log(`⚠️ 分析警告 (${detailedAnalysis.warnings.length}件):`, analysisWarnings);
+          }
+          
+          console.log(`✅ リアルタイム分析完了: 信頼度 ${Math.round(detailedAnalysis.confidence * 100)}%`);
+          console.log(`🕐 分析結果: ${detailedAnalysis.summary}`);
+          
+        } catch (analysisError) {
+          console.error('⚠️ リアルタイム分析に失敗しました。基本記録を続行します:', analysisError);
+          // 分析に失敗しても基本記録は続行
+        }
       }
 
       // ログタイプ分析を実行

@@ -99,7 +99,7 @@ export interface TodoStats {
 /**
  * メッセージ分類結果
  */
-export type MessageClassification = 'TODO' | 'ACTIVITY_LOG' | 'MEMO' | 'UNCERTAIN';
+export type MessageClassification = 'TODO' | 'MEMO' | 'UNCERTAIN';
 
 /**
  * AI分類結果

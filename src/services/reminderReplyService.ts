@@ -8,6 +8,8 @@ export interface TimeRange {
 export interface ReminderReplyResult {
   isReminderReply: boolean;
   timeRange?: TimeRange;
+  reminderTime?: Date;
+  reminderContent?: string;
 }
 
 export interface NearbyReminderResult {
@@ -43,7 +45,9 @@ export class ReminderReplyService {
       
       return {
         isReminderReply: true,
-        timeRange
+        timeRange,
+        reminderTime: referencedMessage.createdAt,
+        reminderContent: referencedMessage.content
       };
     } catch (error) {
       return { isReminderReply: false };

@@ -5,6 +5,7 @@ import { ApiCostMonitor } from './apiCostMonitor';
 import { toZonedTime, format } from 'date-fns-tz';
 import { ClassificationResult, MessageClassification } from '../types/todo';
 import { withErrorHandling, AppError, ErrorType } from '../utils/errorHandler';
+import { ActivityAnalysisResult, ReminderContext } from '../types/activityAnalysis';
 
 /**
  * Google Gemini API サービスクラス
@@ -119,11 +120,10 @@ export class GeminiService {
 あなたは時間管理アシスタントです。ユーザーのメッセージを分析して、以下の分類のいずれかに分類してください。
 
 分類カテゴリ:
-1. "activity_log" - 過去の活動や作業の記録・報告
-2. "todo_creation" - 新しいタスクやTODOの作成依頼
-3. "todo_inquiry" - 既存のTODOの確認・検索・状況確認
-4. "gap_report" - 作業の隙間時間や休憩時間の報告
-5. "other" - その他のメッセージ
+1. "todo_creation" - 新しいタスクやTODOの作成依頼
+2. "todo_inquiry" - 既存のTODOの確認・検索・状況確認
+3. "memo" - メモや覚え書きの保存
+4. "other" - その他のメッセージ
 
 メッセージ: "${message}"
 
@@ -154,7 +154,7 @@ export class GeminiService {
 
       // 分類の妥当性チェック
       const validClassifications: MessageClassification[] = [
-        'TODO', 'ACTIVITY_LOG', 'MEMO', 'UNCERTAIN'
+        'TODO', 'MEMO', 'UNCERTAIN'
       ];
       
       if (!validClassifications.includes(parsed.classification)) {
@@ -228,13 +228,13 @@ export class GeminiService {
       };
     }
 
-    // デフォルトは活動ログ
+    // デフォルトは不明
     return {
-      classification: 'ACTIVITY_LOG',
-      confidence: 0.6,
+      classification: 'UNCERTAIN',
+      confidence: 0.4,
       priority: 2,
-      reason: 'キーワードベース分類（デフォルト：活動ログ）',
-      analysis: '特定のキーワードが検出されなかったため、活動ログとして分類しました'
+      reason: 'キーワードベース分類（デフォルト：不明）',
+      analysis: '特定のキーワードが検出されなかったため、不明として分類しました'
     };
   }
 
@@ -253,9 +253,11 @@ export class GeminiService {
    */
   public async classifyMessageWithReminderContext(
     messageContent: string,
-    timeRange: { start: Date; end: Date }
+    timeRange: { start: Date; end: Date },
+    reminderTime?: Date,
+    reminderContent?: string
   ): Promise<ClassificationResult & { contextType: 'REMINDER_REPLY' }> {
-    const prompt = this.buildReminderContextPrompt(messageContent, timeRange);
+    const prompt = this.buildReminderContextPrompt(messageContent, timeRange, reminderTime, reminderContent);
     
     // プロンプトのログ出力
     console.log('📤 [Gemini API] リマインダーReply分析プロンプト:');
@@ -348,22 +350,44 @@ export class GeminiService {
   /**
    * リマインダーReply用のプロンプトを構築
    */
-  public buildReminderContextPrompt(messageContent: string, timeRange: { start: Date; end: Date }): string {
-    const startTime = timeRange.start.toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' });
-    const endTime = timeRange.end.toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' });
+  public buildReminderContextPrompt(
+    messageContent: string, 
+    timeRange: { start: Date; end: Date },
+    reminderTime?: Date,
+    reminderContent?: string
+  ): string {
+    const startTimeStr = timeRange.start.toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' });
+    const endTimeStr = timeRange.end.toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' });
+    const reminderTimeStr = reminderTime ? reminderTime.toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' }) : '';
     
     return `
-このメッセージは${startTime}から${endTime}までの30分間の活動についてのリマインダーへの返信です。
+あなたは時間管理アシスタントです。以下は30分間隔のリマインダーへの返信です。
 
-ユーザーメッセージ: "${messageContent}"
+【リマインダー情報】
+- リマインダー送信時刻: ${reminderTimeStr}
+- 対象時間範囲: ${startTimeStr} - ${endTimeStr} (30分間)
+- リマインダーメッセージ: "${reminderContent || 'この30分、何してた？'}"
 
-この時間帯の活動内容として記録し、以下の形式で応答してください：
+【ユーザーの返信】
+"${messageContent}"
 
-分類: ACTIVITY_LOG | TODO | MEMO | UNCERTAIN
-信頼度: 0.0-1.0の数値
-分析: 活動内容の詳細な説明（時間範囲を考慮して解釈）
+【分析指示】
+1. この返信は上記30分間の活動についての報告として解釈してください
+2. 時間範囲を明確に意識した活動内容の分析を行ってください
+3. リマインダーへの返信という文脈を考慮してください
 
-リマインダーへの返信であることを踏まえ、指定された時間範囲での活動として解釈してください。
+【出力形式】（JSON形式）
+{
+  "classification": "ACTIVITY_LOG|TODO|MEMO|UNCERTAIN",
+  "confidence": 0.0-1.0の信頼度,
+  "priority": 1-5の優先度,
+  "reasoning": "分類理由",
+  "analysis": "活動内容の詳細分析（時間範囲と文脈を明記）",
+  "timeContextAnalysis": "時間範囲との関連性分析",
+  "reminderResponseQuality": "リマインダーへの返信としての適切性評価"
+}
+
+JSON形式のみで回答してください。
     `.trim();
   }
 
@@ -406,6 +430,252 @@ export class GeminiService {
       minute: '2-digit'
     });
     return `${startTime}-${endTime}`;
+  }
+
+  /**
+   * 活動内容を分析（リマインダーReply対応版）
+   */
+  public async analyzeActivityContent(
+    message: string,
+    currentTime: Date,
+    timezone: string,
+    reminderContext?: ReminderContext
+  ): Promise<ActivityAnalysisResult> {
+    const prompt = reminderContext?.isReminderReply
+      ? this.buildReminderActivityAnalysisPrompt(message, currentTime, timezone, reminderContext)
+      : this.buildGeneralActivityAnalysisPrompt(message, currentTime, timezone);
+    
+    // ログ出力
+    const logTitle = reminderContext?.isReminderReply 
+      ? 'リマインダーReply活動分析' 
+      : '通常活動分析';
+      
+    console.log(`📤 [Gemini API] ${logTitle}プロンプト:`);
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    console.log(prompt);
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    
+    try {
+      const result = await this.model.generateContent(prompt);
+      const responseText = result.response.text();
+      
+      console.log(`📥 [Gemini API] ${logTitle}レスポンス:`);
+      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      console.log(responseText);
+      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      
+      // トークン使用量の記録
+      if (result.response.usageMetadata) {
+        const { promptTokenCount, candidatesTokenCount } = result.response.usageMetadata;
+        await this.costMonitor.recordApiCall('analyzeActivity', promptTokenCount, candidatesTokenCount);
+      }
+      
+      return this.parseActivityAnalysisResponse(responseText);
+    } catch (error) {
+      console.error('❌ 活動分析エラー:', error);
+      throw new AppError(
+        '活動分析に失敗しました',
+        ErrorType.API,
+        { error, message, reminderContext }
+      );
+    }
+  }
+
+  /**
+   * リマインダーReply用の詳細プロンプト
+   */
+  private buildReminderActivityAnalysisPrompt(
+    message: string,
+    currentTime: Date,
+    timezone: string,
+    context: ReminderContext
+  ): string {
+    const startTime = context.timeRange!.start.toLocaleString('ja-JP', { timeZone: timezone });
+    const endTime = context.timeRange!.end.toLocaleString('ja-JP', { timeZone: timezone });
+    const reminderTime = context.reminderTime!.toLocaleString('ja-JP', { timeZone: timezone });
+    
+    return `
+あなたは時間管理の専門家です。以下はリマインダーへの返信として報告された活動内容です。
+
+【リマインダー情報】
+- リマインダー送信時刻: ${reminderTime}
+- 対象時間範囲: ${startTime} - ${endTime} (30分間)
+- リマインダー内容: "${context.reminderContent || 'この30分、何してた？'}"
+
+【ユーザーの返信】
+"${message}"
+
+【分析タスク】
+1. 活動時間の確定
+   - 時間範囲は上記の30分間として確定
+   - メッセージ内に別の時間情報があれば補足として記録
+
+2. 活動内容の抽出
+   - 30分間で行った活動を具体的に抽出
+   - 複数の活動がある場合は時間配分も推定
+
+3. 活動の分類
+   - 適切なカテゴリーに分類（開発、会議、調査、管理、休憩など）
+   - 30分という時間枠での妥当性も評価
+
+【出力形式】（JSON）
+{
+  "timeEstimation": {
+    "startTime": "${context.timeRange!.start.toISOString()}",
+    "endTime": "${context.timeRange!.end.toISOString()}",
+    "duration": 30,
+    "confidence": 1.0,
+    "source": "reminder_reply"
+  },
+  "activityContent": {
+    "mainActivity": "30分間のメイン活動の明確な説明",
+    "subActivities": ["サブ活動1", "サブ活動2"],
+    "structuredContent": "30分間の活動の構造化された詳細説明"
+  },
+  "activityCategory": {
+    "primaryCategory": "開発|会議|調査|管理|休憩|その他",
+    "subCategory": "より具体的なサブカテゴリー",
+    "tags": ["関連タグ1", "関連タグ2"]
+  },
+  "analysisMetadata": {
+    "confidence": 0.9,
+    "reminderReplyContext": true,
+    "warnings": ["警告がある場合のみ"]
+  }
+}
+
+JSON形式のみで回答してください。説明文は不要です。`.trim();
+  }
+
+  /**
+   * 通常メッセージ用のプロンプト
+   */
+  private buildGeneralActivityAnalysisPrompt(
+    message: string,
+    currentTime: Date,
+    timezone: string
+  ): string {
+    const currentTimeStr = currentTime.toLocaleString('ja-JP', { timeZone: timezone });
+    
+    return `
+あなたは時間管理の専門家です。以下のメッセージから活動情報を分析してください。
+
+【現在時刻】
+${currentTimeStr}
+
+【ユーザーメッセージ】
+"${message}"
+
+【分析タスク】
+1. 活動時間の推定
+   - メッセージから時間情報を抽出（「午前中」「さっき」「2時間」「14:00-16:00」など）
+   - 曖昧な表現も現在時刻を基準に具体的な時刻に変換
+   - 開始時刻、終了時刻、継続時間を推定
+
+2. 活動内容の抽出
+   - 主要な活動を明確に抽出
+   - 複数の活動がある場合は分離して特定
+   - 構造化された説明文を生成
+
+3. 活動の分類
+   - 適切なカテゴリーに分類（開発、会議、調査、管理、休憩など）
+   - サブカテゴリーも可能な限り特定
+   - 関連するタグを抽出
+
+【出力形式】（JSON）
+{
+  "timeEstimation": {
+    "startTime": "ISO 8601形式（推定できない場合はnull）",
+    "endTime": "ISO 8601形式（推定できない場合はnull）",
+    "duration": 分単位の数値（推定できない場合はnull）,
+    "confidence": 0.0-1.0の信頼度,
+    "source": "ai_estimation"
+  },
+  "activityContent": {
+    "mainActivity": "メインの活動内容の明確な説明",
+    "subActivities": ["サブ活動1", "サブ活動2"],
+    "structuredContent": "活動の構造化された詳細説明"
+  },
+  "activityCategory": {
+    "primaryCategory": "開発|会議|調査|管理|休憩|その他",
+    "subCategory": "より具体的なサブカテゴリー",
+    "tags": ["関連タグ1", "関連タグ2"]
+  },
+  "analysisMetadata": {
+    "confidence": 0.0-1.0,
+    "reminderReplyContext": false,
+    "warnings": ["推定が困難な場合の警告"]
+  }
+}
+
+JSON形式のみで回答してください。説明文は不要です。`.trim();
+  }
+
+  /**
+   * 活動分析レスポンスのパース
+   */
+  private parseActivityAnalysisResponse(response: string): ActivityAnalysisResult {
+    try {
+      // JSONブロックを抽出
+      const jsonMatch = response.match(/\{[\s\S]*\}/);
+      if (!jsonMatch) {
+        throw new Error('JSONレスポンスが見つかりません');
+      }
+
+      const jsonText = jsonMatch[0];
+      const parsed = JSON.parse(jsonText);
+
+      // 必須フィールドの検証とデフォルト値設定
+      return {
+        timeEstimation: {
+          startTime: parsed.timeEstimation?.startTime || null,
+          endTime: parsed.timeEstimation?.endTime || null,
+          duration: parsed.timeEstimation?.duration || null,
+          confidence: Math.max(0, Math.min(1, parsed.timeEstimation?.confidence || 0.5)),
+          source: parsed.timeEstimation?.source || 'ai_estimation'
+        },
+        activityContent: {
+          mainActivity: parsed.activityContent?.mainActivity || '活動内容を特定できませんでした',
+          subActivities: parsed.activityContent?.subActivities || [],
+          structuredContent: parsed.activityContent?.structuredContent || parsed.activityContent?.mainActivity || '詳細な分析を取得できませんでした'
+        },
+        activityCategory: {
+          primaryCategory: parsed.activityCategory?.primaryCategory || 'その他',
+          subCategory: parsed.activityCategory?.subCategory || undefined,
+          tags: parsed.activityCategory?.tags || []
+        },
+        analysisMetadata: {
+          confidence: Math.max(0, Math.min(1, parsed.analysisMetadata?.confidence || 0.5)),
+          reminderReplyContext: parsed.analysisMetadata?.reminderReplyContext || false,
+          warnings: parsed.analysisMetadata?.warnings || []
+        }
+      };
+
+    } catch (error) {
+      console.error('活動分析レスポンスのパースエラー:', error);
+      console.log('元のレスポンス:', response);
+      
+      // パースエラー時はデフォルト値を返す
+      return {
+        timeEstimation: {
+          confidence: 0.1,
+          source: 'ai_estimation'
+        },
+        activityContent: {
+          mainActivity: 'レスポンスの解析に失敗しました',
+          subActivities: [],
+          structuredContent: 'AI分析結果を取得できませんでした'
+        },
+        activityCategory: {
+          primaryCategory: 'その他',
+          tags: []
+        },
+        analysisMetadata: {
+          confidence: 0.1,
+          warnings: ['レスポンスの解析に失敗しました']
+        }
+      };
+    }
   }
 
   // 以下は互換性のための古いメソッドスタブ（deprecated）

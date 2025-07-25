@@ -195,6 +195,7 @@ export class ActivityLoggingIntegration {
       this.messageSelectionHandler.setTodoRepository(this.repository);
       this.messageSelectionHandler.setActivityLogService(this.activityLogService);
       this.messageSelectionHandler.setMemoRepository(this.memoRepository);
+      this.messageSelectionHandler.setGeminiService(this.geminiService);
       
       // リマインダーReplyサービスの初期化
       this.reminderReplyService = new ReminderReplyService();
@@ -341,7 +342,22 @@ export class ActivityLoggingIntegration {
       if (reminderReplyResult.isReminderReply && reminderReplyResult.timeRange) {
         console.log(`✅ [リマインダーReply] Reply検出成功:`, reminderReplyResult.timeRange);
         
-        // リマインダーReplyとして活動ログに記録
+        // GeminiServiceでAI分析を実行（新しいanalyzeActivityContentメソッドを使用）
+        console.log(`🤖 [リマインダーReply] Gemini分析開始...`);
+        const analysis = await this.geminiService.analyzeActivityContent(
+          content,
+          message.createdAt,
+          timezone,
+          {
+            isReminderReply: true,
+            timeRange: reminderReplyResult.timeRange,
+            reminderTime: reminderReplyResult.reminderTime,
+            reminderContent: reminderReplyResult.reminderContent
+          }
+        );
+        console.log(`✅ [リマインダーReply] Gemini分析完了:`, analysis);
+        
+        // 分析結果を含めてリマインダーReplyとして活動ログに記録
         const activityLog = {
           userId,
           content,
@@ -350,18 +366,32 @@ export class ActivityLoggingIntegration {
           isReminderReply: true,
           timeRangeStart: reminderReplyResult.timeRange.start.toISOString(),
           timeRangeEnd: reminderReplyResult.timeRange.end.toISOString(),
-          contextType: 'REMINDER_REPLY' as const
+          contextType: 'REMINDER_REPLY' as const,
+          // AI分析結果を追加（新しい構造）
+          estimatedStartTime: analysis.timeEstimation.startTime,
+          estimatedEndTime: analysis.timeEstimation.endTime,
+          estimatedDuration: analysis.timeEstimation.duration,
+          activityCategory: analysis.activityCategory.primaryCategory,
+          activitySubCategory: analysis.activityCategory.subCategory,
+          activityTags: analysis.activityCategory.tags?.join(', '),
+          structuredContent: analysis.activityContent.structuredContent,
+          aiAnalysisConfidence: analysis.analysisMetadata.confidence,
+          aiAnalysisSource: analysis.timeEstimation.source
         };
         
         await this.repository.saveLog(activityLog);
         console.log(`✅ [リマインダーReply] 活動ログ記録完了: ${userId}`);
         
-        // ユーザーに確認メッセージを送信
+        // ユーザーに確認メッセージを送信（AI分析結果も含む）
         const timeRange = reminderReplyResult.timeRange;
         const startTime = this.formatTimeForUser(timeRange.start, timezone);
         const endTime = this.formatTimeForUser(timeRange.end, timezone);
         
-        await message.reply(`✅ リマインダーへの返信として記録しました。\n⏰ 時間範囲: ${startTime} - ${endTime}`);
+        await message.reply(`✅ リマインダーへの返信として記録しました。
+⏰ 時間範囲: ${startTime} - ${endTime}
+📊 カテゴリー: ${analysis.activityCategory.primaryCategory}
+📝 ${analysis.activityContent.structuredContent}
+🏷️ タグ: ${analysis.activityCategory.tags.join(', ')}`);
         
         return true;
       }
