@@ -144,7 +144,7 @@ export class ActivityContentAnalyzer {
       console.log('🤖 Gemini活動分析開始...');
       
       // GeminiServiceを使用してAI分析を実行
-      const result = await this.geminiService.analyzeActivity(input, '', [], timeAnalysis.timezone);
+      const result = await this.geminiService.classifyMessageWithAI(input);
       
       // レスポンスを詳細分析形式に変換
       return this.parseGeminiActivityResponse(result, timeAnalysis, basicBreakdown);

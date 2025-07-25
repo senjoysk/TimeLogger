@@ -24,7 +24,12 @@ CREATE TABLE IF NOT EXISTS activity_logs (
     match_status TEXT DEFAULT 'unmatched' CHECK (match_status IN ('unmatched', 'matched', 'ignored')),
     matched_log_id TEXT,            -- マッチング相手のログID
     activity_key TEXT,              -- 活動内容の分類キー
-    similarity_score REAL           -- マッチング時の類似度スコア
+    similarity_score REAL,          -- マッチング時の類似度スコア
+    -- リマインダーReply機能カラム（新機能）
+    is_reminder_reply BOOLEAN DEFAULT FALSE, -- リマインダーへのreplyかどうか
+    time_range_start TEXT,          -- 明示的な時間範囲開始（UTC、ISO 8601形式）
+    time_range_end TEXT,            -- 明示的な時間範囲終了（UTC、ISO 8601形式）
+    context_type TEXT DEFAULT 'NORMAL' CHECK (context_type IN ('REMINDER_REPLY', 'POST_REMINDER', 'NORMAL')) -- コンテキストタイプ
 );
 
 -- 分析結果キャッシュテーブル

@@ -99,7 +99,7 @@ export interface TodoStats {
 /**
  * メッセージ分類結果
  */
-export type MessageClassification = 'TODO' | 'ACTIVITY_LOG' | 'MEMO' | 'UNCERTAIN';
+export type MessageClassification = 'TODO' | 'MEMO' | 'UNCERTAIN';
 
 /**
  * AI分類結果
@@ -108,6 +108,7 @@ export interface ClassificationResult {
   classification: MessageClassification;
   confidence: number;
   reason: string;
+  analysis?: string; // 分析結果の詳細（リマインダーコンテキスト用）
   suggestedAction?: string;
   priority?: number;
   dueDateSuggestion?: string;

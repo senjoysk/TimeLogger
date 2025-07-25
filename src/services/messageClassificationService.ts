@@ -46,7 +46,7 @@ export class MessageClassificationService implements IMessageClassificationServi
 1. **TODO**: 将来実行予定のタスク・作業
    - 例: "資料を作成する", "会議の準備をする", "〇〇を完了させる"
    
-2. **ACTIVITY_LOG**: 現在・過去の活動記録
+2. **ACTIVITY_LOG**: 削除済み（MessageSelectionHandlerで処理）
    - 例: "資料作成中", "会議に参加した", "〇〇を完了した"
    
 3. **MEMO**: 参考情報・メモ
@@ -58,7 +58,7 @@ export class MessageClassificationService implements IMessageClassificationServi
 
 以下のJSON形式で回答してください：
 {
-  "classification": "TODO|ACTIVITY_LOG|MEMO|UNCERTAIN",
+  "classification": "TODO|MEMO|UNCERTAIN",
   "confidence": 0.85,
   "reason": "判定理由",
   "suggested_action": "推奨アクション（TODOの場合）",
@@ -136,7 +136,7 @@ export class MessageClassificationService implements IMessageClassificationServi
       /までに/, /予定/, /する予定/, /しよう/, /するつもり/
     ];
 
-    // ACTIVITY_LOG パターン
+    // ACTIVITY_LOG patterns removed
     const activityPatterns = [
       /した$/, /やった$/, /完了した/, /参加した/, /作成した/,
       /中$/, /している/, /していた/, /しました/
@@ -160,14 +160,7 @@ export class MessageClassificationService implements IMessageClassificationServi
       };
     }
 
-    // ACTIVITY_LOG判定
-    if (activityPatterns.some(pattern => pattern.test(message))) {
-      return {
-        classification: 'ACTIVITY_LOG',
-        confidence: 0.8,
-        reason: '活動ログ関連のキーワードが検出されました'
-      };
-    }
+    // ACTIVITY_LOG classification removed - now handled by MessageSelectionHandler
 
     // MEMO判定
     if (memoPatterns.some(pattern => pattern.test(message))) {
@@ -199,14 +192,7 @@ export class MessageClassificationService implements IMessageClassificationServi
       };
     }
 
-    // 過去形・完了表現 → ACTIVITY_LOG
-    if (/した|やった|完了|終わり/.test(message)) {
-      return {
-        classification: 'ACTIVITY_LOG',
-        confidence: 0.75,
-        reason: '完了した行動を示す表現が含まれています'
-      };
-    }
+    // Past tense expressions classification removed - now handled by MessageSelectionHandler
 
     // 情報・参考 → MEMO
     if (/参考|情報|メモ|リンク/.test(message)) {

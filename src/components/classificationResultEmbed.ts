@@ -116,7 +116,7 @@ export function createClassificationButtons(
   );
 
   // 他の分類オプション
-  const alternatives: MessageClassification[] = ['TODO', 'ACTIVITY_LOG', 'MEMO'];
+  const alternatives: MessageClassification[] = ['TODO', 'MEMO', 'UNCERTAIN'];
   const alternativeButtons = alternatives
     .filter(alt => alt !== suggestedClassification)
     .slice(0, 2) // 最大2つの代替案
@@ -247,8 +247,7 @@ function getClassificationColor(classification: MessageClassification): { color:
   switch (classification) {
     case 'TODO':
       return { color: 0x00ff00, icon: '📋' }; // 緑
-    case 'ACTIVITY_LOG':
-      return { color: 0x0099ff, icon: '📝' }; // 青
+    // ACTIVITY_LOG case removed
     case 'MEMO':
       return { color: 0xffaa00, icon: '📄' }; // オレンジ
     case 'UNCERTAIN':
@@ -265,14 +264,13 @@ function getClassificationLabel(classification: MessageClassification): string {
   switch (classification) {
     case 'TODO':
       return 'TODO';
-    case 'ACTIVITY_LOG':
-      return '活動ログ';
+    // ACTIVITY_LOG case removed
     case 'MEMO':
       return 'メモ';
     case 'UNCERTAIN':
-      return '不明';
+      return '不明確';
     default:
-      return '不明';
+      return '不明確';
   }
 }
 
@@ -291,8 +289,7 @@ function getButtonStyle(classification: MessageClassification): ButtonStyle {
   switch (classification) {
     case 'TODO':
       return ButtonStyle.Success;
-    case 'ACTIVITY_LOG':
-      return ButtonStyle.Primary;
+    // ACTIVITY_LOG case removed
     case 'MEMO':
       return ButtonStyle.Secondary;
     case 'UNCERTAIN':

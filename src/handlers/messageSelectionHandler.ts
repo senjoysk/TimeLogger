@@ -6,12 +6,14 @@
  */
 
 import { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } from 'discord.js';
+import { GeminiService } from '../services/geminiService';
 
 export class MessageSelectionHandler {
   private storedMessages: Map<string, string> = new Map();
   private todoRepository?: any;
   private activityLogService?: any;
   private memoRepository?: any;
+  private geminiService?: GeminiService;
 
   constructor() {
     // 最小限の実装：メッセージ保存用Map初期化
@@ -30,6 +32,11 @@ export class MessageSelectionHandler {
   setMemoRepository(memoRepository: any) {
     // 🟢 Green Phase: MemoRepository依存性注入
     this.memoRepository = memoRepository;
+  }
+
+  setGeminiService(geminiService: GeminiService) {
+    // AI分析のためのGeminiService依存性注入
+    this.geminiService = geminiService;
   }
 
   async showSelectionUI(message: any, userId: string, content: string) {
@@ -125,23 +132,43 @@ export class MessageSelectionHandler {
         try {
           // 🔄 先にDiscordに応答してタイムアウトを防ぐ
           await interaction.update({
-            content: '📝 活動ログ記録中...',
+            content: '📝 活動ログを分析中...',
             embeds: [],
             components: []
           });
           
-          if (this.activityLogService && messageContent) {
-            // 実際の活動ログ記録処理
+          if (this.activityLogService && this.geminiService && messageContent) {
+            // AI分析を実行（通常メッセージ）
+            console.log(`🤖 [通常活動ログ] AI分析開始: userId=${userId}, content="${messageContent}"`);
+            const activityAnalysis = await this.geminiService.analyzeActivityContent(
+              messageContent,
+              new Date(),
+              timezone
+              // reminderContextは渡さない（通常メッセージなので）
+            );
+            console.log(`✅ [通常活動ログ] AI分析完了:`, activityAnalysis);
+            
+            // 実際の活動ログ記録処理（AI分析結果を含む）
             console.log(`📝 活動ログ記録開始: userId=${userId}, content="${messageContent}", timezone=${timezone}`);
-            await this.activityLogService.recordActivity(userId, messageContent, timezone);
+            await this.activityLogService.recordActivity(userId, messageContent, timezone, undefined, activityAnalysis);
             console.log(`✅ 活動ログ記録完了`);
             
-            // 処理完了後に結果を編集
+            // 処理完了後に結果を編集（AI分析結果も表示）
             await interaction.editReply({
-              content: '📝 活動ログとして記録しました！'
+              content: `📝 活動ログとして記録しました！
+
+🤖 **AI分析結果:**
+⏰ 推定時間: ${activityAnalysis.timeEstimation.startTime ? 
+  new Date(activityAnalysis.timeEstimation.startTime).toLocaleString('ja-JP', { timeZone: timezone }).split(' ')[1] 
+  : '不明'} - ${activityAnalysis.timeEstimation.endTime ? 
+  new Date(activityAnalysis.timeEstimation.endTime).toLocaleString('ja-JP', { timeZone: timezone }).split(' ')[1] 
+  : '不明'}
+📊 カテゴリー: ${activityAnalysis.activityCategory.primaryCategory}
+📝 ${activityAnalysis.activityContent.structuredContent}
+🏷️ タグ: ${activityAnalysis.activityCategory.tags.join(', ')}`
             });
           } else {
-            console.log(`⚠️ 活動ログ記録スキップ: activityLogService=${!!this.activityLogService}, messageContent="${messageContent}"`);
+            console.log(`⚠️ 活動ログ記録スキップ: activityLogService=${!!this.activityLogService}, geminiService=${!!this.geminiService}, messageContent="${messageContent}"`);
             await interaction.editReply({
               content: '📝 活動ログとして記録しました！'
             });

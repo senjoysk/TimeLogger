@@ -53,8 +53,8 @@ describe('GeminiService TODO判定機能', () => {
       
       const result = await service.classifyMessageWithAI(message);
       
-      expect(result.classification).toBe('ACTIVITY_LOG');
-      expect(result.confidence).toBeGreaterThanOrEqual(0.5); // フォールバック分類も考慮
+      expect(result.classification).toBe('UNCERTAIN');
+      expect(result.confidence).toBeGreaterThanOrEqual(0.3); // フォールバック分類も考慮
       expect(result.reason).toBeDefined();
     });
 
@@ -73,8 +73,8 @@ describe('GeminiService TODO判定機能', () => {
       
       const result = await service.classifyMessageWithAI(message);
       
-      // フォールバック分類では ACTIVITY_LOG になる
-      expect(result.classification).toBe('ACTIVITY_LOG');
+      // フォールバック分類では UNCERTAIN になる
+      expect(result.classification).toBe('UNCERTAIN');
       expect(result.confidence).toBeGreaterThanOrEqual(0.3);
     });
 
@@ -109,8 +109,8 @@ describe('GeminiService TODO判定機能', () => {
       
       const result = await service.classifyMessageWithAI(message);
       
-      // 複雑な文脈なので、TODO、ACTIVITY_LOG、UNCERTAINのいずれかになる可能性がある
-      expect(['TODO', 'ACTIVITY_LOG', 'UNCERTAIN']).toContain(result.classification);
+      // 複雑な文脈なので、TODO、MEMO、UNCERTAINのいずれかになる可能性がある
+      expect(['TODO', 'MEMO', 'UNCERTAIN']).toContain(result.classification);
       expect(result.confidence).toBeGreaterThanOrEqual(0.3); // 0.3も含む
       expect(result.reason).toBeDefined();
     });
@@ -131,8 +131,8 @@ describe('GeminiService TODO判定機能', () => {
     test('空のメッセージでもエラーにならない', async () => {
       const result = await service.classifyMessageWithAI('');
       
-      // フォールバック分類では ACTIVITY_LOG になる
-      expect(result.classification).toBe('ACTIVITY_LOG');
+      // フォールバック分類では UNCERTAIN になる
+      expect(result.classification).toBe('UNCERTAIN');
       expect(result.confidence).toBeGreaterThanOrEqual(0.4);
     });
 

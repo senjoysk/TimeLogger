@@ -29,6 +29,7 @@ import { ITimezoneService } from '../services/interfaces/ITimezoneService';
 import { ConfigService } from '../services/configService';
 import { ITimeProvider } from '../interfaces/dependencies';
 import { TimeProviderService } from '../services/timeProviderService';
+import { ReminderReplyService } from '../services/reminderReplyService';
 
 /**
  * 活動記録システム統合設定インターフェース
@@ -81,6 +82,7 @@ export class ActivityLoggingIntegration {
   private profileHandler!: ProfileCommandHandler;
   private memoHandler!: MemoCommandHandler;
   private messageSelectionHandler!: MessageSelectionHandler;
+  private reminderReplyService!: ReminderReplyService;
 
   // 設定
   private config: ActivityLoggingConfig;
@@ -193,6 +195,10 @@ export class ActivityLoggingIntegration {
       this.messageSelectionHandler.setTodoRepository(this.repository);
       this.messageSelectionHandler.setActivityLogService(this.activityLogService);
       this.messageSelectionHandler.setMemoRepository(this.memoRepository);
+      this.messageSelectionHandler.setGeminiService(this.geminiService);
+      
+      // リマインダーReplyサービスの初期化
+      this.reminderReplyService = new ReminderReplyService();
       
       // TimezoneHandlerにDynamicReportSchedulerのコールバックを設定
       this.timezoneHandler.setTimezoneChangeCallback(async (userId: string, oldTimezone: string | null, newTimezone: string) => {
@@ -326,6 +332,67 @@ export class ActivityLoggingIntegration {
       if (content.startsWith('!')) {
         console.log(`🔧 [活動記録] コマンド検出: "${content}"`);
         await this.handleCommand(message, userId, content, timezone);
+        return true;
+      }
+
+      // リマインダーReply検出処理
+      console.log(`🔍 [リマインダーReply] 検出処理開始: ${userId}`);
+      const reminderReplyResult = await this.reminderReplyService.isReminderReply(message);
+      
+      if (reminderReplyResult.isReminderReply && reminderReplyResult.timeRange) {
+        console.log(`✅ [リマインダーReply] Reply検出成功:`, reminderReplyResult.timeRange);
+        
+        // GeminiServiceでAI分析を実行（新しいanalyzeActivityContentメソッドを使用）
+        console.log(`🤖 [リマインダーReply] Gemini分析開始...`);
+        const analysis = await this.geminiService.analyzeActivityContent(
+          content,
+          message.createdAt,
+          timezone,
+          {
+            isReminderReply: true,
+            timeRange: reminderReplyResult.timeRange,
+            reminderTime: reminderReplyResult.reminderTime,
+            reminderContent: reminderReplyResult.reminderContent
+          }
+        );
+        console.log(`✅ [リマインダーReply] Gemini分析完了:`, analysis);
+        
+        // 分析結果を含めてリマインダーReplyとして活動ログに記録
+        const activityLog = {
+          userId,
+          content,
+          inputTimestamp: message.createdAt.toISOString(),
+          businessDate: this.calculateBusinessDate(message.createdAt, timezone),
+          isReminderReply: true,
+          timeRangeStart: reminderReplyResult.timeRange.start.toISOString(),
+          timeRangeEnd: reminderReplyResult.timeRange.end.toISOString(),
+          contextType: 'REMINDER_REPLY' as const,
+          // AI分析結果を追加（新しい構造）
+          estimatedStartTime: analysis.timeEstimation.startTime,
+          estimatedEndTime: analysis.timeEstimation.endTime,
+          estimatedDuration: analysis.timeEstimation.duration,
+          activityCategory: analysis.activityCategory.primaryCategory,
+          activitySubCategory: analysis.activityCategory.subCategory,
+          activityTags: analysis.activityCategory.tags?.join(', '),
+          structuredContent: analysis.activityContent.structuredContent,
+          aiAnalysisConfidence: analysis.analysisMetadata.confidence,
+          aiAnalysisSource: analysis.timeEstimation.source
+        };
+        
+        await this.repository.saveLog(activityLog);
+        console.log(`✅ [リマインダーReply] 活動ログ記録完了: ${userId}`);
+        
+        // ユーザーに確認メッセージを送信（AI分析結果も含む）
+        const timeRange = reminderReplyResult.timeRange;
+        const startTime = this.formatTimeForUser(timeRange.start, timezone);
+        const endTime = this.formatTimeForUser(timeRange.end, timezone);
+        
+        await message.reply(`✅ リマインダーへの返信として記録しました。
+⏰ 時間範囲: ${startTime} - ${endTime}
+📊 カテゴリー: ${analysis.activityCategory.primaryCategory}
+📝 ${analysis.activityContent.structuredContent}
+🏷️ タグ: ${analysis.activityCategory.tags.join(', ')}`);
+        
         return true;
       }
 
@@ -916,6 +983,33 @@ export class ActivityLoggingIntegration {
     `.trim();
   }
 
+  /**
+   * 業務日を計算（5am基準）
+   */
+  private calculateBusinessDate(timestamp: Date, timezone: string): string {
+    // TimeProviderを使用してユーザーのタイムゾーンで5am基準の業務日を計算
+    const localTime = new Date(timestamp.toLocaleString('en-US', { timeZone: timezone }));
+    const businessDate = new Date(localTime);
+    
+    // 5am未満の場合は前日扱い
+    if (localTime.getHours() < 5) {
+      businessDate.setDate(businessDate.getDate() - 1);
+    }
+    
+    return businessDate.toISOString().split('T')[0]; // YYYY-MM-DD形式
+  }
+
+  /**
+   * ユーザーのタイムゾーンで時刻をフォーマット
+   */
+  private formatTimeForUser(timestamp: Date, timezone: string): string {
+    return timestamp.toLocaleString('ja-JP', {
+      timeZone: timezone,
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false
+    });
+  }
 
   /**
    * 全ユーザーのタイムゾーン情報を取得（Bot用）

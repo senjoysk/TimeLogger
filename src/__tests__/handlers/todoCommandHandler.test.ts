@@ -504,7 +504,7 @@ describe('TodoCommandHandler', () => {
       expect(updateCall.content).toBe('📄 メモとして保存されました。');
     });
 
-    test('活動ログとして分類するボタンが正しく動作する', async () => {
+    test.skip('活動ログとして分類するボタンが正しく動作する（ACTIVITY_LOG分類削除により無効化）', async () => {
       // 実際の本番環境のセッションID形式を使用
       const sessionId = '770478489203507241_1736226160123_abc123';
       const activeSessions = (handler as any).activeSessions;
@@ -942,7 +942,7 @@ describe('TodoCommandHandler', () => {
   });
 
   describe('依存関係注入', () => {
-    test('ActivityLogServiceが注入されていない場合でも動作する', async () => {
+    test.skip('ActivityLogServiceが注入されていない場合でも動作する（ACTIVITY_LOG分類削除により無効化）', async () => {
       // ActivityLogServiceなしでハンドラーを作成
       const handlerWithoutActivityLog = new TodoCommandHandler(
         mockTodoRepo,
@@ -959,7 +959,7 @@ describe('TodoCommandHandler', () => {
         userId: 'test-user',
         originalMessage: 'テスト活動',
         result: {
-          classification: 'ACTIVITY_LOG',
+          classification: 'UNCERTAIN',
           confidence: 0.8,
           reason: '活動ログ'
         },
@@ -983,7 +983,7 @@ describe('TodoCommandHandler', () => {
       handlerWithoutActivityLog.destroy();
     });
 
-    test('ActivityLogServiceのエラーが適切に処理される', async () => {
+    test.skip('ActivityLogServiceのエラーが適切に処理される（ACTIVITY_LOG分類削除により無効化）', async () => {
       // recordActivityでエラーを発生させる
       mockActivityLogService.recordActivity.mockRejectedValueOnce(
         new Error('データベース接続エラー')
@@ -996,7 +996,7 @@ describe('TodoCommandHandler', () => {
         userId: 'test-user',
         originalMessage: 'エラーテスト',
         result: {
-          classification: 'ACTIVITY_LOG',
+          classification: 'UNCERTAIN',
           confidence: 0.8,
           reason: '活動ログ'
         },
@@ -1016,7 +1016,7 @@ describe('TodoCommandHandler', () => {
       expect(updateCall.content).toBe('❌ 活動ログの作成中にエラーが発生しました。');
     });
 
-    test('正常なActivityLogService注入の確認', async () => {
+    test.skip('正常なActivityLogService注入の確認（ACTIVITY_LOG分類削除により無効化）', async () => {
       // ActivityLogServiceが正しく使用されることを確認
       const sessionId = 'test-session-normal';
       const activeSessions = (handler as any).activeSessions;
@@ -1025,7 +1025,7 @@ describe('TodoCommandHandler', () => {
         userId: 'test-user',
         originalMessage: '正常テスト',
         result: {
-          classification: 'ACTIVITY_LOG',
+          classification: 'UNCERTAIN',
           confidence: 0.9,
           reason: '活動ログとして明確'
         },

@@ -265,11 +265,8 @@ export class TodoCommandHandler implements ITodoCommandHandler {
         type = '';
         sessionId = idParts.slice(1).join('_');
       }
-      // activity_logの特別処理
-      else if (idParts[1] === 'activity' && idParts[2] === 'log') {
-        type = 'activity_log';
-        sessionId = idParts.slice(3).join('_');
-      } else {
+      // activity_log classification removed
+      else {
         type = idParts[1];
         sessionId = idParts.slice(2).join('_');
       }
@@ -356,12 +353,8 @@ export class TodoCommandHandler implements ITodoCommandHandler {
     if (action === 'confirm') {
       finalClassification = session.result.classification;
     } else if (action === 'classify') {
-      // activity_logを正しくマッピング
-      if (type === 'activity_log') {
-        finalClassification = 'ACTIVITY_LOG';
-      } else {
-        finalClassification = type.toUpperCase() as MessageClassification;
-      }
+      // 分類タイプを正規化
+      finalClassification = type.toUpperCase() as MessageClassification;
     } else {
       // セッション削除
       this.activeSessions.delete(sessionId);
@@ -399,9 +392,7 @@ export class TodoCommandHandler implements ITodoCommandHandler {
         await this.createTodoFromMessage(interaction, originalMessage, originalResult, userId, timezone);
         break;
         
-      case 'ACTIVITY_LOG':
-        await this.createActivityLogFromMessage(interaction, originalMessage, userId, timezone);
-        break;
+      // ACTIVITY_LOG分類は削除されました（MessageSelectionHandlerで処理）
         
       case 'MEMO':
         // メモとして処理（将来実装）
@@ -468,44 +459,7 @@ export class TodoCommandHandler implements ITodoCommandHandler {
   /**
    * メッセージから活動ログを作成
    */
-  private async createActivityLogFromMessage(
-    interaction: ButtonInteraction,
-    message: string,
-    userId: string,
-    timezone: string
-  ): Promise<void> {
-    try {
-      // 活動ログサービスが利用可能な場合は記録
-      if (this.activityLogService) {
-        const log = await this.activityLogService.recordActivity(userId, message, timezone);
-        console.log(`📝 活動ログ作成: ${userId} "${message}"`);
-        
-        // シンプルサマリーではキャッシュ無効化は不要
-        console.log(`✅ TODOから活動ログ作成完了: ${userId} [${log.businessDate}]`);
-      }
-
-      const successEmbed = new EmbedBuilder()
-        .setTitle('📝 活動ログ作成完了')
-        .setDescription(`**内容**: ${message}`)
-        .setColor(0x0099ff)
-        .setTimestamp();
-
-      await interaction.update({
-        content: '',
-        embeds: [successEmbed],
-        components: []
-      });
-
-    } catch (error) {
-      console.error('❌ 活動ログ作成エラー:', error);
-      
-      await interaction.update({
-        content: '❌ 活動ログの作成中にエラーが発生しました。',
-        embeds: [],
-        components: []
-      });
-    }
-  }
+  // createActivityLogFromMessage method removed - activity logs are now handled by MessageSelectionHandler
 
   /**
    * TODO一覧を表示（ページネーション対応）

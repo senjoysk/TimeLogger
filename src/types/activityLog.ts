@@ -33,6 +33,12 @@ export interface ActivityLog {
   matchedLogId?: string;     // マッチング相手のログID
   activityKey?: string;      // 活動内容の分類キー（マッチング用）
   similarityScore?: number;  // マッチング時の類似度スコア
+
+  // リマインダーReply機能（新機能）
+  isReminderReply?: boolean; // リマインダーへのreplyかどうか
+  timeRangeStart?: string;   // 明示的な時間範囲開始（UTC、ISO 8601形式）
+  timeRangeEnd?: string;     // 明示的な時間範囲終了（UTC、ISO 8601形式）
+  contextType?: 'REMINDER_REPLY' | 'POST_REMINDER' | 'NORMAL'; // コンテキストタイプ
 }
 
 // 活動ログ作成用（ID等は自動生成）
@@ -57,6 +63,12 @@ export interface CreateActivityLogRequest {
   matchedLogId?: string;
   activityKey?: string;
   similarityScore?: number;
+
+  // リマインダーReply機能（オプション）
+  isReminderReply?: boolean;
+  timeRangeStart?: string;
+  timeRangeEnd?: string;
+  contextType?: 'REMINDER_REPLY' | 'POST_REMINDER' | 'NORMAL';
 }
 
 // 統合分析結果の型定義

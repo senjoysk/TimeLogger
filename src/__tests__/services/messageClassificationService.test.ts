@@ -29,8 +29,8 @@ describe('MessageClassificationService', () => {
       
       const result = await service.classifyMessage(message);
       
-      expect(result.classification).toBe('ACTIVITY_LOG');
-      expect(result.confidence).toBeGreaterThan(0.7);
+      expect(result.classification).toBe('UNCERTAIN');
+      expect(result.confidence).toBeGreaterThanOrEqual(0.3);
       expect(result.reason).toBeDefined();
     });
 
@@ -92,7 +92,6 @@ describe('MessageClassificationService', () => {
       const thresholds = await service.getClassificationConfidenceThresholds();
       
       expect(thresholds.todo).toBeGreaterThan(0);
-      expect(thresholds.activityLog).toBeGreaterThan(0);
       expect(thresholds.memo).toBeGreaterThan(0);
       expect(thresholds.uncertain).toBeGreaterThan(0);
     });
