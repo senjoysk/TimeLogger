@@ -6,6 +6,7 @@
 import { ClassificationResult } from '../../types/todo';
 import { ActivityAnalysisResult, ReminderContext } from '../../types/activityAnalysis';
 import { PreviousActivities } from '../../types/database';
+import { CostAlert } from '../../types/costAlert';
 
 /**
  * API使用量統計
@@ -41,9 +42,9 @@ export interface IGeminiService {
    * コストアラートをチェック
    * @param userId ユーザーID
    * @param timezone タイムゾーン
-   * @returns アラート情報
+   * @returns アラート情報（nullの場合はアラートなし）
    */
-  checkCostAlerts(userId: string, timezone: string): Promise<any>;
+  checkCostAlerts(userId: string, timezone: string): Promise<CostAlert | null>;
 
   /**
    * メッセージをAIで分類

@@ -5,6 +5,7 @@ import {
   CreateActivityPromptSettingsRequest, 
   UpdateActivityPromptSettingsRequest 
 } from '../types/activityPrompt';
+import { CostAlert } from '../types/costAlert';
 
 /**
  * ユーザー情報
@@ -51,7 +52,7 @@ export interface IApiCostRepository {
     estimatedCost: number;
     operationBreakdown: Record<string, { calls: number; inputTokens: number; outputTokens: number; cost: number }>;
   }>;
-  checkCostAlerts(timezone?: string): Promise<{ message: string; level: 'warning' | 'critical' } | null>;
+  checkCostAlerts(timezone?: string): Promise<CostAlert | null>;
   generateDailyReport(timezone: string): Promise<string>;
 }
 

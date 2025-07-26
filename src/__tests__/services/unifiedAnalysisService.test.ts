@@ -5,6 +5,7 @@
 
 import { UnifiedAnalysisService } from '../../services/unifiedAnalysisService';
 import { ActivityLog } from '../../types/activityLog';
+import { CostAlert } from '../../types/costAlert';
 
 // 最小限のモック実装
 class MockRepository {
@@ -45,7 +46,7 @@ class MockCostRepository {
       estimatedCost: 0
     };
   }
-  async checkCostAlerts(): Promise<any> {
+  async checkCostAlerts(): Promise<CostAlert | null> {
     return null;
   }
   async generateDailyReport(): Promise<string> {

@@ -1,6 +1,7 @@
 import { config } from '../config';
 import { IApiCostRepository } from '../repositories/interfaces';
 import { getCurrentBusinessDate } from '../utils/timeUtils';
+import { CostAlert } from '../types/costAlert';
 
 /**
  * Gemini API使用量とコスト監視サービス
@@ -83,7 +84,7 @@ export class ApiCostMonitor {
   /**
    * 警告レベルのチェック
    */
-  public async checkCostAlerts(timezone?: string): Promise<{ level: 'info' | 'warning' | 'critical', message: string } | null> {
+  public async checkCostAlerts(timezone?: string): Promise<CostAlert | null> {
     const alert = await this.repository.checkCostAlerts(timezone);
     return alert ? { level: alert.level, message: alert.message } : null;
   }

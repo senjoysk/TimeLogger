@@ -7,6 +7,8 @@ import { ClassificationResult, MessageClassification } from '../types/todo';
 import { withErrorHandling, AppError, ErrorType } from '../utils/errorHandler';
 import { ActivityAnalysisResult, ReminderContext } from '../types/activityAnalysis';
 import { PreviousActivities } from '../types/database';
+import { CostAlert } from '../types/costAlert';
+import { ClassificationAIResponse, ActivityAnalysisAIResponse } from '../types/aiResponse';
 
 /**
  * Google Gemini API サービスクラス
@@ -53,7 +55,7 @@ export class GeminiService {
   /**
    * コスト警告をチェック
    */
-  public async checkCostAlerts(userId: string, timezone: string) {
+  public async checkCostAlerts(userId: string, timezone: string): Promise<CostAlert | null> {
     return await this.costMonitor.checkCostAlerts(timezone);
   }
 
@@ -151,7 +153,7 @@ export class GeminiService {
       }
 
       const jsonText = jsonMatch[0];
-      const parsed = JSON.parse(jsonText);
+      const parsed = JSON.parse(jsonText) as ClassificationAIResponse;
 
       // 分類の妥当性チェック
       const validClassifications: MessageClassification[] = [
@@ -164,7 +166,7 @@ export class GeminiService {
       }
 
       // 信頼度の妥当性チェック
-      const confidence = Math.max(0, Math.min(1, parseFloat(parsed.confidence) || 0.5));
+      const confidence = Math.max(0, Math.min(1, parseFloat(String(parsed.confidence)) || 0.5));
       
       // 優先度の妥当性チェック
       const priority = this.validatePriority(parsed.priority);
@@ -624,16 +626,16 @@ JSON形式のみで回答してください。説明文は不要です。`.trim(
       }
 
       const jsonText = jsonMatch[0];
-      const parsed = JSON.parse(jsonText);
+      const parsed = JSON.parse(jsonText) as ActivityAnalysisAIResponse;
 
       // 必須フィールドの検証とデフォルト値設定
       return {
         timeEstimation: {
-          startTime: parsed.timeEstimation?.startTime || null,
-          endTime: parsed.timeEstimation?.endTime || null,
-          duration: parsed.timeEstimation?.duration || null,
+          startTime: parsed.timeEstimation?.startTime || undefined,
+          endTime: parsed.timeEstimation?.endTime || undefined,
+          duration: parsed.timeEstimation?.duration || undefined,
           confidence: Math.max(0, Math.min(1, parsed.timeEstimation?.confidence || 0.5)),
-          source: parsed.timeEstimation?.source || 'ai_estimation'
+          source: (parsed.timeEstimation?.source || 'ai_estimation') as 'reminder_reply' | 'ai_estimation' | 'user_specified'
         },
         activityContent: {
           mainActivity: parsed.activityContent?.mainActivity || '活動内容を特定できませんでした',

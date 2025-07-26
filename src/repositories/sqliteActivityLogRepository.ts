@@ -3,6 +3,8 @@
  * 自然言語ログ方式に対応
  */
 
+import { CostAlert } from '../types/costAlert';
+
 import { Database } from 'sqlite3';
 import { v4 as uuidv4 } from 'uuid';
 import { toZonedTime, format } from 'date-fns-tz';
@@ -1004,7 +1006,7 @@ export class SqliteActivityLogRepository implements IActivityLogRepository, IApi
   /**
    * コスト警告をチェック
    */
-  async checkCostAlerts(timezone?: string): Promise<{ message: string; level: 'warning' | 'critical' } | null> {
+  async checkCostAlerts(timezone?: string): Promise<CostAlert | null> {
     try {
       const resolvedTimezone = timezone || this.getDefaultTimezone();
       const stats = await this.getTodayStats(resolvedTimezone);
