@@ -678,17 +678,25 @@ JSON形式のみで回答してください。説明文は不要です。`.trim(
     }
   }
 
-  // 以下は互換性のための古いメソッドスタブ（deprecated）
   /**
-   * @deprecated このメソッドは廃止予定です
+   * 活動を分析
+   * @param content 活動内容
+   * @param userId ユーザーID
+   * @param timezone タイムゾーン
+   * @param previousActivities 過去の活動データ（オプション）
+   * @returns 活動分析結果
    */
   public async analyzeActivity(
-    userInput: string,
-    timeSlot: string,
-    previousActivities: any[] = [],
-    timezone: string
-  ): Promise<any> {
-    console.warn('❌ analyzeActivity method is deprecated and should not be used');
-    throw new Error('Method analyzeActivity is deprecated');
+    content: string,
+    userId: string,
+    timezone: string,
+    previousActivities?: any[]
+  ): Promise<ActivityAnalysisResult> {
+    // analyzeActivityContentメソッドに委譲
+    return this.analyzeActivityContent(
+      content,
+      new Date(),
+      timezone
+    );
   }
 }

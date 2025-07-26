@@ -149,6 +149,134 @@ ADMIN_PASSWORD=your_admin_password
 1. [Google AI Studio](https://makersuite.google.com/app/apikey) でAPI キーを取得
 2. `.env` ファイルに設定
 
+### 7. 開発環境のコード品質チェック設定
+
+このプロジェクトでは、**依存性注入の統一**と**any型の使用禁止**を徹底するため、自動コードレビューシステムを構築しています。
+
+#### 🔧 コード品質管理の原則
+
+##### **依存性注入の統一**
+- **Interface First**: すべてのサービス依存関係はインターフェースで定義
+- **Constructor Injection**: コンストラクタでの依存関係注入を強制
+- **Concrete Class 依存禁止**: 具象クラスではなくインターフェースに依存
+
+##### **any型使用の完全禁止**
+- **Type Safety**: TypeScriptの型安全性を最大限活用
+- **Explicit Typing**: すべての変数・関数・メソッドの型を明示
+- **Interface Definition**: 未定義の型はインターフェースで型定義を作成
+
+#### 🐶 Huskyによる自動コードレビュー
+
+```bash
+# npm installで自動的にHuskyが設定されます（package.jsonのprepareスクリプトで実行）
+npm install
+```
+
+#### 🔍 コミット時の自動チェック
+
+コミット時に以下が自動実行されます：
+
+```bash
+# 1. TypeScriptビルドチェック（型安全性確認）
+npm run build
+
+# 2. テスト実行（機能品質確認）
+npm test
+
+# 3. 依存性注入とany型使用のチェック（アンチパターン検出）
+./scripts/code-review/dependency-injection-check.sh
+```
+
+#### 🚫 チェックで拒否される例
+
+```bash
+$ git commit -m "新機能追加"
+
+# ❌ any型の使用を検出:
+#   src/services/newService.ts:15:    private geminiService?: any;
+#   src/handlers/newHandler.ts:23:    handleRequest(data: any): Promise<any>
+# 
+# ❌ 依存性注入の問題を検出:
+#   src/services/newService.ts:10:    constructor(private repository: SqliteRepository)
+#   → interface IRepository を使用してください
+# 
+# husky - pre-commit script failed (code 2)
+# → コミットが拒否される
+```
+
+#### 🎯 正しいコード例
+
+```typescript
+// ✅ 良い例: インターフェースを使用した依存性注入
+import { IGeminiService } from './interfaces/IGeminiService';
+import { IActivityLogRepository } from './interfaces/IActivityLogRepository';
+
+export class MessageClassificationService {
+  constructor(
+    private geminiService: IGeminiService,  // ✅ インターフェース使用
+    private repository: IActivityLogRepository  // ✅ インターフェース使用
+  ) {}
+
+  // ✅ 明示的な型定義
+  async classifyMessage(content: string): Promise<ClassificationResult> {
+    // 実装...
+  }
+}
+
+// ❌ 悪い例: any型と具象クラス依存
+export class BadService {
+  constructor(
+    private geminiService: any,  // ❌ any型使用
+    private repository: SqliteActivityLogRepository  // ❌ 具象クラス依存
+  ) {}
+
+  async process(data: any): Promise<any> {  // ❌ any型使用
+    // 実装...
+  }
+}
+```
+
+#### ⚡ 手動でコード品質チェックを実行
+
+```bash
+# 依存性注入チェックのみ実行
+npm run quality:di-check
+
+# 完全な品質チェック実行
+npm run build && npm test && npm run quality:di-check
+```
+
+#### 🔧 修正方法
+
+##### **any型の修正**
+```typescript
+// ❌ 修正前
+private service?: any;
+function processData(input: any): any { }
+
+// ✅ 修正後
+private service?: IGeminiService;
+function processData(input: ActivityLog): ProcessResult { }
+```
+
+##### **依存性注入の修正**
+```typescript
+// ❌ 修正前
+constructor(private repo: SqliteActivityLogRepository) {}
+
+// ✅ 修正後
+constructor(private repo: IActivityLogRepository) {}
+```
+
+#### 🛠️ チェックをスキップしたい場合
+
+```bash
+# 緊急時のみ使用（非推奨）
+git commit -m "緊急修正" --no-verify
+```
+
+**⚠️ 重要**: `--no-verify`の使用は、コード品質保証を無効にするため、緊急時以外は使用しないでください。コードベースの品質維持のため、必ず修正してからコミットしてください。
+
 ## 使用方法
 
 ### 開発環境での起動

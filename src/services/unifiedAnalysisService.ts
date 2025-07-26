@@ -7,6 +7,7 @@ import { GoogleGenerativeAI, GenerativeModel } from '@google/generative-ai';
 import { toZonedTime, format } from 'date-fns-tz';
 import { config } from '../config';
 import { IActivityLogRepository } from '../repositories/activityLogRepository';
+import { IApiCostRepository } from '../repositories/interfaces';
 import {
   ActivityLog,
   DailyAnalysisResult,
@@ -59,7 +60,7 @@ export class UnifiedAnalysisService implements IUnifiedAnalysisService {
 
   constructor(
     private repository: IActivityLogRepository,
-    costRepository: any // 既存のAPIコストリポジトリ
+    costRepository: IApiCostRepository
   ) {
     // Gemini API の初期化
     this.genAI = new GoogleGenerativeAI(config.gemini.apiKey);

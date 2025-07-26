@@ -4,6 +4,7 @@
  */
 
 import { MessageClassification, ClassificationResult } from '../types/todo';
+import { IGeminiService } from './interfaces/IGeminiService';
 
 export interface IMessageClassificationService {
   /**
@@ -35,9 +36,9 @@ export interface IMessageClassificationService {
  * Gemini AIを使用した自動分類
  */
 export class MessageClassificationService implements IMessageClassificationService {
-  private geminiService?: any; // GeminiServiceのインスタンス（オプション）
+  private geminiService?: IGeminiService;
 
-  constructor(geminiService?: any) {
+  constructor(geminiService?: IGeminiService) {
     this.geminiService = geminiService;
   }
   private readonly classificationPromptTemplate = `

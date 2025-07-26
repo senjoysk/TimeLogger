@@ -18,7 +18,7 @@ interface UtcTime {
 }
 
 interface UserTimezone {
-  user_id: string;
+  userId: string;
   timezone: string;
 }
 
@@ -75,8 +75,8 @@ export class DynamicReportScheduler {
         return;
       }
       
-      for (const { user_id, timezone } of userTimezones) {
-        await this.onTimezoneChanged(user_id, null, timezone);
+      for (const { userId, timezone } of userTimezones) {
+        await this.onTimezoneChanged(userId, null, timezone);
       }
       
       console.log(`✅ DynamicReportScheduler initialized with ${userTimezones.length} users`);

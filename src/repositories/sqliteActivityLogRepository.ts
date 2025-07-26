@@ -1195,11 +1195,10 @@ export class SqliteActivityLogRepository implements IActivityLogRepository, IApi
    */
   async getUnprocessedNotifications(): Promise<Array<{
     id: string;
-    user_id: string;
-    old_timezone: string | null;
-    new_timezone: string;
-    changed_at: string;
-    processed: boolean;
+    userId: string;
+    type: string;
+    data: any;
+    createdAt: Date;
   }>> {
     try {
       const sql = `
@@ -1214,11 +1213,13 @@ export class SqliteActivityLogRepository implements IActivityLogRepository, IApi
       console.log(`📍 未処理通知取得: ${rows.length}件`);
       return rows.map(row => ({
         id: row.id,
-        user_id: row.user_id,
-        old_timezone: row.old_timezone,
-        new_timezone: row.new_timezone,
-        changed_at: row.changed_at,
-        processed: Boolean(row.processed)
+        userId: row.user_id,
+        type: 'timezone_change',
+        data: {
+          oldTimezone: row.old_timezone,
+          newTimezone: row.new_timezone
+        },
+        createdAt: new Date(row.changed_at)
       }));
     } catch (error) {
       console.error('❌ 未処理通知取得エラー:', error);
@@ -2128,7 +2129,7 @@ export class SqliteActivityLogRepository implements IActivityLogRepository, IApi
    * スケジューラー用の全ユーザータイムゾーン情報を取得
    * DynamicReportScheduler用のシンプルなインターフェース
    */
-  async getAllUserTimezonesForScheduler(): Promise<Array<{ user_id: string; timezone: string }>> {
+  async getAllUserTimezonesForScheduler(): Promise<Array<{ userId: string; timezone: string }>> {
     try {
       const rows = await this.allQuery(`
         SELECT user_id, timezone 
@@ -2142,7 +2143,7 @@ export class SqliteActivityLogRepository implements IActivityLogRepository, IApi
       }
       
       return rows.map(row => ({
-        user_id: row.user_id,
+        userId: row.user_id,
         timezone: row.timezone || this.getDefaultTimezone()
       }));
     } catch (error) {

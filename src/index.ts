@@ -57,13 +57,14 @@ class Application {
       console.log('📅 スケジューラーを初期化中...');
       const repository = this.bot.getRepository();
       if (!repository) {
-        console.warn('⚠️ リポジトリが取得できませんが、活動記録システムで続行します');
+        console.error('❌ リポジトリが取得できないため、スケジューラーの初期化をスキップします');
+        return;
       }
-      this.scheduler = new EnhancedScheduler(this.bot, repository);
+      this.scheduler = new EnhancedScheduler(this.bot, repository as any);
       
       // 動的スケジューラーの設定
-      this.dynamicScheduler.setRepository(repository);
-      this.timezoneMonitor.setRepository(repository);
+      this.dynamicScheduler.setRepository(repository as any);
+      this.timezoneMonitor.setRepository(repository as any);
       this.timezoneMonitor.setScheduler(this.dynamicScheduler);
       
       // EnhancedSchedulerに動的コンポーネントを統合

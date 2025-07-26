@@ -6,36 +6,34 @@
  */
 
 import { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } from 'discord.js';
-import { GeminiService } from '../services/geminiService';
+import { IGeminiService } from '../services/interfaces/IGeminiService';
+import { IActivityLogService } from '../services/activityLogService';
+import { IMemoRepository, ITodoRepository } from '../repositories/interfaces';
 
 export class MessageSelectionHandler {
   private storedMessages: Map<string, string> = new Map();
-  private todoRepository?: any;
-  private activityLogService?: any;
-  private memoRepository?: any;
-  private geminiService?: GeminiService;
+  private todoRepository?: ITodoRepository;
+  private activityLogService?: IActivityLogService;
+  private memoRepository?: IMemoRepository;
+  private geminiService?: IGeminiService;
 
   constructor() {
     // 最小限の実装：メッセージ保存用Map初期化
   }
 
-  setTodoRepository(todoRepository: any) {
-    // 🟢 Green Phase: TodoRepository依存性注入
+  setTodoRepository(todoRepository: ITodoRepository) {
     this.todoRepository = todoRepository;
   }
 
-  setActivityLogService(activityLogService: any) {
-    // 🟢 Green Phase: ActivityLogService依存性注入
+  setActivityLogService(activityLogService: IActivityLogService) {
     this.activityLogService = activityLogService;
   }
 
-  setMemoRepository(memoRepository: any) {
-    // 🟢 Green Phase: MemoRepository依存性注入
+  setMemoRepository(memoRepository: IMemoRepository) {
     this.memoRepository = memoRepository;
   }
 
-  setGeminiService(geminiService: GeminiService) {
-    // AI分析のためのGeminiService依存性注入
+  setGeminiService(geminiService: IGeminiService) {
     this.geminiService = geminiService;
   }
 
@@ -99,8 +97,8 @@ export class MessageSelectionHandler {
               userId,
               content: messageContent, // contentフィールドが必須
               status: 'pending' as const,
-              priority: 'medium' as const,
-              dueDate: null,
+              priority: 0, // 通常優先度
+              dueDate: undefined,
               timezone
             };
             console.log(`📋 TODO作成開始:`, todoRequest);

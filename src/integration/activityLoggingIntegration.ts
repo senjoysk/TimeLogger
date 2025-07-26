@@ -1020,8 +1020,12 @@ export class ActivityLoggingIntegration {
     }
 
     try {
-      // スケジューラー用のメソッドを使用
-      return await this.repository.getAllUserTimezonesForScheduler();
+      // スケジューラー用のメソッドを使用して、フィールド名を変換
+      const userTimezones = await this.repository.getAllUserTimezonesForScheduler();
+      return userTimezones.map(({ userId, timezone }) => ({
+        user_id: userId,
+        timezone
+      }));
     } catch (error) {
       console.error('❌ 全ユーザータイムゾーン取得エラー:', error);
       throw new ActivityLogError('全ユーザータイムゾーンの取得に失敗しました', 'GET_ALL_USER_TIMEZONES_ERROR', { error });

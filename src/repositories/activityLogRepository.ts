@@ -238,6 +238,56 @@ export interface IActivityLogRepository {
     newTimezone: string;
     changedAt: Date;
   }>>;
+
+  // === システム管理 ===
+
+  /**
+   * 全ユーザー情報を取得
+   * @returns ユーザー情報配列
+   */
+  getAllUsers(): Promise<Array<{
+    userId: string;
+    username?: string;
+    timezone: string;
+    registrationDate: string;
+    lastSeenAt: string;
+    isActive: boolean;
+    createdAt: string;
+    updatedAt: string;
+  }>>;
+
+  /**
+   * データベースインスタンスを取得
+   * @returns SQLiteデータベースインスタンス
+   */
+  getDatabase(): any;
+
+  /**
+   * スケジューラー用の全ユーザーのタイムゾーン情報を取得
+   * @returns ユーザータイムゾーン情報配列
+   */
+  getAllUserTimezonesForScheduler(): Promise<Array<{
+    userId: string;
+    timezone: string;
+  }>>;
+
+  /**
+   * 未処理の通知を取得
+   * @returns 未処理通知配列
+   */
+  getUnprocessedNotifications(): Promise<Array<{
+    id: string;
+    userId: string;
+    type: string;
+    data: any;
+    createdAt: Date;
+  }>>;
+
+  /**
+   * 通知を処理済みとしてマーク
+   * @param notificationId 通知ID
+   */
+  markNotificationAsProcessed(notificationId: string): Promise<void>;
 }
 
 /**

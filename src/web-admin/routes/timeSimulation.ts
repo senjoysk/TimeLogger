@@ -223,6 +223,9 @@ export function createTimeSimulationRouter(bot: TaskLoggerBot | null = null): Ro
         try {
           // ユーザーのタイムゾーン情報を取得
           const repository = bot.getRepository();
+          if (!repository) {
+            return res.status(500).json({ error: 'Repository not available' });
+          }
           const users = await repository.getAllUsers();
           const user = users.find((u: any) => u.userId === targetUserId);
           const userTimezone = user?.timezone || 'Asia/Tokyo';

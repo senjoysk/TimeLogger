@@ -1,0 +1,6 @@
+# コード品質チェック
+npm run build
+npm test
+
+# 依存性注入とany型使用のチェック
+./scripts/code-review/dependency-injection-check.sh

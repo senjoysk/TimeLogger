@@ -1,4 +1,4 @@
-import { Client, GatewayIntentBits, Partials } from 'discord.js';
+import { Client, GatewayIntentBits, Partials, Message } from 'discord.js';
 import { config } from './config';
 import { ActivityLoggingIntegration, createDefaultConfig } from './integration';
 
@@ -18,6 +18,8 @@ import {
   ILogger,
   ITimeProvider 
 } from './interfaces/dependencies';
+import { IActivityLogRepository } from './repositories/activityLogRepository';
+import { HealthStatus, RecoveryAttemptResult } from './types/health';
 import { 
   DiscordClientFactory, 
   RealTimeProvider,
@@ -178,7 +180,7 @@ export class TaskLoggerBot {
   /**
    * システムエラーハンドリング
    */
-  private async handleSystemError(healthStatus: any): Promise<void> {
+  private async handleSystemError(healthStatus: HealthStatus): Promise<void> {
     console.error('🚨 システムエラー検知:', healthStatus);
     
     // 重大なエラーかどうかを判定
@@ -186,7 +188,7 @@ export class TaskLoggerBot {
     
     // 管理者通知（重大なエラーの場合のみ）
     if (config.monitoring.adminNotification.enabled && isCriticalError) {
-      const errorMessage = healthStatus.issues.join('\n• ');
+      const errorMessage = healthStatus.details?.errors?.join('\n• ') || 'システムエラーが発生しました';
       await this.sendAdminNotification(
         '🚨 **システムエラー検知**',
         `**検知時刻**: ${healthStatus.timestamp}\n**問題**:\n• ${errorMessage}\n\n**対処**: システムの自動復旧を試行中...`
@@ -200,7 +202,7 @@ export class TaskLoggerBot {
   /**
    * 重大なエラーかどうかを判定
    */
-  private isCriticalError(healthStatus: any): boolean {
+  private isCriticalError(healthStatus: HealthStatus): boolean {
     // Discord接続が切れている場合は重大
     if (!healthStatus.checks.discordReady) {
       this.incrementErrorCount('discord_connection');
@@ -273,7 +275,7 @@ export class TaskLoggerBot {
   /**
    * 自動復旧試行
    */
-  private async attemptAutoRecovery(healthStatus: any): Promise<void> {
+  private async attemptAutoRecovery(healthStatus: HealthStatus): Promise<void> {
     console.log('🔄 自動復旧を試行中...');
     
     // Discord接続の再試行
@@ -787,7 +789,7 @@ export class TaskLoggerBot {
    * データベースインスタンスを取得（活動記録システム経由）
    * @returns データベースインスタンス
    */
-  public getRepository(): any {
+  public getRepository(): IActivityLogRepository | undefined {
     return this.activityLoggingIntegration?.getRepository();
   }
 
@@ -801,7 +803,7 @@ export class TaskLoggerBot {
   /**
    * ActivityLoggingIntegrationインスタンスを取得
    */
-  public getActivityLoggingIntegration(): any {
+  public getActivityLoggingIntegration(): ActivityLoggingIntegration | undefined {
     return this.activityLoggingIntegration;
   }
 
@@ -900,7 +902,7 @@ export class TaskLoggerBot {
   /**
    * promptコマンドを処理（統合システムから呼び出される）
    */
-  public async handlePromptCommand(message: any, args: string[], userId: string, timezone: string): Promise<void> {
+  public async handlePromptCommand(message: Message, args: string[], userId: string, timezone: string): Promise<void> {
     if (!this.promptCommandHandler) {
       await message.reply('❌ 活動促し機能が初期化されていません。');
       return;
