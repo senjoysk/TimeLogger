@@ -73,8 +73,9 @@ async function cleanupTestDatabaseFiles(): Promise<void> {
       }
     } catch (error) {
       // ディレクトリが存在しない場合は無視
-      if (error.code !== 'ENOENT' && error.code !== 'ENOTDIR') {
-        console.warn(`⚠️ WALファイルクリーンアップ中にエラーが発生 (${targetDir}):`, error.message);
+      const fsError = error as { code?: string; message?: string };
+      if (fsError.code !== 'ENOENT' && fsError.code !== 'ENOTDIR') {
+        console.warn(`⚠️ WALファイルクリーンアップ中にエラーが発生 (${targetDir}):`, fsError.message || error);
       }
     }
   }
