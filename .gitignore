@@ -23,6 +23,11 @@ data/
 *.db
 *.sqlite
 *.db.backup.*
+# SQLite WAL ファイル（テスト環境）
+test-data/*.db-shm
+test-data/*.db-wal
+src/__tests__/**/*.db-shm
+src/__tests__/**/*.db-wal
 
 # ログファイル
 logs/

@@ -38,7 +38,53 @@ afterAll(async () => {
   
   // プロセス内のタイマーをクリア
   jest.clearAllTimers();
+  
+  // テスト完了後にSQLite WALファイルを削除
+  await cleanupTestDatabaseFiles();
 });
+
+// SQLite WALファイルのクリーンアップ関数
+async function cleanupTestDatabaseFiles(): Promise<void> {
+  const fs = require('fs').promises;
+  const path = require('path');
+  
+  // クリーンアップ対象ディレクトリ
+  const cleanupDirs = [
+    path.join(__dirname, '../../test-data'),
+    path.join(__dirname, 'web-admin/integration')
+  ];
+  
+  let totalDeletedFiles = 0;
+  
+  for (const targetDir of cleanupDirs) {
+    try {
+      const files = await fs.readdir(targetDir);
+      
+      // .db-shm と .db-wal ファイルを削除
+      const filesToDelete = files.filter((file: string) => 
+        file.endsWith('.db-shm') || file.endsWith('.db-wal')
+      );
+      
+      for (const file of filesToDelete) {
+        const filePath = path.join(targetDir, file);
+        await fs.unlink(filePath);
+        console.log(`✅ クリーンアップ: ${path.relative(__dirname, filePath)} を削除しました`);
+        totalDeletedFiles++;
+      }
+    } catch (error) {
+      // ディレクトリが存在しない場合は無視
+      if (error.code !== 'ENOENT' && error.code !== 'ENOTDIR') {
+        console.warn(`⚠️ WALファイルクリーンアップ中にエラーが発生 (${targetDir}):`, error.message);
+      }
+    }
+  }
+  
+  if (totalDeletedFiles === 0) {
+    console.log('✅ クリーンアップ: 削除対象のWALファイルはありませんでした');
+  } else {
+    console.log(`✅ クリーンアップ完了: ${totalDeletedFiles}個のWALファイルを削除しました`);
+  }
+}
 
 // Jestがテストファイルとして認識するためのダミーテスト
 describe('Test Setup', () => {
