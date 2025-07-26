@@ -7,7 +7,7 @@
 
 import { Router, Request, Response } from 'express';
 import { SummaryTestService } from '../services/summaryTestService';
-import { TaskLoggerBot } from '../../bot';
+import { IDiscordBot } from '../../interfaces/dependencies';
 import { MockTimeProvider, MockLogger } from '../../factories';
 import { SummaryTestRequest } from '../types/testing';
 // Express Request型の拡張を読み込み
@@ -16,7 +16,7 @@ import '../middleware/timezoneMiddleware';
 /**
  * サマリーテスト用ルーター作成
  */
-export function createSummaryTestRouter(bot: TaskLoggerBot | null): Router {
+export function createSummaryTestRouter(bot: IDiscordBot | null): Router {
   const router = Router();
   
   // サービス初期化
@@ -82,7 +82,7 @@ export function createSummaryTestRouter(bot: TaskLoggerBot | null): Router {
         });
       }
 
-      const users = await bot.getRegisteredUsers();
+      const users = await bot.getRegisteredUsers!();
       res.json({
         success: true,
         users
@@ -117,7 +117,7 @@ export function createSummaryTestRouter(bot: TaskLoggerBot | null): Router {
         });
       }
 
-      const summaryPreview = await bot.generateSummaryPreview(userId);
+      const summaryPreview = await bot.generateSummaryPreview!(userId);
       res.json({
         success: true,
         userId,
@@ -157,7 +157,7 @@ export function createSummaryTestRouter(bot: TaskLoggerBot | null): Router {
         // 対象ユーザーの存在確認
         if (bot) {
           try {
-            const registeredUsers = await bot.getRegisteredUsers();
+            const registeredUsers = await bot.getRegisteredUsers!();
             const registeredUserIds = registeredUsers.map(u => u.userId);
             const nonExistentUsers = testRequest.targetUsers.filter(
               id => !registeredUserIds.includes(id)
@@ -200,8 +200,8 @@ export function createSummaryTestRouter(bot: TaskLoggerBot | null): Router {
   router.get('/status', async (req: Request, res: Response) => {
     try {
       const botStatus = bot ? {
-        isInitialized: bot.isSystemInitialized(),
-        clientReady: bot.getClient().readyAt !== null,
+        isInitialized: bot.isSystemInitialized?.() || false,
+        clientReady: bot.getClient?.()?.readyAt !== null,
         uptime: process.uptime()
       } : {
         isInitialized: false,

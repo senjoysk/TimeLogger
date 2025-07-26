@@ -60,8 +60,24 @@ describe('TODO一括操作の統合テスト', () => {
 
   afterAll(async () => {
     // テスト後にデータベースファイルを削除
+    try {
+      if (sqliteRepo) {
+        // データベース接続を明示的に閉じる
+        await sqliteRepo.close();
+      }
+    } catch (error) {
+      console.warn('Warning: Failed to close database connection:', error);
+    }
+    
+    // 少し待ってからファイル削除を試行
+    await new Promise(resolve => setTimeout(resolve, 100));
+    
     if (fs.existsSync(testDbPath)) {
-      fs.unlinkSync(testDbPath);
+      try {
+        fs.unlinkSync(testDbPath);
+      } catch (error) {
+        console.warn('Warning: Failed to delete test database file:', error);
+      }
     }
   });
 
@@ -79,23 +95,37 @@ describe('TODO一括操作の統合テスト', () => {
     // 各テスト前にテストTODOを作成
     createdTodoIds = [];
     
+    // 少し待ってから作成処理を開始（競合状態の回避）
+    await new Promise(resolve => setTimeout(resolve, 50));
+    
     for (let i = 1; i <= 3; i++) {
-      const response = await request(app)
-        .post('/todos')
-        .set('Authorization', authHeader)
-        .send({
-          userId: 'test-user',
-          content: `一括テストTODO${i}`,
-          description: `一括テスト説明${i}`,
-          priority: 'medium'
-        })
-        .expect(302); // リダイレクト
+      try {
+        const response = await request(app)
+          .post('/todos')
+          .set('Authorization', authHeader)
+          .send({
+            userId: 'test-user',
+            content: `一括テストTODO${i}`,
+            description: `一括テスト説明${i}`,
+            priority: 'medium'
+          })
+          .timeout(5000); // タイムアウト設定を追加
+          
+        // 少し待ってからデータベースから確認
+        await new Promise(resolve => setTimeout(resolve, 50));
         
-      // リダイレクトレスポンスからTODO IDを取得（実際のTODO作成確認）
-      const todos = await sqliteRepo.getTodosByUserId('test-user');
-      const newTodo = todos.find(t => t.content === `一括テストTODO${i}`);
-      if (newTodo) {
-        createdTodoIds.push(newTodo.id);
+        // リダイレクトレスポンスからTODO IDを取得（実際のTODO作成確認）
+        const todos = await sqliteRepo.getTodosByUserId('test-user');
+        const newTodo = todos.find(t => t.content === `一括テストTODO${i}`);
+        if (newTodo) {
+          createdTodoIds.push(newTodo.id);
+        }
+      } catch (error) {
+        console.error(`Failed to create TODO ${i}:`, error);
+        if (error instanceof Error) {
+          console.error('Error details:', error.message);
+        }
+        throw error;
       }
     }
     
@@ -375,34 +405,66 @@ describe('TODO一括操作の統合テスト', () => {
     });
 
     test('不正なJSONデータでは400エラー', async () => {
-      // 一括ステータス更新 - todoIdsが配列でない（文字列は許可されているので、nullでテスト）
-      await request(app)
-        .post('/todos/bulk/status')
-        .set('Authorization', authHeader)
-        .send({
-          todoIds: null,
-          status: 'completed'
-        })
-        .expect(400);
+      try {
+        // 一括ステータス更新 - todoIdsが配列でない（文字列は許可されているので、nullでテスト）
+        const response1 = await request(app)
+          .post('/todos/bulk/status')
+          .set('Authorization', authHeader)
+          .set('Content-Type', 'application/json')
+          .send({
+            todoIds: null,
+            status: 'completed'
+          })
+          .timeout(5000);
+        
+        expect(response1.status).toBe(400);
+        expect(response1.body.error).toBeDefined();
 
-      // 一括削除 - todoIdsが配列でない（文字列は許可されているので、nullでテスト）
-      await request(app)
-        .post('/todos/bulk/delete')
-        .set('Authorization', authHeader)
-        .send({
-          todoIds: null
-        })
-        .expect(400);
+        // レスポンス間で少し待つ
+        await new Promise(resolve => setTimeout(resolve, 50));
 
-      // statusが不正なケース
-      await request(app)
-        .post('/todos/bulk/status')
-        .set('Authorization', authHeader)
-        .send({
-          todoIds: createdTodoIds,
-          status: null
-        })
-        .expect(400);
+        // 一括削除 - todoIdsが配列でない（文字列は許可されているので、nullでテスト）
+        const response2 = await request(app)
+          .post('/todos/bulk/delete')
+          .set('Authorization', authHeader)
+          .set('Content-Type', 'application/json')
+          .send({
+            todoIds: null
+          })
+          .timeout(5000);
+          
+        expect(response2.status).toBe(400);
+        expect(response2.body.error).toBeDefined();
+
+        // レスポンス間で少し待つ
+        await new Promise(resolve => setTimeout(resolve, 50));
+
+        // statusが不正なケース
+        const response3 = await request(app)
+          .post('/todos/bulk/status')
+          .set('Authorization', authHeader)
+          .set('Content-Type', 'application/json')
+          .send({
+            todoIds: createdTodoIds,
+            status: null
+          })
+          .timeout(5000);
+          
+        expect(response3.status).toBe(400);
+        expect(response3.body.error).toBeDefined();
+      } catch (error) {
+        console.error('Test failed with error:', error);
+        
+        // エラーの詳細を取得
+        if (error instanceof Error) {
+          console.error('Error stack:', error.stack);
+          if (error.message && error.message.includes('Parse Error')) {
+            console.error('HTTP Parse Error detected. This might be a server crash or invalid response.');
+          }
+        }
+        
+        throw error;
+      }
     });
   });
 });

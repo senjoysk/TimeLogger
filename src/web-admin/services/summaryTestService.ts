@@ -4,8 +4,7 @@
  * 日次サマリー送信のテスト・検証機能を提供するサービス
  */
 
-import { TaskLoggerBot } from '../../bot';
-import { ITimeProvider, ILogger } from '../../interfaces/dependencies';
+import { ITimeProvider, ILogger, IDiscordBot } from '../../interfaces/dependencies';
 import { 
   SummaryTestRequest, 
   SummaryTestResponse, 
@@ -25,11 +24,11 @@ interface UserInfo {
  * サマリーテストサービス
  */
 export class SummaryTestService {
-  private readonly bot: TaskLoggerBot | null;
+  private readonly bot: IDiscordBot | null;
   private readonly timeProvider: ITimeProvider;
   private readonly logger: ILogger;
 
-  constructor(bot: TaskLoggerBot | null, timeProvider: ITimeProvider, logger: ILogger) {
+  constructor(bot: IDiscordBot | null, timeProvider: ITimeProvider, logger: ILogger) {
     this.bot = bot;
     this.timeProvider = timeProvider;
     this.logger = logger;

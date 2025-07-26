@@ -37,6 +37,39 @@ export interface IDiscordBot {
    */
   getConfig?(): any;
 
+  /**
+   * リポジトリを取得
+   */
+  getRepository?(): any;
+
+  /**
+   * 登録ユーザー一覧を取得
+   */
+  getRegisteredUsers?(): Promise<any[]>;
+
+  /**
+   * サマリープレビューを生成
+   * @param userId ユーザーID
+   */
+  generateSummaryPreview?(userId: string): Promise<any>;
+
+  /**
+   * システムが初期化済みかどうか
+   */
+  isSystemInitialized?(): boolean;
+
+  /**
+   * Discord クライアントを取得
+   */
+  getClient?(): Client;
+
+  /**
+   * 活動促しメッセージを送信
+   * @param userId ユーザーID
+   * @param timezone タイムゾーン
+   */
+  sendActivityPromptToUser?(userId: string, timezone: string): Promise<void>;
+
   // TaskLoggerBot互換性のため追加
   [key: string]: any;
 }

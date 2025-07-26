@@ -11,7 +11,9 @@ import { createTodoRouter } from './todos';
 import { createTimeSimulationRouter } from './timeSimulation';
 import { createSummaryTestRouter } from './summaryTest';
 import { createTimezoneRouter } from './timezone';
-export function createRoutes(adminService: AdminService, securityService: SecurityService, databasePath: string, bot?: any): Router {
+import { IDiscordBot } from '../../interfaces/dependencies';
+
+export function createRoutes(adminService: AdminService, securityService: SecurityService, databasePath: string, bot?: IDiscordBot): Router {
   const router = Router();
 
   // すべてのレスポンスにbasePathを追加するミドルウェア
@@ -34,8 +36,8 @@ export function createRoutes(adminService: AdminService, securityService: Securi
 
   // 開発ツール（GitHub Issue #37）- Production環境では無効化
   if (securityService.getEnvironment().env !== 'production') {
-    router.use('/tools/api/time-simulation', createTimeSimulationRouter(bot));
-    router.use('/tools/api/summary-test', createSummaryTestRouter(bot));
+    router.use('/tools/api/time-simulation', createTimeSimulationRouter(bot || null));
+    router.use('/tools/api/summary-test', createSummaryTestRouter(bot || null));
 
     // 開発ツール管理画面
     router.get('/tools/time-simulation', (req, res) => {

@@ -11,14 +11,14 @@ import { MockTimeProvider } from '../../factories';
 import { TimeSetRequest } from '../types/testing';
 import { ActivityPromptRepository } from '../../repositories/activityPromptRepository';
 import { SqliteActivityLogRepository } from '../../repositories/sqliteActivityLogRepository';
-import { TaskLoggerBot } from '../../bot';
+import { IDiscordBot } from '../../interfaces/dependencies';
 // Express Request型の拡張を読み込み
 import '../middleware/timezoneMiddleware';
 
 /**
  * 時刻シミュレーション用ルーター作成
  */
-export function createTimeSimulationRouter(bot: TaskLoggerBot | null = null): Router {
+export function createTimeSimulationRouter(bot: IDiscordBot | null = null): Router {
   const router = Router();
   
   // TimeSimulationServiceはシングルトンのTimeProviderServiceを使用
@@ -26,7 +26,7 @@ export function createTimeSimulationRouter(bot: TaskLoggerBot | null = null): Ro
   
   // 手動リマインダー機能用のリポジトリ初期化
   let activityPromptRepository: ActivityPromptRepository | null = null;
-  if (bot) {
+  if (bot && bot.getRepository) {
     try {
       const repository = bot.getRepository();
       if (repository && repository.getDatabase) {
@@ -222,6 +222,9 @@ export function createTimeSimulationRouter(bot: TaskLoggerBot | null = null): Ro
       for (const targetUserId of targetUsers) {
         try {
           // ユーザーのタイムゾーン情報を取得
+          if (!bot || !bot.getRepository) {
+            return res.status(500).json({ error: 'Repository not available' });
+          }
           const repository = bot.getRepository();
           if (!repository) {
             return res.status(500).json({ error: 'Repository not available' });
@@ -231,7 +234,11 @@ export function createTimeSimulationRouter(bot: TaskLoggerBot | null = null): Ro
           const userTimezone = user?.timezone || 'Asia/Tokyo';
 
           // リマインダーを送信
-          await bot.sendActivityPromptToUser(targetUserId, userTimezone);
+          if (bot.sendActivityPromptToUser) {
+            await bot.sendActivityPromptToUser(targetUserId, userTimezone);
+          } else {
+            throw new Error('sendActivityPromptToUser method not available');
+          }
           
           results.push({
             userId: targetUserId,
