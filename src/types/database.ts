@@ -99,12 +99,13 @@ export interface UserTimezoneRow {
 export interface TodoTaskRow {
   id: string;
   user_id: string;
-  title: string;
+  content: string;  // データベーススキーマに合わせてtitleからcontentに変更
   description?: string;
   status: string;
   priority: string;
   due_date?: string;
   completed_at?: string;
+  related_activity_id?: string;  // 関連する活動ログID
   created_at: string;
   updated_at: string;
 }
@@ -129,9 +130,9 @@ export interface UserRegistrationRow {
   user_id: string;
   username?: string;
   timezone: string;
-  registration_date: string;
-  last_seen_at: string;
-  is_active: number; // SQLiteのBOOLEANは0/1のINTEGER
+  first_seen: string;  // データベーススキーマに合わせてregistration_dateからfirst_seenに変更
+  last_seen: string;   // データベーススキーマに合わせてlast_seen_atからlast_seenに変更
+  is_active: number;   // SQLiteのBOOLEANは0/1のINTEGER
   created_at: string;
   updated_at: string;
 }
@@ -264,7 +265,7 @@ export interface UserSettingRow {
  * API統計集計クエリの結果型
  */
 export interface ApiStatsRow {
-  operation_type: string;
+  operation: string;  // SQLクエリでoperationカラムを使用するため統一
   calls: number;
   total_input_tokens: number;
   total_output_tokens: number;

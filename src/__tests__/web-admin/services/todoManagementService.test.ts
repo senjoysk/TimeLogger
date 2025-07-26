@@ -34,7 +34,7 @@ describe('TodoManagementService', () => {
       // Arrange
       const newTodo = {
         userId: 'test-user-123',
-        title: 'Test TODO Task',
+        content: 'Test TODO Task',
         description: 'Test description',
         priority: 'high' as TodoPriority,
         dueDate: '2024-12-31'
@@ -43,7 +43,7 @@ describe('TodoManagementService', () => {
       const expectedTodo: TodoTask = {
         id: 'todo-123',
         userId: 'test-user-123',
-        title: 'Test TODO Task',
+        content: 'Test TODO Task',
         description: 'Test description',
         status: 'pending',
         priority: 'high',
@@ -66,7 +66,7 @@ describe('TodoManagementService', () => {
       // Arrange
       const todoId = 'todo-123';
       const updates = {
-        title: 'Updated TODO Task',
+        content: 'Updated TODO Task',
         status: 'in_progress' as TodoStatus,
         priority: 'medium' as TodoPriority
       };
@@ -74,7 +74,7 @@ describe('TodoManagementService', () => {
       const updatedTodo: TodoTask = {
         id: todoId,
         userId: 'test-user-123',
-        title: 'Updated TODO Task',
+        content: 'Updated TODO Task',
         description: 'Test description',
         status: 'in_progress',
         priority: 'medium',
@@ -112,7 +112,7 @@ describe('TodoManagementService', () => {
       const expectedTodo: TodoTask = {
         id: todoId,
         userId: 'test-user-123',
-        title: 'Test TODO Task',
+        content: 'Test TODO Task',
         description: 'Test description',
         status: 'pending',
         priority: 'high',
@@ -294,7 +294,7 @@ describe('TodoManagementService', () => {
         {
           id: 'todo-1',
           userId: 'test-user-123',
-          title: 'High Priority TODO',
+          content: 'High Priority TODO',
           description: 'Urgent task',
           status: 'pending',
           priority: 'high',
@@ -320,7 +320,7 @@ describe('TodoManagementService', () => {
         {
           id: 'todo-overdue',
           userId: 'test-user-123',
-          title: 'Overdue TODO',
+          content: 'Overdue TODO',
           description: 'This is overdue',
           status: 'pending',
           priority: 'high',
@@ -346,7 +346,7 @@ describe('TodoManagementService', () => {
       // Arrange
       const invalidTodo = {
         userId: '', // 空のユーザーID
-        title: '',  // 空のタイトル
+        content: '',  // 空のコンテンツ
         description: 'Test description',
         priority: 'invalid' as TodoPriority, // 無効な優先度
         dueDate: 'invalid-date' // 無効な日付
@@ -382,7 +382,7 @@ describe('TodoManagementService', () => {
         {
           id: 'todo-bulk-1',
           userId: 'test-user-123',
-          title: 'テストタスク001',
+          content: 'テストタスク001',
           description: '',
           status: 'pending',
           priority: 'medium',
@@ -392,7 +392,7 @@ describe('TodoManagementService', () => {
         {
           id: 'todo-bulk-2',
           userId: 'test-user-123',
-          title: 'テストタスク002',
+          content: 'テストタスク002',
           description: '',
           status: 'pending',
           priority: 'medium',
@@ -402,7 +402,7 @@ describe('TodoManagementService', () => {
         {
           id: 'todo-bulk-3',
           userId: 'test-user-123',
-          title: 'テストタスク003',
+          content: 'テストタスク003',
           description: '',
           status: 'pending',
           priority: 'medium',
@@ -412,7 +412,7 @@ describe('TodoManagementService', () => {
         {
           id: 'todo-bulk-4',
           userId: 'test-user-123',
-          title: 'テストタスク004',
+          content: 'テストタスク004',
           description: '',
           status: 'pending',
           priority: 'medium',
@@ -422,7 +422,7 @@ describe('TodoManagementService', () => {
         {
           id: 'todo-bulk-5',
           userId: 'test-user-123',
-          title: 'テストタスク005',
+          content: 'テストタスク005',
           description: '',
           status: 'pending',
           priority: 'medium',
@@ -439,32 +439,32 @@ describe('TodoManagementService', () => {
       // Assert
       expect(result).toEqual(expectedTodos);
       expect(result).toHaveLength(5);
-      expect(result[0].title).toBe('テストタスク001');
-      expect(result[4].title).toBe('テストタスク005');
+      expect(result[0].content).toBe('テストタスク001');
+      expect(result[4].content).toBe('テストタスク005');
       expect(mockRepository.bulkCreateTodos).toHaveBeenCalledWith(expect.arrayContaining([
         expect.objectContaining({
           userId: 'test-user-123',
-          title: 'テストタスク001',
+          content: 'テストタスク001',
           priority: 'medium'
         }),
         expect.objectContaining({
           userId: 'test-user-123',
-          title: 'テストタスク002',
+          content: 'テストタスク002',
           priority: 'medium'
         }),
         expect.objectContaining({
           userId: 'test-user-123',
-          title: 'テストタスク003',
+          content: 'テストタスク003',
           priority: 'medium'
         }),
         expect.objectContaining({
           userId: 'test-user-123',
-          title: 'テストタスク004',
+          content: 'テストタスク004',
           priority: 'medium'
         }),
         expect.objectContaining({
           userId: 'test-user-123',
-          title: 'テストタスク005',
+          content: 'テストタスク005',
           priority: 'medium'
         })
       ]));
@@ -549,7 +549,7 @@ describe('TodoManagementService', () => {
         expectedTodos.push({
           id: `todo-bulk-${i}`,
           userId: 'test-user-123',
-          title: `タスク${String(i).padStart(3, '0')}`,
+          content: `タスク${String(i).padStart(3, '0')}`,
           description: '',
           status: 'pending',
           priority: 'low',
@@ -565,9 +565,9 @@ describe('TodoManagementService', () => {
 
       // Assert
       expect(result).toHaveLength(15);
-      expect(result[0].title).toBe('タスク001');
-      expect(result[9].title).toBe('タスク010');
-      expect(result[14].title).toBe('タスク015');
+      expect(result[0].content).toBe('タスク001');
+      expect(result[9].content).toBe('タスク010');
+      expect(result[14].content).toBe('タスク015');
     });
   });
 });

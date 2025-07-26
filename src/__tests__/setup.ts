@@ -1,6 +1,23 @@
 // Jest グローバルセットアップファイル
 // テスト実行前に必要な設定を行う
 
+// グローバルなconsoleモック設定（Test Suite失敗表示を防ぐため）
+// console.error/warnの実際の出力を防ぎ、代わりにjest.fnで記録
+const originalConsole = { ...console };
+global.console = {
+  ...console,
+  log: jest.fn((...args) => {
+    // テスト中でもクリーンアップメッセージは表示
+    if (args[0]?.includes('✅ クリーンアップ') || args[0]?.includes('⚠️')) {
+      originalConsole.log(...args);
+    }
+  }),
+  error: jest.fn(),
+  warn: jest.fn(),
+  info: console.info,
+  debug: console.debug,
+};
+
 // タイムゾーンを固定（テストの一貫性確保）
 process.env.TZ = 'UTC';
 
@@ -10,25 +27,14 @@ process.env.DISCORD_TOKEN = 'test-discord-token';
 process.env.GEMINI_API_KEY = 'test-gemini-key';
 process.env.TARGET_USER_ID = 'test-user-123';
 
-// コンソールログを制御（テスト中の出力を抑制）
-const originalConsoleLog = console.log;
-const originalConsoleError = console.error;
-const originalConsoleWarn = console.warn;
-
+// beforeEach/afterEachでモックをクリア
 beforeEach(() => {
-  // テスト中はコンソールログを抑制
-  console.log = jest.fn();
-  console.error = jest.fn();
-  console.warn = jest.fn();
+  // 各テスト前にモックの呼び出し履歴をクリア
+  jest.clearAllMocks();
 });
 
 afterEach(() => {
-  // テスト後はコンソールログを復元
-  console.log = originalConsoleLog;
-  console.error = originalConsoleError;
-  console.warn = originalConsoleWarn;
-  
-  // すべてのモックをクリア
+  // 各テスト後にもモックの呼び出し履歴をクリア
   jest.clearAllMocks();
 });
 
@@ -68,22 +74,22 @@ async function cleanupTestDatabaseFiles(): Promise<void> {
       for (const file of filesToDelete) {
         const filePath = path.join(targetDir, file);
         await fs.unlink(filePath);
-        console.log(`✅ クリーンアップ: ${path.relative(__dirname, filePath)} を削除しました`);
+        originalConsole.log(`✅ クリーンアップ: ${path.relative(__dirname, filePath)} を削除しました`);
         totalDeletedFiles++;
       }
     } catch (error) {
       // ディレクトリが存在しない場合は無視
       const fsError = error as { code?: string; message?: string };
       if (fsError.code !== 'ENOENT' && fsError.code !== 'ENOTDIR') {
-        console.warn(`⚠️ WALファイルクリーンアップ中にエラーが発生 (${targetDir}):`, fsError.message || error);
+        originalConsole.warn(`⚠️ WALファイルクリーンアップ中にエラーが発生 (${targetDir}):`, fsError.message || error);
       }
     }
   }
   
   if (totalDeletedFiles === 0) {
-    console.log('✅ クリーンアップ: 削除対象のWALファイルはありませんでした');
+    originalConsole.log('✅ クリーンアップ: 削除対象のWALファイルはありませんでした');
   } else {
-    console.log(`✅ クリーンアップ完了: ${totalDeletedFiles}個のWALファイルを削除しました`);
+    originalConsole.log(`✅ クリーンアップ完了: ${totalDeletedFiles}個のWALファイルを削除しました`);
   }
 }
 

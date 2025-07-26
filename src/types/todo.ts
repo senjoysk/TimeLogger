@@ -41,7 +41,7 @@ export interface Todo {
 export interface TodoTask {
   id: string;
   userId: string;
-  title: string;
+  content: string;  // titleからcontentに統一
   description?: string;
   status: TodoStatus;
   priority: TodoPriority;

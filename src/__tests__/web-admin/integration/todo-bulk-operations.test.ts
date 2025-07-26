@@ -85,7 +85,7 @@ describe('TODO一括操作の統合テスト', () => {
         .set('Authorization', authHeader)
         .send({
           userId: 'test-user',
-          title: `一括テストTODO${i}`,
+          content: `一括テストTODO${i}`,
           description: `一括テスト説明${i}`,
           priority: 'medium'
         })

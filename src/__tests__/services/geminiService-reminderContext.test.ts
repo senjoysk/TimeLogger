@@ -1,27 +1,37 @@
 import { GeminiService } from '../../services/geminiService';
+import { IApiCostRepository } from '../../repositories/interfaces';
+
+// GoogleGenerativeAIをモック（ファイル上部で実行）
+jest.mock('@google/generative-ai', () => ({
+  GoogleGenerativeAI: jest.fn().mockImplementation(() => ({
+    getGenerativeModel: jest.fn().mockReturnValue({
+      generateContent: jest.fn()
+    })
+  }))
+}));
 
 // GeminiServiceでのリマインダーコンテキスト付きAI分析テスト（実装済み）
 describe('GeminiService ReminderContext機能（実装済み）', () => {
   let geminiService: GeminiService;
-  let mockApiCostRepository: any;
+  let mockApiCostRepository: jest.Mocked<IApiCostRepository>;
 
   beforeEach(() => {
+    // IApiCostRepositoryのモック作成
     mockApiCostRepository = {
-      recordApiCall: jest.fn()
-    };
+      recordApiCall: jest.fn(),
+      getTodayStats: jest.fn().mockResolvedValue({
+        totalCalls: 0,
+        totalInputTokens: 0,
+        totalOutputTokens: 0,
+        estimatedCost: 0,
+        operationBreakdown: {}
+      }),
+      generateDailyReport: jest.fn().mockResolvedValue('Daily report')
+    } as any;
     
     // console.logをスパイして、ログ出力を確認できるようにする
     jest.spyOn(console, 'log').mockImplementation(() => {});
     jest.spyOn(console, 'error').mockImplementation(() => {});
-    
-    // GoogleGenerativeAIをモック
-    jest.doMock('@google/generative-ai', () => ({
-      GoogleGenerativeAI: jest.fn().mockImplementation(() => ({
-        getGenerativeModel: jest.fn().mockReturnValue({
-          generateContent: jest.fn()
-        })
-      }))
-    }));
     
     geminiService = new GeminiService(mockApiCostRepository);
   });
@@ -32,7 +42,7 @@ describe('GeminiService ReminderContext機能（実装済み）', () => {
   });
 
   describe('classifyMessageWithReminderContext', () => {
-    test.skip('リマインダーReplyメッセージを時間範囲付きで分析する（モック設定問題によりスキップ）', async () => {
+    test('リマインダーReplyメッセージを時間範囲付きで分析する', async () => {
       const messageContent = '会議とメール返信をしていました';
       const timeRange = {
         start: new Date('2024-01-15T11:00:00Z'),
@@ -59,7 +69,10 @@ describe('GeminiService ReminderContext機能（実装済み）', () => {
           }
         }
       };
-      jest.spyOn(geminiService['model'], 'generateContent').mockResolvedValue(mockResponse as any);
+      
+      // modelのgenerateContentメソッドをモック
+      const generateContentSpy = jest.spyOn(geminiService['model'], 'generateContent');
+      generateContentSpy.mockResolvedValue(mockResponse as any);
 
       const result = await geminiService.classifyMessageWithReminderContext(
         messageContent, 
@@ -76,7 +89,7 @@ describe('GeminiService ReminderContext機能（実装済み）', () => {
       expect(console.log).toHaveBeenCalledWith('📥 [Gemini API] リマインダーReply分析レスポンス:');
     });
 
-    test.skip('リマインダー直後メッセージを文脈考慮で分析する（モック設定問題によりスキップ）', async () => {
+    test('リマインダー直後メッセージを文脈考慮で分析する', async () => {
       const messageContent = 'さっきの会議、疲れた...';
       const reminderTime = new Date('2024-01-15T11:30:00Z');
       const timeDiff = 3; // 3分後
@@ -101,7 +114,10 @@ describe('GeminiService ReminderContext機能（実装済み）', () => {
           }
         }
       };
-      jest.spyOn(geminiService['model'], 'generateContent').mockResolvedValue(mockResponse as any);
+      
+      // modelのgenerateContentメソッドをモック
+      const generateContentSpy = jest.spyOn(geminiService['model'], 'generateContent');
+      generateContentSpy.mockResolvedValue(mockResponse as any);
 
       const result = await geminiService.classifyMessageWithNearbyReminderContext(
         messageContent,

@@ -28,7 +28,7 @@ describe('AdminRepository TODO管理機能拡張', () => {
       // Arrange
       const newTodo = {
         userId: 'test-user-123',
-        title: 'Test TODO Task',
+        content: 'Test TODO Task',
         description: 'Test description',
         priority: 'high' as TodoPriority,
         dueDate: '2024-12-31'
@@ -41,7 +41,7 @@ describe('AdminRepository TODO管理機能拡張', () => {
       expect(result).toBeDefined();
       expect(result.id).toBeDefined();
       expect(result.userId).toBe(newTodo.userId);
-      expect(result.title).toBe(newTodo.title);
+      expect(result.content).toBe(newTodo.content);
       // descriptionは現在の実装では空文字になる（設計上の制約）
       expect(result.description).toBe('');
       expect(result.priority).toBe(newTodo.priority);
@@ -55,7 +55,7 @@ describe('AdminRepository TODO管理機能拡張', () => {
       // Arrange
       const newTodo = {
         userId: 'test-user-123',
-        title: 'Test TODO Task',
+        content: 'Test TODO Task',
         description: 'Test description',
         priority: 'high' as TodoPriority,
         dueDate: '2024-12-31'
@@ -63,7 +63,7 @@ describe('AdminRepository TODO管理機能拡張', () => {
       const createdTodo = await repository.createTodoTask(newTodo);
 
       const updates = {
-        title: 'Updated TODO Task',
+        content: 'Updated TODO Task',
         status: 'in_progress' as TodoStatus,
         priority: 'medium' as TodoPriority
       };
@@ -74,7 +74,7 @@ describe('AdminRepository TODO管理機能拡張', () => {
       // Assert
       expect(result).toBeDefined();
       expect(result.id).toBe(createdTodo.id);
-      expect(result.title).toBe(updates.title);
+      expect(result.content).toBe(updates.content);
       expect(result.status).toBe(updates.status);
       expect(result.priority).toBe(updates.priority);
       expect(result.updatedAt).not.toBe(createdTodo.updatedAt);
@@ -84,7 +84,7 @@ describe('AdminRepository TODO管理機能拡張', () => {
       // Arrange
       const newTodo = {
         userId: 'test-user-123',
-        title: 'Test TODO Task',
+        content: 'Test TODO Task',
         description: 'Test description',
         priority: 'high' as TodoPriority,
         dueDate: '2024-12-31'
@@ -106,7 +106,7 @@ describe('AdminRepository TODO管理機能拡張', () => {
       // Arrange
       const newTodo = {
         userId: 'test-user-123',
-        title: 'Test TODO Task',
+        content: 'Test TODO Task',
         description: 'Test description',
         priority: 'high' as TodoPriority,
         dueDate: '2024-12-31'
@@ -120,7 +120,7 @@ describe('AdminRepository TODO管理機能拡張', () => {
       expect(result).toBeDefined();
       expect(result!.id).toBe(createdTodo.id);
       expect(result!.userId).toBe(createdTodo.userId);
-      expect(result!.title).toBe(createdTodo.title);
+      expect(result!.content).toBe(createdTodo.content);
     });
 
     test('存在しないTODOタスクを取得しようとするとnullを返す', async () => {
@@ -138,14 +138,14 @@ describe('AdminRepository TODO管理機能拡張', () => {
       const todos = await Promise.all([
         repository.createTodoTask({
           userId: 'test-user-123',
-          title: 'TODO 1',
+          content: 'TODO 1',
           description: 'Test description 1',
           priority: 'high' as TodoPriority,
           dueDate: '2024-12-31'
         }),
         repository.createTodoTask({
           userId: 'test-user-123',
-          title: 'TODO 2',
+          content: 'TODO 2',
           description: 'Test description 2',
           priority: 'medium' as TodoPriority,
           dueDate: '2024-12-31'
@@ -173,14 +173,14 @@ describe('AdminRepository TODO管理機能拡張', () => {
       const todos = await Promise.all([
         repository.createTodoTask({
           userId: 'test-user-123',
-          title: 'TODO 1',
+          content: 'TODO 1',
           description: 'Test description 1',
           priority: 'high' as TodoPriority,
           dueDate: '2024-12-31'
         }),
         repository.createTodoTask({
           userId: 'test-user-123',
-          title: 'TODO 2',
+          content: 'TODO 2',
           description: 'Test description 2',
           priority: 'medium' as TodoPriority,
           dueDate: '2024-12-31'
@@ -222,7 +222,7 @@ describe('AdminRepository TODO管理機能拡張', () => {
       // 期限切れのTODO
       const overdueTodo = await repository.createTodoTask({
         userId: testUserId,
-        title: 'Overdue TODO',
+        content: 'Overdue TODO',
         description: 'This is overdue',
         priority: 'high' as TodoPriority,
         dueDate: yesterdayStr
@@ -231,7 +231,7 @@ describe('AdminRepository TODO管理機能拡張', () => {
       // 期限切れでないTODO
       await repository.createTodoTask({
         userId: testUserId,
-        title: 'Future TODO',
+        content: 'Future TODO',
         description: 'This is not overdue',
         priority: 'medium' as TodoPriority,
         dueDate: tomorrowStr
@@ -245,7 +245,7 @@ describe('AdminRepository TODO管理機能拡張', () => {
       expect(result.length).toBeGreaterThan(0);
       expect(result.some(todo => todo.id === overdueTodo.id)).toBe(true);
       // 期限切れでないTODOは含まれていないことを確認
-      expect(result.every(todo => todo.title !== 'Future TODO')).toBe(true);
+      expect(result.every(todo => todo.content !== 'Future TODO')).toBe(true);
     });
   });
 });

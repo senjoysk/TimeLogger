@@ -97,8 +97,8 @@ describe('basePath統合テスト', () => {
         .timeout(10000)
         .send({
           userId: 'testuser',
-          title: 'Test TODO',
-          content: 'Test content'
+          content: 'Test TODO',
+          description: 'Test content'
         });
 
       // 作成したTODOを取得
@@ -132,7 +132,7 @@ describe('basePath統合テスト', () => {
         .timeout(10000)
         .send({
           userId: 'testuser',
-          title: 'Test TODO for Delete',
+          content: 'Test TODO for Delete',
           description: 'Test content',
           priority: 'medium'
         });
@@ -175,7 +175,7 @@ describe('basePath統合テスト', () => {
         .timeout(10000)
         .send({
           userId: 'testuser',
-          title: 'Test TODO',
+          content: 'Test TODO',
           description: 'Test content',
           priority: 'medium'
         });
@@ -236,8 +236,8 @@ describe('basePath統合テスト', () => {
         .timeout(10000)
         .send({
           userId: 'testuser',
-          title: 'Test TODO',
-          content: 'Test content'
+          content: 'Test TODO',
+          description: 'Test content'
         });
 
       // 作成したTODOを取得
@@ -270,7 +270,7 @@ describe('basePath統合テスト', () => {
         .auth('testuser', 'testpass')
         .send({
           userId: 'testuser',
-          title: 'Test TODO for Delete',
+          content: 'Test TODO for Delete',
           description: 'Test content',
           priority: 'medium'
         })
@@ -313,7 +313,7 @@ describe('basePath統合テスト', () => {
         .auth('testuser', 'testpass')
         .send({
           userId: 'testuser',
-          title: 'Test TODO',
+          content: 'Test TODO',
           description: 'Test content',
           priority: 'medium'
         })

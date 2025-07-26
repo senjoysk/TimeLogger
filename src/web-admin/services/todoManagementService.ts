@@ -8,14 +8,14 @@ import { AdminRepository } from '../repositories/adminRepository';
 
 export interface CreateTodoRequest {
   userId: string;
-  title: string;
+  content: string;  // titleからcontentに統一
   description?: string;
   priority: TodoPriority;
   dueDate?: string;
 }
 
 export interface UpdateTodoRequest {
-  title?: string;
+  content?: string;  // titleからcontentに統一
   description?: string;
   status?: TodoStatus;
   priority?: TodoPriority;
@@ -48,7 +48,7 @@ export class TodoManagementService {
    */
   async createTodo(data: CreateTodoRequest): Promise<TodoTask> {
     // バリデーション
-    if (!data.userId || !data.title) {
+    if (!data.userId || !data.content) {
       throw new Error('Invalid TODO data');
     }
 
@@ -167,7 +167,7 @@ export class TodoManagementService {
       const sequentialNumber = String(i).padStart(3, '0');
       todoRequests.push({
         userId: request.userId,
-        title: `${request.baseName}${sequentialNumber}`,
+        content: `${request.baseName}${sequentialNumber}`,
         description: '',
         priority: request.priority
       });

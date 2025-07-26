@@ -153,7 +153,7 @@ export class ConfigService implements IConfigService {
    * @param key 設定キー
    * @returns 設定値
    */
-  get(key: string): any {
+  get(key: string): string | number | boolean | undefined {
     return this.config.get(key);
   }
 

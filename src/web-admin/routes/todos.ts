@@ -148,11 +148,11 @@ router.post('/', async (req, res, next) => {
       return res.status(403).json({ error: 'Production環境では作成操作は許可されていません' });
     }
 
-    const { userId, title, description, priority, dueDate } = req.body;
+    const { userId, content, description, priority, dueDate } = req.body;
 
     const newTodo = await todoService.createTodo({
       userId,
-      title,
+      content,
       description,
       priority,
       dueDate
@@ -228,10 +228,10 @@ router.post('/:id', async (req, res, next) => {
     }
 
     const todoId = req.params.id;
-    const { title, description, status, priority, dueDate } = req.body;
+    const { content, description, status, priority, dueDate } = req.body;
 
     await todoService.updateTodo(todoId, {
-      title,
+      content,
       description,
       status,
       priority,

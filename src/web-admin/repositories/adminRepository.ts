@@ -291,7 +291,7 @@ export class AdminRepository implements IAdminRepository {
     return {
       id: todo.id,
       userId: todo.userId,
-      title: todo.content,
+      content: todo.content, // content統一によりcontentを使用
       description: '', // Todo型にはdescriptionがないため空文字
       status: todo.status,
       priority: priorityMap[todo.priority] || 'medium',
@@ -306,7 +306,7 @@ export class AdminRepository implements IAdminRepository {
    */
   async createTodoTask(data: {
     userId: string;
-    title: string;
+    content: string;
     description?: string;
     priority: TodoPriority;
     dueDate?: string;
@@ -314,7 +314,7 @@ export class AdminRepository implements IAdminRepository {
     // SqliteActivityLogRepositoryを使用してTODOを作成
     const createdTodo = await this.sqliteRepo.createTodo({
       userId: data.userId,
-      content: data.title, // titleをcontentにマッピング
+      content: data.content, // content統一により直接マッピング
       priority: data.priority === 'high' ? 1 : data.priority === 'low' ? -1 : 0,
       dueDate: data.dueDate || undefined,
       sourceType: 'manual'
@@ -328,7 +328,7 @@ export class AdminRepository implements IAdminRepository {
    * TODOタスクを更新
    */
   async updateTodoTask(todoId: string, updates: {
-    title?: string;
+    content?: string;
     description?: string;
     status?: TodoStatus;
     priority?: TodoPriority;
@@ -342,7 +342,7 @@ export class AdminRepository implements IAdminRepository {
 
     // SqliteActivityLogRepositoryを使用してTODOを更新
     const updateData: any = {};
-    if (updates.title) updateData.content = updates.title;
+    if (updates.content) updateData.content = updates.content;
     if (updates.status) updateData.status = updates.status;
     if (updates.priority) {
       updateData.priority = updates.priority === 'high' ? 1 : updates.priority === 'low' ? -1 : 0;
@@ -507,7 +507,7 @@ export class AdminRepository implements IAdminRepository {
       } catch (error) {
         // エラーログを記録（本番環境での問題特定用）
         const errorMsg = error instanceof Error ? error.message : 'Unknown error';
-        errors.push(`Failed to create TODO "${request.title}": ${errorMsg}`);
+        errors.push(`Failed to create TODO "${request.content}": ${errorMsg}`);
         continue;
       }
     }

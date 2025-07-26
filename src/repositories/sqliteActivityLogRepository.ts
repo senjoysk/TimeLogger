@@ -973,7 +973,7 @@ export class SqliteActivityLogRepository implements IActivityLogRepository, IApi
         totalOutputTokens += row.total_output_tokens;
         estimatedCost += row.total_cost;
 
-        operationBreakdown[row.operation_type] = {
+        operationBreakdown[row.operation] = {
           calls: row.calls,
           inputTokens: row.total_input_tokens,
           outputTokens: row.total_output_tokens,
@@ -1120,12 +1120,31 @@ export class SqliteActivityLogRepository implements IActivityLogRepository, IApi
    */
   async saveUserTimezone(userId: string, timezone: string): Promise<void> {
     try {
-      const sql = `
-        INSERT OR REPLACE INTO user_settings (user_id, timezone)
-        VALUES (?, ?)
-      `;
+      const now = new Date().toISOString();
       
-      await this.runQuery(sql, [userId, timezone]);
+      // 既存ユーザーかチェック
+      const existingUser = await this.getQuery<UserRegistrationRow>(
+        'SELECT * FROM user_settings WHERE user_id = ?',
+        [userId]
+      );
+      
+      if (existingUser) {
+        // 既存ユーザーの場合はタイムゾーンのみ更新
+        const sql = `
+          UPDATE user_settings 
+          SET timezone = ?, updated_at = ?
+          WHERE user_id = ?
+        `;
+        await this.runQuery(sql, [timezone, now, userId]);
+      } else {
+        // 新規ユーザーの場合はfirst_seen, last_seenも設定
+        const sql = `
+          INSERT INTO user_settings (user_id, timezone, first_seen, last_seen, is_active, created_at, updated_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?)
+        `;
+        await this.runQuery(sql, [userId, timezone, now, now, true, now, now]);
+      }
+      
       console.log(`✅ ユーザータイムゾーン設定保存: ${userId} -> ${timezone}`);
     } catch (error) {
       console.error('❌ ユーザータイムゾーン設定保存エラー:', error);
@@ -1866,13 +1885,14 @@ export class SqliteActivityLogRepository implements IActivityLogRepository, IApi
     return {
       id: row.id,
       userId: row.user_id,
-      content: row.title, // TodoTaskRowはtitleを使用
+      content: row.content, // データベーススキーマに合わせてcontentを使用
       status: row.status as TodoStatus,
       priority: row.priority as any,
       dueDate: row.due_date,
       createdAt: row.created_at,
       updatedAt: row.updated_at,
       completedAt: row.completed_at,
+      relatedActivityId: row.related_activity_id, // 関連する活動ログIDをマッピング
       sourceType: 'manual' as any // デフォルト値
     };
   }
@@ -2120,8 +2140,8 @@ export class SqliteActivityLogRepository implements IActivityLogRepository, IApi
         userId: row.user_id,
         username: row.username,
         timezone: row.timezone,
-        registrationDate: row.registration_date,
-        lastSeenAt: row.last_seen_at,
+        registrationDate: row.first_seen,  // データベーススキーマのfirst_seenをregistrationDateにマッピング
+        lastSeenAt: row.last_seen,         // データベーススキーマのlast_seenをlastSeenAtにマッピング
         isActive: sqliteBooleanToBoolean(row.is_active as SqliteBoolean),
         createdAt: row.created_at,
         updatedAt: row.updated_at
@@ -2147,8 +2167,8 @@ export class SqliteActivityLogRepository implements IActivityLogRepository, IApi
         userId: row.user_id,
         username: row.username || 'Unknown User',
         timezone: row.timezone,
-        registrationDate: row.registration_date,
-        lastSeenAt: row.last_seen_at,
+        registrationDate: row.first_seen,  // データベーススキーマのfirst_seenをregistrationDateにマッピング
+        lastSeenAt: row.last_seen,         // データベーススキーマのlast_seenをlastSeenAtにマッピング
         isActive: sqliteBooleanToBoolean(row.is_active as SqliteBoolean),
         createdAt: row.created_at,
         updatedAt: row.updated_at
@@ -2527,27 +2547,70 @@ export class SqliteActivityLogRepository implements IActivityLogRepository, IApi
    * 活動促し通知設定を作成
    */
   async createSettings(request: CreateActivityPromptSettingsRequest): Promise<ActivityPromptSettings> {
-    const sql = `
-      INSERT OR REPLACE INTO user_settings (
-        user_id, 
-        prompt_enabled, 
-        prompt_start_hour, 
-        prompt_start_minute, 
-        prompt_end_hour, 
-        prompt_end_minute,
-        timezone
-      ) VALUES (?, ?, ?, ?, ?, ?, ?)
-    `;
+    const now = new Date().toISOString();
     
-    await this.runQuery(sql, [
-      request.userId,
-      request.isEnabled ? 1 : 0,
-      request.startHour || 8,
-      request.startMinute || 30,
-      request.endHour || 18,
-      request.endMinute || 0,
-      'Asia/Tokyo' // デフォルトタイムゾーン
-    ]);
+    // 既存ユーザーかチェック
+    const existingUser = await this.getQuery<UserRegistrationRow>(
+      'SELECT * FROM user_settings WHERE user_id = ?',
+      [request.userId]
+    );
+    
+    if (existingUser) {
+      // 既存ユーザーの場合は活動促し設定のみ更新
+      const sql = `
+        UPDATE user_settings 
+        SET prompt_enabled = ?, 
+            prompt_start_hour = ?, 
+            prompt_start_minute = ?, 
+            prompt_end_hour = ?, 
+            prompt_end_minute = ?,
+            timezone = ?,
+            updated_at = ?
+        WHERE user_id = ?
+      `;
+      await this.runQuery(sql, [
+        request.isEnabled ? 1 : 0,
+        request.startHour || 8,
+        request.startMinute || 30,
+        request.endHour || 18,
+        request.endMinute || 0,
+        'Asia/Tokyo',
+        now,
+        request.userId
+      ]);
+    } else {
+      // 新規ユーザーの場合はfirst_seen, last_seenも設定
+      const sql = `
+        INSERT INTO user_settings (
+          user_id, 
+          prompt_enabled, 
+          prompt_start_hour, 
+          prompt_start_minute, 
+          prompt_end_hour, 
+          prompt_end_minute,
+          timezone,
+          first_seen,
+          last_seen,
+          is_active,
+          created_at,
+          updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `;
+      await this.runQuery(sql, [
+        request.userId,
+        request.isEnabled ? 1 : 0,
+        request.startHour || 8,
+        request.startMinute || 30,
+        request.endHour || 18,
+        request.endMinute || 0,
+        'Asia/Tokyo',
+        now,
+        now,
+        true,
+        now,
+        now
+      ]);
+    }
 
     const settings = await this.getSettings(request.userId);
     if (!settings) {

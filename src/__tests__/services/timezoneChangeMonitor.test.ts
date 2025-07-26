@@ -22,8 +22,14 @@ describe('TimezoneChangeMonitor', () => {
   let monitor: TimezoneChangeMonitor;
   let mockScheduler: jest.Mocked<DynamicReportScheduler>;
   let mockRepository: any;
+  let consoleErrorSpy: jest.SpyInstance;
+  let consoleWarnSpy: jest.SpyInstance;
 
   beforeEach(() => {
+    // console spyをセットアップ
+    consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+    consoleWarnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    
     // スケジューラーのモック
     mockScheduler = new MockDynamicReportScheduler() as jest.Mocked<DynamicReportScheduler>;
     mockScheduler.onTimezoneChanged = jest.fn();
@@ -42,9 +48,19 @@ describe('TimezoneChangeMonitor', () => {
     monitor.setRepository(mockRepository);
   });
 
-  afterEach(() => {
+  afterEach(async () => {
+    // 監視を停止
+    monitor.stop();
+    
+    // 非同期処理の完了を待つ
+    await new Promise(resolve => setTimeout(resolve, 50));
+    
+    // console spyをリストア
+    consoleErrorSpy.mockRestore();
+    consoleWarnSpy.mockRestore();
+    
+    // モックをクリア
     jest.clearAllMocks();
-    monitor.stop(); // 監視を停止
   });
 
   describe('ポーリング監視テスト', () => {
@@ -133,9 +149,6 @@ describe('TimezoneChangeMonitor', () => {
     test('should handle polling errors gracefully', async () => {
       // ポーリングエラー処理テスト
 
-      // console.errorをモックしてエラーログをキャプチャ
-      const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
-
       mockRepository.getUserTimezoneChanges.mockRejectedValue(
         new Error('Database connection failed')
       );
@@ -147,13 +160,10 @@ describe('TimezoneChangeMonitor', () => {
       expect(mockScheduler.onTimezoneChanged).not.toHaveBeenCalled();
 
       // エラーログが出力されることを確認
-      expect(consoleSpy).toHaveBeenCalledWith(
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
         expect.stringContaining('❌ Polling for timezone changes failed:'),
         expect.any(Error)
       );
-
-      // スパイをクリーンアップ
-      consoleSpy.mockRestore();
     });
   });
 
@@ -187,9 +197,6 @@ describe('TimezoneChangeMonitor', () => {
     test('should handle notification processing errors', async () => {
       // 通知処理エラーハンドリングテスト
 
-      // console.errorをモックしてエラーログをキャプチャ
-      const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
-
       mockRepository.getUnprocessedNotifications.mockResolvedValue([
         {
           id: 'notif1',
@@ -213,20 +220,14 @@ describe('TimezoneChangeMonitor', () => {
       expect(mockRepository.markNotificationAsProcessed).not.toHaveBeenCalled();
 
       // エラーログが出力されることを確認
-      expect(consoleSpy).toHaveBeenCalledWith(
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
         expect.stringContaining('❌ Failed to process notification notif1:'),
         expect.any(Error)
       );
-
-      // スパイをクリーンアップ
-      consoleSpy.mockRestore();
     });
 
     test('should batch process multiple notifications', async () => {
       // バッチ処理テスト
-
-      // console.errorをモックしてエラーログをキャプチャ
-      const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
 
       mockRepository.getUnprocessedNotifications.mockResolvedValue([
         {
@@ -252,9 +253,6 @@ describe('TimezoneChangeMonitor', () => {
 
       expect(mockScheduler.onTimezoneChanged).toHaveBeenCalledTimes(2);
       expect(mockRepository.markNotificationAsProcessed).toHaveBeenCalledTimes(2);
-
-      // スパイをクリーンアップ
-      consoleSpy.mockRestore();
     });
   });
 
@@ -428,9 +426,6 @@ describe('TimezoneChangeMonitor', () => {
     test('should recover from temporary database errors', async () => {
       // 一時的DB障害からの復旧テスト
 
-      // console.errorをモックしてエラーログをキャプチャ
-      const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
-
       // より短い間隔でテスト
       monitor.setPollingInterval(50); // 50ms
 
@@ -452,21 +447,15 @@ describe('TimezoneChangeMonitor', () => {
       expect(mockRepository.getUserTimezoneChanges.mock.calls.length).toBeGreaterThanOrEqual(3);
 
       // エラーログが出力されることを確認（最初の2回の失敗時）
-      expect(consoleSpy).toHaveBeenCalledWith(
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
         expect.stringContaining('❌ Polling for timezone changes failed:'),
         expect.any(Error)
       );
-
-      // スパイをクリーンアップ
-      consoleSpy.mockRestore();
     });
 
     test('should handle getUserTimezoneChanges is not a function error', async () => {
       // getUserTimezoneChanges is not a function エラーの検出テスト（timezoneChangeMonitor.ts:159-163で修正済み）
       
-      // console.errorをモックしてエラーログをキャプチャ
-      const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
-
       // getUserTimezoneChanges メソッドが存在しないリポジトリを作成
       const incompleteRepository = {
         // getUserTimezoneChanges: jest.fn(), // このメソッドを削除
@@ -487,23 +476,17 @@ describe('TimezoneChangeMonitor', () => {
       await new Promise(resolve => setTimeout(resolve, 100));
       
       // エラーログが出力されることを確認
-      expect(consoleSpy).toHaveBeenCalledWith(
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
         expect.stringContaining('❌ getUserTimezoneChanges is not a function')
       );
       
       // スケジューラーは呼ばれない
       expect(mockScheduler.onTimezoneChanged).not.toHaveBeenCalled();
-      
-      // スパイをクリーンアップ
-      consoleSpy.mockRestore();
     });
 
     test('should handle missing repository methods gracefully', async () => {
       // リポジトリのメソッドが不完全な場合のテスト
       
-      // console.errorをモックしてエラーログをキャプチャ
-      const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
-
       // 一部のメソッドが存在しないリポジトリ
       const incompleteRepository = {
         getUserTimezoneChanges: jest.fn().mockResolvedValue([]),
@@ -524,24 +507,17 @@ describe('TimezoneChangeMonitor', () => {
       await new Promise(resolve => setTimeout(resolve, 100));
       
       // エラーログが出力されることを確認
-      expect(consoleSpy).toHaveBeenCalledWith(
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
         expect.stringContaining('❌ getUnprocessedNotifications is not a function')
       );
       
       // スケジューラーは呼ばれない
       expect(mockScheduler.onTimezoneChanged).not.toHaveBeenCalled();
-      
-      // スパイをクリーンアップ
-      consoleSpy.mockRestore();
     });
 
     test('should handle repository methods returning non-arrays', async () => {
       // リポジトリメソッドが配列以外を返す場合のテスト
       
-      // console.errorをモックしてエラーログをキャプチャ
-      const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
-      const consoleWarnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
-
       const badRepository = {
         getUserTimezoneChanges: jest.fn().mockResolvedValue("not an array"), // 配列でない
         getUnprocessedNotifications: jest.fn().mockResolvedValue(null), // null
@@ -570,10 +546,6 @@ describe('TimezoneChangeMonitor', () => {
       expect(consoleWarnSpy).toHaveBeenCalledWith(
         expect.stringContaining('⚠️ getUnprocessedNotifications returned invalid data, skipping')
       );
-      
-      // スパイをクリーンアップ
-      consoleSpy.mockRestore();
-      consoleWarnSpy.mockRestore();
     });
   });
 });
