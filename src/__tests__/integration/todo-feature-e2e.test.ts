@@ -10,6 +10,7 @@ import { ActivityLoggingIntegration, ActivityLoggingConfig } from '../../integra
 import { Message, ButtonInteraction, User, TextChannel } from 'discord.js';
 import { ActivityLog } from '../../types/activityLog';
 import { Todo } from '../../types/todo';
+import { ITodoRepository } from '../../repositories/interfaces';
 import { MockGeminiService } from '../mocks/mockGeminiService';
 import { getTestDbPath, cleanupTestDatabase } from '../../utils/testDatabasePath';
 
@@ -224,7 +225,7 @@ describe('TODO機能 End-to-End テスト', () => {
       expect(embedData.embeds[0].data.description).toContain('プレゼン資料');
 
       // 作成されたTODO IDを取得（リアルIDを使用）
-      const todos = await testRepository.getTodosByUserId('test-user-123');
+      const todos = await (testRepository as any as ITodoRepository).getTodosByUserId('test-user-123');
       expect(todos.length).toBeGreaterThan(0);
       const todoId = todos[0].id;
 
@@ -335,7 +336,7 @@ describe('TODO機能 End-to-End テスト', () => {
 
       // 作成されたTODO IDを取得
       const testRepository = integration.getRepository();
-      const todos = await testRepository.getTodosByUserId('test-user-123');
+      const todos = await (testRepository as any as ITodoRepository).getTodosByUserId('test-user-123');
       expect(todos.length).toBeGreaterThan(0);
       const todoId = todos[0].id;
 
@@ -354,7 +355,7 @@ describe('TODO機能 End-to-End テスト', () => {
       expect(completeMessage.replySent[0]).toContain('完了');
 
       // データベースから直接確認
-      const updatedTodos = await testRepository.getTodosByUserId('test-user-123');
+      const updatedTodos = await (testRepository as any as ITodoRepository).getTodosByUserId('test-user-123');
       expect(updatedTodos.length).toBeGreaterThan(0);
       
       // 編集したTODOを見つける

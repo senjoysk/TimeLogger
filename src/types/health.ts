@@ -29,6 +29,18 @@ export interface HealthStatus {
     /** エラー情報 */
     errors?: string[];
     
+    /** 初期化状態 */
+    initialized?: boolean;
+    
+    /** データベース接続状態 */
+    database?: boolean;
+    
+    /** サービス準備状態 */
+    services?: boolean;
+    
+    /** ハンドラー準備状態 */
+    handlers?: boolean;
+    
     /** その他の詳細情報 */
     [key: string]: any;
   };

@@ -66,7 +66,7 @@ describe('ActivityLoggingIntegration Coverage Tests', () => {
       const health = await uninitIntegration.healthCheck();
       
       expect(health.healthy).toBe(false);
-      expect(health.details.initialized).toBe(false);
+      expect(health.details!.initialized).toBe(false);
     });
 
     test('不正な設定での初期化エラー', async () => {
@@ -77,10 +77,11 @@ describe('ActivityLoggingIntegration Coverage Tests', () => {
     });
 
     test('二重初期化の防止', async () => {
-      // 既に初期化済みのintegrationで再初期化を試行
-      await integration.initialize();
+      // integrationは既にbeforeAllで初期化済み
+      // 再初期化を試行
+      await expect(integration.initialize()).resolves.not.toThrow();
       
-      // 二重初期化は正常に処理される（既に初期化済みなので何もしない）
+      // 二重初期化後も正常に動作することを確認
       const health = await integration.healthCheck();
       expect(health.healthy).toBe(true);
     });
@@ -175,10 +176,10 @@ describe('ActivityLoggingIntegration Coverage Tests', () => {
       expect(health.details).toHaveProperty('handlers');
       
       // 全てのコンポーネントが正常
-      expect(health.details.initialized).toBe(true);
-      expect(health.details.database).toBe(true);
-      expect(health.details.services).toBe(true);
-      expect(health.details.handlers).toBe(true);
+      expect(health.details!.initialized).toBe(true);
+      expect(health.details!.database).toBe(true);
+      expect(health.details!.services).toBe(true);
+      expect(health.details!.handlers).toBe(true);
     });
   });
 
@@ -198,7 +199,7 @@ describe('ActivityLoggingIntegration Coverage Tests', () => {
       
       // シャットダウン後の状態確認
       health = await tempIntegration.healthCheck();
-      expect(health.details.initialized).toBe(false);
+      expect(health.details!.initialized).toBe(false);
     });
 
     test('リソースクリーンアップの確認', async () => {

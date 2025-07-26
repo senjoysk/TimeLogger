@@ -6,6 +6,7 @@
 import { Client, Message, ButtonInteraction } from 'discord.js';
 // Removed better-sqlite3 import - using sqlite3 via repository
 import { SqliteActivityLogRepository } from '../repositories/sqliteActivityLogRepository';
+import { IActivityLogRepository } from '../repositories/activityLogRepository';
 import { SqliteMemoRepository } from '../repositories/sqliteMemoRepository';
 import { ActivityLogService } from '../services/activityLogService';
 import { EditCommandHandler } from '../handlers/editCommandHandler';
@@ -30,6 +31,7 @@ import { ConfigService } from '../services/configService';
 import { ITimeProvider } from '../interfaces/dependencies';
 import { TimeProviderService } from '../services/timeProviderService';
 import { ReminderReplyService } from '../services/reminderReplyService';
+import { HealthStatus } from '../types/health';
 
 /**
  * 活動記録システム統合設定インターフェース
@@ -106,6 +108,11 @@ export class ActivityLoggingIntegration {
    * 活動記録システムを初期化
    */
   async initialize(): Promise<void> {
+    if (this.isInitialized) {
+      console.log('ℹ️ 活動記録システムは既に初期化済みです');
+      return;
+    }
+    
     try {
       console.log('🚀 活動記録システムの初期化を開始...');
 
@@ -703,7 +710,7 @@ export class ActivityLoggingIntegration {
   /**
    * リポジトリインスタンスを取得
    */
-  getRepository(): any {
+  getRepository(): IActivityLogRepository {
     return this.repository;
   }
 
@@ -802,34 +809,59 @@ export class ActivityLoggingIntegration {
   /**
    * システムの健全性チェック
    */
-  async healthCheck(): Promise<{ healthy: boolean; details: any }> {
+  async healthCheck(): Promise<HealthStatus> {
     try {
-      const details: any = {
-        initialized: this.isInitialized,
-        database: false,
-        services: false,
-        handlers: false
+      const checks = {
+        discordReady: false,
+        activityLoggingInitialized: this.isInitialized,
+        databaseConnected: false,
+        servicesReady: false,
+        handlersReady: false
       };
 
       if (this.isInitialized) {
         // データベース接続チェック
-        details.database = await this.repository.isConnected();
+        checks.databaseConnected = await this.repository.isConnected();
 
         // サービス存在チェック
-        details.services = !!(this.activityLogService);
+        checks.servicesReady = !!(this.activityLogService);
 
         // ハンドラー存在チェック
-        details.handlers = !!(this.editHandler && this.summaryHandler && this.logsHandler && this.timezoneHandler);
+        checks.handlersReady = !!(this.editHandler && this.summaryHandler && this.logsHandler && this.timezoneHandler);
+
+        // Discord Bot接続チェック（統合済みの場合）
+        checks.discordReady = !!(this.botInstance);
       }
 
-      const healthy = details.initialized && details.database && details.services && details.handlers;
+      const healthy = checks.activityLoggingInitialized && 
+                     checks.databaseConnected && 
+                     checks.servicesReady && 
+                     checks.handlersReady;
 
-      return { healthy, details };
+      return { 
+        healthy, 
+        checks,
+        details: {
+          initialized: checks.activityLoggingInitialized,
+          database: checks.databaseConnected,
+          services: checks.servicesReady,
+          handlers: checks.handlersReady
+        },
+        timestamp: new Date()
+      };
     } catch (error) {
       console.error('❌ ヘルスチェックエラー:', error);
       return { 
         healthy: false, 
-        details: { error: String(error) } 
+        checks: {
+          discordReady: false,
+          activityLoggingInitialized: false,
+          databaseConnected: false
+        },
+        details: { 
+          errors: [String(error)] 
+        },
+        timestamp: new Date()
       };
     }
   }

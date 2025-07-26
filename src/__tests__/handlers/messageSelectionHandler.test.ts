@@ -353,8 +353,8 @@ describe('実際の処理統合テスト', () => {
       userId: 'test-user-123',
       content: 'テストメッセージ内容',
       status: 'pending',
-      priority: 'medium',
-      dueDate: null,
+      priority: 0,
+      dueDate: undefined,
       timezone: 'Asia/Tokyo'
     });
   });

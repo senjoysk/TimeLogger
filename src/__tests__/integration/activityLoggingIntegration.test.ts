@@ -200,10 +200,10 @@ describe('活動記録システム統合テスト', () => {
       const healthCheck = await integration.healthCheck();
       
       expect(healthCheck.healthy).toBe(true);
-      expect(healthCheck.details.initialized).toBe(true);
-      expect(healthCheck.details.database).toBe(true);
-      expect(healthCheck.details.services).toBe(true);
-      expect(healthCheck.details.handlers).toBe(true);
+      expect(healthCheck.details!.initialized).toBe(true);
+      expect(healthCheck.details!.database).toBe(true);
+      expect(healthCheck.details!.services).toBe(true);
+      expect(healthCheck.details!.handlers).toBe(true);
     });
 
     test('システム統計が取得できる', async () => {
@@ -409,7 +409,7 @@ describe('活動記録システム統合テスト', () => {
       // Botが初期化時にintegrationを使用することを確認
       const healthCheck = await integration.healthCheck();
       expect(healthCheck.healthy).toBe(true);
-      expect(healthCheck.details.initialized).toBe(true);
+      expect(healthCheck.details!.initialized).toBe(true);
       expect(integration.getConfig()).toBeDefined();
       expect(integration.getConfig().debugMode).toBe(true);
     });
@@ -441,14 +441,14 @@ describe('活動記録システム統合テスト', () => {
       // シャットダウン前の状態確認
       const healthCheckBefore = await testIntegration.healthCheck();
       expect(healthCheckBefore.healthy).toBe(true);
-      expect(healthCheckBefore.details.initialized).toBe(true);
+      expect(healthCheckBefore.details!.initialized).toBe(true);
       
       // シャットダウン実行
       await testIntegration.shutdown();
       
       // シャットダウン後の状態確認
       const healthCheckAfter = await testIntegration.healthCheck();
-      expect(healthCheckAfter.details.initialized).toBe(false);
+      expect(healthCheckAfter.details!.initialized).toBe(false);
     });
   });
 

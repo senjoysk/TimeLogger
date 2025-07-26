@@ -45,6 +45,12 @@ class MockCostRepository {
       estimatedCost: 0
     };
   }
+  async checkCostAlerts(): Promise<any> {
+    return null;
+  }
+  async generateDailyReport(): Promise<string> {
+    return 'Mock daily report';
+  }
 }
 
 // Gemini API のシンプルなモック

@@ -140,7 +140,9 @@ export class TimezoneChangeMonitor {
 
     // 定期実行を開始
     this.processorTimer = setInterval(async () => {
-      await this.processNotifications();
+      if (this.repository && this.scheduler) {
+        await this.processNotifications();
+      }
     }, this.pollingInterval);
 
     console.log(`✅ Timezone notification processor started`);
@@ -200,6 +202,7 @@ export class TimezoneChangeMonitor {
   private async processNotifications(): Promise<void> {
     try {
       if (!this.repository || !this.scheduler) {
+        // テスト環境などでrepositoryが設定されていない場合は静かに終了
         return;
       }
 
