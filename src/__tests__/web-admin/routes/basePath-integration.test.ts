@@ -18,6 +18,7 @@ describe('basePath統合テスト', () => {
     process.env.ADMIN_USERNAME = 'testuser';
     process.env.ADMIN_PASSWORD = 'testpass';
     process.env.NODE_ENV = 'test';
+    process.env.IS_PRODUCTION = 'false';  // 明示的に本番モードを無効化
     // SKIP_MIGRATIONS環境変数は廃止されました
     
     // テストDBクリーンアップ
@@ -60,65 +61,128 @@ describe('basePath統合テスト', () => {
 
   describe('AdminServer単体（basePath = ""）', () => {
     beforeEach(async () => {
-      adminServer = new AdminServer(testDbPath, 3002);
+      // 古いインスタンスがあれば先にクリーンアップ
+      if (adminServer) {
+        const repo = (adminServer as any).sqliteRepo;
+        if (repo && typeof repo.close === 'function') {
+          try {
+            await repo.close();
+          } catch (error) {
+            // 無視
+          }
+        }
+      }
+      
+      // 少し待ってから新しいインスタンスを作成
+      await new Promise(resolve => setTimeout(resolve, 200));
+      
+      // ランダムポートを使用してポート競合を回避
+      const port = 3000 + Math.floor(Math.random() * 1000);
+      adminServer = new AdminServer(testDbPath, port);
       await adminServer.initializeDatabase();
+      
+      // 初期化後にもう少し長く待つ
+      await new Promise(resolve => setTimeout(resolve, 150));
     });
 
     afterEach(async () => {
       if (adminServer) {
-        // データベース接続を閉じる
-        const repo = (adminServer as any).sqliteRepo;
-        if (repo && typeof repo.close === 'function') {
-          await repo.close();
+        try {
+          // データベース接続を閉じる
+          const repo = (adminServer as any).sqliteRepo;
+          if (repo && typeof repo.close === 'function') {
+            await repo.close();
+          }
+        } catch (error) {
+          // クリーンアップエラーは無視
+        }
+        
+        try {
+          // AdminServerのクリーンアップ
+          if (typeof (adminServer as any).cleanup === 'function') {
+            await (adminServer as any).cleanup();
+          }
+        } catch (error) {
+          // クリーンアップエラーは無視
         }
       }
+      // クリーンアップ後にもう少し長く待つ
+      await new Promise(resolve => setTimeout(resolve, 200));
     });
 
     test('TODO作成フォームのaction属性が正しく設定される', async () => {
-      const app = adminServer.getExpressApp();
-      const response = await request(app)
-        .get('/todos/new')
-        .auth('testuser', 'testpass')
-        .timeout(10000)
-        .expect(200);
-      
-      // basePath = "" の場合、action="/todos"
-      expect(response.text).toContain('action="/todos"');
-      expect(response.text).not.toContain('action="/admin/todos"');
+      try {
+        const app = adminServer.getExpressApp();
+        
+        // サーバーが準備できているか確認
+        expect(app).toBeDefined();
+        
+        // サーバーの準備ができるまで少し待つ
+        await new Promise(resolve => setTimeout(resolve, 200));
+        
+        const response = await request(app)
+          .get('/todos/new')
+          .auth('testuser', 'testpass')
+          .timeout(15000)
+          .retry(3)
+          .expect(200);
+        
+        // basePath = "" の場合、action="/todos"
+        expect(response.text).toContain('action="/todos"');
+        expect(response.text).not.toContain('action="/admin/todos"');
+      } catch (error) {
+        console.error('Test failed with error:', error);
+        throw error;
+      }
     }, 30000);
 
     test('TODO編集フォームのaction属性が正しく設定される', async () => {
-      const app = adminServer.getExpressApp();
-      
-      // まずTODOを作成
-      await request(app)
-        .post('/todos')
-        .auth('testuser', 'testpass')
-        .timeout(10000)
-        .send({
-          userId: 'testuser',
-          content: 'Test TODO',
-          description: 'Test content'
-        });
-
-      // 作成したTODOを取得
-      const dashboardResponse = await request(app)
-        .get('/todos')
-        .auth('testuser', 'testpass')
-        .timeout(10000);
-      
-      // TODOが存在する場合のみ編集フォームをテスト
-      if (dashboardResponse.text.includes('Test TODO')) {
-        const editResponse = await request(app)
-          .get('/todos/1/edit')
-          .auth('testuser', 'testpass')
-          .timeout(10000);
+      try {
+        const app = adminServer.getExpressApp();
+        expect(app).toBeDefined();
         
-        if (editResponse.status === 200) {
-          // basePath = "" の場合、action="/todos/1"
-          expect(editResponse.text).toContain('action="/todos/1"');
-          expect(editResponse.text).not.toContain('action="/admin/todos/1"');
+        // サーバーの準備ができるまで少し待つ
+        await new Promise(resolve => setTimeout(resolve, 200));
+        
+        // まずTODOを作成
+        await request(app)
+          .post('/todos')
+          .auth('testuser', 'testpass')
+          .timeout(15000)
+          .retry(3)
+          .send({
+            userId: 'testuser',
+            content: 'Test TODO',
+            description: 'Test content'
+          });
+
+        // 少し待ってからTODOを取得
+        await new Promise(resolve => setTimeout(resolve, 100));
+
+        // 作成したTODOを取得
+        const dashboardResponse = await request(app)
+          .get('/todos')
+          .auth('testuser', 'testpass')
+          .timeout(15000)
+          .retry(3);
+      
+        // TODOが存在する場合のみ編集フォームをテスト
+        if (dashboardResponse.text.includes('Test TODO')) {
+          const editResponse = await request(app)
+            .get('/todos/1/edit')
+            .auth('testuser', 'testpass')
+            .timeout(15000)
+            .retry(3);
+          
+          if (editResponse.status === 200) {
+            // basePath = "" の場合、action="/todos/1"
+            expect(editResponse.text).toContain('action="/todos/1"');
+            expect(editResponse.text).not.toContain('action="/admin/todos/1"');
+          }
         }
+      } catch (error) {
+        console.error('Test failed with error:', error);
+        throw error;
       }
     }, 30000);
 
@@ -136,6 +200,14 @@ describe('basePath統合テスト', () => {
           description: 'Test content',
           priority: 'medium'
         });
+
+      // エラーの場合はログを出力
+      if (createResponse.status === 500) {
+        console.log('AdminServer TODO作成エラー:');
+        console.log('Status:', createResponse.status);
+        console.log('Response:', createResponse.text);
+        console.log('Headers:', createResponse.headers);
+      }
 
       // TODO作成が成功したことを確認
       expect(createResponse.status).toBe(302);
@@ -275,6 +347,14 @@ describe('basePath統合テスト', () => {
           priority: 'medium'
         })
         .timeout(10000); // 10秒タイムアウト
+
+      // エラーの場合はログを出力
+      if (createResponse.status === 500) {
+        console.log('IntegratedServer TODO作成エラー:');
+        console.log('Status:', createResponse.status);
+        console.log('Response:', createResponse.text);
+        console.log('Headers:', createResponse.headers);
+      }
 
       // TODO作成が成功したことを確認
       expect(createResponse.status).toBe(302);

@@ -18,7 +18,7 @@ import {
   MatchingCandidate
 } from '../types/activityLog';
 import { RealTimeActivityAnalyzer } from './realTimeActivityAnalyzer';
-import { GeminiService } from './geminiService';
+import { IGeminiService } from './interfaces/IGeminiService';
 import { 
   DetailedActivityAnalysis,
   RecentActivityContext,
@@ -158,7 +158,7 @@ export class ActivityLogService implements IActivityLogService {
   
   constructor(
     private repository: IActivityLogRepository,
-    geminiService: GeminiService,
+    geminiService: IGeminiService,
     private timezoneService?: ITimezoneService
   ) {
     // リアルタイム分析システムを初期化

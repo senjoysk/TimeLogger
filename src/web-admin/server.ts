@@ -10,6 +10,7 @@ import { AdminService } from './services/adminService';
 import { SecurityService } from './services/securityService';
 import { AdminRepository } from './repositories/adminRepository';
 import { SqliteActivityLogRepository } from '../repositories/sqliteActivityLogRepository';
+import { IUnifiedRepository } from '../repositories/interfaces';
 import { createTimezoneMiddleware } from './middleware/timezoneMiddleware';
 import { createRoutes } from './routes';
 import { errorHandler } from './middleware/errorHandler';
@@ -21,7 +22,7 @@ export class AdminServer {
   private securityService: SecurityService;
   private port: number;
   private databasePath: string;
-  private sqliteRepo: SqliteActivityLogRepository;
+  private sqliteRepo: IUnifiedRepository;
 
   constructor(databasePath: string, port: number = 3001, private bot?: IDiscordBot) {
     this.port = port;

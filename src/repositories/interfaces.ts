@@ -6,6 +6,7 @@ import {
   UpdateActivityPromptSettingsRequest 
 } from '../types/activityPrompt';
 import { CostAlert } from '../types/costAlert';
+import { IActivityLogRepository } from './activityLogRepository';
 
 /**
  * ユーザー情報
@@ -181,4 +182,22 @@ export interface IActivityPromptRepository {
   
   // 設定存在確認
   settingsExists(userId: string): Promise<boolean>;
+}
+
+/**
+ * 統合リポジトリインターフェース
+ * SQLiteActivityLogRepositoryの全機能を統合
+ */
+export interface IUnifiedRepository extends 
+  IActivityLogRepository, 
+  IApiCostRepository, 
+  ITodoRepository, 
+  IMessageClassificationRepository, 
+  IUserRepository, 
+  IActivityPromptRepository {
+  
+  // データベース管理メソッド
+  initializeDatabase(): Promise<void>;
+  close(): Promise<void>;
+  ensureSchema(): Promise<void>;
 }

@@ -12,16 +12,16 @@ import {
   MatchingCandidate,
   ActivityLogError
 } from '../types/activityLog';
-import { GeminiService } from './geminiService';
+import { IGeminiService } from './interfaces/IGeminiService';
 
 /**
  * 開始・終了ログマッチングサービス
  */
 export class ActivityLogMatchingService {
   private strategy: MatchingStrategy;
-  private geminiService?: GeminiService;
+  private geminiService?: IGeminiService;
 
-  constructor(strategy: MatchingStrategy, geminiService?: GeminiService) {
+  constructor(strategy: MatchingStrategy, geminiService?: IGeminiService) {
     this.strategy = strategy;
     this.geminiService = geminiService;
   }

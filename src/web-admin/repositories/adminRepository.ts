@@ -6,17 +6,18 @@
 import { IAdminRepository } from '../interfaces/adminInterfaces';
 import { SearchFilters, PaginationOptions } from '../types/admin';
 import { SqliteActivityLogRepository } from '../../repositories/sqliteActivityLogRepository';
+import { IUnifiedRepository } from '../../repositories/interfaces';
 import { TodoTask, TodoStatus, TodoPriority, Todo } from '../../types/todo';
 import { v4 as uuidv4 } from 'uuid';
 import { ITimezoneService } from '../../services/interfaces/ITimezoneService';
 import { CreateTodoRequest } from '../services/todoManagementService';
 
 export class AdminRepository implements IAdminRepository {
-  private sqliteRepo: SqliteActivityLogRepository;
+  private sqliteRepo: IUnifiedRepository;
   private timezoneService?: ITimezoneService;
 
   constructor(
-    sqliteRepo: SqliteActivityLogRepository,
+    sqliteRepo: IUnifiedRepository,
     timezoneService?: ITimezoneService
   ) {
     this.sqliteRepo = sqliteRepo;
@@ -90,7 +91,7 @@ export class AdminRepository implements IAdminRepository {
         const users = await this.sqliteRepo.getAllUsers();
         let totalLogs = 0;
         for (const user of users) {
-          const logs = await this.sqliteRepo.getActivityRecords(user.userId, this.getDefaultTimezone());
+          const logs = await (this.sqliteRepo as any).getActivityRecords(user.userId, this.getDefaultTimezone());
           totalLogs += logs.length;
         }
         return totalLogs;
@@ -180,7 +181,7 @@ export class AdminRepository implements IAdminRepository {
         const users = await this.sqliteRepo.getAllUsers();
         const allLogs = [];
         for (const user of users) {
-          const logs = await this.sqliteRepo.getActivityRecords(user.userId, this.getDefaultTimezone());
+          const logs = await (this.sqliteRepo as any).getActivityRecords(user.userId, this.getDefaultTimezone());
           allLogs.push(...logs);
         }
         allLogs.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
@@ -216,7 +217,7 @@ export class AdminRepository implements IAdminRepository {
     switch (tableName) {
       case 'activity_logs':
         if (filters.userId && filters.userId !== 'all') {
-          const logs = await this.sqliteRepo.getActivityRecords(filters.userId, this.getDefaultTimezone());
+          const logs = await (this.sqliteRepo as any).getActivityRecords(filters.userId, this.getDefaultTimezone());
           return this.paginate(logs, page, limit);
         }
         return this.getTableData(tableName, options);

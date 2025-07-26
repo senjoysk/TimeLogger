@@ -13,8 +13,8 @@ import {
   ButtonStyle
 } from 'discord.js';
 import { ITodoRepository, IMessageClassificationRepository } from '../repositories/interfaces';
-import { GeminiService } from '../services/geminiService';
-import { MessageClassificationService } from '../services/messageClassificationService';
+import { IGeminiService } from '../services/interfaces/IGeminiService';
+import { IMessageClassificationService } from '../services/messageClassificationService';
 import { 
   Todo, 
   TodoStatus, 
@@ -102,8 +102,8 @@ export class TodoCommandHandler implements ITodoCommandHandler {
   constructor(
     private todoRepository: ITodoRepository,
     private classificationRepository: IMessageClassificationRepository,
-    private geminiService: GeminiService,
-    private classificationService: MessageClassificationService,
+    private geminiService: IGeminiService,
+    private classificationService: IMessageClassificationService,
     private activityLogService?: ActivityLogService // 活動ログサービスの注入
   ) {
     // セッションタイムアウトのクリーンアップ

@@ -6,7 +6,7 @@
 import { Client, Message, ButtonInteraction } from 'discord.js';
 // Removed better-sqlite3 import - using sqlite3 via repository
 import { SqliteActivityLogRepository } from '../repositories/sqliteActivityLogRepository';
-import { IActivityLogRepository } from '../repositories/activityLogRepository';
+import { IUnifiedRepository } from '../repositories/interfaces';
 import { SqliteMemoRepository } from '../repositories/sqliteMemoRepository';
 import { ActivityLogService } from '../services/activityLogService';
 import { EditCommandHandler } from '../handlers/editCommandHandler';
@@ -17,8 +17,8 @@ import { UnmatchedCommandHandler } from '../handlers/unmatchedCommandHandler';
 import { TodoCommandHandler } from '../handlers/todoCommandHandler';
 import { ProfileCommandHandler } from '../handlers/profileCommandHandler';
 import { MemoCommandHandler } from '../handlers/memoCommandHandler';
-import { GeminiService } from '../services/geminiService';
-import { MessageClassificationService } from '../services/messageClassificationService';
+import { IGeminiService } from '../services/interfaces/IGeminiService';
+import { IMessageClassificationService } from '../services/messageClassificationService';
 import { GapDetectionService } from '../services/gapDetectionService';
 import { DynamicReportScheduler } from '../services/dynamicReportScheduler';
 import { DailyReportSender } from '../services/dailyReportSender';
@@ -52,9 +52,13 @@ export interface ActivityLoggingConfig {
   /** 対象ユーザーID（レガシー設定・将来削除予定） */
   targetUserId: string;
   /** 外部リポジトリの注入（テスト用） */
-  repository?: SqliteActivityLogRepository;
+  repository?: IUnifiedRepository;
   /** 外部時刻プロバイダーの注入（テスト・シミュレーション用） */
   timeProvider?: ITimeProvider;
+  /** 外部Geminiサービスの注入（テスト用） */
+  geminiService?: IGeminiService;
+  /** 外部メッセージ分類サービスの注入（テスト用） */
+  messageClassificationService?: IMessageClassificationService;
 }
 
 /**
@@ -62,11 +66,11 @@ export interface ActivityLoggingConfig {
  */
 export class ActivityLoggingIntegration {
   // サービス層
-  private repository!: SqliteActivityLogRepository;
+  private repository!: IUnifiedRepository;
   private memoRepository!: SqliteMemoRepository;
   private activityLogService!: ActivityLogService;
-  private geminiService!: GeminiService;
-  private messageClassificationService!: MessageClassificationService;
+  private geminiService!: IGeminiService;
+  private messageClassificationService!: IMessageClassificationService;
   private gapDetectionService!: GapDetectionService;
   private dynamicReportScheduler!: DynamicReportScheduler;
   private dailyReportSender!: DailyReportSender;
@@ -148,7 +152,16 @@ export class ActivityLoggingIntegration {
       // 2. サービス層の初期化
       // コスト管理機能の初期化（統合版）
       // SqliteActivityLogRepositoryがIApiCostRepositoryも実装しているため、同じインスタンスを使用
-      this.geminiService = new GeminiService(this.repository);
+      if (this.config.geminiService) {
+        // 外部から注入されたGeminiServiceを使用（テスト用）
+        this.geminiService = this.config.geminiService;
+        console.log('✅ 外部GeminiServiceを使用（テスト用）');
+      } else {
+        // 通常の場合は新しいGeminiServiceを作成
+        const { GeminiService } = await import('../services/geminiService');
+        this.geminiService = new GeminiService(this.repository);
+        console.log('✅ 新規GeminiServiceを作成');
+      }
       
       // ActivityLogServiceにGeminiServiceを注入（リアルタイム分析のため）
       this.activityLogService = new ActivityLogService(this.repository, this.geminiService);
@@ -159,7 +172,16 @@ export class ActivityLoggingIntegration {
       
       
       // TODO機能サービスの初期化
-      this.messageClassificationService = new MessageClassificationService(this.geminiService);
+      if (this.config.messageClassificationService) {
+        // 外部から注入されたメッセージ分類サービスを使用（テスト用）
+        this.messageClassificationService = this.config.messageClassificationService;
+        console.log('✅ 外部MessageClassificationServiceを使用（テスト用）');
+      } else {
+        // 通常の場合は新しいMessageClassificationServiceを作成
+        const { MessageClassificationService } = await import('../services/messageClassificationService');
+        this.messageClassificationService = new MessageClassificationService(this.geminiService);
+        console.log('✅ 新規MessageClassificationServiceを作成');
+      }
       
       // DynamicReportSchedulerの初期化
       this.dynamicReportScheduler = new DynamicReportScheduler();
@@ -712,7 +734,7 @@ export class ActivityLoggingIntegration {
   /**
    * リポジトリインスタンスを取得
    */
-  getRepository(): IActivityLogRepository {
+  getRepository(): IUnifiedRepository {
     return this.repository;
   }
 
@@ -1080,7 +1102,7 @@ export class ActivityLoggingIntegration {
       }
 
       // データベースリポジトリのクリーンアップ
-      if (this.repository && typeof this.repository.close === 'function') {
+      if (this.repository) {
         await this.repository.close();
         console.log('✅ データベース接続クリーンアップ完了');
       }

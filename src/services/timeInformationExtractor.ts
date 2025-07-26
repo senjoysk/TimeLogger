@@ -15,7 +15,7 @@ import {
   RealTimeAnalysisErrorCode
 } from '../types/realTimeAnalysis';
 import { TimePatternMatcher, TIME_EXPRESSION_NORMALIZER } from '../utils/timePatterns';
-import { GeminiService } from './geminiService';
+import { IGeminiService } from './interfaces/IGeminiService';
 import { ITimezoneService } from './interfaces/ITimezoneService';
 
 /**
@@ -25,7 +25,7 @@ export class TimeInformationExtractor {
   private patternMatcher: TimePatternMatcher;
 
   constructor(
-    private geminiService: GeminiService,
+    private geminiService: IGeminiService,
     private timezoneService?: ITimezoneService
   ) {
     this.patternMatcher = new TimePatternMatcher();

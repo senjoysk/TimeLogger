@@ -19,7 +19,7 @@ import {
 import { TimeInformationExtractor } from './timeInformationExtractor';
 import { ActivityContentAnalyzer } from './activityContentAnalyzer';
 import { TimeConsistencyValidator } from './timeConsistencyValidator';
-import { GeminiService } from './geminiService';
+import { IGeminiService } from './interfaces/IGeminiService';
 import { ITimezoneService } from './interfaces/ITimezoneService';
 
 /**
@@ -32,7 +32,7 @@ export class RealTimeActivityAnalyzer {
   private consistencyValidator: TimeConsistencyValidator;
   
   constructor(
-    geminiService: GeminiService,
+    geminiService: IGeminiService,
     private timezoneService?: ITimezoneService
   ) {
     this.timeExtractor = new TimeInformationExtractor(geminiService, timezoneService);

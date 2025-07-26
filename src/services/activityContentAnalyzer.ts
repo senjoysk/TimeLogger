@@ -11,13 +11,13 @@ import {
   RealTimeAnalysisError,
   RealTimeAnalysisErrorCode
 } from '../types/realTimeAnalysis';
-import { GeminiService } from './geminiService';
+import { IGeminiService } from './interfaces/IGeminiService';
 
 /**
  * 活動内容分析クラス
  */
 export class ActivityContentAnalyzer {
-  constructor(private geminiService: GeminiService) {}
+  constructor(private geminiService: IGeminiService) {}
 
   /**
    * メイン分析メソッド - 活動内容を詳細分析

@@ -1,7 +1,7 @@
 import * as cron from 'node-cron';
 import { TaskLoggerBot } from './bot';
 import { config } from './config';
-import { SqliteActivityLogRepository } from './repositories/sqliteActivityLogRepository';
+import { IUnifiedRepository } from './repositories/interfaces';
 import { toZonedTime } from 'date-fns-tz';
 import { 
   ISchedulerService, 
@@ -27,6 +27,7 @@ export interface SchedulerDependencies {
   timeProvider?: ITimeProvider;
   configService?: IConfigService;
   activityPromptRepository?: IActivityPromptRepository;
+  activityLogRepository?: IUnifiedRepository;
 }
 
 /**
@@ -35,7 +36,7 @@ export interface SchedulerDependencies {
  */
 export class Scheduler {
   private bot: TaskLoggerBot;
-  private repository: SqliteActivityLogRepository;
+  private repository: IUnifiedRepository;
   private jobs: Map<string, any> = new Map(); // cron.ScheduledTaskからanyに変更（DI対応）
   private userTimezones: Map<string, string> = new Map();
   
@@ -48,11 +49,11 @@ export class Scheduler {
 
   constructor(
     bot: TaskLoggerBot, 
-    repository: SqliteActivityLogRepository,
+    repository: IUnifiedRepository,
     dependencies?: SchedulerDependencies
   ) {
     this.bot = bot;
-    this.repository = repository;
+    this.repository = dependencies?.activityLogRepository || repository;
     
     // DI依存関係の初期化（デフォルトまたは注入された実装を使用）
     this.schedulerService = dependencies?.schedulerService || new CronSchedulerService();
