@@ -6,6 +6,7 @@ import { toZonedTime, format } from 'date-fns-tz';
 import { ClassificationResult, MessageClassification } from '../types/todo';
 import { withErrorHandling, AppError, ErrorType } from '../utils/errorHandler';
 import { ActivityAnalysisResult, ReminderContext } from '../types/activityAnalysis';
+import { PreviousActivities } from '../types/database';
 
 /**
  * Google Gemini API サービスクラス
@@ -690,7 +691,7 @@ JSON形式のみで回答してください。説明文は不要です。`.trim(
     content: string,
     userId: string,
     timezone: string,
-    previousActivities?: any[]
+    previousActivities?: PreviousActivities
   ): Promise<ActivityAnalysisResult> {
     // analyzeActivityContentメソッドに委譲
     return this.analyzeActivityContent(

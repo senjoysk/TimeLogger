@@ -5,6 +5,7 @@
 
 import { ClassificationResult } from '../../types/todo';
 import { ActivityAnalysisResult, ReminderContext } from '../../types/activityAnalysis';
+import { PreviousActivities } from '../../types/database';
 
 /**
  * API使用量統計
@@ -121,6 +122,6 @@ export interface IGeminiService {
     content: string,
     userId: string,
     timezone: string,
-    previousActivities?: any[]
+    previousActivities?: PreviousActivities
   ): Promise<ActivityAnalysisResult>;
 }

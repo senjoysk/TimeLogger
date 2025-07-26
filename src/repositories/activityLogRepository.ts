@@ -3,6 +3,7 @@
  * 自然言語ログ方式に対応
  */
 
+import { Database } from 'sqlite3';
 import {
   ActivityLog,
   CreateActivityLogRequest,
@@ -260,7 +261,7 @@ export interface IActivityLogRepository {
    * データベースインスタンスを取得
    * @returns SQLiteデータベースインスタンス
    */
-  getDatabase(): any;
+  getDatabase(): Database;
 
   /**
    * スケジューラー用の全ユーザーのタイムゾーン情報を取得
@@ -279,7 +280,7 @@ export interface IActivityLogRepository {
     id: string;
     userId: string;
     type: string;
-    data: any;
+    data: unknown;
     createdAt: Date;
   }>>;
 
@@ -306,7 +307,7 @@ export interface IActivityLogRepositoryFactory {
    * @param connection 既存のデータベース接続
    * @returns IActivityLogRepository実装
    */
-  createFromConnection(connection: any): IActivityLogRepository;
+  createFromConnection(connection: Database): IActivityLogRepository;
 }
 
 /**

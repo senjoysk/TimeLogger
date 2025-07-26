@@ -9,6 +9,38 @@ import { toZonedTime, format } from 'date-fns-tz';
 import { MigrationManager } from '../database/migrationManager';
 import { DatabaseInitializer } from '../database/databaseInitializer';
 import {
+  QueryParams,
+  QueryParam,
+  SqliteRunResult,
+  SqliteBoolean,
+  ActivityLogRow,
+  AnalysisCacheRow,
+  ApiCostRow,
+  UserTimezoneRow,
+  TodoTaskRow,
+  MessageClassificationHistoryRow,
+  UserRegistrationRow,
+  NotificationRow,
+  UserSettingRow,
+  ApiStatsRow,
+  UserTimezoneStatsRow,
+  TimezoneChangeRow,
+  UserStatsAggregateRow,
+  NotificationDataRow,
+  CountRow,
+  DailyStatsRow,
+  HourlyStatsRow,
+  DateLogStatsRow,
+  MatchedLogPairRow,
+  ActivityPromptSettingRow,
+  TodoStatsRow,
+  ClassificationAccuracyRow,
+  DatabaseQueryResult,
+  DatabaseQueryResults,
+  sqliteBooleanToBoolean,
+  booleanToSqliteBoolean
+} from '../types/database';
+import {
   IActivityLogRepository,
   LogSearchCriteria
 } from './activityLogRepository';
@@ -20,7 +52,9 @@ import {
   CreateAnalysisCacheRequest,
   DailyAnalysisResult,
   BusinessDateInfo,
-  ActivityLogError
+  ActivityLogError,
+  LogType,
+  MatchStatus
 } from '../types/activityLog';
 import {
   Todo,
@@ -279,7 +313,7 @@ export class SqliteActivityLogRepository implements IActivityLogRepository, IApi
         ORDER BY input_timestamp ASC
       `;
 
-      const rows = await this.allQuery(sql, [userId, businessDate]) as any[];
+      const rows = await this.allQuery<ActivityLogRow>(sql, [userId, businessDate]);
       return rows.map(this.mapRowToActivityLog);
     } catch (error) {
       console.error('❌ ログ取得エラー:', error);
@@ -299,7 +333,7 @@ export class SqliteActivityLogRepository implements IActivityLogRepository, IApi
         ORDER BY business_date ASC, input_timestamp ASC
       `;
 
-      const rows = await this.allQuery(sql, [userId, startDate, endDate]) as any[];
+      const rows = await this.allQuery<ActivityLogRow>(sql, [userId, startDate, endDate]);
       return rows.map(this.mapRowToActivityLog);
     } catch (error) {
       console.error('❌ 期間ログ取得エラー:', error);
@@ -608,7 +642,7 @@ export class SqliteActivityLogRepository implements IActivityLogRepository, IApi
         ORDER BY input_timestamp DESC 
         LIMIT ?
       `;
-      const rows = await this.allQuery(sql, [userId, limit]) as any[];
+      const rows = await this.allQuery<ActivityLogRow>(sql, [userId, limit]);
       return rows.map(this.mapRowToActivityLog);
     } catch (error) {
       console.error('❌ 最新ログ取得エラー:', error);
@@ -719,7 +753,7 @@ export class SqliteActivityLogRepository implements IActivityLogRepository, IApi
   /**
    * SQLクエリ実行（更新系）
    */
-  private runQuery(sql: string, params: any[] = []): Promise<any> {
+  private runQuery(sql: string, params: QueryParams = []): Promise<SqliteRunResult> {
     return new Promise((resolve, reject) => {
       this.db.run(sql, params, function(err) {
         if (err) {
@@ -734,13 +768,13 @@ export class SqliteActivityLogRepository implements IActivityLogRepository, IApi
   /**
    * SQLクエリ実行（単一行取得）
    */
-  private getQuery(sql: string, params: any[] = []): Promise<any> {
+  private getQuery<T = unknown>(sql: string, params: QueryParams = []): Promise<DatabaseQueryResult<T>> {
     return new Promise((resolve, reject) => {
       this.db.get(sql, params, (err, row) => {
         if (err) {
           reject(err);
         } else {
-          resolve(row);
+          resolve(row as T | null);
         }
       });
     });
@@ -749,13 +783,13 @@ export class SqliteActivityLogRepository implements IActivityLogRepository, IApi
   /**
    * SQLクエリ実行（複数行取得）
    */
-  private allQuery(sql: string, params: any[] = []): Promise<any[]> {
+  private allQuery<T = unknown>(sql: string, params: QueryParams = []): Promise<DatabaseQueryResults<T>> {
     return new Promise((resolve, reject) => {
       this.db.all(sql, params, (err, rows) => {
         if (err) {
           reject(err);
         } else {
-          resolve(rows);
+          resolve(rows as T[]);
         }
       });
     });
@@ -764,14 +798,14 @@ export class SqliteActivityLogRepository implements IActivityLogRepository, IApi
   /**
    * データベース行をActivityLogオブジェクトにマッピング
    */
-  private mapRowToActivityLog(row: any): ActivityLog {
+  private mapRowToActivityLog(row: ActivityLogRow): ActivityLog {
     const log: ActivityLog = {
       id: row.id,
       userId: row.user_id,
       content: row.content,
       inputTimestamp: row.input_timestamp,
       businessDate: row.business_date,
-      isDeleted: row.is_deleted === 1,
+      isDeleted: sqliteBooleanToBoolean(row.is_deleted as SqliteBoolean),
       createdAt: row.created_at,
       updatedAt: row.updated_at
     };
@@ -786,11 +820,17 @@ export class SqliteActivityLogRepository implements IActivityLogRepository, IApi
     if (row.analysis_warnings !== undefined) log.analysisWarnings = row.analysis_warnings;
 
     // 開始・終了ログマッチング関連フィールドをマッピング（存在する場合のみ）
-    if (row.log_type !== undefined) log.logType = row.log_type;
-    if (row.match_status !== undefined) log.matchStatus = row.match_status;
+    if (row.log_type !== undefined) log.logType = row.log_type as LogType;
+    if (row.match_status !== undefined) log.matchStatus = row.match_status as MatchStatus;
     if (row.matched_log_id !== undefined) log.matchedLogId = row.matched_log_id;
     if (row.activity_key !== undefined) log.activityKey = row.activity_key;
     if (row.similarity_score !== undefined) log.similarityScore = row.similarity_score;
+
+    // リマインダーReply機能関連フィールドをマッピング（存在する場合のみ）
+    if (row.is_reminder_reply !== undefined) log.isReminderReply = sqliteBooleanToBoolean(row.is_reminder_reply as SqliteBoolean);
+    if (row.time_range_start !== undefined) log.timeRangeStart = row.time_range_start;
+    if (row.time_range_end !== undefined) log.timeRangeEnd = row.time_range_end;
+    if (row.context_type !== undefined) log.contextType = row.context_type as 'REMINDER_REPLY' | 'POST_REMINDER' | 'NORMAL';
 
     return log;
   }
@@ -896,7 +936,7 @@ export class SqliteActivityLogRepository implements IActivityLogRepository, IApi
 
       // デバッグ用: 全レコードを取得
       if (process.env.NODE_ENV === 'test') {
-        const allRecords = await this.allQuery('SELECT * FROM api_costs ORDER BY timestamp DESC') as any[];
+        const allRecords = await this.allQuery<ApiCostRow>('SELECT * FROM api_costs ORDER BY timestamp DESC');
         console.log(`🔍 getTodayStats - 全レコード数: ${allRecords.length}`);
         if (allRecords.length > 0) {
           console.log(`🔍 最新レコード: ${JSON.stringify(allRecords[0])}`);
@@ -914,7 +954,7 @@ export class SqliteActivityLogRepository implements IActivityLogRepository, IApi
         GROUP BY operation
       `;
 
-      const rows = await this.allQuery(sql) as any[];
+      const rows = await this.allQuery<ApiStatsRow>(sql);
       
       // デバッグ情報（テスト時のみ）
       if (process.env.NODE_ENV === 'test') {
@@ -933,7 +973,7 @@ export class SqliteActivityLogRepository implements IActivityLogRepository, IApi
         totalOutputTokens += row.total_output_tokens;
         estimatedCost += row.total_cost;
 
-        operationBreakdown[row.operation] = {
+        operationBreakdown[row.operation_type] = {
           calls: row.calls,
           inputTokens: row.total_input_tokens,
           outputTokens: row.total_output_tokens,
@@ -1106,7 +1146,7 @@ export class SqliteActivityLogRepository implements IActivityLogRepository, IApi
         WHERE user_id = ?
       `;
       
-      const row = await this.getQuery(sql, [userId]);
+      const row = await this.getQuery<UserTimezoneRow>(sql, [userId]);
       
       if (row && row.timezone) {
         console.log(`📍 ユーザータイムゾーン取得: ${userId} -> ${row.timezone}`);
@@ -1132,7 +1172,7 @@ export class SqliteActivityLogRepository implements IActivityLogRepository, IApi
         FROM user_settings
       `;
       
-      const rows = await this.allQuery(sql);
+      const rows = await this.allQuery<UserTimezoneStatsRow>(sql);
       const timezones: { [userId: string]: string } = {};
       
       for (const row of rows) {
@@ -1167,7 +1207,7 @@ export class SqliteActivityLogRepository implements IActivityLogRepository, IApi
         WHERE processed = 0
       `;
       
-      const params: any[] = [];
+      const params: QueryParams = [];
       if (since) {
         sql += ` AND changed_at > ?`;
         params.push(since.toISOString());
@@ -1175,7 +1215,7 @@ export class SqliteActivityLogRepository implements IActivityLogRepository, IApi
       
       sql += ` ORDER BY changed_at ASC`;
       
-      const rows = await this.allQuery(sql, params);
+      const rows = await this.allQuery<TimezoneChangeRow>(sql, params);
       
       console.log(`📍 タイムゾーン変更取得: ${rows.length}件 (since: ${since?.toISOString() || 'all'})`);
       return rows.map(row => ({
@@ -1197,7 +1237,7 @@ export class SqliteActivityLogRepository implements IActivityLogRepository, IApi
     id: string;
     userId: string;
     type: string;
-    data: any;
+    data: unknown;
     createdAt: Date;
   }>> {
     try {
@@ -1208,11 +1248,11 @@ export class SqliteActivityLogRepository implements IActivityLogRepository, IApi
         ORDER BY changed_at ASC
       `;
       
-      const rows = await this.allQuery(sql);
+      const rows = await this.allQuery<TimezoneChangeRow>(sql);
       
       console.log(`📍 未処理通知取得: ${rows.length}件`);
       return rows.map(row => ({
-        id: row.id,
+        id: `timezone_change_${row.user_id}_${row.changed_at}`,
         userId: row.user_id,
         type: 'timezone_change',
         data: {
@@ -1258,7 +1298,7 @@ export class SqliteActivityLogRepository implements IActivityLogRepository, IApi
         SELECT * FROM activity_logs 
         WHERE user_id = ? AND is_deleted = 0
       `;
-      const params: any[] = [userId];
+      const params: QueryParams = [userId];
 
       if (businessDate) {
         sql += ` AND business_date = ?`;
@@ -1267,7 +1307,7 @@ export class SqliteActivityLogRepository implements IActivityLogRepository, IApi
 
       sql += ` ORDER BY input_timestamp DESC`;
 
-      const rows = await this.allQuery(sql, params);
+      const rows = await this.allQuery<ActivityLogRow>(sql, params);
       return rows.map(this.mapRowToActivityLog);
     } catch (error) {
       console.error('❌ 活動レコード取得エラー:', error);
@@ -1290,7 +1330,7 @@ export class SqliteActivityLogRepository implements IActivityLogRepository, IApi
   }): Promise<void> {
     try {
       const setParts: string[] = [];
-      const params: any[] = [];
+      const params: QueryParams = [];
 
       if (matchInfo.matchStatus !== undefined) {
         setParts.push('match_status = ?');
@@ -1350,7 +1390,7 @@ export class SqliteActivityLogRepository implements IActivityLogRepository, IApi
 
       sql += ' ORDER BY input_timestamp ASC';
 
-      const rows = await this.allQuery(sql, params) as any[];
+      const rows = await this.allQuery<ActivityLogRow>(sql, params);
       return rows.map(this.mapRowToActivityLog);
     } catch (error) {
       console.error('❌ 未マッチログ取得エラー:', error);
@@ -1391,7 +1431,7 @@ export class SqliteActivityLogRepository implements IActivityLogRepository, IApi
 
       sql += ' ORDER BY start_log.input_timestamp ASC';
 
-      const rows = await this.allQuery(sql, params) as any[];
+      const rows = await this.allQuery<MatchedLogPairRow>(sql, params);
       
       return rows.map(row => {
         const startLog = this.mapRowToActivityLog(row);
@@ -1404,10 +1444,9 @@ export class SqliteActivityLogRepository implements IActivityLogRepository, IApi
           isDeleted: false,
           createdAt: row.created_at,
           updatedAt: row.updated_at,
-          logType: row.end_log_type,
+          logType: row.end_log_type as LogType,
           matchStatus: 'matched',
-          matchedLogId: startLog.id,
-          activityKey: row.end_activity_key
+          matchedLogId: startLog.id
         };
 
         return { startLog, endLog };
@@ -1475,7 +1514,7 @@ export class SqliteActivityLogRepository implements IActivityLogRepository, IApi
     const sql = 'SELECT * FROM todo_tasks WHERE id = ?';
     
     try {
-      const row = await this.getQuery(sql, [id]);
+      const row = await this.getQuery<TodoTaskRow>(sql, [id]);
       return row ? this.mapRowToTodo(row) : null;
     } catch (error) {
       throw new TodoError('TODO取得に失敗しました', 'GET_TODO_ERROR', { error, id });
@@ -1487,7 +1526,7 @@ export class SqliteActivityLogRepository implements IActivityLogRepository, IApi
    */
   async getTodosByUserId(userId: string, options?: GetTodosOptions): Promise<Todo[]> {
     let sql = 'SELECT * FROM todo_tasks WHERE user_id = ? AND is_deleted = 0';
-    const params: any[] = [userId];
+    const params: QueryParams = [userId];
 
     if (options?.status) {
       sql += ' AND status = ?';
@@ -1513,7 +1552,7 @@ export class SqliteActivityLogRepository implements IActivityLogRepository, IApi
     }
 
     try {
-      const rows = await this.allQuery(sql, params);
+      const rows = await this.allQuery<TodoTaskRow>(sql, params);
       return rows.map(row => this.mapRowToTodo(row));
     } catch (error) {
       throw new TodoError('TODO一覧取得に失敗しました', 'GET_TODOS_ERROR', { error, userId, options });
@@ -1604,7 +1643,7 @@ export class SqliteActivityLogRepository implements IActivityLogRepository, IApi
     const searchPattern = `%${keyword}%`;
     
     try {
-      const rows = await this.allQuery(sql, [userId, searchPattern]);
+      const rows = await this.allQuery<TodoTaskRow>(sql, [userId, searchPattern]);
       return rows.map(row => this.mapRowToTodo(row));
     } catch (error) {
       throw new TodoError('TODO検索に失敗しました', 'SEARCH_TODOS_ERROR', { error, userId, keyword });
@@ -1629,15 +1668,15 @@ export class SqliteActivityLogRepository implements IActivityLogRepository, IApi
     `;
     
     try {
-      const row = await this.getQuery(sql, [userId]);
+      const row = await this.getQuery<TodoStatsRow>(sql, [userId]);
       return {
-        total: row.total || 0,
-        pending: row.pending || 0,
-        inProgress: row.in_progress || 0,
-        completed: row.completed || 0,
-        cancelled: row.cancelled || 0,
-        todayCompleted: row.today_completed || 0,
-        weekCompleted: row.week_completed || 0,
+        total: row?.total || 0,
+        pending: row?.pending || 0,
+        inProgress: row?.in_progress || 0,
+        completed: row?.completed || 0,
+        cancelled: row?.cancelled || 0,
+        todayCompleted: row?.today_completed || 0,
+        weekCompleted: row?.week_completed || 0,
       };
     } catch (error) {
       throw new TodoError('TODO統計取得に失敗しました', 'GET_TODO_STATS_ERROR', { error, userId });
@@ -1649,7 +1688,7 @@ export class SqliteActivityLogRepository implements IActivityLogRepository, IApi
    */
   async getTodosWithDueDate(userId: string, beforeDate?: string): Promise<Todo[]> {
     let sql = 'SELECT * FROM todo_tasks WHERE user_id = ? AND due_date IS NOT NULL';
-    const params: any[] = [userId];
+    const params: QueryParams = [userId];
 
     if (beforeDate) {
       sql += ' AND due_date <= ?';
@@ -1659,7 +1698,7 @@ export class SqliteActivityLogRepository implements IActivityLogRepository, IApi
     sql += ' ORDER BY due_date ASC';
 
     try {
-      const rows = await this.allQuery(sql, params);
+      const rows = await this.allQuery<TodoTaskRow>(sql, params);
       return rows.map(row => this.mapRowToTodo(row));
     } catch (error) {
       throw new TodoError('期日付きTODO取得に失敗しました', 'GET_TODOS_WITH_DUE_DATE_ERROR', { error, userId, beforeDate });
@@ -1673,7 +1712,7 @@ export class SqliteActivityLogRepository implements IActivityLogRepository, IApi
     const sql = 'SELECT * FROM todo_tasks WHERE related_activity_id = ? ORDER BY created_at DESC';
     
     try {
-      const rows = await this.allQuery(sql, [activityId]);
+      const rows = await this.allQuery<TodoTaskRow>(sql, [activityId]);
       return rows.map(row => this.mapRowToTodo(row));
     } catch (error) {
       throw new TodoError('活動関連TODO取得に失敗しました', 'GET_TODOS_BY_ACTIVITY_ERROR', { error, activityId });
@@ -1783,7 +1822,7 @@ export class SqliteActivityLogRepository implements IActivityLogRepository, IApi
     sql += ' GROUP BY ai_classification';
 
     try {
-      const rows = await this.allQuery(sql, params);
+      const rows = await this.allQuery<ClassificationAccuracyRow>(sql, params);
       return rows.map(row => ({
         classification: row.classification as MessageClassification,
         totalCount: row.total_count,
@@ -1801,7 +1840,7 @@ export class SqliteActivityLogRepository implements IActivityLogRepository, IApi
    */
   async getClassificationHistory(userId: string, limit?: number): Promise<MessageClassificationHistory[]> {
     let sql = 'SELECT * FROM message_classifications WHERE user_id = ? ORDER BY classified_at DESC';
-    const params: any[] = [userId];
+    const params: QueryParams = [userId];
 
     if (limit) {
       sql += ' LIMIT ?';
@@ -1809,7 +1848,7 @@ export class SqliteActivityLogRepository implements IActivityLogRepository, IApi
     }
 
     try {
-      const rows = await this.allQuery(sql, params);
+      const rows = await this.allQuery<MessageClassificationHistoryRow>(sql, params);
       return rows.map(row => this.mapRowToClassificationHistory(row));
     } catch (error) {
       throw new TodoError('分類履歴取得に失敗しました', 'GET_CLASSIFICATION_HISTORY_ERROR', { error, userId });
@@ -1823,37 +1862,32 @@ export class SqliteActivityLogRepository implements IActivityLogRepository, IApi
   /**
    * データベース行をTodoオブジェクトにマッピング
    */
-  private mapRowToTodo(row: any): Todo {
+  private mapRowToTodo(row: TodoTaskRow): Todo {
     return {
       id: row.id,
       userId: row.user_id,
-      content: row.content,
+      content: row.title, // TodoTaskRowはtitleを使用
       status: row.status as TodoStatus,
-      priority: row.priority,
+      priority: row.priority as any,
       dueDate: row.due_date,
       createdAt: row.created_at,
       updatedAt: row.updated_at,
       completedAt: row.completed_at,
-      sourceType: row.source_type as any,
-      relatedActivityId: row.related_activity_id,
-      aiConfidence: row.ai_confidence,
+      sourceType: 'manual' as any // デフォルト値
     };
   }
 
   /**
    * データベース行をMessageClassificationHistoryオブジェクトにマッピング
    */
-  private mapRowToClassificationHistory(row: any): MessageClassificationHistory {
+  private mapRowToClassificationHistory(row: MessageClassificationHistoryRow): MessageClassificationHistory {
     return {
       id: row.id,
       userId: row.user_id,
       messageContent: row.message_content,
-      aiClassification: row.ai_classification as MessageClassification,
-      aiConfidence: row.ai_confidence,
-      userClassification: row.user_classification as MessageClassification,
-      classifiedAt: row.classified_at,
-      feedback: row.feedback,
-      isCorrect: row.is_correct === 1 ? true : row.is_correct === 0 ? false : undefined,
+      aiClassification: row.classification_type as MessageClassification,
+      aiConfidence: row.confidence_score,
+      classifiedAt: row.processed_at
     };
   }
 
@@ -1876,7 +1910,7 @@ export class SqliteActivityLogRepository implements IActivityLogRepository, IApi
     `;
 
     try {
-      const rows = await this.allQuery(sql, [
+      const rows = await this.allQuery<TodoTaskRow>(sql, [
         userId,
         startDate + 'T00:00:00Z',
         endDate + 'T23:59:59Z',
@@ -1906,7 +1940,7 @@ export class SqliteActivityLogRepository implements IActivityLogRepository, IApi
     `;
 
     try {
-      const rows = await this.allQuery(sql, [userId, ...statuses]);
+      const rows = await this.allQuery<TodoTaskRow>(sql, [userId, ...statuses]);
       return rows.map(row => this.mapRowToTodo(row));
     } catch (error) {
       console.error('❌ ステータス最適化TODO取得エラー:', error);
@@ -2074,7 +2108,7 @@ export class SqliteActivityLogRepository implements IActivityLogRepository, IApi
    */
   async getUserInfo(userId: string): Promise<UserInfo | null> {
     try {
-      const row = await this.getQuery(
+      const row = await this.getQuery<UserRegistrationRow>(
         'SELECT * FROM user_settings WHERE user_id = ?',
         [userId]
       );
@@ -2086,9 +2120,9 @@ export class SqliteActivityLogRepository implements IActivityLogRepository, IApi
         userId: row.user_id,
         username: row.username,
         timezone: row.timezone,
-        registrationDate: row.first_seen || row.created_at,
-        lastSeenAt: row.last_seen || row.updated_at,
-        isActive: Boolean(row.is_active),
+        registrationDate: row.registration_date,
+        lastSeenAt: row.last_seen_at,
+        isActive: sqliteBooleanToBoolean(row.is_active as SqliteBoolean),
         createdAt: row.created_at,
         updatedAt: row.updated_at
       };
@@ -2103,7 +2137,7 @@ export class SqliteActivityLogRepository implements IActivityLogRepository, IApi
    */
   async getAllUsers(): Promise<UserInfo[]> {
     try {
-      const rows = await this.allQuery('SELECT * FROM user_settings ORDER BY COALESCE(first_seen, created_at) DESC');
+      const rows = await this.allQuery<UserRegistrationRow>('SELECT * FROM user_settings ORDER BY created_at DESC');
       
       if (!rows || rows.length === 0) {
         return [];
@@ -2113,9 +2147,9 @@ export class SqliteActivityLogRepository implements IActivityLogRepository, IApi
         userId: row.user_id,
         username: row.username || 'Unknown User',
         timezone: row.timezone,
-        registrationDate: row.first_seen || row.created_at,
-        lastSeenAt: row.last_seen || row.updated_at,
-        isActive: Boolean(row.is_active),
+        registrationDate: row.registration_date,
+        lastSeenAt: row.last_seen_at,
+        isActive: sqliteBooleanToBoolean(row.is_active as SqliteBoolean),
         createdAt: row.created_at,
         updatedAt: row.updated_at
       }));
@@ -2131,7 +2165,7 @@ export class SqliteActivityLogRepository implements IActivityLogRepository, IApi
    */
   async getAllUserTimezonesForScheduler(): Promise<Array<{ userId: string; timezone: string }>> {
     try {
-      const rows = await this.allQuery(`
+      const rows = await this.allQuery<UserTimezoneStatsRow>(`
         SELECT user_id, timezone 
         FROM user_settings 
         WHERE is_active = 1 
@@ -2179,15 +2213,15 @@ export class SqliteActivityLogRepository implements IActivityLogRepository, IApi
       WHERE user_id = ? AND is_deleted = 0
     `;
     
-    const result = await this.runQuery(sql, [userId]);
+    const result = await this.getQuery<UserStatsAggregateRow>(sql, [userId]);
     
     return {
-      totalLogs: result.total_logs || 0,
-      thisMonthLogs: result.this_month_logs || 0,
-      thisWeekLogs: result.this_week_logs || 0,
-      todayLogs: result.today_logs || 0,
-      avgLogsPerDay: result.avg_logs_per_day || 0,
-      totalMinutesLogged: result.total_minutes || 0
+      totalLogs: result?.total_logs || 0,
+      thisMonthLogs: result?.this_month_logs || 0,
+      thisWeekLogs: result?.this_week_logs || 0,
+      todayLogs: result?.today_logs || 0,
+      avgLogsPerDay: result?.avg_logs_per_day || 0,
+      totalMinutesLogged: result?.total_minutes || 0
     };
   }
 
@@ -2298,7 +2332,7 @@ export class SqliteActivityLogRepository implements IActivityLogRepository, IApi
   // ユーザー統計のヘルパーメソッド
 
   private async getTotalLogsCount(userId: string): Promise<number> {
-    const result = await this.allQuery(
+    const result = await this.allQuery<CountRow>(
       'SELECT COUNT(*) as count FROM activity_logs WHERE user_id = ? AND is_deleted = 0',
       [userId]
     );
@@ -2327,7 +2361,7 @@ export class SqliteActivityLogRepository implements IActivityLogRepository, IApi
         break;
     }
 
-    const result = await this.allQuery(
+    const result = await this.allQuery<CountRow>(
       `SELECT COUNT(*) as count FROM activity_logs WHERE user_id = ? AND is_deleted = 0 ${dateCondition}`,
       [userId]
     );
@@ -2335,7 +2369,7 @@ export class SqliteActivityLogRepository implements IActivityLogRepository, IApi
   }
 
   private async getAverageLogsPerDay(userId: string): Promise<number> {
-    const result = await this.allQuery(`
+    const result = await this.allQuery<DailyStatsRow>(`
       SELECT 
         COUNT(DISTINCT business_date) as days,
         COUNT(*) as logs
@@ -2349,14 +2383,14 @@ export class SqliteActivityLogRepository implements IActivityLogRepository, IApi
   }
 
   private async getMostActiveHour(userId: string): Promise<number | null> {
-    const result = await this.allQuery(`
+    const result = await this.allQuery<HourlyStatsRow>(`
       SELECT 
         CAST(strftime('%H', input_timestamp) AS INTEGER) as hour,
-        COUNT(*) as count
+        COUNT(*) as total
       FROM activity_logs 
       WHERE user_id = ? AND is_deleted = 0
       GROUP BY hour
-      ORDER BY count DESC
+      ORDER BY total DESC
       LIMIT 1
     `, [userId]);
     
@@ -2364,7 +2398,7 @@ export class SqliteActivityLogRepository implements IActivityLogRepository, IApi
   }
 
   private async getTotalMinutesLogged(userId: string): Promise<number> {
-    const result = await this.allQuery(`
+    const result = await this.allQuery<HourlyStatsRow>(`
       SELECT COALESCE(SUM(total_minutes), 0) as total
       FROM activity_logs 
       WHERE user_id = ? AND is_deleted = 0 AND total_minutes IS NOT NULL
@@ -2374,7 +2408,7 @@ export class SqliteActivityLogRepository implements IActivityLogRepository, IApi
   }
 
   private async getLongestActiveDay(userId: string): Promise<{ date: string; logCount: number } | null> {
-    const result = await this.allQuery(`
+    const result = await this.allQuery<DateLogStatsRow>(`
       SELECT 
         business_date as date,
         COUNT(*) as logCount
@@ -2540,7 +2574,7 @@ export class SqliteActivityLogRepository implements IActivityLogRepository, IApi
       WHERE user_id = ?
     `;
     
-    const result = await this.allQuery(sql, [userId]);
+    const result = await this.allQuery<ActivityPromptSettingRow>(sql, [userId]);
     if (result.length === 0) {
       return null;
     }
@@ -2565,7 +2599,7 @@ export class SqliteActivityLogRepository implements IActivityLogRepository, IApi
    */
   async updateSettings(userId: string, update: UpdateActivityPromptSettingsRequest): Promise<void> {
     const setParts: string[] = [];
-    const values: any[] = [];
+    const values: QueryParams = [];
 
     if (update.isEnabled !== undefined) {
       setParts.push('prompt_enabled = ?');
@@ -2628,8 +2662,8 @@ export class SqliteActivityLogRepository implements IActivityLogRepository, IApi
       WHERE prompt_enabled = 1
     `;
     
-    const results = await this.allQuery(sql);
-    return results.map((row: any) => ({
+    const results = await this.allQuery<UserSettingRow>(sql);
+    return results.map((row: UserSettingRow) => ({
       userId: row.user_id,
       isEnabled: Boolean(row.prompt_enabled),
       startHour: row.prompt_start_hour,
@@ -2657,8 +2691,8 @@ export class SqliteActivityLogRepository implements IActivityLogRepository, IApi
         )
     `;
     
-    const results = await this.allQuery(sql, [hour, hour, minute, minute, minute, minute]);
-    return results.map((row: any) => row.user_id);
+    const results = await this.allQuery<UserSettingRow>(sql, [hour, hour, minute, minute, minute, minute]);
+    return results.map((row: UserSettingRow) => row.user_id);
   }
 
   /**
@@ -2699,8 +2733,8 @@ export class SqliteActivityLogRepository implements IActivityLogRepository, IApi
    */
   async settingsExists(userId: string): Promise<boolean> {
     const sql = `SELECT COUNT(*) as count FROM user_settings WHERE user_id = ?`;
-    const result = await this.allQuery(sql, [userId]);
-    return result[0].count > 0;
+    const result = await this.allQuery<CountRow>(sql, [userId]);
+    return (result[0]?.count || 0) > 0;
   }
 
   // ================================================================
