@@ -3,6 +3,20 @@ import { Database } from 'sqlite3';
 import * as fs from 'fs';
 import * as path from 'path';
 
+// マイグレーションマネージャーをモック化
+jest.mock('../../database/migrationManager', () => {
+  return {
+    MigrationManager: jest.fn().mockImplementation(() => ({
+      initialize: jest.fn().mockResolvedValue(undefined),
+      getMigrationStatus: jest.fn().mockResolvedValue({
+        pending: 2,
+        executed: 1
+      }),
+      runMigrations: jest.fn().mockResolvedValue(undefined)
+    }))
+  };
+});
+
 describe('DatabaseInitializer', () => {
   let db: Database;
   let initializer: DatabaseInitializer;
@@ -88,6 +102,7 @@ describe('DatabaseInitializer', () => {
       
       expect(result.isNewDatabase).toBe(false);
       expect(result.method).toBe('migration');
+      expect(result.migrationsApplied).toBe(2); // モックで設定したpending数
     });
 
     test('初期化エラーが適切にハンドリングされる', async () => {
