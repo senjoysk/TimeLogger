@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Staging環境デプロイスクリプト
-# 使用方法: ./scripts/staging/deploy-to-staging.sh [--skip-tests] [--force]
+# 使用方法: ./scripts/staging/deploy-to-staging.sh [--skip-tests] [--force] [--allow-any-branch]
 
 set -e
 
@@ -12,6 +12,7 @@ cd "$PROJECT_DIR"
 STAGING_APP_NAME="timelogger-staging"
 SKIP_TESTS=false
 FORCE_DEPLOY=false
+ALLOW_ANY_BRANCH=false
 
 # カラー定義
 RED='\033[0;31m'
@@ -36,9 +37,13 @@ while [[ $# -gt 0 ]]; do
             FORCE_DEPLOY=true
             shift
             ;;
+        --allow-any-branch)
+            ALLOW_ANY_BRANCH=true
+            shift
+            ;;
         *)
             echo "❌ 不明なオプション: $1"
-            echo "使用方法: $0 [--skip-tests] [--force]"
+            echo "使用方法: $0 [--skip-tests] [--force] [--allow-any-branch]"
             exit 1
             ;;
     esac
@@ -48,6 +53,7 @@ echo "🚀 Staging環境デプロイを開始します..."
 echo "📱 アプリ: $STAGING_APP_NAME"
 echo "🧪 テストスキップ: $SKIP_TESTS"
 echo "💪 強制デプロイ: $FORCE_DEPLOY"
+echo "🌿 任意ブランチ許可: $ALLOW_ANY_BRANCH"
 echo "🌐 URL: https://$STAGING_APP_NAME.fly.dev"
 echo "📁 作業ディレクトリ: $PROJECT_DIR"
 
@@ -82,11 +88,15 @@ if [ "$FORCE_DEPLOY" = false ]; then
     
     # ブランチ確認
     CURRENT_BRANCH=$(git branch --show-current)
-    if [ "$CURRENT_BRANCH" != "develop" ] && [ "$FORCE_DEPLOY" = false ]; then
+    if [ "$CURRENT_BRANCH" != "develop" ] && [ "$ALLOW_ANY_BRANCH" = false ]; then
         log_error "現在のブランチ: $CURRENT_BRANCH (必須: develop)"
         log_error "ステージング環境はdevelopブランチからのみデプロイ可能です"
         log_info "正しいブランチに切り替えてください: git checkout develop"
+        log_info "または --allow-any-branch オプションを使用してください（開発・テスト用）"
         exit 1
+    elif [ "$ALLOW_ANY_BRANCH" = true ] && [ "$CURRENT_BRANCH" != "develop" ]; then
+        log_warning "⚠️  特例モード: $CURRENT_BRANCH ブランチからデプロイします"
+        log_warning "   これは開発・テスト目的でのみ使用してください"
     fi
 fi
 
