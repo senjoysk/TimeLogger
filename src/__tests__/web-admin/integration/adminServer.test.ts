@@ -17,7 +17,7 @@ describe('AdminServer Integration Tests', () => {
     process.env.ADMIN_USERNAME = 'testuser';
     process.env.ADMIN_PASSWORD = 'testpass';
     process.env.NODE_ENV = 'test';
-    process.env.SKIP_MIGRATIONS = 'true';
+    // SKIP_MIGRATIONS環境変数は廃止されました
     
     // テスト用データベースが存在する場合は削除
     cleanupTestDatabase(testDbPath);

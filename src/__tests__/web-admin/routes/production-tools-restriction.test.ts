@@ -26,7 +26,7 @@ describe('Production環境での開発ツールアクセス制限', () => {
     // 環境変数設定
     process.env.ADMIN_USERNAME = 'testuser';
     process.env.ADMIN_PASSWORD = 'testpass';
-    process.env.SKIP_MIGRATIONS = 'true';
+    // SKIP_MIGRATIONS環境変数は廃止されました
     
     // テストDBクリーンアップ
     cleanupTestDatabase(testDbPath);

@@ -7,6 +7,7 @@ import { Database } from 'sqlite3';
 import { v4 as uuidv4 } from 'uuid';
 import { toZonedTime, format } from 'date-fns-tz';
 import { MigrationManager } from '../database/migrationManager';
+import { DatabaseInitializer } from '../database/databaseInitializer';
 import {
   IActivityLogRepository,
   LogSearchCriteria
@@ -154,135 +155,27 @@ export class SqliteActivityLogRepository implements IActivityLogRepository, IApi
 
   /**
    * データベースの初期化（テーブル作成）
+   * 全環境で統一されたマイグレーション方式を使用
    */
   public async initializeDatabase(): Promise<void> {
     try {
-      // 統一データベースが既に作成済みかチェック
-      const isUnifiedDbReady = await this.checkUnifiedDatabaseReady();
-      const forceMigrations = process.env.FORCE_MIGRATIONS === 'true';
+      console.log('🚀 統一データベース初期化を開始します...');
+      console.log(`  環境: NODE_ENV=${process.env.NODE_ENV}`);
       
-      if (isUnifiedDbReady && !forceMigrations) {
-        console.log('✅ 統一データベースが既に存在、マイグレーション処理をスキップ');
-        
-        // 新しいテーブルが追加された場合のための追加処理
-        await this.ensureNewTablesExist();
-        
-        this.connected = true;
-        return;
-      }
+      const initializer = new DatabaseInitializer(this.db);
       
-      if (forceMigrations) {
-        console.log('⚠️ FORCE_MIGRATIONS=true: マイグレーションを強制実行します');
-      }
+      // 初期化実行
+      const result = await initializer.initialize();
       
-      console.log('🔧 統一データベースが未作成、通常の初期化処理を実行');
+      console.log(`✅ データベース初期化完了:`, {
+        新規DB: result.isNewDatabase,
+        方式: result.method,
+        作成テーブル数: result.tablesCreated,
+        適用マイグレーション数: result.migrationsApplied
+      });
       
-      // マイグレーション処理の制御（より堅牢な条件）
-      const shouldSkipMigrations = process.env.SKIP_MIGRATIONS === 'true' || process.env.NODE_ENV === 'test';
-      
-      if (shouldSkipMigrations) {
-        console.log('⚠️ マイグレーション処理をスキップ - 直接スキーマ作成を実行');
-        console.log(`  理由: SKIP_MIGRATIONS=${process.env.SKIP_MIGRATIONS}, NODE_ENV=${process.env.NODE_ENV}`);
-        // フォールバック処理で必要なカラムを確実に追加
-        await this.ensureUserSettingsColumns();
-      } else {
-        console.log('🔄 マイグレーション処理を実行');
-        console.log(`  環境: NODE_ENV=${process.env.NODE_ENV}`);
-        
-        try {
-          // 1. 基本スキーマを最初に作成（マイグレーションの前提条件）
-          console.log('📝 基本スキーマから基本テーブルを作成中...');
-          await this.createBasicTablesFromSchema();
-          
-          // 2. マイグレーションシステムを初期化
-          await this.migrationManager.initialize();
-          
-          // 3. 未実行のマイグレーションを実行（基本テーブルが存在する状態で）
-          await this.migrationManager.runMigrations();
-          
-          // 4. マイグレーション成功後も、念のためフォールバック処理を実行
-          // （既存カラムはスキップされるため安全）
-          await this.ensureUserSettingsColumns();
-          
-        } catch (error) {
-          console.error('❌ マイグレーション実行エラー:', error);
-          console.log('🔄 フォールバック: 直接スキーマ作成を実行');
-          // マイグレーション失敗時のフォールバック処理
-          await this.ensureUserSettingsColumns();
-        }
-      }
-      
-      // 新スキーマファイルから読み込み（柔軟なパス解決）
-      let schemaPath = path.join(__dirname, '../database/newSchema.sql');
-      
-      // srcディレクトリからのパスも試す
-      if (!fs.existsSync(schemaPath)) {
-        schemaPath = path.join(__dirname, '../../src/database/newSchema.sql');
-      }
-      
-      // プロジェクトルートからのパスも試す
-      if (!fs.existsSync(schemaPath)) {
-        schemaPath = path.join(process.cwd(), 'src/database/newSchema.sql');
-      }
-      
-      console.log(`📁 スキーマファイルパス: ${schemaPath}`);
-      console.log(`📁 ファイル存在確認: ${fs.existsSync(schemaPath)}`);
-      
-      if (!fs.existsSync(schemaPath)) {
-        throw new Error(`スキーマファイルが見つかりません: ${schemaPath}`);
-      }
-      
-      const schema = fs.readFileSync(schemaPath, 'utf8');
-      
-      // スキーマを実行（複数文に対応、TRIGGERとVIEWを考慮）
-      const statements = this.splitSqlStatements(schema);
-      
-      console.log(`📝 実行予定のSQL文数: ${statements.length}`);
-      
-      for (let i = 0; i < statements.length; i++) {
-        const statement = statements[i].trim();
-        if (statement) {
-          try {
-            console.log(`🔧 SQL文 ${i + 1}/${statements.length} 実行中: ${statement.substring(0, 100)}...`);
-            await this.runQuery(statement);
-            console.log(`✅ SQL文 ${i + 1} 実行完了`);
-          } catch (error: any) {
-            // カラムが既に存在する場合のエラーを無視
-            if (error.message?.includes('duplicate column name') || 
-                error.message?.includes('already exists')) {
-              console.log(`⏩ SQL文 ${i + 1} スキップ（既に存在）`);
-              continue;
-            }
-            // discord_message_idカラムが存在しない場合は作成を試みる
-            if (error.message?.includes('no such column: discord_message_id') &&
-                statement.includes('CREATE INDEX') && statement.includes('discord_message_id')) {
-              console.log('🔧 discord_message_idカラムを追加中...');
-              try {
-                await this.runQuery('ALTER TABLE activity_logs ADD COLUMN discord_message_id TEXT');
-                await this.runQuery('ALTER TABLE activity_logs ADD COLUMN recovery_processed BOOLEAN DEFAULT FALSE');
-                await this.runQuery('ALTER TABLE activity_logs ADD COLUMN recovery_timestamp TEXT');
-                console.log('✅ カラム追加完了、インデックス再作成...');
-                await this.runQuery(statement);
-                console.log(`✅ SQL文 ${i + 1} 実行完了（リトライ後）`);
-                continue;
-              } catch (retryError: any) {
-                if (retryError.message?.includes('duplicate column name')) {
-                  console.log('⏩ カラムは既に存在、インデックスのみ作成');
-                  continue;
-                }
-              }
-            }
-            console.error(`❌ SQL文 ${i + 1} 実行エラー:`, error);
-            console.error(`問題のSQL文:`, statement);
-            throw error;
-          }
-        }
-      }
-
       this.connected = true;
-      console.log('✅ 新活動ログデータベースの初期化が完了しました');
     } catch (error) {
-      console.error('スキーマ作成エラー:', error);
       console.error('❌ データベース初期化エラー:', error);
       throw new ActivityLogError('データベースの初期化に失敗しました', 'DB_INIT_ERROR', { error });
     }
