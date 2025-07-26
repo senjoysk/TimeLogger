@@ -7,6 +7,7 @@ import express from 'express';
 import basicAuth from 'express-basic-auth';
 import path from 'path';
 import { AdminServer } from './web-admin/server';
+import { IDiscordBot } from './interfaces/dependencies';
 
 export class IntegratedServer {
   private app: express.Application;
@@ -14,7 +15,7 @@ export class IntegratedServer {
   private adminServer: AdminServer;
   private databasePath: string;
 
-  constructor(databasePath: string, private bot?: any) {
+  constructor(databasePath: string, private bot?: IDiscordBot) {
     this.port = parseInt(process.env.PORT || '3000');
     this.databasePath = databasePath;
     this.app = express();

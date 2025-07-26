@@ -87,7 +87,8 @@ describe('依存性注入インターフェースのテスト', () => {
         isDebugMode: jest.fn(),
         getDefaultTimezone: jest.fn(),
         getServerPort: jest.fn(),
-        validate: jest.fn()
+        validate: jest.fn(),
+        get: jest.fn()
       };
       
       expect(typeof mockConfig.getDiscordToken).toBe('function');
@@ -97,6 +98,7 @@ describe('依存性注入インターフェースのテスト', () => {
       expect(typeof mockConfig.getDefaultTimezone).toBe('function');
       expect(typeof mockConfig.getServerPort).toBe('function');
       expect(typeof mockConfig.validate).toBe('function');
+      expect(typeof mockConfig.get).toBe('function');
     });
   });
 

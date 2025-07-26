@@ -10,11 +10,44 @@ export enum ErrorType {
   SYSTEM = 'SYSTEM'
 }
 
+// ログデータの型定義
+export interface LogData {
+  /** メッセージ */
+  message?: string;
+  /** メッセージの長さ */
+  messageLength?: number;
+  /** 文字列データ */
+  stringData?: Record<string, string>;
+  /** 数値データ */
+  numericData?: Record<string, number>;
+  /** 真偽値データ */
+  booleanData?: Record<string, boolean>;
+  /** 配列データ */
+  arrayData?: Record<string, (string | number | boolean)[]>;
+  /** オブジェクトデータ（簡単な型のみ） */
+  objectData?: Record<string, Record<string, string | number | boolean>>;
+  /** 日時データ */
+  dateData?: Record<string, string>;
+  /** エラー情報 */
+  errorInfo?: {
+    name?: string;
+    message?: string;
+    stack?: string;
+  };
+  /** その他の情報 */
+  [key: string]: unknown;
+}
+
 export interface ErrorContext {
   userId?: string;
   operation?: string;
-  details?: Record<string, any>;
-  [key: string]: any; // 追加の任意プロパティを許可
+  details?: LogData;
+  /** エラーオブジェクト */
+  error?: unknown;
+  /** 追加のコンテキスト情報 */
+  additionalContext?: Record<string, string | number | boolean>;
+  /** その他の情報 */
+  [key: string]: unknown;
 }
 
 /**
@@ -103,7 +136,7 @@ export class ErrorHandler {
    * @param message メッセージ
    * @param data 追加データ
    */
-  public static logDebug(operation: string, message: string, data?: any): void {
+  public static logDebug(operation: string, message: string, data?: LogData): void {
     console.log(`🔧 [DEBUG] ${operation}: ${message}`, data ? data : '');
   }
 
@@ -113,7 +146,7 @@ export class ErrorHandler {
    * @param message メッセージ
    * @param data 追加データ
    */
-  public static logInfo(operation: string, message: string, data?: any): void {
+  public static logInfo(operation: string, message: string, data?: LogData): void {
     console.log(`ℹ️ [INFO] ${operation}: ${message}`, data ? data : '');
   }
 
@@ -123,7 +156,7 @@ export class ErrorHandler {
    * @param message メッセージ
    * @param data 追加データ
    */
-  public static logSuccess(operation: string, message: string, data?: any): void {
+  public static logSuccess(operation: string, message: string, data?: LogData): void {
     console.log(`✅ [SUCCESS] ${operation}: ${message}`, data ? data : '');
   }
 }

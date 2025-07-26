@@ -28,7 +28,7 @@ import { MessageSelectionHandler } from '../handlers/messageSelectionHandler';
 import { TimezoneService } from '../services/timezoneService';
 import { ITimezoneService } from '../services/interfaces/ITimezoneService';
 import { ConfigService } from '../services/configService';
-import { ITimeProvider } from '../interfaces/dependencies';
+import { ITimeProvider, IDiscordBot } from '../interfaces/dependencies';
 import { TimeProviderService } from '../services/timeProviderService';
 import { ReminderReplyService } from '../services/reminderReplyService';
 import { HealthStatus } from '../types/health';
@@ -92,7 +92,7 @@ export class ActivityLoggingIntegration {
   private timeProvider: ITimeProvider;
   
   // Bot インスタンス（コマンド処理用）
-  private botInstance?: any;
+  private botInstance?: IDiscordBot;
   
   // 非同期処理の管理
   private pendingAnalysisTasks: Set<NodeJS.Immediate> = new Set();
@@ -236,7 +236,7 @@ export class ActivityLoggingIntegration {
    * Discord Botにメッセージハンドラーを統合
    * 既存のハンドラーより優先して処理
    */
-  integrateWithBot(client: Client, bot?: any): void {
+  integrateWithBot(client: Client, bot?: IDiscordBot): void {
     if (!this.isInitialized) {
       throw new ActivityLogError(
         '活動記録システムが初期化されていません', 
@@ -251,7 +251,7 @@ export class ActivityLoggingIntegration {
 
     // DailyReportSenderの初期化（Botが提供された場合）
     if (bot) {
-      this.dailyReportSender = new DailyReportSender(this, bot);
+      this.dailyReportSender = new DailyReportSender(this, bot as any);
       this.dynamicReportScheduler.setReportSender(this.dailyReportSender);
       console.log('✅ DailyReportSender初期化完了');
     }
@@ -515,7 +515,9 @@ export class ActivityLoggingIntegration {
       case 'プロンプト':
       case '通知':
         console.log(`📢 promptコマンド実行: ユーザー=${userId}, タイムゾーン=${timezone}`);
-        await this.botInstance?.handlePromptCommand(message, args, userId, timezone);
+        if (this.botInstance?.handlePromptCommand) {
+          await this.botInstance.handlePromptCommand(message, args, userId, timezone);
+        }
         break;
 
       default:

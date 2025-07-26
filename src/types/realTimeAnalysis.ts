@@ -45,6 +45,30 @@ export interface RecentActivityLog {
   category?: string;
 }
 
+// 学習された値の型定義
+export interface LearnedValue {
+  /** 時間表現パターンの値 */
+  timeValue?: {
+    start?: string;
+    end?: string;
+    duration?: number;
+  };
+  /** 活動期間パターンの値 */
+  durationValue?: {
+    typical: number; // 分
+    minimum: number;
+    maximum: number;
+  };
+  /** 作業スケジュールパターンの値 */
+  scheduleValue?: {
+    startTime: string;
+    endTime: string;
+    breakTimes?: string[];
+  };
+  /** その他の値 */
+  rawValue?: string | number | boolean;
+}
+
 /**
  * ユーザーの記録パターン
  */
@@ -54,7 +78,7 @@ export interface UserPattern {
   /** パターン */
   pattern: string;
   /** 学習された値 */
-  learnedValue: any;
+  learnedValue: LearnedValue;
   /** 信頼度 */
   confidence: number;
   /** 最終更新日 */
@@ -133,6 +157,20 @@ export enum TimeExtractionMethod {
   CONTEXTUAL = 'contextual'
 }
 
+// 正規化された値の型定義
+export interface NormalizedValue {
+  /** 時刻値（ISO 8601形式） */
+  timeValue?: string;
+  /** 期間値（分） */
+  durationMinutes?: number;
+  /** 数値 */
+  numericValue?: number;
+  /** 真偽値 */
+  booleanValue?: boolean;
+  /** 文字列値 */
+  stringValue?: string;
+}
+
 /**
  * 解析された時刻コンポーネント
  */
@@ -142,7 +180,7 @@ export interface ParsedTimeComponent {
   /** 抽出された値 */
   value: string;
   /** 正規化された値 */
-  normalizedValue?: any;
+  normalizedValue?: NormalizedValue;
   /** 信頼度 */
   confidence: number;
   /** 文字列内の位置 */
@@ -218,6 +256,36 @@ export enum ActivityPriority {
   BACKGROUND = 'background'
 }
 
+// リアルタイム分析警告詳細情報の型定義
+export interface RealTimeAnalysisWarningDetails {
+  /** 警告が発生した時刻 */
+  timestamp?: string;
+  /** 信頼度の値 */
+  confidenceValue?: number;
+  /** 信頼度 */
+  confidence?: number;
+  /** 分析に失敗した要素 */
+  failedElement?: string;
+  /** 推定された時間範囲 */
+  estimatedRange?: {
+    start?: string;
+    end?: string;
+  };
+  /** 重複している時間 */
+  overlapInfo?: {
+    conflictWith?: string;
+    overlapMinutes?: number;
+  };
+  /** 入力解析の詳細 */
+  inputAnalysis?: {
+    originalText?: string;
+    parsedElements?: string[];
+    unparsedText?: string;
+  };
+  /** その他の詳細情報 */
+  [key: string]: unknown;
+}
+
 /**
  * 分析警告
  */
@@ -229,7 +297,7 @@ export interface AnalysisWarning {
   /** 警告メッセージ */
   message: string;
   /** 詳細情報 */
-  details: Record<string, any>;
+  details: RealTimeAnalysisWarningDetails;
 }
 
 
@@ -301,6 +369,40 @@ export interface GeminiTimeAnalysisResponse {
   }[];
 }
 
+// パターンマッチング結果の型定義
+export interface PatternMatchResult {
+  /** 開始時刻（時） */
+  startHour?: number;
+  /** 開始時刻（分） */
+  startMinute?: number;
+  /** 終了時刻（時） */
+  endHour?: number;
+  /** 終了時刻（分） */
+  endMinute?: number;
+  /** 継続時間（分） */
+  durationMinutes?: number;
+  /** 相対時刻（分前） */
+  relativeMinutes?: number;
+  /** 時間帯タイプ */
+  periodType?: string;
+  /** 時刻情報 */
+  timeInfo?: {
+    start?: string;
+    end?: string;
+    duration?: number;
+  };
+  /** マッチしたキーワード */
+  keywords?: string[];
+  /** 抽出された数値 */
+  numbers?: number[];
+  /** 抽出された単位 */
+  units?: string[];
+  /** 追加情報 */
+  additional?: Record<string, unknown>;
+  /** その他の情報 */
+  metadata?: Record<string, string | number | boolean>;
+}
+
 /**
  * 時刻パターンマッチング結果
  */
@@ -314,9 +416,9 @@ export interface TimePatternMatch {
   /** キャプチャグループ */
   groups: string[];
   /** パース結果 */
-  parsed?: any;
+  parsed?: PatternMatchResult;
   /** パース結果（代替形式） */
-  parsedInfo?: any;
+  parsedInfo?: PatternMatchResult;
   /** 信頼度 */
   confidence: number;
   /** 文字列内の位置 */
@@ -342,6 +444,41 @@ export interface ContextualAdjustment {
 
 // ===== エラー型 =====
 
+// リアルタイム分析エラー詳細情報の型定義
+export interface RealTimeAnalysisErrorDetails {
+  /** エラーの原因となった入力 */
+  input?: string;
+  /** エラーが発生した分析段階 */
+  analysisStage?: 'input_validation' | 'time_extraction' | 'activity_analysis' | 'consistency_check' | 'output_generation';
+  /** AI分析のレスポンス */
+  aiResponse?: string;
+  /** 関連するタイムスタンプ */
+  timestamp?: string;
+  /** 関連するユーザーID */
+  userId?: string;
+  /** エラーオブジェクト */
+  error?: unknown;
+  /** 分析のコンテキスト情報 */
+  context?: {
+    timezone?: string;
+    sessionInfo?: string;
+    recentLogs?: string[];
+  };
+  /** パフォーマンス情報 */
+  performance?: {
+    processingTimeMs?: number;
+    memoryUsage?: number;
+  };
+  /** ネットワークエラー情報 */
+  networkInfo?: {
+    endpoint?: string;
+    statusCode?: number;
+    responseTime?: number;
+  };
+  /** その他の詳細情報 */
+  [key: string]: unknown;
+}
+
 /**
  * リアルタイム分析エラー
  */
@@ -349,7 +486,7 @@ export class RealTimeAnalysisError extends Error {
   constructor(
     message: string,
     public code: RealTimeAnalysisErrorCode,
-    public details?: any
+    public details?: RealTimeAnalysisErrorDetails
   ) {
     super(message);
     this.name = 'RealTimeAnalysisError';

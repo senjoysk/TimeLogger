@@ -43,7 +43,8 @@ const createMockConfigService = (): IConfigService => ({
   isDebugMode: jest.fn().mockReturnValue(false),
   getDefaultTimezone: jest.fn().mockReturnValue('Asia/Tokyo'),
   getServerPort: jest.fn().mockReturnValue(3000),
-  validate: jest.fn().mockReturnValue(true)
+  validate: jest.fn().mockReturnValue(true),
+  get: jest.fn()
 });
 
 describe('Scheduler DI対応テスト', () => {

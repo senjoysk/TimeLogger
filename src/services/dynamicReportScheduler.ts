@@ -44,14 +44,24 @@ export class DynamicReportScheduler {
   private reportSender?: ReportSender;
 
   /**
-   * リポジトリを設定（テスト用）
+   * コンストラクタ（依存性注入対応）
+   * @param repository データリポジトリ（オプショナル、後で注入可能）
+   * @param reportSender レポート送信者（オプショナル、後で注入可能）
+   */
+  constructor(repository?: Repository, reportSender?: ReportSender) {
+    this.repository = repository;
+    this.reportSender = reportSender;
+  }
+
+  /**
+   * リポジトリを設定（レガシー対応・テスト用）
    */
   setRepository(repository: Repository): void {
     this.repository = repository;
   }
 
   /**
-   * レポート送信者を設定
+   * レポート送信者を設定（レガシー対応）
    */
   setReportSender(reportSender: ReportSender): void {
     this.reportSender = reportSender;

@@ -40,7 +40,7 @@ export interface ParsedTimeInfo {
   /** 時間帯タイプ */
   periodType?: string;
   /** 追加情報 */
-  additional?: Record<string, any>;
+  additional?: Record<string, string | number | boolean>;
 }
 
 /**

@@ -76,14 +76,24 @@ export class TimezoneChangeMonitor {
   };
 
   /**
-   * DynamicReportSchedulerを設定
+   * コンストラクタ（依存性注入対応）
+   * @param repository データリポジトリ（オプショナル）
+   * @param scheduler 動的レポートスケジューラー（オプショナル）
+   */
+  constructor(repository?: Repository, scheduler?: DynamicReportScheduler) {
+    this.repository = repository;
+    this.scheduler = scheduler;
+  }
+
+  /**
+   * DynamicReportSchedulerを設定（レガシー対応）
    */
   setScheduler(scheduler: DynamicReportScheduler): void {
     this.scheduler = scheduler;
   }
 
   /**
-   * Repositoryを設定
+   * Repositoryを設定（レガシー対応）
    */
   setRepository(repository: Repository): void {
     this.repository = repository;

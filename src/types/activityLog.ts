@@ -130,12 +130,67 @@ export interface WorkBalance {
   adminTimeRatio: number;     // 管理業務時間の割合
 }
 
+// エラー詳細情報の型定義
+export interface ErrorDetails {
+  /** エラーの原因となったデータ */
+  sourceData?: unknown;
+  /** エラーが発生した処理段階 */
+  stage?: string;
+  /** 関連するIDや識別子 */
+  relatedIds?: string[];
+  /** エラーコード */
+  errorCode?: string;
+  /** スタックトレース情報 */
+  stackTrace?: string;
+  /** エラーオブジェクト */
+  error?: unknown;
+  /** スキーマパス */
+  schemaPath?: string;
+  /** ユーザーID */
+  userId?: string;
+  /** 操作名 */
+  operation?: string;
+  /** 時刻情報 */
+  timestamp?: string;
+  /** ログID */
+  logId?: string;
+  /** タイムゾーン */
+  timezone?: string;
+  /** 追加のコンテキスト情報 */
+  context?: Record<string, string | number | boolean>;
+  /** その他の詳細情報 */
+  [key: string]: unknown;
+}
+
+// 分析警告詳細情報の型定義
+export interface AnalysisWarningDetails {
+  /** 警告が発生したログID */
+  logId?: string;
+  /** 警告が発生した時刻 */
+  timestamp?: string;
+  /** 影響を受けるデータの範囲 */
+  affectedRange?: {
+    startTime?: string;
+    endTime?: string;
+  };
+  /** 推奨される修正アクション */
+  suggestedFix?: string;
+  /** 信頼度の値 */
+  confidenceValue?: number;
+  /** 重複している時間（分） */
+  overlapMinutes?: number;
+  /** 空白の時間（分） */
+  gapMinutes?: number;
+  /** その他の詳細情報 */
+  [key: string]: unknown;
+}
+
 // 分析警告・注意事項
 export interface AnalysisWarning {
   type: WarningType;
   level: WarningLevel;
   message: string;
-  details: Record<string, any>;
+  details: AnalysisWarningDetails;
 }
 
 export type WarningType = 
@@ -224,7 +279,7 @@ export class ActivityLogError extends Error {
   constructor(
     message: string,
     public code: string,
-    public details?: any
+    public details?: ErrorDetails
   ) {
     super(message);
     this.name = 'ActivityLogError';

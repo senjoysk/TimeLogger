@@ -13,6 +13,7 @@ import { SqliteActivityLogRepository } from '../repositories/sqliteActivityLogRe
 import { createTimezoneMiddleware } from './middleware/timezoneMiddleware';
 import { createRoutes } from './routes';
 import { errorHandler } from './middleware/errorHandler';
+import { IDiscordBot } from '../interfaces/dependencies';
 
 export class AdminServer {
   private app: express.Application;
@@ -22,7 +23,7 @@ export class AdminServer {
   private databasePath: string;
   private sqliteRepo: SqliteActivityLogRepository;
 
-  constructor(databasePath: string, port: number = 3001, private bot?: any) {
+  constructor(databasePath: string, port: number = 3001, private bot?: IDiscordBot) {
     this.port = port;
     this.databasePath = databasePath;
     this.app = express();

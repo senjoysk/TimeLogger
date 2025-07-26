@@ -3,8 +3,43 @@
  * テスト可能性向上のための抽象化レイヤー
  */
 
-import { Client, ClientOptions } from 'discord.js';
+import { Client, ClientOptions, Message } from 'discord.js';
 import { Application } from 'express';
+
+/**
+ * Discord Bot インターフェース
+ * Botの基本機能を抽象化
+ */
+export interface IDiscordBot {
+  /**
+   * プロンプトコマンドを処理
+   * @param message Discordメッセージ
+   * @param args コマンド引数
+   * @param userId ユーザーID
+   * @param timezone タイムゾーン
+   */
+  handlePromptCommand?(message: Message, args: string[], userId: string, timezone: string): Promise<void>;
+
+  /**
+   * ユーザーにメッセージを送信
+   * @param userId ユーザーID
+   * @param content メッセージ内容
+   */
+  sendMessageToUser?(userId: string, content: string): Promise<void>;
+
+  /**
+   * Botが初期化済みかどうか
+   */
+  isReady?(): boolean;
+
+  /**
+   * Bot設定の取得
+   */
+  getConfig?(): any;
+
+  // TaskLoggerBot互換性のため追加
+  [key: string]: any;
+}
 
 /**
  * Discord Clientファクトリーインターフェース
@@ -185,6 +220,21 @@ export interface IConfigService {
    * @returns 設定が有効かどうか
    */
   validate(): boolean;
+
+  /**
+   * 設定値を型安全に取得（ジェネリック版）
+   * @param key 設定キー
+   * @returns 設定値
+   */
+  get<T = unknown>(key: string): T | undefined;
+
+  /**
+   * 設定値を型安全に取得（オーバーロード版）
+   */
+  get(key: 'discordToken' | 'geminiApiKey' | 'databasePath' | 'environment' | 'logLevel' | 'defaultTimezone'): string;
+  get(key: 'debugMode'): boolean;
+  get(key: 'serverPort'): number;
+  get(key: string): unknown;
 }
 
 /**

@@ -149,11 +149,13 @@ export class ConfigService implements IConfigService {
   }
 
   /**
-   * 設定値を動的に取得
-   * @param key 設定キー
-   * @returns 設定値
+   * 設定値を型安全に取得（オーバーロード）
    */
-  get(key: string): string | number | boolean | undefined {
+  get(key: 'discordToken' | 'geminiApiKey' | 'databasePath' | 'environment' | 'logLevel' | 'defaultTimezone'): string;
+  get(key: 'debugMode'): boolean;
+  get(key: 'serverPort'): number;
+  get<T = unknown>(key: string): T | undefined;
+  get(key: string): unknown {
     return this.config.get(key);
   }
 
