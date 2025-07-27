@@ -93,6 +93,9 @@ async function cleanupTestDatabaseFiles(): Promise<void> {
   }
 }
 
+// クリーンアップ関数をエクスポート
+export { cleanupTestDatabaseFiles };
+
 // Jestがテストファイルとして認識するためのダミーテスト
 describe('Test Setup', () => {
   it('環境設定が正しく行われている', () => {

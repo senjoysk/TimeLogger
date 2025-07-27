@@ -68,6 +68,9 @@ describe('AdminRepository TODO管理機能拡張', () => {
         priority: 'medium' as TodoPriority
       };
 
+      // 時間の確実な変更のため少し待機
+      await new Promise(resolve => setTimeout(resolve, 10));
+
       // Act
       const result = await repository.updateTodoTask(createdTodo.id, updates);
 
