@@ -58,7 +58,7 @@ check_method_count() {
         return 0
     fi
     
-    local method_count=$(grep -c "^\s*\(public\|private\|protected\)\s.*(" "$file" 2>/dev/null || echo "0")
+    local method_count=$(grep -c "^\s*\(public\|private\|protected\)\s.*(" "$file" 2>/dev/null | head -1 || echo "0")
     
     if [ "$method_count" -gt "$MAX_METHODS" ]; then
         if ! check_srp_exception "$file"; then
@@ -156,7 +156,7 @@ if [ -n "$(git diff --cached --name-only)" ]; then
     files_to_check=$(git diff --cached --name-only | grep -E '\.(ts|js)$' | grep -v node_modules | grep -v dist || echo "")
 else
     # 初回コミットなど、コミット対象ファイルがない場合は全ファイルをチェック
-    files_to_check=$(find src -name "*.ts" -o -name "*.js" | grep -v node_modules | grep -v __tests__ | head -20)
+    files_to_check=$(find src -name "*.ts" -o -name "*.js" | grep -v node_modules | grep -v __tests__)
 fi
 
 if [ -z "$files_to_check" ]; then
