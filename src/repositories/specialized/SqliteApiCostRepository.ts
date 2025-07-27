@@ -24,6 +24,13 @@ export class SqliteApiCostRepository implements IApiCostRepository {
   }
 
   /**
+   * データベースのスキーマを確保する
+   */
+  async ensureSchema(): Promise<void> {
+    await this.ensureApiCostsTable();
+  }
+
+  /**
    * API呼び出しを記録
    */
   async recordApiCall(operation: string, inputTokens: number, outputTokens: number): Promise<void> {

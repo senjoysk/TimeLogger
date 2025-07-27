@@ -90,6 +90,7 @@ class MockTodoRepository implements ITodoRepository {
       inProgress: userTodos.filter(t => t.status === 'in_progress').length,
       completed: userTodos.filter(t => t.status === 'completed').length,
       cancelled: userTodos.filter(t => t.status === 'cancelled').length,
+      overdue: 0,
       todayCompleted: 0,
       weekCompleted: 0,
     };

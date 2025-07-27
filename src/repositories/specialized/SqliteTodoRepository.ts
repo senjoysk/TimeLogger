@@ -268,6 +268,7 @@ export class SqliteTodoRepository implements ITodoRepository {
           pending: 0,
           inProgress: 0,
           cancelled: 0,
+          overdue: 0,
           todayCompleted: 0,
           weekCompleted: 0
         };
@@ -279,6 +280,7 @@ export class SqliteTodoRepository implements ITodoRepository {
         pending: (row.pending as number) || 0,
         inProgress: (row.in_progress as number) || 0,
         cancelled: 0, // 現在はキャンセル機能未実装
+        overdue: 0, // 現在は未実装
         todayCompleted: 0, // 現在は未実装
         weekCompleted: 0 // 現在は未実装
       };

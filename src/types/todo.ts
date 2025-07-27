@@ -92,6 +92,7 @@ export interface TodoStats {
   inProgress: number;
   completed: number;
   cancelled: number;
+  overdue: number;
   todayCompleted: number;
   weekCompleted: number;
 }

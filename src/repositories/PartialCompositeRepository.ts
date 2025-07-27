@@ -1,56 +1,237 @@
 /**
- * 段階的移行用PartialCompositeRepository
- * 既存のSqliteActivityLogRepositoryをベースに、分離済みインターフェースのみを専用リポジトリに委譲
+ * Phase 4B完了: 完全分離CompositeRepository
+ * 全インターフェースを専用リポジトリに完全委譲
  * 
- * 移行戦略:
+ * 完全分離戦略:
  * - IApiCostRepository -> SqliteApiCostRepository（分離済み）
  * - ITodoRepository -> SqliteTodoRepository（分離済み）
  * - IMessageClassificationRepository -> SqliteMessageClassificationRepository（分離済み）
  * - IUserRepository -> SqliteUserRepository（分離済み）
- * - その他 -> SqliteActivityLogRepository（元のまま）
+ * - IActivityLogRepository -> SqliteActivityLogRepository（Phase 4B完了）
+ * - IActivityPromptRepository -> SqliteActivityPromptRepository（Phase 4B完了）
  */
 
-import { SqliteActivityLogRepository } from './sqliteActivityLogRepository';
+import { SqliteActivityLogRepository } from './specialized/SqliteActivityLogRepository';
 import { SqliteApiCostRepository } from './specialized/SqliteApiCostRepository';
 import { SqliteTodoRepository } from './specialized/SqliteTodoRepository';
 import { SqliteMessageClassificationRepository } from './specialized/SqliteMessageClassificationRepository';
 import { SqliteUserRepository } from './specialized/SqliteUserRepository';
-import { IUnifiedRepository, UserStats } from './interfaces';
+import { SqliteActivityPromptRepository } from './specialized/SqliteActivityPromptRepository';
+import { IUnifiedRepository, UserStats, UserTimezone, TimezoneChange, TimezoneNotification } from './interfaces';
 import { 
   CreateTodoRequest, UpdateTodoRequest, Todo, TodoPriority, TodoStatus, GetTodosOptions,
   MessageClassification, MessageClassificationHistory
 } from '../types/todo';
 import { CostAlert } from '../types/costAlert';
 import { UserInfo } from '../types/database';
+import {
+  ActivityLog,
+  CreateActivityLogRequest,
+  AnalysisCache,
+  CreateAnalysisCacheRequest,
+  DailyAnalysisResult,
+  BusinessDateInfo
+} from '../types/activityLog';
+import {
+  ActivityPromptSettings,
+  CreateActivityPromptSettingsRequest,
+  UpdateActivityPromptSettingsRequest
+} from '../types/activityPrompt';
 
 /**
- * 段階的移行用PartialCompositeRepository
- * 最小限の変更でActivityLoggingIntegrationが動作するよう設計
+ * Phase 4B完了: 完全分離CompositeRepository
+ * 全インターフェースを専用リポジトリに完全委譲
  */
-export class PartialCompositeRepository extends SqliteActivityLogRepository implements IUnifiedRepository {
+export class PartialCompositeRepository implements IUnifiedRepository {
+  private activityLogRepo: SqliteActivityLogRepository;
   private apiCostRepo: SqliteApiCostRepository;
   private todoRepo: SqliteTodoRepository;
   private messageClassificationRepo: SqliteMessageClassificationRepository;
   private userRepo: SqliteUserRepository;
+  private activityPromptRepo: SqliteActivityPromptRepository;
 
   constructor(databasePath: string) {
-    super(databasePath);
-    
-    // 分離済み専用リポジトリを初期化
+    // 全インターフェースを専用リポジトリに委譲
+    this.activityLogRepo = new SqliteActivityLogRepository(databasePath);
     this.apiCostRepo = new SqliteApiCostRepository(databasePath);
     this.todoRepo = new SqliteTodoRepository(databasePath);
     this.messageClassificationRepo = new SqliteMessageClassificationRepository(databasePath);
     this.userRepo = new SqliteUserRepository(databasePath);
+    this.activityPromptRepo = new SqliteActivityPromptRepository(databasePath);
   }
 
   /**
-   * データベース初期化（親クラスのメソッドを使用）
+   * データベース初期化（全専用リポジトリを初期化）
    */
   async initializeDatabase(): Promise<void> {
-    await super.initializeDatabase();
+    // メインのDBスキーマは activityLogRepo で初期化
+    await this.activityLogRepo.ensureSchema();
+    
+    // 各専用リポジトリのスキーマを確実に初期化
+    await this.apiCostRepo.ensureSchema();
     await this.todoRepo.ensureSchema();
     await this.messageClassificationRepo.ensureSchema();
     await this.userRepo.ensureSchema();
+    await this.activityPromptRepo.ensureSchema();
+  }
+
+  /**
+   * データベース接続を閉じる
+   */
+  async close(): Promise<void> {
+    // DatabaseConnectionは共有インスタンスなので、一度だけ閉じる
+    const db = (this.activityLogRepo as any).db;
+    if (db && typeof db.close === 'function') {
+      await db.close();
+    }
+  }
+
+  /**
+   * スキーマ確認（互換性のため）
+   */
+  async ensureSchema(): Promise<void> {
+    await this.initializeDatabase();
+  }
+
+  // =============================================================================
+  // IActivityLogRepository - 分離済みリポジトリに委譲
+  // =============================================================================
+  
+  async saveLog(request: CreateActivityLogRequest): Promise<ActivityLog> {
+    return this.activityLogRepo.saveLog(request);
+  }
+
+  async getLogsByDate(userId: string, businessDate: string, includeDeleted?: boolean): Promise<ActivityLog[]> {
+    return this.activityLogRepo.getLogsByDate(userId, businessDate, includeDeleted);
+  }
+
+  async getLogsByDateRange(userId: string, startDate: string, endDate: string, includeDeleted?: boolean): Promise<ActivityLog[]> {
+    return this.activityLogRepo.getLogsByDateRange(userId, startDate, endDate, includeDeleted);
+  }
+
+  async getLogById(id: string): Promise<ActivityLog | null> {
+    return this.activityLogRepo.getLogById(id);
+  }
+
+  async updateLog(logId: string, newContent: string): Promise<ActivityLog> {
+    return this.activityLogRepo.updateLog(logId, newContent);
+  }
+
+  async deleteLog(logId: string): Promise<ActivityLog> {
+    return this.activityLogRepo.deleteLog(logId);
+  }
+
+  async saveAnalysisCache(request: CreateAnalysisCacheRequest): Promise<AnalysisCache> {
+    return this.activityLogRepo.saveAnalysisCache(request);
+  }
+
+  async getAnalysisCache(userId: string, businessDate: string): Promise<AnalysisCache | null> {
+    return this.activityLogRepo.getAnalysisCache(userId, businessDate);
+  }
+
+  async clearExpiredCache(): Promise<void> {
+    return this.activityLogRepo.clearExpiredCache();
+  }
+
+  // 不足しているIActivityLogRepositoryメソッド
+  async permanentDeleteLog(logId: string): Promise<boolean> {
+    return this.activityLogRepo.permanentDeleteLog(logId);
+  }
+
+  async restoreLog(logId: string): Promise<ActivityLog> {
+    return this.activityLogRepo.restoreLog(logId);
+  }
+
+  async updateAnalysisCache(userId: string, businessDate: string, analysisResult: DailyAnalysisResult, logCount: number): Promise<AnalysisCache> {
+    return this.activityLogRepo.updateAnalysisCache(userId, businessDate, analysisResult, logCount);
+  }
+
+  async deleteAnalysisCache(userId: string, businessDate: string): Promise<boolean> {
+    return this.activityLogRepo.deleteAnalysisCache(userId, businessDate);
+  }
+
+  async isCacheValid(userId: string, businessDate: string, currentLogCount: number): Promise<boolean> {
+    return this.activityLogRepo.isCacheValid(userId, businessDate, currentLogCount);
+  }
+
+  async getLogCount(userId: string, includeDeleted?: boolean): Promise<number> {
+    return this.activityLogRepo.getLogCount(userId, includeDeleted);
+  }
+
+  async getLogCountByDate(userId: string, businessDate: string, includeDeleted?: boolean): Promise<number> {
+    return this.activityLogRepo.getLogCountByDate(userId, businessDate, includeDeleted);
+  }
+
+  async getLatestLogs(userId: string, limit?: number): Promise<ActivityLog[]> {
+    return this.activityLogRepo.getLatestLogs(userId, limit);
+  }
+
+  async cleanupOldCaches(olderThanDays: number): Promise<number> {
+    return this.activityLogRepo.cleanupOldCaches(olderThanDays);
+  }
+
+  calculateBusinessDate(date: string, timezone: string): BusinessDateInfo {
+    return this.activityLogRepo.calculateBusinessDate(date, timezone);
+  }
+
+  async isConnected(): Promise<boolean> {
+    return this.activityLogRepo.isConnected();
+  }
+
+  async withTransaction<T>(operation: () => Promise<T>): Promise<T> {
+    return this.activityLogRepo.withTransaction(operation);
+  }
+
+  async updateLogMatching(logId: string, matchInfo: {
+    matchStatus?: string;
+    matchedLogId?: string;
+    similarityScore?: number;
+  }): Promise<void> {
+    return this.activityLogRepo.updateLogMatching(logId, matchInfo);
+  }
+
+  async getUnmatchedLogs(userId: string, logType: string, businessDate?: string): Promise<ActivityLog[]> {
+    return this.activityLogRepo.getUnmatchedLogs(userId, logType, businessDate);
+  }
+
+  async getMatchedLogPairs(userId: string, businessDate?: string): Promise<{ startLog: ActivityLog; endLog: ActivityLog }[]> {
+    return this.activityLogRepo.getMatchedLogPairs(userId, businessDate);
+  }
+
+  getDatabase() {
+    return this.activityLogRepo.getDatabase();
+  }
+
+  async getAllUserTimezonesForScheduler(): Promise<Array<{
+    userId: string;
+    timezone: string;
+  }>> {
+    return this.activityLogRepo.getAllUserTimezonesForScheduler();
+  }
+
+  async getUnprocessedNotifications(): Promise<TimezoneNotification[]> {
+    return this.activityLogRepo.getUnprocessedNotifications();
+  }
+
+  async markNotificationAsProcessed(notificationId: string): Promise<void> {
+    return this.activityLogRepo.markNotificationAsProcessed(notificationId);
+  }
+
+  async getBusinessDateInfo(userId: string, timezone: string): Promise<BusinessDateInfo> {
+    return this.activityLogRepo.getBusinessDateInfo(userId, timezone);
+  }
+
+  // スケジューラー関連（ActivityLogRepositoryから委譲）
+  async getUserTimezoneChanges(since?: Date): Promise<TimezoneChange[]> {
+    return this.activityLogRepo.getUserTimezoneChanges(since);
+  }
+
+  async getUserTimezone(userId: string): Promise<string | null> {
+    return this.activityLogRepo.getUserTimezone(userId);
+  }
+
+  async saveUserTimezone(userId: string, timezone: string): Promise<void> {
+    return this.activityLogRepo.saveUserTimezone(userId, timezone);
   }
 
   // =============================================================================
@@ -105,6 +286,40 @@ export class PartialCompositeRepository extends SqliteActivityLogRepository impl
 
   async deleteTodo(id: string): Promise<void> {
     await this.todoRepo.deleteTodo(id);
+  }
+
+  // 不足しているTODOメソッド
+  async searchTodos(userId: string, keyword: string): Promise<Todo[]> {
+    return this.todoRepo.searchTodos(userId, keyword);
+  }
+
+  async getTodoStats(userId: string): Promise<{
+    total: number;
+    pending: number;
+    inProgress: number;
+    completed: number;
+    cancelled: number;
+    overdue: number;
+    todayCompleted: number;
+    weekCompleted: number;
+  }> {
+    return this.todoRepo.getTodoStats(userId);
+  }
+
+  async getTodosWithDueDate(userId: string): Promise<Todo[]> {
+    return this.todoRepo.getTodosWithDueDate(userId);
+  }
+
+  async getTodosByActivityId(activityLogId: string): Promise<Todo[]> {
+    return this.todoRepo.getTodosByActivityId(activityLogId);
+  }
+
+  async getTodosByDateRange(userId: string, startDate: string, endDate: string): Promise<Todo[]> {
+    return this.todoRepo.getTodosByDateRange(userId, startDate, endDate);
+  }
+
+  async getTodosByStatusOptimized(userId: string, statuses: TodoStatus[]): Promise<Todo[]> {
+    return this.todoRepo.getTodosByStatusOptimized(userId, statuses);
   }
 
   // =============================================================================
@@ -176,11 +391,54 @@ export class PartialCompositeRepository extends SqliteActivityLogRepository impl
   }
 
   // =============================================================================
-  // その他のメソッドは親クラス（SqliteActivityLogRepository）をそのまま使用
+  // IActivityPromptRepository - 分離済みリポジトリに委譲
   // =============================================================================
   
-  // 親クラスのメソッドがそのまま利用可能:
-  // - saveLog, getLogsByDate, getLogsByDateRange, getLogById, updateLog, deleteLog
-  // - getUserTimezone, setUserTimezone, saveActivityPrompt など
-  // - その他のIUnifiedRepositoryメソッド
+  async createSettings(request: CreateActivityPromptSettingsRequest): Promise<ActivityPromptSettings> {
+    return this.activityPromptRepo.createSettings(request);
+  }
+
+  async getSettings(userId: string): Promise<ActivityPromptSettings | null> {
+    return this.activityPromptRepo.getSettings(userId);
+  }
+
+  async updateSettings(userId: string, update: UpdateActivityPromptSettingsRequest): Promise<void> {
+    return this.activityPromptRepo.updateSettings(userId, update);
+  }
+
+  async deleteSettings(userId: string): Promise<void> {
+    return this.activityPromptRepo.deleteSettings(userId);
+  }
+
+  async getEnabledSettings(): Promise<ActivityPromptSettings[]> {
+    return this.activityPromptRepo.getEnabledSettings();
+  }
+
+  async getUsersToPromptAt(hour: number, minute: number): Promise<string[]> {
+    return this.activityPromptRepo.getUsersToPromptAt(hour, minute);
+  }
+
+  async enablePrompt(userId: string): Promise<void> {
+    return this.activityPromptRepo.enablePrompt(userId);
+  }
+
+  async disablePrompt(userId: string): Promise<void> {
+    return this.activityPromptRepo.disablePrompt(userId);
+  }
+
+  async settingsExists(userId: string): Promise<boolean> {
+    return this.activityPromptRepo.settingsExists(userId);
+  }
+
+  // =============================================================================
+  // Phase 4B完了: 全インターフェース分離完成
+  // =============================================================================
+  
+  // 全てのインターフェースが専用リポジトリに完全委譲されました:
+  // ✅ IActivityLogRepository -> SqliteActivityLogRepository
+  // ✅ IApiCostRepository -> SqliteApiCostRepository  
+  // ✅ ITodoRepository -> SqliteTodoRepository
+  // ✅ IMessageClassificationRepository -> SqliteMessageClassificationRepository
+  // ✅ IUserRepository -> SqliteUserRepository
+  // ✅ IActivityPromptRepository -> SqliteActivityPromptRepository
 }

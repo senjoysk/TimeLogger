@@ -93,13 +93,14 @@ class MockTodoRepository implements ITodoRepository {
     );
   }
 
-  async getTodoStats() { 
+  async getTodoStats(userId: string) { 
     return { 
       total: 0, 
       pending: 0, 
       completed: 0, 
       inProgress: 0,
       cancelled: 0,
+      overdue: 0,
       todayCompleted: 0,
       weekCompleted: 0
     }; 

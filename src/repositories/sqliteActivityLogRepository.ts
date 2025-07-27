@@ -1691,6 +1691,7 @@ export class SqliteActivityLogRepository implements IActivityLogRepository, IApi
         inProgress: row?.in_progress || 0,
         completed: row?.completed || 0,
         cancelled: row?.cancelled || 0,
+        overdue: 0, // 現在は未実装
         todayCompleted: row?.today_completed || 0,
         weekCompleted: row?.week_completed || 0,
       };
