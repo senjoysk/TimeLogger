@@ -1,11 +1,14 @@
 /**
  * 活動記録システム統合クラス
  * Discord Botに自然言語活動ログシステムを統合
+ * 
+ * @SRP-EXCEPTION: Discord Bot統合システムとして複数責務の統合管理が必要
+ * @SRP-REASON: Phase 4C予定 - メッセージ処理・AI統合・コマンド処理・システム初期化を分離予定
  */
 
 import { Client, Message, ButtonInteraction } from 'discord.js';
 // Removed better-sqlite3 import - using sqlite3 via repository
-import { SqliteActivityLogRepository } from '../repositories/sqliteActivityLogRepository';
+import { PartialCompositeRepository } from '../repositories/PartialCompositeRepository';
 import { IUnifiedRepository, IMemoRepository } from '../repositories/interfaces';
 import { SqliteMemoRepository } from '../repositories/sqliteMemoRepository';
 import { ActivityLogService, IActivityLogService } from '../services/activityLogService';
@@ -129,7 +132,7 @@ export class ActivityLoggingIntegration {
         console.log('✅ 外部リポジトリを使用（テスト用）');
       } else {
         // 通常の場合は新しいリポジトリを作成
-        this.repository = new SqliteActivityLogRepository(this.config.databasePath);
+        this.repository = new PartialCompositeRepository(this.config.databasePath);
         
         // リポジトリの初期化を明示的に実行
         await this.repository.initializeDatabase();
@@ -153,7 +156,7 @@ export class ActivityLoggingIntegration {
 
       // 2. サービス層の初期化
       // コスト管理機能の初期化（統合版）
-      // SqliteActivityLogRepositoryがIApiCostRepositoryも実装しているため、同じインスタンスを使用
+      // CompositeRepositoryが複数のインターフェースを統合しているため、同じインスタンスを使用
       if (this.config.geminiService) {
         // 外部から注入されたGeminiServiceを使用（テスト用）
         this.geminiService = this.config.geminiService;
@@ -167,7 +170,7 @@ export class ActivityLoggingIntegration {
       
       // ActivityLogServiceにGeminiServiceを注入（リアルタイム分析のため）
       this.activityLogService = new ActivityLogService(this.repository, this.geminiService);
-      console.log('✅ GeminiService初期化完了（統合リポジトリ使用）');
+      console.log('✅ GeminiService初期化完了（CompositeRepository使用）');
       
       
       this.gapDetectionService = new GapDetectionService(this.repository);
