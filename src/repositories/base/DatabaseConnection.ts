@@ -18,7 +18,7 @@ type SqliteParam = string | number | boolean | null;
  * データベース接続管理クラス
  */
 export class DatabaseConnection {
-  private static instance: DatabaseConnection | null = null;
+  private static instances: Map<string, DatabaseConnection> = new Map();
   private db: Database | null = null;
   private connected: boolean = false;
   private migrationManager: MigrationManager | null = null;
@@ -29,13 +29,13 @@ export class DatabaseConnection {
   }
 
   /**
-   * シングルトンインスタンスの取得
+   * パスごとのインスタンスを管理
    */
   public static getInstance(databasePath: string): DatabaseConnection {
-    if (!DatabaseConnection.instance) {
-      DatabaseConnection.instance = new DatabaseConnection(databasePath);
+    if (!DatabaseConnection.instances.has(databasePath)) {
+      DatabaseConnection.instances.set(databasePath, new DatabaseConnection(databasePath));
     }
-    return DatabaseConnection.instance;
+    return DatabaseConnection.instances.get(databasePath)!;
   }
 
   /**
@@ -177,7 +177,7 @@ export class DatabaseConnection {
             this.db = null;
             this.connected = false;
             this.migrationManager = null;
-            DatabaseConnection.instance = null;
+            DatabaseConnection.instances.delete(this.databasePath);
             console.log('✅ データベース接続が閉鎖されました');
             resolve();
           }

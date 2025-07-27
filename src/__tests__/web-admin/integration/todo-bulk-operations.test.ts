@@ -8,13 +8,13 @@ import * as fs from 'fs';
 import * as path from 'path';
 import express, { Request, Response, NextFunction } from 'express';
 import { createTodoRouter } from '../../../web-admin/routes/todos';
-import { SqliteActivityLogRepository } from '../../../repositories/sqliteActivityLogRepository';
+import { SqliteTodoRepository } from '../../../repositories/specialized/SqliteTodoRepository';
 import { TodoTask } from '../../../types/todo';
 
 describe('TODO一括操作の統合テスト', () => {
   let app: any;
   let testDbPath: string;
-  let sqliteRepo: SqliteActivityLogRepository;
+  let sqliteRepo: SqliteTodoRepository;
   let createdTodoIds: string[] = [];
   
   // テストタイムアウトを30秒に設定
@@ -28,9 +28,9 @@ describe('TODO一括操作の統合テスト', () => {
     // テスト用の一時データベースファイル作成
     testDbPath = path.join(__dirname, `test-bulk-${Date.now()}.db`);
     
-    // SqliteActivityLogRepositoryの初期化
-    sqliteRepo = new SqliteActivityLogRepository(testDbPath);
-    await sqliteRepo.initializeDatabase();
+    // SqliteTodoRepositoryの初期化
+    sqliteRepo = new SqliteTodoRepository(testDbPath);
+    await sqliteRepo.ensureSchema();
     
     // Expressアプリケーションを作成
     app = express();
@@ -63,7 +63,11 @@ describe('TODO一括操作の統合テスト', () => {
     try {
       if (sqliteRepo) {
         // データベース接続を明示的に閉じる
-        await sqliteRepo.close();
+        // SqliteTodoRepositoryにはcloseメソッドがないため、DatabaseConnectionのcloseを使用
+        const dbConnection = (sqliteRepo as any).dbConnection;
+        if (dbConnection) {
+          await dbConnection.close();
+        }
       }
     } catch (error) {
       console.warn('Warning: Failed to close database connection:', error);
