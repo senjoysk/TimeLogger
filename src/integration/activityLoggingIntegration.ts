@@ -28,6 +28,7 @@ import { MessageSelectionHandler } from '../handlers/messageSelectionHandler';
 import { TimezoneService } from '../services/timezoneService';
 import { ITimezoneService } from '../services/interfaces/ITimezoneService';
 import { ConfigService } from '../services/configService';
+import { TaskLoggerBot } from '../bot';
 import { ITimeProvider, IDiscordBot } from '../interfaces/dependencies';
 import { TimeProviderService } from '../services/timeProviderService';
 import { ReminderReplyService } from '../services/reminderReplyService';
@@ -273,7 +274,7 @@ export class ActivityLoggingIntegration {
 
     // DailyReportSenderの初期化（Botが提供された場合）
     if (bot) {
-      this.dailyReportSender = new DailyReportSender(this, bot as any);
+      this.dailyReportSender = new DailyReportSender(this, bot as unknown as TaskLoggerBot);
       this.dynamicReportScheduler.setReportSender(this.dailyReportSender);
       console.log('✅ DailyReportSender初期化完了');
     }
@@ -782,7 +783,7 @@ export class ActivityLoggingIntegration {
         reply: async (content: string) => {
           return mockProgressMessage; // プログレスメッセージを返す
         }
-      };
+      } as Pick<Message, 'reply'>;
       
       // サマリーハンドラーを使って今日のサマリーを生成
       await this.summaryHandler.handle(mockMessage as any, userId, [], timezone);
@@ -900,7 +901,16 @@ export class ActivityLoggingIntegration {
   /**
    * 統計情報を取得
    */
-  async getSystemStats(): Promise<any> {
+  async getSystemStats(): Promise<{
+    totalUsers: number;
+    totalLogs: number;
+    isInitialized: boolean;
+    uptime: number;
+    config: {
+      enableAutoAnalysis: boolean;
+      [key: string]: unknown;
+    };
+  }> {
     if (!this.isInitialized) {
       throw new ActivityLogError('システムが初期化されていません', 'SYSTEM_NOT_INITIALIZED');
     }
@@ -977,7 +987,7 @@ export class ActivityLoggingIntegration {
     try {
       // データベースからユーザーのタイムゾーンを取得
       if ('getUserTimezone' in this.repository) {
-        const dbTimezone = await (this.repository as any).getUserTimezone(userId);
+        const dbTimezone = await this.repository.getUserTimezone(userId);
         if (dbTimezone) {
           return dbTimezone;
         }
@@ -998,15 +1008,15 @@ export class ActivityLoggingIntegration {
   private async ensureUserRegistered(userId: string, username: string): Promise<boolean> {
     try {
       // IUserRepositoryメソッドを使用
-      const userExists = await (this.repository as any).userExists(userId);
+      const userExists = await this.repository.userExists(userId);
       
       if (!userExists) {
-        await (this.repository as any).registerUser(userId, username);
+        await this.repository.registerUser(userId, username);
         console.log(`🎉 新規ユーザー自動登録: ${userId} (${username})`);
         return true; // 新規ユーザー
       } else {
         // 最終利用日時を更新
-        await (this.repository as any).updateLastSeen(userId);
+        await this.repository.updateLastSeen(userId);
         return false; // 既存ユーザー
       }
     } catch (error) {

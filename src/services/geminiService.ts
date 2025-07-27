@@ -197,8 +197,8 @@ export class GeminiService {
   /**
    * 優先度の妥当性をチェック
    */
-  private validatePriority(priority: any): number {
-    const p = parseInt(priority);
+  private validatePriority(priority: unknown): number {
+    const p = parseInt(String(priority), 10);
     return (p >= 1 && p <= 5) ? p : 3; // デフォルトは中優先度
   }
 

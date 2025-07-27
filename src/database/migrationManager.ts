@@ -78,7 +78,7 @@ export class MigrationManager {
   private async getExecutedMigrations(): Promise<Set<string>> {
     try {
       const result = await this.queryDatabase('SELECT version FROM schema_migrations WHERE success = 1');
-      return new Set(result.map(row => row.version));
+      return new Set(result.map(row => row.version as string));
     } catch (error) {
       console.log('⚠️ マイグレーション履歴テーブルが存在しません（初回実行）');
       return new Set();
@@ -91,7 +91,7 @@ export class MigrationManager {
   private async columnExists(tableName: string, columnName: string): Promise<boolean> {
     try {
       const result = await this.queryDatabase(`PRAGMA table_info(${tableName})`);
-      return result.some((row: any) => row.name === columnName);
+      return result.some((row: Record<string, unknown>) => (row.name as string) === columnName);
     } catch (error) {
       console.log(`⚠️ テーブル ${tableName} が存在しません`);
       return false;
@@ -153,11 +153,10 @@ export class MigrationManager {
       }
       
       console.log('✅ 全マイグレーションが完了しました');
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('❌ マイグレーション実行エラー:', {
-        message: error.message,
-        code: error.code,
-        stack: error.stack,
+        message: (error as Error).message,
+        stack: (error as Error).stack,
         path: this.migrationsPath
       });
       throw new ActivityLogError('マイグレーションの実行に失敗しました', 'MIGRATION_EXECUTION_ERROR', { error });
@@ -219,7 +218,7 @@ export class MigrationManager {
         VALUES (?, ?, ?, ?, ?)
       `;
       
-      await this.executeQuery(sql, [version, description, executionTime, success ? 1 : 0, errorMessage || null]);
+      await this.executeQuery(sql, [version, description, executionTime, success ? 1 : 0, errorMessage || '']);
     } catch (error) {
       console.error('⚠️ マイグレーション履歴記録エラー:', error);
       // マイグレーション履歴記録の失敗は致命的エラーとしない
@@ -237,7 +236,7 @@ export class MigrationManager {
   /**
    * データベースクエリ実行（Promise化）
    */
-  private executeQuery(sql: string, params: any[] = []): Promise<void> {
+  private executeQuery(sql: string, params: (string | number | boolean)[] = []): Promise<void> {
     return new Promise((resolve, reject) => {
       this.db.run(sql, params, function(err) {
         if (err) {
@@ -411,8 +410,8 @@ export class MigrationManager {
   /**
    * カラム既存エラーかどうかを判定
    */
-  private isColumnAlreadyExistsError(error: any): boolean {
-    const errorMessage = String(error?.message || error).toLowerCase();
+  private isColumnAlreadyExistsError(error: unknown): boolean {
+    const errorMessage = String((error as Error)?.message || error).toLowerCase();
     return errorMessage.includes('duplicate column name') || 
            errorMessage.includes('already exists') ||
            errorMessage.includes('duplicate column');
@@ -503,13 +502,13 @@ export class MigrationManager {
   /**
    * データベースクエリ実行（結果取得）
    */
-  private queryDatabase(sql: string, params: any[] = []): Promise<any[]> {
+  private queryDatabase(sql: string, params: (string | number | boolean)[] = []): Promise<Record<string, unknown>[]> {
     return new Promise((resolve, reject) => {
       this.db.all(sql, params, (err, rows) => {
         if (err) {
           reject(err);
         } else {
-          resolve(rows);
+          resolve(rows as Record<string, unknown>[]);
         }
       });
     });
@@ -518,7 +517,13 @@ export class MigrationManager {
   /**
    * マイグレーション状態の確認
    */
-  async getMigrationStatus(): Promise<any> {
+  async getMigrationStatus(): Promise<{
+    available: number;
+    executed: number;
+    pending: number;
+    pendingMigrations: string[];
+    error?: string;
+  }> {
     try {
       const availableMigrations = this.getAvailableMigrations();
       const executedMigrations = await this.getExecutedMigrations();

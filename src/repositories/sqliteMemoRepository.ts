@@ -98,7 +98,7 @@ export class SqliteMemoRepository implements IMemoRepository {
         WHERE id = ?
       `;
 
-      this.db.get(query, [id], (err, row: any) => {
+      this.db.get(query, [id], (err, row: Record<string, unknown> | undefined) => {
         if (err) {
           reject(new MemoError('メモの取得に失敗しました', 'GET_ERROR', err));
         } else if (!row) {
@@ -122,7 +122,7 @@ export class SqliteMemoRepository implements IMemoRepository {
         ORDER BY created_at DESC
       `;
 
-      this.db.all(query, [userId], (err, rows: any[]) => {
+      this.db.all(query, [userId], (err, rows: Record<string, unknown>[]) => {
         if (err) {
           reject(new MemoError('メモの取得に失敗しました', 'GET_ERROR', err));
         } else {
@@ -139,7 +139,7 @@ export class SqliteMemoRepository implements IMemoRepository {
   async updateMemo(id: string, update: UpdateMemoRequest): Promise<void> {
     return new Promise((resolve, reject) => {
       const setParts: string[] = [];
-      const params: any[] = [];
+      const params: (string | number | boolean)[] = [];
 
       if (update.content !== undefined) {
         setParts.push('content = ?');
@@ -205,7 +205,7 @@ export class SqliteMemoRepository implements IMemoRepository {
         ORDER BY created_at DESC
       `;
 
-      this.db.all(query, [userId, `%${keyword}%`], (err, rows: any[]) => {
+      this.db.all(query, [userId, `%${keyword}%`], (err, rows: Record<string, unknown>[]) => {
         if (err) {
           reject(new MemoError('メモの検索に失敗しました', 'SEARCH_ERROR', err));
         } else {
@@ -228,7 +228,7 @@ export class SqliteMemoRepository implements IMemoRepository {
         ORDER BY created_at DESC
       `;
 
-      this.db.all(query, [userId, `%"${tag}"%`], (err, rows: any[]) => {
+      this.db.all(query, [userId, `%"${tag}"%`], (err, rows: Record<string, unknown>[]) => {
         if (err) {
           reject(new MemoError('メモの検索に失敗しました', 'SEARCH_ERROR', err));
         } else {
@@ -242,14 +242,14 @@ export class SqliteMemoRepository implements IMemoRepository {
   /**
    * データベース行をMemoオブジェクトに変換
    */
-  private rowToMemo(row: any): Memo {
+  private rowToMemo(row: Record<string, unknown>): Memo {
     return {
-      id: row.id,
-      userId: row.user_id,
-      content: row.content,
-      tags: JSON.parse(row.tags || '[]'),
-      createdAt: row.created_at,
-      updatedAt: row.updated_at
+      id: row.id as string,
+      userId: row.user_id as string,
+      content: row.content as string,
+      tags: JSON.parse((row.tags as string) || '[]'),
+      createdAt: row.created_at as string,
+      updatedAt: row.updated_at as string
     };
   }
 

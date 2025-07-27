@@ -4,6 +4,7 @@
  */
 
 import { CostAlert } from '../types/costAlert';
+import { TodoSourceType } from '../types/todo';
 
 import { Database } from 'sqlite3';
 import { v4 as uuidv4 } from 'uuid';
@@ -349,7 +350,7 @@ export class SqliteActivityLogRepository implements IActivityLogRepository, IApi
   async getLogById(logId: string): Promise<ActivityLog | null> {
     try {
       const sql = 'SELECT * FROM activity_logs WHERE id = ?';
-      const row = await this.getQuery(sql, [logId]) as any;
+      const row = await this.getQuery(sql, [logId]) as ActivityLogRow | undefined;
       
       return row ? this.mapRowToActivityLog(row) : null;
     } catch (error) {
@@ -517,7 +518,7 @@ export class SqliteActivityLogRepository implements IActivityLogRepository, IApi
   async getAnalysisCache(userId: string, businessDate: string): Promise<AnalysisCache | null> {
     try {
       const sql = 'SELECT * FROM daily_analysis_cache WHERE user_id = ? AND business_date = ?';
-      const row = await this.getQuery(sql, [userId, businessDate]) as any;
+      const row = await this.getQuery(sql, [userId, businessDate]) as AnalysisCacheRow | undefined;
       
       if (!row) return null;
 
@@ -525,7 +526,7 @@ export class SqliteActivityLogRepository implements IActivityLogRepository, IApi
         id: row.id,
         userId: row.user_id,
         businessDate: row.business_date,
-        analysisResult: JSON.parse(row.analysis_result),
+        analysisResult: JSON.parse(row.analysis_result as string),
         logCount: row.log_count,
         generatedAt: row.generated_at
       };
@@ -608,8 +609,8 @@ export class SqliteActivityLogRepository implements IActivityLogRepository, IApi
         SELECT COUNT(*) as count FROM activity_logs 
         WHERE user_id = ? ${includeDeleted ? '' : 'AND is_deleted = 0'}
       `;
-      const row = await this.getQuery(sql, [userId]) as any;
-      return row.count;
+      const row = await this.getQuery(sql, [userId]) as { count: number } | undefined;
+      return row?.count ?? 0;
     } catch (error) {
       console.error('❌ ログ数取得エラー:', error);
       throw new ActivityLogError('ログ数の取得に失敗しました', 'GET_LOG_COUNT_ERROR', { error, userId });
@@ -625,8 +626,8 @@ export class SqliteActivityLogRepository implements IActivityLogRepository, IApi
         SELECT COUNT(*) as count FROM activity_logs 
         WHERE user_id = ? AND business_date = ? ${includeDeleted ? '' : 'AND is_deleted = 0'}
       `;
-      const row = await this.getQuery(sql, [userId, businessDate]) as any;
-      return row.count;
+      const row = await this.getQuery(sql, [userId, businessDate]) as { count: number } | undefined;
+      return row?.count ?? 0;
     } catch (error) {
       console.error('❌ 日別ログ数取得エラー:', error);
       throw new ActivityLogError('日別ログ数の取得に失敗しました', 'GET_DATE_LOG_COUNT_ERROR', { error, userId, businessDate });
@@ -662,8 +663,8 @@ export class SqliteActivityLogRepository implements IActivityLogRepository, IApi
       const cutoffIso = cutoffDate.toISOString();
 
       const countSql = 'SELECT COUNT(*) as count FROM daily_analysis_cache WHERE generated_at < ?';
-      const countRow = await this.getQuery(countSql, [cutoffIso]) as any;
-      const deleteCount = countRow.count;
+      const countRow = await this.getQuery(countSql, [cutoffIso]) as { count: number } | undefined;
+      const deleteCount = countRow?.count ?? 0;
 
       const deleteSql = 'DELETE FROM daily_analysis_cache WHERE generated_at < ?';
       await this.runQuery(deleteSql, [cutoffIso]);
@@ -1585,7 +1586,7 @@ export class SqliteActivityLogRepository implements IActivityLogRepository, IApi
    */
   async updateTodo(id: string, update: UpdateTodoRequest): Promise<void> {
     const updateFields: string[] = [];
-    const params: any[] = [];
+    const params: (string | number | boolean)[] = [];
 
     if (update.content !== undefined) {
       updateFields.push('content = ?');
@@ -1833,7 +1834,7 @@ export class SqliteActivityLogRepository implements IActivityLogRepository, IApi
       FROM message_classifications
       WHERE user_classification IS NOT NULL
     `;
-    const params: any[] = [];
+    const params: (string | number | boolean)[] = [];
 
     if (userId) {
       sql += ' AND user_id = ?';
@@ -1889,13 +1890,13 @@ export class SqliteActivityLogRepository implements IActivityLogRepository, IApi
       userId: row.user_id,
       content: row.content, // データベーススキーマに合わせてcontentを使用
       status: row.status as TodoStatus,
-      priority: row.priority as any,
+      priority: typeof row.priority === 'string' ? parseInt(row.priority, 10) : row.priority,
       dueDate: row.due_date,
       createdAt: row.created_at,
       updatedAt: row.updated_at,
       completedAt: row.completed_at,
       relatedActivityId: row.related_activity_id, // 関連する活動ログIDをマッピング
-      sourceType: 'manual' as any // デフォルト値
+      sourceType: 'manual' as TodoSourceType // デフォルト値
     };
   }
 
@@ -2033,7 +2034,7 @@ export class SqliteActivityLogRepository implements IActivityLogRepository, IApi
         const rows = await this.allQuery(
           "SELECT name FROM sqlite_master WHERE type='table' AND name=?", 
           [tableName]
-        ) as any[];
+        ) as Record<string, unknown>[];
         
         if (rows.length === 0) {
           console.log(`🔍 テーブル ${tableName} が存在しません - 統一DBは未準備`);

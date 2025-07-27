@@ -20,7 +20,7 @@ const DEFAULT_CONFIG = {
  * 環境変数の読み込みと設定値の提供を担当
  */
 export class ConfigService implements IConfigService {
-  private config: Map<string, any> = new Map();
+  private config: Map<string, unknown> = new Map();
 
   constructor() {
     this.loadConfig();
@@ -62,7 +62,7 @@ export class ConfigService implements IConfigService {
     if (!token) {
       throw new Error('DISCORD_BOT_TOKEN環境変数が設定されていません');
     }
-    return token;
+    return token as string;
   }
 
   /**
@@ -73,49 +73,49 @@ export class ConfigService implements IConfigService {
     if (!apiKey) {
       throw new Error('GEMINI_API_KEY環境変数が設定されていません');
     }
-    return apiKey;
+    return apiKey as string;
   }
 
   /**
    * データベースパスを取得
    */
   getDatabasePath(): string {
-    return this.config.get('databasePath');
+    return this.config.get('databasePath') as string;
   }
 
   /**
    * デバッグモードの設定を取得
    */
   isDebugMode(): boolean {
-    return this.config.get('debugMode');
+    return this.config.get('debugMode') as boolean;
   }
 
   /**
    * デフォルトタイムゾーンを取得
    */
   getDefaultTimezone(): string {
-    return this.config.get('defaultTimezone');
+    return this.config.get('defaultTimezone') as string;
   }
 
   /**
    * HTTPサーバーポート番号を取得
    */
   getServerPort(): number {
-    return this.config.get('serverPort');
+    return this.config.get('serverPort') as number;
   }
 
   /**
    * 環境名を取得
    */
   getEnvironment(): string {
-    return this.config.get('environment');
+    return this.config.get('environment') as string;
   }
 
   /**
    * ログレベルを取得
    */
   getLogLevel(): string {
-    return this.config.get('logLevel');
+    return this.config.get('logLevel') as string;
   }
 
   /**
@@ -164,7 +164,7 @@ export class ConfigService implements IConfigService {
    * @param key 設定キー
    * @param value 設定値
    */
-  set(key: string, value: any): void {
+  set(key: string, value: unknown): void {
     this.config.set(key, value);
   }
 

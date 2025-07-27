@@ -13,6 +13,7 @@
 
 import { SummaryTestService } from '../../../web-admin/services/summaryTestService';
 import { TaskLoggerBot } from '../../../bot';
+import type { IDiscordBot } from '../../../interfaces/dependencies';
 import { MockTimeProvider, MockLogger } from '../../../factories';
 import { SummaryTestRequest, SummaryTestUserResult } from '../../../web-admin/types/testing';
 
@@ -31,7 +32,7 @@ describe('SummaryTestService', () => {
     mockLogger = new MockLogger();
     mockBot = new MockTaskLoggerBot() as jest.Mocked<TaskLoggerBot>;
     
-    service = new SummaryTestService(mockBot, mockTimeProvider, mockLogger);
+    service = new SummaryTestService(mockBot as unknown as IDiscordBot, mockTimeProvider, mockLogger);
   });
 
   afterEach(() => {

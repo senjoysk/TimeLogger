@@ -188,13 +188,14 @@ export class DatabaseInitializer {
           }
           
           console.log(`✅ SQL ${i + 1}/${statements.length} 実行完了`);
-        } catch (error: any) {
+        } catch (error: unknown) {
           // 既存オブジェクトエラーは無視（idempotent）
-          if (error.message?.includes('already exists')) {
+          const err = error as Error;
+          if (err.message?.includes('already exists')) {
             console.log(`⏩ SQL ${i + 1} スキップ（既存）`);
             continue;
           }
-          console.error(`❌ SQL実行エラー (文 ${i + 1}):`, error);
+          console.error(`❌ SQL実行エラー (文 ${i + 1}):`, err);
           console.error(`❌ 失敗したSQL:`, statement);
           throw error;
         }
@@ -334,7 +335,7 @@ export class DatabaseInitializer {
   /**
    * データベースクエリ実行（Promise化）
    */
-  private executeQuery(sql: string, params: any[] = []): Promise<void> {
+  private executeQuery(sql: string, params: (string | number | boolean)[] = []): Promise<void> {
     return new Promise((resolve, reject) => {
       this.db.run(sql, params, function(err) {
         if (err) {
@@ -349,7 +350,7 @@ export class DatabaseInitializer {
   /**
    * データベースクエリ実行（結果取得）
    */
-  private queryDatabase<T>(sql: string, params: any[] = []): Promise<T[]> {
+  private queryDatabase<T>(sql: string, params: (string | number | boolean)[] = []): Promise<T[]> {
     return new Promise((resolve, reject) => {
       this.db.all(sql, params, (err, rows) => {
         if (err) {

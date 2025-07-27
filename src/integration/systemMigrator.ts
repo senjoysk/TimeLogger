@@ -203,7 +203,7 @@ export class SystemMigrator {
     try {
       // 旧システムのレコード数を取得
       const countResult = await this.getQuery('SELECT COUNT(*) as count FROM activity_records');
-      this.stats.oldRecordsCount = countResult?.count || 0;
+      this.stats.oldRecordsCount = (countResult?.count as number) || 0;
 
       if (this.stats.oldRecordsCount === 0) {
         this.log('📝 移行対象データがありません');
@@ -251,7 +251,7 @@ export class SystemMigrator {
   /**
    * 単一レコードを移行
    */
-  private async migrateRecord(oldRecord: any): Promise<void> {
+  private async migrateRecord(oldRecord: Record<string, unknown>): Promise<void> {
     if (this.config.dryRun) {
       // ドライランでは実際に保存しない
       return;
@@ -260,14 +260,14 @@ export class SystemMigrator {
     try {
       // 旧レコードから新レコード形式に変換
       const newLog = {
-        id: oldRecord.id,
-        userId: oldRecord.user_id,
-        content: oldRecord.original_text || oldRecord.content || 'データなし',
-        inputTimestamp: oldRecord.created_at,
-        businessDate: oldRecord.business_date,
+        id: oldRecord.id as string,
+        userId: oldRecord.user_id as string,
+        content: (oldRecord.original_text || oldRecord.content || 'データなし') as string,
+        inputTimestamp: oldRecord.created_at as string,
+        businessDate: oldRecord.business_date as string,
         isDeleted: false,
-        createdAt: oldRecord.created_at,
-        updatedAt: oldRecord.updated_at || oldRecord.created_at
+        createdAt: oldRecord.created_at as string,
+        updatedAt: (oldRecord.updated_at || oldRecord.created_at) as string
       };
 
       // 重複チェック
@@ -301,21 +301,21 @@ export class SystemMigrator {
       }
 
       // サンプルレコードの整合性チェック
-      const sampleOldRecord = this.oldDb.prepare(`
+      const sampleOldRecord = await this.getQuery(`
         SELECT * FROM activity_records 
         ORDER BY created_at ASC 
         LIMIT 1
-      `).get() as any;
+      `);
 
       if (sampleOldRecord) {
-        const sampleNewRecord = await this.newRepository.getLogById(sampleOldRecord.id);
+        const sampleNewRecord = await this.newRepository.getLogById(sampleOldRecord.id as string);
         
         if (!sampleNewRecord) {
           this.stats.warningCount++;
-          this.log(`⚠️ サンプルレコードが見つかりません: ${sampleOldRecord.id}`);
+          this.log(`⚠️ サンプルレコードが見つかりません: ${sampleOldRecord.id as string}`);
         } else if (sampleNewRecord.content !== (sampleOldRecord.original_text || sampleOldRecord.content)) {
           this.stats.warningCount++;
-          this.log(`⚠️ サンプルレコードの内容が一致しません: ${sampleOldRecord.id}`);
+          this.log(`⚠️ サンプルレコードの内容が一致しません: ${sampleOldRecord.id as string}`);
         }
       }
 
@@ -373,13 +373,13 @@ export class SystemMigrator {
   /**
    * SQLクエリ実行（単一行取得）
    */
-  private getQuery(sql: string, params: any[] = []): Promise<any> {
+  private getQuery(sql: string, params: (string | number | boolean)[] = []): Promise<Record<string, unknown> | undefined> {
     return new Promise((resolve, reject) => {
       this.oldDb.get(sql, params, (err, row) => {
         if (err) {
           reject(err);
         } else {
-          resolve(row);
+          resolve(row as Record<string, unknown> | undefined);
         }
       });
     });
@@ -388,13 +388,13 @@ export class SystemMigrator {
   /**
    * SQLクエリ実行（複数行取得）
    */
-  private getAllQuery(sql: string, params: any[] = []): Promise<any[]> {
+  private getAllQuery(sql: string, params: (string | number | boolean)[] = []): Promise<Record<string, unknown>[]> {
     return new Promise((resolve, reject) => {
       this.oldDb.all(sql, params, (err, rows) => {
         if (err) {
           reject(err);
         } else {
-          resolve(rows);
+          resolve(rows as Record<string, unknown>[]);
         }
       });
     });

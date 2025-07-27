@@ -89,14 +89,14 @@ export class ActivityPromptRepository implements IActivityPromptRepository {
     if (!row) return null;
 
     return {
-      userId: row.user_id,
+      userId: row.user_id as string,
       isEnabled: Boolean(row.prompt_enabled),
-      startHour: row.prompt_start_hour,
-      startMinute: row.prompt_start_minute,
-      endHour: row.prompt_end_hour,
-      endMinute: row.prompt_end_minute,
-      createdAt: row.created_at,
-      updatedAt: row.updated_at
+      startHour: row.prompt_start_hour as number,
+      startMinute: row.prompt_start_minute as number,
+      endHour: row.prompt_end_hour as number,
+      endMinute: row.prompt_end_minute as number,
+      createdAt: row.created_at as string,
+      updatedAt: row.updated_at as string
     };
   }
 
@@ -105,7 +105,7 @@ export class ActivityPromptRepository implements IActivityPromptRepository {
    */
   async updateSettings(userId: string, update: UpdateActivityPromptSettingsRequest): Promise<void> {
     const setParts: string[] = [];
-    const values: any[] = [];
+    const values: (string | number | boolean)[] = [];
 
     if (update.isEnabled !== undefined) {
       setParts.push('prompt_enabled = ?');
@@ -183,14 +183,14 @@ export class ActivityPromptRepository implements IActivityPromptRepository {
 
     const rows = await this.allQuery(sql, []);
     return rows.map(row => ({
-      userId: row.user_id,
+      userId: row.user_id as string,
       isEnabled: Boolean(row.prompt_enabled),
-      startHour: row.prompt_start_hour,
-      startMinute: row.prompt_start_minute,
-      endHour: row.prompt_end_hour,
-      endMinute: row.prompt_end_minute,
-      createdAt: row.created_at,
-      updatedAt: row.updated_at
+      startHour: row.prompt_start_hour as number,
+      startMinute: row.prompt_start_minute as number,
+      endHour: row.prompt_end_hour as number,
+      endMinute: row.prompt_end_minute as number,
+      createdAt: row.created_at as string,
+      updatedAt: row.updated_at as string
     }));
   }
 
@@ -215,7 +215,7 @@ export class ActivityPromptRepository implements IActivityPromptRepository {
       hour, hour, minute   // 終了時刻チェック
     ]);
 
-    return rows.map(row => row.user_id);
+    return rows.map(row => row.user_id as string);
   }
 
   /**
@@ -307,7 +307,7 @@ export class ActivityPromptRepository implements IActivityPromptRepository {
   /**
    * SQLクエリ実行（INSERT/UPDATE/DELETE）
    */
-  private async runQuery(sql: string, params: any[]): Promise<void> {
+  private async runQuery(sql: string, params: (string | number | boolean)[]): Promise<void> {
     return new Promise((resolve, reject) => {
       this.db.run(sql, params, function(err) {
         if (err) reject(err);
@@ -319,11 +319,11 @@ export class ActivityPromptRepository implements IActivityPromptRepository {
   /**
    * SQLクエリ実行（単一行取得）
    */
-  private async getQuery(sql: string, params: any[]): Promise<any> {
+  private async getQuery(sql: string, params: (string | number | boolean)[]): Promise<Record<string, unknown> | null> {
     return new Promise((resolve, reject) => {
       this.db.get(sql, params, (err, row) => {
         if (err) reject(err);
-        else resolve(row || null);
+        else resolve(row as Record<string, unknown> || null);
       });
     });
   }
@@ -331,11 +331,11 @@ export class ActivityPromptRepository implements IActivityPromptRepository {
   /**
    * SQLクエリ実行（複数行取得）
    */
-  private async allQuery(sql: string, params: any[]): Promise<any[]> {
+  private async allQuery(sql: string, params: (string | number | boolean)[]): Promise<Record<string, unknown>[]> {
     return new Promise((resolve, reject) => {
       this.db.all(sql, params, (err, rows) => {
         if (err) reject(err);
-        else resolve(rows || []);
+        else resolve(rows as Record<string, unknown>[] || []);
       });
     });
   }

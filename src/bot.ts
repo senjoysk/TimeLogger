@@ -1,6 +1,7 @@
 import { Client, GatewayIntentBits, Partials, Message } from 'discord.js';
 import { config } from './config';
 import { ActivityLoggingIntegration, createDefaultConfig } from './integration';
+import type { UserInfo } from './interfaces/dependencies';
 
 /**
  * Bot の動作状態
@@ -103,7 +104,18 @@ export class TaskLoggerBot {
   /**
    * システムヘルスチェック
    */
-  private async checkSystemHealth(): Promise<any> {
+  private async checkSystemHealth(): Promise<{
+    status: 'ok' | 'error';
+    timestamp: string;
+    checks: {
+      discordReady: boolean;
+      activityLoggingInitialized: boolean;
+      databaseConnected: boolean;
+    };
+    issues: string[];
+    botStatus: string;
+    uptime: number;
+  }> {
     const issues = [];
     
     // Discord接続チェック
@@ -143,7 +155,7 @@ export class TaskLoggerBot {
         databaseConnected
       },
       issues,
-      botStatus: this.status,
+      botStatus: String(this.status),
       uptime: process.uptime()
     };
   }
@@ -151,7 +163,21 @@ export class TaskLoggerBot {
   /**
    * 詳細なシステム状態を取得
    */
-  private async getDetailedSystemStatus(): Promise<any> {
+  private async getDetailedSystemStatus(): Promise<{
+    status: 'ok' | 'error';
+    timestamp: string;
+    checks: {
+      discordReady: boolean;
+      activityLoggingInitialized: boolean;
+      databaseConnected: boolean;
+    };
+    issues: string[];
+    botStatus: string;
+    uptime: number;
+    environment: Record<string, unknown>;
+    discord: Record<string, unknown>;
+    config: Record<string, unknown>;
+  }> {
     const healthStatus = await this.checkSystemHealth();
     
     return {
@@ -325,7 +351,7 @@ export class TaskLoggerBot {
       await this.activityLoggingIntegration.initialize();
       
       // Discord Clientに統合（自身のBotインスタンスを渡す）
-      this.activityLoggingIntegration.integrateWithBot(this.client, this);
+      this.activityLoggingIntegration.integrateWithBot(this.client, this as unknown as import('./interfaces/dependencies').IDiscordBot);
       
       // 活動促しコマンドハンドラーを初期化
       await this.initializePromptCommandHandler();
@@ -548,7 +574,7 @@ export class TaskLoggerBot {
   /**
    * 登録ユーザー一覧を取得（テスト用）
    */
-  public async getRegisteredUsers(): Promise<Array<{ userId: string; timezone: string }>> {
+  public async getRegisteredUsers(): Promise<UserInfo[]> {
     try {
       if (!this.activityLoggingIntegration) {
         return [];
@@ -556,9 +582,16 @@ export class TaskLoggerBot {
 
       // SqliteActivityLogRepositoryから登録ユーザーを取得
       const users = await this.activityLoggingIntegration.getAllUserTimezones();
+      const now = new Date().toISOString();
       return users.map(user => ({
         userId: user.user_id,
-        timezone: user.timezone
+        username: undefined,
+        timezone: user.timezone,
+        registrationDate: now,
+        lastSeenAt: now,
+        isActive: true,
+        createdAt: now,
+        updatedAt: now
       }));
     } catch (error) {
       console.error('❌ 登録ユーザー取得エラー:', error);

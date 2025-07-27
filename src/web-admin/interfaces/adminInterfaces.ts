@@ -7,9 +7,9 @@ import { TableInfo, TableDataResult, TableSummary, SearchFilters, PaginationOpti
 export interface IAdminRepository {
   getTableNames(): Promise<string[]>;
   getTableCount(tableName: string): Promise<number>;
-  getTableData(tableName: string, options?: PaginationOptions): Promise<any[]>;
-  searchTableData(tableName: string, filters: SearchFilters, options?: PaginationOptions): Promise<any[]>;
-  getTableSchema(tableName: string): Promise<any>;
+  getTableData(tableName: string, options?: PaginationOptions): Promise<Record<string, unknown>[]>;
+  searchTableData(tableName: string, filters: SearchFilters, options?: PaginationOptions): Promise<Record<string, unknown>[]>;
+  getTableSchema(tableName: string): Promise<Record<string, unknown>>;
 }
 
 export interface IAdminService {

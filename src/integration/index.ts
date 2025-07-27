@@ -122,8 +122,8 @@ export function loadConfigFromEnv(): ActivityLoggingConfig {
  * システム統計を取得する便利関数
  */
 export async function getSystemOverview(integration: ActivityLoggingIntegration): Promise<{
-  health: any;
-  stats: any;
+  health: Record<string, unknown>;
+  stats: Record<string, unknown>;
   config: ActivityLoggingConfig;
 }> {
   const [health, stats] = await Promise.all([
@@ -132,7 +132,7 @@ export async function getSystemOverview(integration: ActivityLoggingIntegration)
   ]);
 
   return {
-    health,
+    health: health as unknown as Record<string, unknown>,
     stats,
     config: integration.getConfig()
   };

@@ -5,12 +5,27 @@
 
 import { Client, ClientOptions, Message } from 'discord.js';
 import { Application } from 'express';
+import { IActivityLogRepository } from '../repositories/activityLogRepository';
+
+// Define user info locally to avoid circular imports
+export interface UserInfo {
+  userId: string;
+  username?: string;
+  timezone: string;
+  registrationDate: string;
+  lastSeenAt: string;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
 
 /**
  * Discord Bot インターフェース
  * Botの基本機能を抽象化
  */
 export interface IDiscordBot {
+  [key: string]: unknown;
+  
   /**
    * プロンプトコマンドを処理
    * @param message Discordメッセージ
@@ -35,23 +50,23 @@ export interface IDiscordBot {
   /**
    * Bot設定の取得
    */
-  getConfig?(): any;
+  getConfig?(): IConfigService;
 
   /**
    * リポジトリを取得
    */
-  getRepository?(): any;
+  getRepository?(): IActivityLogRepository | undefined;
 
   /**
    * 登録ユーザー一覧を取得
    */
-  getRegisteredUsers?(): Promise<any[]>;
+  getRegisteredUsers?(): Promise<UserInfo[]>;
 
   /**
    * サマリープレビューを生成
    * @param userId ユーザーID
    */
-  generateSummaryPreview?(userId: string): Promise<any>;
+  generateSummaryPreview?(userId: string): Promise<string>;
 
   /**
    * システムが初期化済みかどうか
@@ -69,9 +84,6 @@ export interface IDiscordBot {
    * @param timezone タイムゾーン
    */
   sendActivityPromptToUser?(userId: string, timezone: string): Promise<void>;
-
-  // TaskLoggerBot互換性のため追加
-  [key: string]: any;
 }
 
 /**
@@ -182,7 +194,7 @@ export interface ILogger {
    * @param message ログメッセージ
    * @param meta 追加のメタデータ
    */
-  info(message: string, meta?: any): void;
+  info(message: string, meta?: Record<string, unknown>): void;
 
   /**
    * エラーログ出力
@@ -190,21 +202,21 @@ export interface ILogger {
    * @param error エラーオブジェクト
    * @param meta 追加のメタデータ
    */
-  error(message: string, error?: Error, meta?: any): void;
+  error(message: string, error?: Error, meta?: Record<string, unknown>): void;
 
   /**
    * 警告ログ出力
    * @param message 警告メッセージ
    * @param meta 追加のメタデータ
    */
-  warn(message: string, meta?: any): void;
+  warn(message: string, meta?: Record<string, unknown>): void;
 
   /**
    * デバッグログ出力
    * @param message デバッグメッセージ
    * @param meta 追加のメタデータ
    */
-  debug(message: string, meta?: any): void;
+  debug(message: string, meta?: Record<string, unknown>): void;
 }
 
 /**

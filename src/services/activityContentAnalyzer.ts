@@ -147,7 +147,7 @@ export class ActivityContentAnalyzer {
       const result = await this.geminiService.classifyMessageWithAI(input);
       
       // レスポンスを詳細分析形式に変換
-      return this.parseGeminiActivityResponse(result, timeAnalysis, basicBreakdown);
+      return this.parseGeminiActivityResponse(result as unknown as Record<string, unknown>, timeAnalysis, basicBreakdown);
 
     } catch (error) {
       console.error('Gemini活動分析エラー:', error);
@@ -235,19 +235,19 @@ JSON形式のみで回答してください。説明文は不要です。
    * Gemini活動分析レスポンスのパース
    */
   private parseGeminiActivityResponse(
-    geminiResult: any,
+    geminiResult: Record<string, unknown>,
     timeAnalysis: TimeAnalysisResult,
     basicBreakdown: BasicActivityBreakdown
   ): GeminiActivityAnalysisResponse {
     // 既存のGeminiService結果を新形式に適応
     const activity: ActivityDetail = {
-      content: geminiResult.structuredContent || basicBreakdown.activities[0]?.content || '活動記録',
-      category: geminiResult.category || '未分類',
-      subCategory: geminiResult.subCategory,
+      content: (geminiResult.structuredContent as string) || basicBreakdown.activities[0]?.content || '活動記録',
+      category: (geminiResult.category as string) || '未分類',
+      subCategory: geminiResult.subCategory as string | undefined,
       timePercentage: 100,
       actualMinutes: timeAnalysis.totalMinutes,
       priority: ActivityPriority.PRIMARY,
-      confidence: geminiResult.confidence || 0.7
+      confidence: (geminiResult.confidence as number) || 0.7
     };
 
     return {

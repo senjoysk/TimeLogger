@@ -58,7 +58,7 @@ export class SummaryTestService {
       if (request.testDateTime) {
         const testDate = new Date(request.testDateTime);
         if (this.timeProvider && 'setMockDate' in this.timeProvider) {
-          (this.timeProvider as any).setMockDate(testDate);
+          (this.timeProvider as { setMockDate(date: Date): void }).setMockDate(testDate);
         }
       }
 
@@ -177,7 +177,7 @@ export class SummaryTestService {
     try {
       // dryRun の値を正しく boolean として評価
       // HTTPリクエストでは文字列として送られてくる可能性があるため、型安全に変換
-      const isDryRun = Boolean(request.dryRun === true || (request.dryRun as any) === 'true');
+      const isDryRun = Boolean(request.dryRun === true || String(request.dryRun) === 'true');
 
       if (isDryRun) {
         // ドライランモード：実際の送信は行わない
@@ -248,7 +248,7 @@ export class SummaryTestService {
   private async getAllRegisteredUsers(): Promise<UserInfo[]> {
     // テスト用のモックメソッド呼び出し
     if (this.bot && 'getRegisteredUsers' in this.bot) {
-      return (this.bot as any).getRegisteredUsers();
+      return (this.bot as { getRegisteredUsers(): Promise<UserInfo[]> }).getRegisteredUsers();
     }
     
     // フォールバック：空の配列
@@ -261,7 +261,7 @@ export class SummaryTestService {
   private async generateSummaryPreview(userId: string): Promise<string> {
     // テスト用のモックメソッド呼び出し
     if (this.bot && 'generateSummaryPreview' in this.bot) {
-      return (this.bot as any).generateSummaryPreview(userId);
+      return (this.bot as { generateSummaryPreview(userId: string): Promise<string> }).generateSummaryPreview(userId);
     }
     
     // フォールバック：デフォルトメッセージ
@@ -275,7 +275,7 @@ export class SummaryTestService {
     // テスト用のモックメソッド呼び出し
     if (this.bot && 'sendDailySummaryToUserForTest' in this.bot) {
       // テスト用の公開メソッドを使用
-      return (this.bot as any).sendDailySummaryToUserForTest(userId, timezone);
+      return (this.bot as { sendDailySummaryToUserForTest(userId: string, timezone: string): Promise<void> }).sendDailySummaryToUserForTest(userId, timezone);
     }
     
     // フォールバック：何もしない
