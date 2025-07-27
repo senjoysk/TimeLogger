@@ -32,9 +32,14 @@ log_error() {
     echo -e "${RED}[GIT-HOOK]${NC} $1"
 }
 
-# 設定ファイルの読み込み
+# 設定ファイルの読み込み（Husky統合後のパス対応）
 HOOK_CONFIG_FILE=".githooks/config"
-if [ -f "$HOOK_CONFIG_FILE" ]; then
+HUSKY_CONFIG_FILE=".husky/config"
+
+# 新旧設定ファイルの読み込み（互換性維持）
+if [ -f "$HUSKY_CONFIG_FILE" ]; then
+    source "$HUSKY_CONFIG_FILE"
+elif [ -f "$HOOK_CONFIG_FILE" ]; then
     source "$HOOK_CONFIG_FILE"
 fi
 
