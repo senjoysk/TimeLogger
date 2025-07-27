@@ -33,8 +33,13 @@ export function errorHandler(
   });
 }
 
-function isAdminError(error: any): error is AdminError {
-  return error && typeof error.code === 'string' && typeof error.statusCode === 'number';
+function isAdminError(error: unknown): error is AdminError {
+  return error !== null && 
+    typeof error === 'object' && 
+    'code' in error && 
+    'statusCode' in error && 
+    typeof (error as Record<string, unknown>).code === 'string' && 
+    typeof (error as Record<string, unknown>).statusCode === 'number';
 }
 
 export function asyncHandler(

@@ -8,7 +8,7 @@ export interface TableInfo {
 }
 
 export interface TableDataResult {
-  data: any[];
+  data: Record<string, unknown>[];
   count: number;
   pagination: {
     page: number;

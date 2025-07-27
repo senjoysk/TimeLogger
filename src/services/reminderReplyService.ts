@@ -17,7 +17,13 @@ export interface NearbyReminderResult {
   reminderTime?: Date;
 }
 
-export class ReminderReplyService {
+export interface IReminderReplyService {
+  isReminderReply(message: Message): Promise<ReminderReplyResult>;
+  calculateTimeRange(reminderTime: Date): TimeRange;
+  detectNearbyReminder(userMessage: Message, recentMessages: Message[]): Promise<NearbyReminderResult>;
+}
+
+export class ReminderReplyService implements IReminderReplyService {
   private readonly REMINDER_KEYWORDS = ['この30分、何してた'];
   private readonly NEARBY_THRESHOLD_MINUTES = 10;
 

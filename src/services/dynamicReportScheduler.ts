@@ -10,6 +10,7 @@
  */
 
 import * as cron from 'node-cron';
+import { UserTimezone } from '../repositories/interfaces';
 // import { toZonedTime } from 'date-fns-tz'; // 将来の拡張用
 
 interface UtcTime {
@@ -17,12 +18,7 @@ interface UtcTime {
   minute: number;
 }
 
-interface UserTimezone {
-  userId: string;
-  timezone: string;
-}
-
-interface Repository {
+interface ISchedulerRepository {
   getAllUserTimezonesForScheduler(): Promise<UserTimezone[]>;
 }
 
@@ -40,7 +36,7 @@ export class DynamicReportScheduler {
   private activeJobs: Map<string, cron.ScheduledTask> = new Map();
   private timezoneUserMap: Map<string, Set<string>> = new Map();
   private utcTimeToTimezones: Map<string, Set<string>> = new Map();
-  private repository?: Repository;
+  private repository?: ISchedulerRepository;
   private reportSender?: ReportSender;
 
   /**
@@ -48,7 +44,7 @@ export class DynamicReportScheduler {
    * @param repository データリポジトリ（オプショナル、後で注入可能）
    * @param reportSender レポート送信者（オプショナル、後で注入可能）
    */
-  constructor(repository?: Repository, reportSender?: ReportSender) {
+  constructor(repository?: ISchedulerRepository, reportSender?: ReportSender) {
     this.repository = repository;
     this.reportSender = reportSender;
   }
@@ -56,7 +52,7 @@ export class DynamicReportScheduler {
   /**
    * リポジトリを設定（レガシー対応・テスト用）
    */
-  setRepository(repository: Repository): void {
+  setRepository(repository: ISchedulerRepository): void {
     this.repository = repository;
   }
 

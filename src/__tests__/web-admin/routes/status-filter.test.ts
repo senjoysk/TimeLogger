@@ -5,8 +5,8 @@
 
 import request from 'supertest';
 import { createTableRoutes } from '../../../web-admin/routes/tables';
-import { AdminService } from '../../../web-admin/services/adminService';
-import { SecurityService } from '../../../web-admin/services/securityService';
+import { IAdminService } from '../../../web-admin/interfaces/adminInterfaces';
+import { SecurityService, ISecurityService } from '../../../web-admin/services/securityService';
 import express from 'express';
 
 // モック作成
@@ -14,13 +14,15 @@ const mockAdminService = {
   getTableList: jest.fn(),
   getTableData: jest.fn(),
   searchTableData: jest.fn(),
-} as unknown as AdminService;
+  getTableSummary: jest.fn(),
+  validateTableName: jest.fn(() => true),
+} as unknown as IAdminService;
 
 const mockSecurityService = {
   validateTableName: jest.fn(() => true),
   sanitizeInput: jest.fn((input: string) => input),
   getEnvironment: jest.fn(() => ({ env: 'development', isReadOnly: false })),
-} as unknown as SecurityService;
+} as unknown as ISecurityService;
 
 describe('TODO tasks table status filter（実装済み）', () => {
   let app: express.Application;

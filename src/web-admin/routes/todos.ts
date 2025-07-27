@@ -5,7 +5,7 @@
 
 import { Router } from 'express';
 import { TodoManagementService, BulkCreateTodoRequest } from '../services/todoManagementService';
-import { SecurityService } from '../services/securityService';
+import { SecurityService, ISecurityService } from '../services/securityService';
 import { AdminRepository } from '../repositories/adminRepository';
 import { SqliteActivityLogRepository } from '../../repositories/sqliteActivityLogRepository';
 import { TodoTask } from '../../types/todo';
@@ -14,7 +14,7 @@ const router = Router();
 
 // TODO管理サービスの初期化
 let todoService: TodoManagementService;
-let securityService: SecurityService;
+let securityService: ISecurityService;
 let isInitialized = false;
 
 function initializeServices(databasePath: string) {

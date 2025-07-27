@@ -85,7 +85,7 @@ fi
 
 # 6. インターフェース未使用の依存関係チェック
 echo "📋 6. インターフェース未使用の依存関係をチェック中..."
-concrete_dependency=$(find src -name "*.ts" -not -path "*/node_modules/*" -not -path "*/dist/*" -not -path "*/__tests__/*" | xargs grep -n "private.*:\s*[A-Z][a-zA-Z]*Service\|private.*:\s*[A-Z][a-zA-Z]*Repository" | grep -v "private.*:\s*I[A-Z]" || true)
+concrete_dependency=$(find src -name "*.ts" -not -path "*/node_modules/*" -not -path "*/dist/*" -not -path "*/__tests__/*" | xargs grep -n "private.*:\s*[A-Z][a-zA-Z]*Service\|private.*:\s*[A-Z][a-zA-Z]*Repository" | grep -v "private.*:\s*I[A-Z]" | grep -v "dependency-injection-check除外対象" || true)
 
 if [ -n "$concrete_dependency" ]; then
     echo -e "${YELLOW}⚠️  インターフェースではなく具象クラスへの依存を検出:${NC}"

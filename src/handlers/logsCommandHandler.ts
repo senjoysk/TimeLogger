@@ -319,7 +319,12 @@ ${this.getUsageInsight(stats)}
   /**
    * 使用状況の洞察を生成
    */
-  private getUsageInsight(stats: any): string {
+  private getUsageInsight(stats: {
+    totalLogs: number;
+    todayLogs: number;
+    weekLogs: number;
+    averageLogsPerDay: number;
+  }): string {
     if (stats.totalLogs === 0) {
       return '📝 記録を始めましょう！活動内容を投稿してください。';
     }

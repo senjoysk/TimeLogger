@@ -15,7 +15,7 @@ import { Scheduler } from './scheduler';
 import { DynamicReportScheduler } from './services/dynamicReportScheduler';
 import { TimezoneChangeMonitor } from './services/timezoneChangeMonitor';
 import { TaskLoggerBot } from './bot';
-import { SqliteActivityLogRepository } from './repositories/sqliteActivityLogRepository';
+import { IUnifiedRepository } from './repositories/interfaces';
 
 interface ComponentHealth {
   dynamicScheduler: 'healthy' | 'failed' | 'not_configured';
@@ -45,7 +45,7 @@ interface PerformanceMetrics {
 interface DebugInformation {
   activeTimezones: string[];
   cronJobs: Array<{ timezone: string; utcTime: string; users: string[] }>;
-  recentActivities: Array<{ timestamp: Date; action: string; details: any }>;
+  recentActivities: Array<{ timestamp: Date; action: string; details: Record<string, unknown> }>;
 }
 
 export class EnhancedScheduler extends Scheduler {
@@ -65,8 +65,12 @@ export class EnhancedScheduler extends Scheduler {
     cronJobEfficiency: 100,
     timezoneDistribution: {}
   };
-  private debugActivities: Array<{ timestamp: Date; action: string; details: any }> = [];
+  private debugActivities: Array<{ timestamp: Date; action: string; details: Record<string, unknown> }> = [];
   private isDynamicModeEnabled = false;
+
+  constructor(bot: TaskLoggerBot, repository: IUnifiedRepository) {
+    super(bot, repository);
+  }
 
   /**
    * 動的スケジューラーを設定
@@ -341,7 +345,7 @@ export class EnhancedScheduler extends Scheduler {
   /**
    * デバッグアクティビティを追加
    */
-  private addDebugActivity(action: string, details: any): void {
+  private addDebugActivity(action: string, details: Record<string, unknown>): void {
     this.debugActivities.push({
       timestamp: new Date(),
       action,

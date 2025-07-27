@@ -6,9 +6,9 @@
 import { Client, Message, ButtonInteraction } from 'discord.js';
 // Removed better-sqlite3 import - using sqlite3 via repository
 import { SqliteActivityLogRepository } from '../repositories/sqliteActivityLogRepository';
-import { IUnifiedRepository } from '../repositories/interfaces';
+import { IUnifiedRepository, IMemoRepository } from '../repositories/interfaces';
 import { SqliteMemoRepository } from '../repositories/sqliteMemoRepository';
-import { ActivityLogService } from '../services/activityLogService';
+import { ActivityLogService, IActivityLogService } from '../services/activityLogService';
 import { EditCommandHandler } from '../handlers/editCommandHandler';
 import { SummaryHandler } from '../handlers/summaryHandler';
 import { LogsCommandHandler } from '../handlers/logsCommandHandler';
@@ -19,7 +19,7 @@ import { ProfileCommandHandler } from '../handlers/profileCommandHandler';
 import { MemoCommandHandler } from '../handlers/memoCommandHandler';
 import { IGeminiService } from '../services/interfaces/IGeminiService';
 import { IMessageClassificationService } from '../services/messageClassificationService';
-import { GapDetectionService } from '../services/gapDetectionService';
+import { GapDetectionService, IGapDetectionService } from '../services/gapDetectionService';
 import { DynamicReportScheduler } from '../services/dynamicReportScheduler';
 import { DailyReportSender } from '../services/dailyReportSender';
 import { ActivityLogError } from '../types/activityLog';
@@ -28,10 +28,11 @@ import { MessageSelectionHandler } from '../handlers/messageSelectionHandler';
 import { TimezoneService } from '../services/timezoneService';
 import { ITimezoneService } from '../services/interfaces/ITimezoneService';
 import { ConfigService } from '../services/configService';
+import { IConfigService } from '../interfaces/dependencies';
 import { TaskLoggerBot } from '../bot';
 import { ITimeProvider, IDiscordBot } from '../interfaces/dependencies';
 import { TimeProviderService } from '../services/timeProviderService';
-import { ReminderReplyService } from '../services/reminderReplyService';
+import { ReminderReplyService, IReminderReplyService } from '../services/reminderReplyService';
 import { HealthStatus } from '../types/health';
 
 /**
@@ -68,14 +69,14 @@ export interface ActivityLoggingConfig {
 export class ActivityLoggingIntegration {
   // サービス層
   private repository!: IUnifiedRepository;
-  private memoRepository!: SqliteMemoRepository;
-  private activityLogService!: ActivityLogService;
+  private memoRepository!: IMemoRepository;
+  private activityLogService!: IActivityLogService;
   private geminiService!: IGeminiService;
   private messageClassificationService!: IMessageClassificationService;
-  private gapDetectionService!: GapDetectionService;
+  private gapDetectionService!: IGapDetectionService;
   private dynamicReportScheduler!: DynamicReportScheduler;
   private dailyReportSender!: DailyReportSender;
-  private configService!: ConfigService;
+  private configService!: IConfigService;
   private timezoneService!: ITimezoneService;
 
   // ハンドラー層
@@ -89,7 +90,7 @@ export class ActivityLoggingIntegration {
   private profileHandler!: ProfileCommandHandler;
   private memoHandler!: MemoCommandHandler;
   private messageSelectionHandler!: MessageSelectionHandler;
-  private reminderReplyService!: ReminderReplyService;
+  private reminderReplyService!: IReminderReplyService;
 
   // 設定
   private config: ActivityLoggingConfig;
@@ -185,8 +186,7 @@ export class ActivityLoggingIntegration {
       }
       
       // DynamicReportSchedulerの初期化
-      this.dynamicReportScheduler = new DynamicReportScheduler();
-      this.dynamicReportScheduler.setRepository(this.repository);
+      this.dynamicReportScheduler = new DynamicReportScheduler(this.repository);
       
       console.log('✅ サービス層初期化完了（TODO統合機能含む）');
 

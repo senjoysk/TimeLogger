@@ -161,12 +161,12 @@ export class GapHandler implements IGapHandler {
 
     collector.on('end', () => {
       // タイムアウト時はボタンを無効化
-      const disabledComponents = message.components.map((row: any) => {
+      const disabledComponents = message.components.map((row) => {
         const newRow = new ActionRowBuilder<ButtonBuilder>();
-        if (row.components) {
-          row.components.forEach((component: any) => {
-            if (component.type === 2) { // ButtonComponent
-              const button = ButtonBuilder.from(component).setDisabled(true);
+        if ('components' in row && Array.isArray(row.components)) {
+          row.components.forEach((component) => {
+            if ('type' in component && component.type === 2) { // ButtonComponent
+              const button = ButtonBuilder.from(component as any).setDisabled(true);
               newRow.addComponents(button);
             }
           });

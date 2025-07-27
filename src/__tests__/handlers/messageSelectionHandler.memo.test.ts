@@ -58,7 +58,7 @@ describe('MessageSelectionHandler MEMOボタン機能テスト', () => {
       mockInteraction.editReply.mockResolvedValue(undefined);
 
       // メッセージを保存
-      await handler.showSelectionUI(mockMessage, userId, 'テストメモ内容');
+      await handler.showSelectionUI(mockMessage as any, userId, 'テストメモ内容');
 
       // Act
       await handler.handleButtonInteraction(mockInteraction as any, userId, timezone);
@@ -90,7 +90,7 @@ describe('MessageSelectionHandler MEMOボタン機能テスト', () => {
       mockInteraction.editReply.mockResolvedValue(undefined);
 
       // メッセージを保存
-      await handlerWithoutRepo.showSelectionUI(mockMessage, userId, 'テストメモ内容');
+      await handlerWithoutRepo.showSelectionUI(mockMessage as any, userId, 'テストメモ内容');
 
       // Act
       await handlerWithoutRepo.handleButtonInteraction(mockInteraction as any, userId, timezone);
@@ -110,7 +110,7 @@ describe('MessageSelectionHandler MEMOボタン機能テスト', () => {
       mockInteraction.editReply.mockResolvedValue(undefined);
 
       // メッセージを保存
-      await handler.showSelectionUI(mockMessage, userId, 'テストメモ内容');
+      await handler.showSelectionUI(mockMessage as any, userId, 'テストメモ内容');
 
       // Act
       await handler.handleButtonInteraction(mockInteraction as any, userId, timezone);
@@ -128,7 +128,7 @@ describe('MessageSelectionHandler MEMOボタン機能テスト', () => {
       mockInteraction.editReply.mockResolvedValue(undefined);
 
       // 空のメッセージを保存
-      await handler.showSelectionUI(mockMessage, userId, '');
+      await handler.showSelectionUI(mockMessage as any, userId, '');
 
       // Act
       await handler.handleButtonInteraction(mockInteraction as any, userId, timezone);
@@ -159,7 +159,7 @@ describe('MessageSelectionHandler MEMOボタン機能テスト', () => {
       mockInteraction.editReply.mockResolvedValue(undefined);
 
       // Act 1: 選択UI表示
-      await handler.showSelectionUI(mockMessage, userId, '統合テストメモ');
+      await handler.showSelectionUI(mockMessage as any, userId, '統合テストメモ');
 
       // Assert 1: UIが正しく表示される
       expect(mockMessage.reply).toHaveBeenCalledWith({

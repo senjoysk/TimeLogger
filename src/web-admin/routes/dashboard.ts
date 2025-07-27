@@ -4,9 +4,10 @@
 
 import { Router } from 'express';
 import { AdminService } from '../services/adminService';
-import { SecurityService } from '../services/securityService';
+import { IAdminService } from '../interfaces/adminInterfaces';
+import { SecurityService, ISecurityService } from '../services/securityService';
 
-export function createDashboardRoutes(adminService: AdminService, securityService: SecurityService): Router {
+export function createDashboardRoutes(adminService: IAdminService, securityService: ISecurityService): Router {
   const router = Router();
 
   // ダッシュボード表示

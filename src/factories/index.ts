@@ -215,25 +215,25 @@ export class ConsoleLogger implements ILogger {
     this.logLevel = logLevel;
   }
 
-  info(message: string, meta?: any): void {
+  info(message: string, meta?: Record<string, unknown>): void {
     if (this.shouldLog('info')) {
       console.log(`[INFO] ${message}`, meta ? JSON.stringify(meta) : '');
     }
   }
 
-  error(message: string, error?: Error, meta?: any): void {
+  error(message: string, error?: Error, meta?: Record<string, unknown>): void {
     if (this.shouldLog('error')) {
       console.error(`[ERROR] ${message}`, error?.stack || error?.message || '', meta ? JSON.stringify(meta) : '');
     }
   }
 
-  warn(message: string, meta?: any): void {
+  warn(message: string, meta?: Record<string, unknown>): void {
     if (this.shouldLog('warn')) {
       console.warn(`[WARN] ${message}`, meta ? JSON.stringify(meta) : '');
     }
   }
 
-  debug(message: string, meta?: any): void {
+  debug(message: string, meta?: Record<string, unknown>): void {
     if (this.shouldLog('debug')) {
       console.log(`[DEBUG] ${message}`, meta ? JSON.stringify(meta) : '');
     }
@@ -253,21 +253,21 @@ export class ConsoleLogger implements ILogger {
  * ログを記録してテストで検証可能
  */
 export class MockLogger implements ILogger {
-  public logs: Array<{ level: string; message: string; meta?: any; error?: Error }> = [];
+  public logs: Array<{ level: string; message: string; meta?: Record<string, unknown>; error?: Error }> = [];
 
-  info(message: string, meta?: any): void {
+  info(message: string, meta?: Record<string, unknown>): void {
     this.logs.push({ level: 'info', message, meta });
   }
 
-  error(message: string, error?: Error, meta?: any): void {
+  error(message: string, error?: Error, meta?: Record<string, unknown>): void {
     this.logs.push({ level: 'error', message, error, meta });
   }
 
-  warn(message: string, meta?: any): void {
+  warn(message: string, meta?: Record<string, unknown>): void {
     this.logs.push({ level: 'warn', message, meta });
   }
 
-  debug(message: string, meta?: any): void {
+  debug(message: string, meta?: Record<string, unknown>): void {
     this.logs.push({ level: 'debug', message, meta });
   }
 

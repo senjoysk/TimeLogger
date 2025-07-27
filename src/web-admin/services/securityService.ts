@@ -5,7 +5,15 @@
 
 import { AdminEnvironment, AdminSecurityError } from '../types/admin';
 
-export class SecurityService {
+export interface ISecurityService {
+  getEnvironment(): AdminEnvironment;
+  validateOperation(operation: string): boolean;
+  validateTableName(tableName: string): boolean;
+  validateAuth(username: string, password: string): boolean;
+  sanitizeInput(input: string): string;
+}
+
+export class SecurityService implements ISecurityService {
   private readonly ALLOWED_TABLES = [
     'activity_logs',
     'api_costs',

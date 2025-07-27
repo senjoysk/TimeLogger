@@ -4,7 +4,8 @@
 
 import { Router } from 'express';
 import { AdminService } from '../services/adminService';
-import { SecurityService } from '../services/securityService';
+import { IAdminService } from '../interfaces/adminInterfaces';
+import { SecurityService, ISecurityService } from '../services/securityService';
 import { createTableRoutes } from './tables';
 import { createDashboardRoutes } from './dashboard';
 import { createTodoRouter } from './todos';
@@ -13,7 +14,7 @@ import { createSummaryTestRouter } from './summaryTest';
 import { createTimezoneRouter } from './timezone';
 import { IDiscordBot } from '../../interfaces/dependencies';
 
-export function createRoutes(adminService: AdminService, securityService: SecurityService, databasePath: string, bot?: IDiscordBot): Router {
+export function createRoutes(adminService: IAdminService, securityService: ISecurityService, databasePath: string, bot?: IDiscordBot): Router {
   const router = Router();
 
   // すべてのレスポンスにbasePathを追加するミドルウェア

@@ -4,9 +4,10 @@
 
 import { Router } from 'express';
 import { AdminService } from '../services/adminService';
-import { SecurityService } from '../services/securityService';
+import { IAdminService } from '../interfaces/adminInterfaces';
+import { SecurityService, ISecurityService } from '../services/securityService';
 
-export function createTableRoutes(adminService: AdminService, securityService: SecurityService): Router {
+export function createTableRoutes(adminService: IAdminService, securityService: ISecurityService): Router {
   const router = Router();
 
   // テーブル一覧
@@ -44,7 +45,7 @@ export function createTableRoutes(adminService: AdminService, securityService: S
       const dateTo = req.query.dateTo as string;
       const status = req.query.status as string;
 
-      if (!securityService.validateTableName(tableName)) {
+      if (!adminService.validateTableName(tableName)) {
         return res.status(400).render('error', {
           title: 'Error',
           message: '許可されていないテーブル名です',

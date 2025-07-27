@@ -17,6 +17,16 @@ describe('AdminService', () => {
       getTableData: jest.fn(),
       searchTableData: jest.fn(),
       getTableSchema: jest.fn(),
+      // TODO管理メソッド
+      createTodoTask: jest.fn(),
+      updateTodoTask: jest.fn(),
+      deleteTodoTask: jest.fn(),
+      getTodoTaskById: jest.fn(),
+      bulkUpdateTodoStatus: jest.fn(),
+      bulkDeleteTodos: jest.fn(),
+      getTodosByUserId: jest.fn(),
+      getOverdueTodos: jest.fn(),
+      bulkCreateTodos: jest.fn(),
     } as jest.Mocked<IAdminRepository>;
     
     adminService = new AdminService(mockRepository);

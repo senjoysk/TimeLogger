@@ -5,7 +5,7 @@
  * ユーザーの選択に応じて適切な処理を実行する
  */
 
-import { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } from 'discord.js';
+import { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ButtonInteraction, Message } from 'discord.js';
 import { IGeminiService } from '../services/interfaces/IGeminiService';
 import { IActivityLogService } from '../services/activityLogService';
 import { IMemoRepository, ITodoRepository } from '../repositories/interfaces';
@@ -37,7 +37,7 @@ export class MessageSelectionHandler {
     this.geminiService = geminiService;
   }
 
-  async showSelectionUI(message: any, userId: string, content: string) {
+  async showSelectionUI(message: Message, userId: string, content: string) {
     // 🟢 Green Phase: メッセージ内容を保存
     this.storedMessages.set(userId, content);
     
@@ -76,7 +76,7 @@ export class MessageSelectionHandler {
     });
   }
 
-  async handleButtonInteraction(interaction: any, userId: string, timezone: string) {
+  async handleButtonInteraction(interaction: ButtonInteraction, userId: string, timezone: string) {
     try {
       // 🟢 Green Phase: 実際の処理統合（エラーハンドリング強化）
       const messageContent = this.storedMessages.get(userId);
@@ -257,7 +257,7 @@ export class MessageSelectionHandler {
     return this.storedMessages.get(userId);
   }
 
-  async processNonCommandMessage(message: any, userId: string, timezone: string): Promise<boolean> {
+  async processNonCommandMessage(message: Message, userId: string, timezone: string): Promise<boolean> {
     // 🟢 Green Phase: ActivityLoggingIntegration統合メソッド
     // AI分類の代わりにユーザー選択UIを表示
     try {

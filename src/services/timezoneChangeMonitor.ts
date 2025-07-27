@@ -11,29 +11,14 @@
  */
 
 import { DynamicReportScheduler } from './dynamicReportScheduler';
-
-interface TimezoneChange {
-  user_id: string;
-  old_timezone: string;
-  new_timezone: string;
-  updated_at: string;
-}
-
-interface TimezoneNotification {
-  id: string;
-  user_id: string;
-  old_timezone: string | null;
-  new_timezone: string;
-  changed_at: string;
-  processed: boolean;
-}
+import { TimezoneChange, TimezoneNotification } from '../repositories/interfaces';
 
 interface UserSettings {
   user_id: string;
   timezone: string;
 }
 
-interface Repository {
+interface ITimezoneRepository {
   getUserTimezoneChanges(since?: Date): Promise<TimezoneChange[]>;
   getUnprocessedNotifications(): Promise<TimezoneNotification[]>;
   markNotificationAsProcessed(notificationId: string): Promise<void>;
@@ -58,7 +43,7 @@ interface MonitorStatistics {
 
 export class TimezoneChangeMonitor {
   private scheduler?: DynamicReportScheduler;
-  private repository?: Repository;
+  private repository?: ITimezoneRepository;
   private pollingInterval: number = 10000; // 10秒
   private pollingTimer?: NodeJS.Timeout;
   private processorTimer?: NodeJS.Timeout;
@@ -80,7 +65,7 @@ export class TimezoneChangeMonitor {
    * @param repository データリポジトリ（オプショナル）
    * @param scheduler 動的レポートスケジューラー（オプショナル）
    */
-  constructor(repository?: Repository, scheduler?: DynamicReportScheduler) {
+  constructor(repository?: ITimezoneRepository, scheduler?: DynamicReportScheduler) {
     this.repository = repository;
     this.scheduler = scheduler;
   }
@@ -95,7 +80,7 @@ export class TimezoneChangeMonitor {
   /**
    * Repositoryを設定（レガシー対応）
    */
-  setRepository(repository: Repository): void {
+  setRepository(repository: ITimezoneRepository): void {
     this.repository = repository;
   }
 

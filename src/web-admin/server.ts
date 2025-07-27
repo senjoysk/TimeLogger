@@ -7,7 +7,8 @@ import express from 'express';
 import basicAuth from 'express-basic-auth';
 import path from 'path';
 import { AdminService } from './services/adminService';
-import { SecurityService } from './services/securityService';
+import { IAdminService } from './interfaces/adminInterfaces';
+import { SecurityService, ISecurityService } from './services/securityService';
 import { AdminRepository } from './repositories/adminRepository';
 import { SqliteActivityLogRepository } from '../repositories/sqliteActivityLogRepository';
 import { IUnifiedRepository } from '../repositories/interfaces';
@@ -18,8 +19,8 @@ import { IDiscordBot } from '../interfaces/dependencies';
 
 export class AdminServer {
   private app: express.Application;
-  private adminService: AdminService;
-  private securityService: SecurityService;
+  private adminService: IAdminService;
+  private securityService: ISecurityService;
   private port: number;
   private databasePath: string;
   private sqliteRepo: IUnifiedRepository;

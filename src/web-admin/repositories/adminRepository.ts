@@ -51,7 +51,7 @@ export class AdminRepository implements IAdminRepository {
       switch (tableName) {
         case 'activity_logs':
           const result = await new Promise<number>((resolve, reject) => {
-            db.get("SELECT COUNT(*) as count FROM activity_logs", (err: any, row: any) => {
+            db.get("SELECT COUNT(*) as count FROM activity_logs", (err: Error | null, row: { count: number }) => {
               if (err) reject(err);
               else resolve(row.count);
             });
@@ -59,7 +59,7 @@ export class AdminRepository implements IAdminRepository {
           return result;
         case 'todo_tasks':
           const todoCount = await new Promise<number>((resolve, reject) => {
-            db.get("SELECT COUNT(*) as count FROM todo_tasks", (err: any, row: any) => {
+            db.get("SELECT COUNT(*) as count FROM todo_tasks", (err: Error | null, row: { count: number }) => {
               if (err) reject(err);
               else resolve(row.count);
             });
@@ -67,7 +67,7 @@ export class AdminRepository implements IAdminRepository {
           return todoCount;
         case 'user_settings':
           const userCount = await new Promise<number>((resolve, reject) => {
-            db.get("SELECT COUNT(DISTINCT user_id) as count FROM user_settings", (err: any, row: any) => {
+            db.get("SELECT COUNT(DISTINCT user_id) as count FROM user_settings", (err: Error | null, row: { count: number }) => {
               if (err) reject(err);
               else resolve(row.count);
             });
@@ -114,7 +114,7 @@ export class AdminRepository implements IAdminRepository {
   /**
    * テーブルデータを取得（ページネーション対応・N+1問題解決版）
    */
-  async getTableData(tableName: string, options: PaginationOptions = {}): Promise<any[]> {
+  async getTableData(tableName: string, options: PaginationOptions = {}): Promise<Record<string, unknown>[]> {
     const { page = 1, limit = 50 } = options;
     
     try {
@@ -124,11 +124,11 @@ export class AdminRepository implements IAdminRepository {
       switch (tableName) {
         case 'activity_logs':
           const offset = (page - 1) * limit;
-          const logs = await new Promise<any[]>((resolve, reject) => {
+          const logs = await new Promise<Record<string, unknown>[]>((resolve, reject) => {
             db.all(
               "SELECT * FROM activity_logs ORDER BY created_at DESC LIMIT ? OFFSET ?",
               [limit, offset],
-              (err: any, rows: any[]) => {
+              (err: Error | null, rows: Record<string, unknown>[]) => {
                 if (err) reject(err);
                 else resolve(rows);
               }
@@ -137,11 +137,11 @@ export class AdminRepository implements IAdminRepository {
           return logs;
         case 'todo_tasks':
           const todoOffset = (page - 1) * limit;
-          const todos = await new Promise<any[]>((resolve, reject) => {
+          const todos = await new Promise<Record<string, unknown>[]>((resolve, reject) => {
             db.all(
               "SELECT * FROM todo_tasks ORDER BY created_at DESC LIMIT ? OFFSET ?",
               [limit, todoOffset],
-              (err: any, rows: any[]) => {
+              (err: Error | null, rows: Record<string, unknown>[]) => {
                 if (err) reject(err);
                 else resolve(rows);
               }
@@ -150,11 +150,11 @@ export class AdminRepository implements IAdminRepository {
           return todos;
         case 'user_settings':
           const userOffset = (page - 1) * limit;
-          const users = await new Promise<any[]>((resolve, reject) => {
+          const users = await new Promise<Record<string, unknown>[]>((resolve, reject) => {
             db.all(
               "SELECT DISTINCT user_id, timezone, created_at, updated_at FROM user_settings ORDER BY updated_at DESC LIMIT ? OFFSET ?",
               [limit, userOffset],
-              (err: any, rows: any[]) => {
+              (err: Error | null, rows: Record<string, unknown>[]) => {
                 if (err) reject(err);
                 else resolve(rows);
               }
@@ -173,7 +173,7 @@ export class AdminRepository implements IAdminRepository {
   /**
    * フォールバック用のテーブルデータ取得（従来の方法）
    */
-  private async getTableDataFallback(tableName: string, options: PaginationOptions = {}): Promise<any[]> {
+  private async getTableDataFallback(tableName: string, options: PaginationOptions = {}): Promise<Record<string, unknown>[]> {
     const { page = 1, limit = 50 } = options;
     
     switch (tableName) {
@@ -194,7 +194,7 @@ export class AdminRepository implements IAdminRepository {
           allTodos.push(...todos);
         }
         allTodos.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-        return this.paginate(allTodos, page, limit);
+        return this.paginate(allTodos as any, page, limit);
       case 'user_settings':
         const userList = await this.sqliteRepo.getAllUsers();
         return this.paginate(userList, page, limit);
@@ -210,7 +210,7 @@ export class AdminRepository implements IAdminRepository {
     tableName: string, 
     filters: SearchFilters, 
     options: PaginationOptions = {}
-  ): Promise<any[]> {
+  ): Promise<Record<string, unknown>[]> {
     const { page = 1, limit = 50 } = options;
     
     // 各テーブルごとに適切なフィルタリングを実装
@@ -218,7 +218,7 @@ export class AdminRepository implements IAdminRepository {
       case 'activity_logs':
         if (filters.userId && filters.userId !== 'all') {
           const logs = await (this.sqliteRepo as any).getActivityRecords(filters.userId, this.getDefaultTimezone());
-          return this.paginate(logs, page, limit);
+          return this.paginate(logs as any, page, limit);
         }
         return this.getTableData(tableName, options);
       case 'todo_tasks':
@@ -250,7 +250,7 @@ export class AdminRepository implements IAdminRepository {
         
         // ソートとページネーション
         finalTodos.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-        return this.paginate(finalTodos, page, limit);
+        return this.paginate(finalTodos as any, page, limit);
       default:
         return this.getTableData(tableName, options);
     }
@@ -259,13 +259,15 @@ export class AdminRepository implements IAdminRepository {
   /**
    * テーブルスキーマを取得
    */
-  async getTableSchema(tableName: string): Promise<any> {
+  async getTableSchema(tableName: string): Promise<Record<string, unknown>> {
     // 暫定的なスキーマ情報を返す
-    return [
-      { name: 'id', type: 'TEXT', pk: 1 },
-      { name: 'created_at', type: 'TEXT', pk: 0 },
-      { name: 'updated_at', type: 'TEXT', pk: 0 }
-    ];
+    return {
+      columns: [
+        { name: 'id', type: 'TEXT', pk: 1 },
+        { name: 'created_at', type: 'TEXT', pk: 0 },
+        { name: 'updated_at', type: 'TEXT', pk: 0 }
+      ]
+    };
   }
 
   /**
@@ -342,7 +344,7 @@ export class AdminRepository implements IAdminRepository {
     }
 
     // SqliteActivityLogRepositoryを使用してTODOを更新
-    const updateData: any = {};
+    const updateData: Record<string, unknown> = {};
     if (updates.content) updateData.content = updates.content;
     if (updates.status) updateData.status = updates.status;
     if (updates.priority) {

@@ -6,6 +6,7 @@
 import * as fs from 'fs';
 import { Database } from 'sqlite3';
 import { SqliteActivityLogRepository } from '../repositories/sqliteActivityLogRepository';
+import { IUnifiedRepository } from '../repositories/interfaces';
 import { ActivityLogError } from '../types/activityLog';
 
 /**
@@ -57,7 +58,7 @@ export class SystemMigrator {
   private config: MigrationConfig;
   private stats: MigrationStats;
   private oldDb!: Database;
-  private newRepository!: SqliteActivityLogRepository;
+  private newRepository!: IUnifiedRepository;
 
   constructor(config: MigrationConfig) {
     this.config = config;

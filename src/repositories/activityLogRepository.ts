@@ -12,6 +12,7 @@ import {
   DailyAnalysisResult,
   BusinessDateInfo
 } from '../types/activityLog';
+import { TimezoneChange, TimezoneNotification } from './interfaces';
 
 /**
  * 活動ログ管理用Repositoryインターフェース
@@ -233,12 +234,7 @@ export interface IActivityLogRepository {
    * @param since 指定時刻以降の変更のみ取得（オプション）
    * @returns タイムゾーン変更履歴配列
    */
-  getUserTimezoneChanges(since?: Date): Promise<Array<{
-    userId: string;
-    oldTimezone: string | null;
-    newTimezone: string;
-    changedAt: Date;
-  }>>;
+  getUserTimezoneChanges(since?: Date): Promise<TimezoneChange[]>;
 
   // === システム管理 ===
 
@@ -276,13 +272,7 @@ export interface IActivityLogRepository {
    * 未処理の通知を取得
    * @returns 未処理通知配列
    */
-  getUnprocessedNotifications(): Promise<Array<{
-    id: string;
-    userId: string;
-    type: string;
-    data: unknown;
-    createdAt: Date;
-  }>>;
+  getUnprocessedNotifications(): Promise<TimezoneNotification[]>;
 
   /**
    * 通知を処理済みとしてマーク

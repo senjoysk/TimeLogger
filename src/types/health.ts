@@ -42,7 +42,7 @@ export interface HealthStatus {
     handlers?: boolean;
     
     /** その他の詳細情報 */
-    [key: string]: any;
+    [key: string]: unknown;
   };
   
   /** チェック実行時刻 */

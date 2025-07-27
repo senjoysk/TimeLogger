@@ -6,12 +6,24 @@
 import { ITimeProvider } from '../interfaces/dependencies';
 import { RealTimeProvider, MockTimeProvider } from '../factories';
 
+export interface ITimeProviderService {
+  getTimeProvider(): ITimeProvider;
+  enableSimulationMode(initialDate?: Date): void;
+  disableSimulationMode(): void;
+  isInSimulationMode(): boolean;
+  setSimulatedTime(date: Date): void;
+  now(): Date;
+  startTimeProgression(): void;
+  stopTimeProgression(): void;
+  isTimeProgressing(): boolean;
+}
+
 /**
  * TimeProviderServiceのシングルトンインスタンス
  * アプリケーション全体で共有される時刻プロバイダーを管理
  */
-export class TimeProviderService {
-  private static instance: TimeProviderService;
+export class TimeProviderService implements ITimeProviderService {
+  private static instance: TimeProviderService; // シングルトンパターンでは具象クラス依存が必要 (dependency-injection-check除外対象)
   private timeProvider: ITimeProvider;
   private isSimulationMode: boolean = false;
 

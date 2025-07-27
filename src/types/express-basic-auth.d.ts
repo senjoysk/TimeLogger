@@ -8,7 +8,7 @@ declare module 'express-basic-auth' {
     challenge?: boolean;
     challengeText?: string;
     realm?: string;
-    unauthorizedResponse?: any;
+    unauthorizedResponse?: string | object;
   }
 
   function basicAuth(options: BasicAuthOptions): RequestHandler;

@@ -12,7 +12,8 @@ import {
   RecentActivityContext,
   GeminiTimeAnalysisResponse,
   RealTimeAnalysisError,
-  RealTimeAnalysisErrorCode
+  RealTimeAnalysisErrorCode,
+  TimePatternMatch
 } from '../types/realTimeAnalysis';
 import { TimePatternMatcher, TIME_EXPRESSION_NORMALIZER } from '../utils/timePatterns';
 import { IGeminiService } from './interfaces/IGeminiService';
@@ -49,18 +50,18 @@ export class TimeInformationExtractor {
       const patternMatches = this.patternMatcher.matchPatterns(normalizedInput);
       const basicAnalysis = this.analyzePatternMatches(patternMatches, inputTimestamp, timezone);
 
-      let finalAnalysis: any;
+      let finalAnalysis: TimeAnalysisResult;
 
       // 3. 基本解析の信頼度が高い場合はそれを優先、低い場合はGeminiを使用
       if (basicAnalysis.confidence && basicAnalysis.confidence > 0.6 && basicAnalysis.startTime) {
         finalAnalysis = {
-          timeInfo: {
-            startTime: basicAnalysis.startTime,
-            endTime: basicAnalysis.endTime,
-            confidence: basicAnalysis.confidence,
-            method: basicAnalysis.method,
-            timezone: basicAnalysis.timezone
-          }
+          startTime: basicAnalysis.startTime,
+          endTime: basicAnalysis.endTime || basicAnalysis.startTime,
+          totalMinutes: basicAnalysis.totalMinutes || 30,
+          confidence: basicAnalysis.confidence,
+          method: basicAnalysis.method || TimeExtractionMethod.EXPLICIT,
+          timezone: timezone,
+          extractedComponents: []
         };
       } else {
         // Geminiによる高度解析
@@ -72,28 +73,37 @@ export class TimeInformationExtractor {
           context
         );
         
+        // GeminiTimeAnalysisResponseをTimeAnalysisResultに変換
+        const startTime = new Date(geminiAnalysis.timeInfo.startTime);
+        const endTime = new Date(geminiAnalysis.timeInfo.endTime);
+        const totalMinutes = Math.round((endTime.getTime() - startTime.getTime()) / (1000 * 60));
+        
+        finalAnalysis = {
+          startTime: geminiAnalysis.timeInfo.startTime,
+          endTime: geminiAnalysis.timeInfo.endTime,
+          totalMinutes: totalMinutes > 0 ? totalMinutes : 30,
+          confidence: geminiAnalysis.timeInfo.confidence,
+          method: geminiAnalysis.timeInfo.method as TimeExtractionMethod,
+          timezone: timezone,
+          extractedComponents: []
+        };
+        
         // パターンマッチがない場合はGeminiの信頼度も下げる
         if (patternMatches.length === 0 || (basicAnalysis.confidence !== undefined && basicAnalysis.confidence <= 0.3)) {
-          geminiAnalysis.timeInfo.confidence = Math.min(geminiAnalysis.timeInfo.confidence, 0.4);
-          geminiAnalysis.timeInfo.method = TimeExtractionMethod.INFERRED;
+          finalAnalysis.confidence = Math.min(finalAnalysis.confidence, 0.4);
+          finalAnalysis.method = TimeExtractionMethod.INFERRED;
         }
-        
-        finalAnalysis = geminiAnalysis;
       }
 
-      // 4. コンテキストベース補正
-      const contextAdjusted = this.adjustWithContext(finalAnalysis, context, inputTimestamp);
+      // 4. extractedComponentsを設定
+      finalAnalysis.extractedComponents = patternMatches.map(match => ({
+        type: this.mapPatternToComponentType(match.patternName),
+        value: match.match,
+        confidence: match.confidence,
+        position: match.position
+      }));
 
-      // 5. 最終検証と結果構築
-      const finalResult = this.buildFinalResult(
-        contextAdjusted,
-        patternMatches,
-        normalizedInput,
-        timezone,
-        startTime
-      );
-
-      return finalResult;
+      return finalAnalysis;
 
     } catch (error) {
       console.error('❌ 時刻抽出エラー:', error);
@@ -150,10 +160,11 @@ export class TimeInformationExtractor {
    * パターンマッチング結果の基本解析
    */
   private analyzePatternMatches(
-    matches: any[],
+    matches: TimePatternMatch[],
     inputTimestamp: Date,
     timezone: string
   ): Partial<TimeAnalysisResult> {
+    
     if (matches.length === 0) {
       return {
         method: TimeExtractionMethod.INFERRED,
@@ -179,7 +190,7 @@ export class TimeInformationExtractor {
    * パターンから時刻を抽出
    */
   private extractTimeFromPattern(
-    match: any,
+    match: TimePatternMatch,
     inputTimestamp: Date,
     timezone: string
   ): Partial<TimeAnalysisResult> {
@@ -217,7 +228,7 @@ export class TimeInformationExtractor {
    * 明示的時刻範囲の処理
    */
   private handleExplicitTimeRange(
-    match: any,
+    match: TimePatternMatch,
     inputTime: Date,
     timezone: string
   ): Partial<TimeAnalysisResult> {
@@ -232,15 +243,15 @@ export class TimeInformationExtractor {
 
       // タイムゾーン時刻として開始・終了時刻を構築
       const startTimeZoned = new Date(inputTime);
-      startTimeZoned.setHours(parsed.startHour, parsed.startMinute || 0, 0, 0);
+      startTimeZoned.setHours(parsed.startHour!, parsed.startMinute || 0, 0, 0);
       
       const endTimeZoned = new Date(inputTime);
-      endTimeZoned.setHours(parsed.endHour, parsed.endMinute || 0, 0, 0);
+      endTimeZoned.setHours(parsed.endHour || parsed.startHour!, parsed.endMinute || 0, 0, 0);
 
       // 深夜をまたぐ時刻範囲の処理
-      if (parsed.startHour >= 22 && parsed.endHour <= 6) {
-        // 23:30から0:30のような場合：開始時刻は前日、終了時刻は当日
-        startTimeZoned.setDate(startTimeZoned.getDate() - 1);
+      if (parsed.startHour! >= 22 && (parsed.endHour || 0) <= 6) {
+        // 23:30から0:30のような場合：終了時刻を翌日とみなす
+        endTimeZoned.setDate(endTimeZoned.getDate() + 1);
       } else if (endTimeZoned <= startTimeZoned) {
         // 通常の日付境界の場合：終了時刻を翌日とみなす
         endTimeZoned.setDate(endTimeZoned.getDate() + 1);
@@ -271,7 +282,7 @@ export class TimeInformationExtractor {
    * 単一時刻パターンの処理
    */
   private handleSingleTimePattern(
-    match: any,
+    match: TimePatternMatch,
     inputTime: Date,
     timezone: string
   ): Partial<TimeAnalysisResult> {
@@ -317,7 +328,7 @@ export class TimeInformationExtractor {
    * 継続時間パターンの処理
    */
   private handleDurationPattern(
-    match: any,
+    match: TimePatternMatch,
     inputTime: Date,
     timezone: string
   ): Partial<TimeAnalysisResult> {
@@ -356,7 +367,7 @@ export class TimeInformationExtractor {
    * 相対時刻パターンの処理
    */
   private handleRelativeTimePattern(
-    match: any,
+    match: TimePatternMatch,
     inputTime: Date,
     timezone: string
   ): Partial<TimeAnalysisResult> {
@@ -409,7 +420,7 @@ export class TimeInformationExtractor {
       const result = await this.geminiService.classifyMessageWithAI(input);
       
       // レスポンスを期待する形式に変換
-      return this.parseGeminiResponse(result, basicAnalysis);
+      return this.parseGeminiResponse(result as any, basicAnalysis);
     } catch (error) {
       console.error('Gemini解析エラー:', error);
       // フォールバック: 基本解析結果を使用
@@ -486,7 +497,7 @@ JSON形式のみで回答してください。説明文は不要です。
    * Geminiレスポンスのパース
    */
   private parseGeminiResponse(
-    geminiResult: any,
+    geminiResult: { startTime?: string; endTime?: string; [key: string]: unknown },
     basicAnalysis: Partial<TimeAnalysisResult>
   ): GeminiTimeAnalysisResponse {
     // 既存のGeminiServiceの結果を新しい形式に変換
@@ -497,17 +508,17 @@ JSON形式のみで回答してください。説明文は不要です。
       timeInfo: {
         startTime: startTime || new Date().toISOString(),
         endTime: endTime || new Date().toISOString(),
-        confidence: geminiResult.confidence || basicAnalysis.confidence || 0.5,
-        method: geminiResult.method || basicAnalysis.method || 'inferred',
-        timezone: basicAnalysis.timezone || this.getDefaultTimezone()
+        confidence: (geminiResult.confidence as number) || (basicAnalysis.confidence as number) || 0.5,
+        method: (geminiResult.method as string) || (basicAnalysis.method as string) || 'inferred',
+        timezone: (basicAnalysis.timezone as string) || this.getDefaultTimezone()
       },
       activities: [{
-        content: geminiResult.structuredContent || '',
-        category: geminiResult.category || '未分類',
-        subCategory: geminiResult.subCategory,
+        content: (geminiResult.structuredContent as string) || '',
+        category: (geminiResult.category as string) || '未分類',
+        subCategory: geminiResult.subCategory as string,
         timePercentage: 100,
         priority: 'primary',
-        confidence: geminiResult.confidence || 0.5
+        confidence: (geminiResult.confidence as number) || 0.5
       }],
       analysis: {
         hasParallelActivities: false,
@@ -560,7 +571,7 @@ JSON形式のみで回答してください。説明文は不要です。
   ): GeminiTimeAnalysisResponse {
     // 最近のログとの重複チェック
     if (context.recentLogs && context.recentLogs.length > 0) {
-      const adjusted = this.checkTimeOverlaps(geminiAnalysis, context.recentLogs);
+      const adjusted = this.checkTimeOverlaps(geminiAnalysis, context.recentLogs as any);
       if (adjusted) {
         return adjusted;
       }
@@ -568,7 +579,7 @@ JSON形式のみで回答してください。説明文は不要です。
 
     // セッション情報による補正
     if (context.currentSession) {
-      return this.adjustWithSessionInfo(geminiAnalysis, context.currentSession);
+      return this.adjustWithSessionInfo(geminiAnalysis, context.currentSession as any);
     }
 
     return geminiAnalysis;
@@ -579,7 +590,7 @@ JSON形式のみで回答してください。説明文は不要です。
    */
   private checkTimeOverlaps(
     analysis: GeminiTimeAnalysisResponse,
-    recentLogs: any[]
+    recentLogs: { startTime?: string; endTime?: string; [key: string]: unknown }[]
   ): GeminiTimeAnalysisResponse | null {
     // 重複検出ロジックを実装
     // 簡略版として、警告のみ追加
@@ -591,7 +602,7 @@ JSON形式のみで回答してください。説明文は不要です。
    */
   private adjustWithSessionInfo(
     analysis: GeminiTimeAnalysisResponse,
-    sessionInfo: any
+    sessionInfo: Record<string, unknown>
   ): GeminiTimeAnalysisResponse {
     // セッション開始時刻との整合性チェック
     return analysis;
@@ -602,7 +613,7 @@ JSON形式のみで回答してください。説明文は不要です。
    */
   private buildFinalResult(
     analysis: GeminiTimeAnalysisResponse,
-    patternMatches: any[],
+    patternMatches: TimePatternMatch[],
     originalInput: string,
     timezone: string,
     startTime: number

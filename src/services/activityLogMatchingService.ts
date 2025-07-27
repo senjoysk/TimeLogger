@@ -14,10 +14,18 @@ import {
 } from '../types/activityLog';
 import { IGeminiService } from './interfaces/IGeminiService';
 
+export interface IActivityLogMatchingService {
+  analyzeLogType(request: LogTypeAnalysisRequest): Promise<LogTypeAnalysisResponse>;
+  calculateTimeScore(startTimestamp: string, endTimestamp: string): number;
+  findMatchingCandidates(startLog: ActivityLog, endCandidates: ActivityLog[]): Promise<MatchingCandidate[]>;
+  findMatchingCandidatesWithSemantic(startLog: ActivityLog, endCandidates: ActivityLog[]): Promise<MatchingCandidate[]>;
+  analyzeLogTypeWithGemini(request: LogTypeAnalysisRequest): Promise<LogTypeAnalysisResponse>;
+}
+
 /**
  * 開始・終了ログマッチングサービス
  */
-export class ActivityLogMatchingService {
+export class ActivityLogMatchingService implements IActivityLogMatchingService {
   private strategy: MatchingStrategy;
   private geminiService?: IGeminiService;
 

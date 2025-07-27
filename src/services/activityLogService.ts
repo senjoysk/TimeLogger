@@ -27,7 +27,7 @@ import {
   ActivityPriority,
   TimeExtractionMethod
 } from '../types/realTimeAnalysis';
-import { ActivityLogMatchingService } from './activityLogMatchingService';
+import { ActivityLogMatchingService, IActivityLogMatchingService } from './activityLogMatchingService';
 import { ITimezoneService } from './interfaces/ITimezoneService';
 
 /**
@@ -154,7 +154,7 @@ export interface IActivityLogService {
  */
 export class ActivityLogService implements IActivityLogService {
   private realTimeAnalyzer: RealTimeActivityAnalyzer;
-  private matchingService: ActivityLogMatchingService;
+  private matchingService: IActivityLogMatchingService;
   
   constructor(
     private repository: IActivityLogRepository,

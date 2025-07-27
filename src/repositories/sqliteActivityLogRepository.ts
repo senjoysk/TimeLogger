@@ -47,7 +47,7 @@ import {
   IActivityLogRepository,
   LogSearchCriteria
 } from './activityLogRepository';
-import { IApiCostRepository, ITodoRepository, IMessageClassificationRepository, IUserRepository, IActivityPromptRepository, UserInfo, UserStats } from './interfaces';
+import { IApiCostRepository, ITodoRepository, IMessageClassificationRepository, IUserRepository, IActivityPromptRepository, UserInfo, UserStats, TimezoneChange, TimezoneNotification } from './interfaces';
 import {
   ActivityLog,
   CreateActivityLogRequest,
@@ -1216,12 +1216,7 @@ export class SqliteActivityLogRepository implements IActivityLogRepository, IApi
   /**
    * 指定時刻以降のタイムゾーン変更を取得
    */
-  async getUserTimezoneChanges(since?: Date): Promise<Array<{
-    userId: string;
-    oldTimezone: string | null;
-    newTimezone: string;
-    changedAt: Date;
-  }>> {
+  async getUserTimezoneChanges(since?: Date): Promise<TimezoneChange[]> {
     try {
       let sql = `
         SELECT user_id, old_timezone, new_timezone, changed_at
@@ -1241,10 +1236,10 @@ export class SqliteActivityLogRepository implements IActivityLogRepository, IApi
       
       console.log(`📍 タイムゾーン変更取得: ${rows.length}件 (since: ${since?.toISOString() || 'all'})`);
       return rows.map(row => ({
-        userId: row.user_id,
-        oldTimezone: row.old_timezone || null,
-        newTimezone: row.new_timezone,
-        changedAt: new Date(row.changed_at)
+        user_id: row.user_id,
+        old_timezone: row.old_timezone,
+        new_timezone: row.new_timezone,
+        updated_at: row.changed_at
       }));
     } catch (error) {
       console.error('❌ タイムゾーン変更取得エラー:', error);
@@ -1255,13 +1250,7 @@ export class SqliteActivityLogRepository implements IActivityLogRepository, IApi
   /**
    * 未処理の通知を取得
    */
-  async getUnprocessedNotifications(): Promise<Array<{
-    id: string;
-    userId: string;
-    type: string;
-    data: unknown;
-    createdAt: Date;
-  }>> {
+  async getUnprocessedNotifications(): Promise<TimezoneNotification[]> {
     try {
       const sql = `
         SELECT id, user_id, old_timezone, new_timezone, changed_at, processed
@@ -1270,18 +1259,23 @@ export class SqliteActivityLogRepository implements IActivityLogRepository, IApi
         ORDER BY changed_at ASC
       `;
       
-      const rows = await this.allQuery<TimezoneChangeRow>(sql);
+      const rows = await this.allQuery<{
+        id: string;
+        user_id: string;
+        old_timezone: string | null;
+        new_timezone: string;
+        changed_at: string;
+        processed: number;
+      }>(sql);
       
       console.log(`📍 未処理通知取得: ${rows.length}件`);
       return rows.map(row => ({
-        id: `timezone_change_${row.user_id}_${row.changed_at}`,
-        userId: row.user_id,
-        type: 'timezone_change',
-        data: {
-          oldTimezone: row.old_timezone,
-          newTimezone: row.new_timezone
-        },
-        createdAt: new Date(row.changed_at)
+        id: row.id,
+        user_id: row.user_id,
+        old_timezone: row.old_timezone,
+        new_timezone: row.new_timezone,
+        changed_at: row.changed_at,
+        processed: sqliteBooleanToBoolean(row.processed as SqliteBoolean)
       }));
     } catch (error) {
       console.error('❌ 未処理通知取得エラー:', error);

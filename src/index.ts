@@ -20,8 +20,9 @@ class Application {
     this.bot = new TaskLoggerBot();
     // スケジューラーの初期化はBotの初期化後に行う
     this.scheduler = null as any;
-    this.dynamicScheduler = new DynamicReportScheduler();
-    this.timezoneMonitor = new TimezoneChangeMonitor();
+    // DynamicReportSchedulerとTimezoneChangeMonitorはリポジトリ取得後に初期化
+    this.dynamicScheduler = null as any;
+    this.timezoneMonitor = null as any;
   }
 
   /**
@@ -60,12 +61,10 @@ class Application {
         console.error('❌ リポジトリが取得できないため、スケジューラーの初期化をスキップします');
         return;
       }
-      this.scheduler = new EnhancedScheduler(this.bot, repository as any);
-      
-      // 動的スケジューラーの設定
-      this.dynamicScheduler.setRepository(repository as any);
-      this.timezoneMonitor.setRepository(repository as any);
-      this.timezoneMonitor.setScheduler(this.dynamicScheduler);
+      // スケジューラーと動的コンポーネントを初期化
+      this.dynamicScheduler = new DynamicReportScheduler(repository);
+      this.timezoneMonitor = new TimezoneChangeMonitor(repository, this.dynamicScheduler);
+      this.scheduler = new EnhancedScheduler(this.bot, repository);
       
       // EnhancedSchedulerに動的コンポーネントを統合
       this.scheduler.setDynamicScheduler(this.dynamicScheduler);

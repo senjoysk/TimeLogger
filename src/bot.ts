@@ -20,6 +20,7 @@ import {
   ITimeProvider 
 } from './interfaces/dependencies';
 import { IActivityLogRepository } from './repositories/activityLogRepository';
+import { IUnifiedRepository } from './repositories/interfaces';
 import { HealthStatus, RecoveryAttemptResult } from './types/health';
 import { 
   DiscordClientFactory, 
@@ -822,7 +823,7 @@ export class TaskLoggerBot {
    * データベースインスタンスを取得（活動記録システム経由）
    * @returns データベースインスタンス
    */
-  public getRepository(): IActivityLogRepository | undefined {
+  public getRepository(): IUnifiedRepository | undefined {
     return this.activityLoggingIntegration?.getRepository();
   }
 

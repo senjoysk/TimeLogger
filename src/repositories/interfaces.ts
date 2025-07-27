@@ -185,6 +185,36 @@ export interface IActivityPromptRepository {
 }
 
 /**
+ * スケジューラー用のユーザータイムゾーン情報
+ */
+export interface UserTimezone {
+  userId: string;
+  timezone: string;
+}
+
+/**
+ * タイムゾーン変更情報
+ */
+export interface TimezoneChange {
+  user_id: string;
+  old_timezone: string | null;
+  new_timezone: string;
+  updated_at: string;
+}
+
+/**
+ * タイムゾーン変更通知
+ */
+export interface TimezoneNotification {
+  id: string;
+  user_id: string;
+  old_timezone: string | null;
+  new_timezone: string;
+  changed_at: string;
+  processed: boolean;
+}
+
+/**
  * 統合リポジトリインターフェース
  * SQLiteActivityLogRepositoryの全機能を統合
  */
@@ -200,4 +230,12 @@ export interface IUnifiedRepository extends
   initializeDatabase(): Promise<void>;
   close(): Promise<void>;
   ensureSchema(): Promise<void>;
+  
+  // スケジューラー関連メソッド
+  getAllUserTimezonesForScheduler(): Promise<UserTimezone[]>;
+  getUserTimezoneChanges(since?: Date): Promise<TimezoneChange[]>;
+  getUnprocessedNotifications(): Promise<TimezoneNotification[]>;
+  markNotificationAsProcessed(notificationId: string): Promise<void>;
+  getUserTimezone(userId: string): Promise<string | null>;
+  saveUserTimezone(userId: string, timezone: string): Promise<void>;
 }

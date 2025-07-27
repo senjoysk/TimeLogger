@@ -31,7 +31,7 @@ import {
   generateSessionId
 } from '../components/classificationResultEmbed';
 import { ActivityLogError } from '../types/activityLog';
-import { ActivityLogService } from '../services/activityLogService';
+import { ActivityLogService, IActivityLogService } from '../services/activityLogService';
 
 /**
  * TODOコマンドの種類
@@ -104,7 +104,7 @@ export class TodoCommandHandler implements ITodoCommandHandler {
     private classificationRepository: IMessageClassificationRepository,
     private geminiService: IGeminiService,
     private classificationService: IMessageClassificationService,
-    private activityLogService?: ActivityLogService // 活動ログサービスの注入
+    private activityLogService?: IActivityLogService // 活動ログサービスの注入
   ) {
     // セッションタイムアウトのクリーンアップ
     this.cleanupInterval = setInterval(() => this.cleanupExpiredSessions(), 60 * 1000); // 1分間隔でクリーンアップ

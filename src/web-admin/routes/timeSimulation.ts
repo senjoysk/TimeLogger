@@ -230,7 +230,7 @@ export function createTimeSimulationRouter(bot: IDiscordBot | null = null): Rout
             return res.status(500).json({ error: 'Repository not available' });
           }
           const users = await repository.getAllUsers();
-          const user = users.find((u: any) => u.userId === targetUserId);
+          const user = users.find((u) => u.userId === targetUserId);
           const userTimezone = user?.timezone || 'Asia/Tokyo';
 
           // リマインダーを送信

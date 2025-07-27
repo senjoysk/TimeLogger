@@ -135,7 +135,7 @@ export class RealTimeActivityAnalyzer {
   private buildFinalAnalysisResult(
     timeAnalysis: TimeAnalysisResult,
     activities: ActivityDetail[],
-    validationResult: any,
+    validationResult: { isValid: boolean; warnings: { type: WarningType; level: WarningLevel; message: string; details?: Record<string, unknown> }[]; overallConfidence: number; recommendations: string[]; validationSummary: string },
     originalInput: string,
     timezone: string,
     inputTimestamp: Date,
@@ -170,7 +170,12 @@ export class RealTimeActivityAnalyzer {
       timeAnalysis,
       activities,
       confidence: validationResult.overallConfidence,
-      warnings: validationResult.warnings,
+      warnings: validationResult.warnings.map(warning => ({
+        type: warning.type,
+        level: warning.level,
+        message: warning.message,
+        details: warning.details ? warning.details as any : {}
+      })),
       metadata,
       summary: this.generateAnalysisSummary(timeAnalysis, activities, validationResult),
       recommendations: validationResult.recommendations || []
@@ -204,7 +209,7 @@ export class RealTimeActivityAnalyzer {
   private generateAnalysisSummary(
     timeAnalysis: TimeAnalysisResult,
     activities: ActivityDetail[],
-    validationResult: any
+    validationResult: { warnings: unknown[]; overallConfidence: number; [key: string]: unknown }
   ): string {
     const startTime = new Date(timeAnalysis.startTime);
     const endTime = new Date(timeAnalysis.endTime);
@@ -239,7 +244,7 @@ export class RealTimeActivityAnalyzer {
     input: string,
     timezone: string,
     inputTimestamp: Date,
-    error: any,
+    error: Error | unknown,
     analysisStartTime: number
   ): DetailedActivityAnalysis {
     console.log('🔄 フォールバック分析を実行中...');
@@ -308,7 +313,7 @@ export class RealTimeActivityAnalyzer {
         level: WarningLevel.ERROR,
         message: '詳細分析に失敗したため、フォールバック分析を実行しました',
         details: {
-          originalError: error.message || 'Unknown error',
+          originalError: error instanceof Error ? error.message : String(error),
           recommendation: '手動で時刻と活動内容を確認してください'
         }
       }],

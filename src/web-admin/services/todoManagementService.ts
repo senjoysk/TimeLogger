@@ -5,6 +5,7 @@
 
 import { TodoTask, TodoStatus, TodoPriority } from '../../types/todo';
 import { AdminRepository } from '../repositories/adminRepository';
+import { IAdminRepository } from '../interfaces/adminInterfaces';
 
 export interface CreateTodoRequest {
   userId: string;
@@ -41,7 +42,7 @@ export interface BulkCreateTodoRequest {
 }
 
 export class TodoManagementService {
-  constructor(private repository: AdminRepository) {}
+  constructor(private repository: IAdminRepository) {}
 
   /**
    * 新しいTODOタスクを作成
