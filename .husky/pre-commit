@@ -2,6 +2,36 @@
 npm run build
 npm test
 
+# 🆕 SRP（単一責任原則）違反チェック
+echo "🔍 Pre-commit check: SRP違反チェック..."
+./scripts/code-review/srp-violation-check.sh
+
+if [ $? -ne 0 ]; then
+    echo ""
+    echo "🚨 コミットが阻止されました！"
+    echo "🛠️ SRP（単一責任原則）違反が検出されました。"
+    echo "📋 ファイル分割または例外指定（@SRP-EXCEPTION）後に再度コミットしてください。"
+    echo ""
+    exit 1
+fi
+
+echo "✅ SRP違反チェック通過"
+
+# 🆕 ファイルサイズ監視チェック
+echo "🔍 Pre-commit check: ファイルサイズ監視..."
+./scripts/code-review/file-size-check.sh
+
+if [ $? -ne 0 ]; then
+    echo ""
+    echo "🚨 コミットが阻止されました！"
+    echo "🛠️ 巨大ファイルが検出されました。"
+    echo "📋 ファイル分割後に再度コミットしてください。"
+    echo ""
+    exit 1
+fi
+
+echo "✅ ファイルサイズチェック通過"
+
 # 依存性注入とany型使用のチェック
 ./scripts/code-review/dependency-injection-check.sh
 
