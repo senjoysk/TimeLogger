@@ -1,11 +1,15 @@
 /**
  * AdminRepository実装
  * 既存のSqliteActivityLogRepositoryを拡張して管理機能を提供
+ * 
+ * @SRP-EXCEPTION: Web管理機能のデータアクセス層として複数テーブルを統合管理
+ * @SRP-REASON: 管理画面の要求により複数のデータソース（活動ログ・TODO・ユーザー）を統合する必要があり、
+ *              分離すると管理UIの複雑性とパフォーマンスが悪化するため一時的に統合
  */
 
 import { IAdminRepository } from '../interfaces/adminInterfaces';
 import { SearchFilters, PaginationOptions } from '../types/admin';
-import { SqliteActivityLogRepository } from '../../repositories/sqliteActivityLogRepository';
+import { PartialCompositeRepository } from '../../repositories/PartialCompositeRepository';
 import { IUnifiedRepository } from '../../repositories/interfaces';
 import { TodoTask, TodoStatus, TodoPriority, Todo } from '../../types/todo';
 import { v4 as uuidv4 } from 'uuid';
@@ -91,7 +95,10 @@ export class AdminRepository implements IAdminRepository {
         const users = await this.sqliteRepo.getAllUsers();
         let totalLogs = 0;
         for (const user of users) {
-          const logs = await (this.sqliteRepo as any).getActivityRecords(user.userId, this.getDefaultTimezone());
+          // Get logs for the last 30 days
+          const endDate = new Date().toISOString().split('T')[0];
+          const startDate = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+          const logs = await this.sqliteRepo.getLogsByDateRange(user.userId, startDate, endDate);
           totalLogs += logs.length;
         }
         return totalLogs;
@@ -181,11 +188,14 @@ export class AdminRepository implements IAdminRepository {
         const users = await this.sqliteRepo.getAllUsers();
         const allLogs = [];
         for (const user of users) {
-          const logs = await (this.sqliteRepo as any).getActivityRecords(user.userId, this.getDefaultTimezone());
+          // Get logs for the last 30 days
+          const endDate = new Date().toISOString().split('T')[0];
+          const startDate = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+          const logs = await this.sqliteRepo.getLogsByDateRange(user.userId, startDate, endDate);
           allLogs.push(...logs);
         }
         allLogs.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-        return this.paginate(allLogs, page, limit);
+        return this.paginate(allLogs as any, page, limit);
       case 'todo_tasks':
         const allUsers = await this.sqliteRepo.getAllUsers();
         const allTodos = [];
@@ -217,7 +227,10 @@ export class AdminRepository implements IAdminRepository {
     switch (tableName) {
       case 'activity_logs':
         if (filters.userId && filters.userId !== 'all') {
-          const logs = await (this.sqliteRepo as any).getActivityRecords(filters.userId, this.getDefaultTimezone());
+          // Get logs for the last 30 days by default
+          const endDate = new Date().toISOString().split('T')[0];
+          const startDate = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+          const logs = await this.sqliteRepo.getLogsByDateRange(filters.userId, startDate, endDate);
           return this.paginate(logs as any, page, limit);
         }
         return this.getTableData(tableName, options);

@@ -3,14 +3,14 @@
  * TDD開発における一貫したテストデータベースセットアップを提供
  */
 
-import { SqliteActivityLogRepository } from '../repositories/sqliteActivityLogRepository';
+import { PartialCompositeRepository } from '../repositories/PartialCompositeRepository';
 import { getTestDbPath, cleanupTestDatabase, prepareTestDatabase } from '../utils/testDatabasePath';
 
 /**
  * 標準化されたテストデータベースセットアップ
  */
 export class TestDatabaseInitializer {
-  private repository: SqliteActivityLogRepository | null = null;
+  private repository: PartialCompositeRepository | null = null;
   private testDbPath: string;
 
   constructor(testFileName: string, suffix?: string) {
@@ -20,12 +20,12 @@ export class TestDatabaseInitializer {
   /**
    * テストデータベースを初期化し、リポジトリインスタンスを返す
    */
-  async initialize(): Promise<SqliteActivityLogRepository> {
+  async initialize(): Promise<PartialCompositeRepository> {
     // データベースパスの準備とクリーンアップ
     prepareTestDatabase(this.testDbPath);
     
     // リポジトリインスタンス作成と初期化
-    this.repository = new SqliteActivityLogRepository(this.testDbPath);
+    this.repository = new PartialCompositeRepository(this.testDbPath);
     await this.repository.initializeDatabase();
     
     return this.repository;
@@ -57,7 +57,7 @@ export class TestDatabaseInitializer {
   /**
    * リポジトリインスタンスを取得（初期化後のみ）
    */
-  getRepository(): SqliteActivityLogRepository {
+  getRepository(): PartialCompositeRepository {
     if (!this.repository) {
       throw new Error('Database not initialized. Call initialize() first.');
     }
@@ -82,7 +82,7 @@ export class TestDatabaseInitializer {
  */
 export function setupTestDatabase(testFileName: string, suffix?: string) {
   const initializer = new TestDatabaseInitializer(testFileName, suffix);
-  let repository: SqliteActivityLogRepository;
+  let repository: PartialCompositeRepository;
 
   beforeEach(async () => {
     repository = await initializer.initialize();
@@ -105,7 +105,7 @@ export function setupTestDatabase(testFileName: string, suffix?: string) {
  */
 export function setupSharedTestDatabase(testFileName: string, suffix?: string) {
   const initializer = new TestDatabaseInitializer(testFileName, suffix);
-  let repository: SqliteActivityLogRepository;
+  let repository: PartialCompositeRepository;
 
   beforeAll(async () => {
     repository = await initializer.initialize();
@@ -127,7 +127,7 @@ export function setupSharedTestDatabase(testFileName: string, suffix?: string) {
  * 各テストケースで独立したDBを使用したい場合
  */
 export async function createTempTestDatabase(testFileName: string): Promise<{
-  repository: SqliteActivityLogRepository;
+  repository: PartialCompositeRepository;
   path: string;
   cleanup: () => Promise<void>;
 }> {

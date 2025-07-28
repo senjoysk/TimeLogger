@@ -13,6 +13,8 @@
     "dev:prod": "NODE_ENV=production ts-node src/index.ts",
     "watch": "NODE_ENV=development ts-node --watch src/index.ts",
     "test": "jest",
+    "test:analyze": "./scripts/test-analysis.sh",
+    "test:failures": "npm test 2>&1 | grep -A 10 -B 2 'FAIL\\|●\\|Error:' | tee test-reports/test-failures-quick.txt",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
     "test:integration": "jest --testPathPattern=integration",

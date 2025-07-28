@@ -7,7 +7,7 @@ import { Router } from 'express';
 import { TodoManagementService, BulkCreateTodoRequest } from '../services/todoManagementService';
 import { SecurityService, ISecurityService } from '../services/securityService';
 import { AdminRepository } from '../repositories/adminRepository';
-import { SqliteActivityLogRepository } from '../../repositories/sqliteActivityLogRepository';
+import { PartialCompositeRepository } from '../../repositories/PartialCompositeRepository';
 import { TodoTask } from '../../types/todo';
 
 const router = Router();
@@ -19,7 +19,7 @@ let isInitialized = false;
 
 function initializeServices(databasePath: string) {
   if (!isInitialized) {
-    const sqliteRepo = new SqliteActivityLogRepository(databasePath);
+    const sqliteRepo = new PartialCompositeRepository(databasePath);
     const adminRepo = new AdminRepository(sqliteRepo);
     todoService = new TodoManagementService(adminRepo);
     securityService = new SecurityService();
@@ -43,7 +43,7 @@ router.get('/', async (req, res, next) => {
     const limit = parseInt(req.query.limit as string) || 20;
 
     // 全ユーザーのTODO取得（一時的に最初のユーザーのTODOを表示）
-    const sqliteRepo = new SqliteActivityLogRepository(req.app.get('databasePath'));
+    const sqliteRepo = new PartialCompositeRepository(req.app.get('databasePath'));
     const users = await sqliteRepo.getAllUsers();
     
     let todos: TodoTask[] = [];
@@ -116,7 +116,7 @@ router.get('/new', async (req, res, next) => {
       });
     }
 
-    const sqliteRepo = new SqliteActivityLogRepository(req.app.get('databasePath'));
+    const sqliteRepo = new PartialCompositeRepository(req.app.get('databasePath'));
     const users = await sqliteRepo.getAllUsers();
 
     res.render('todo-form', {
@@ -195,7 +195,7 @@ router.get('/:id/edit', async (req, res, next) => {
       });
     }
 
-    const sqliteRepo = new SqliteActivityLogRepository(req.app.get('databasePath'));
+    const sqliteRepo = new PartialCompositeRepository(req.app.get('databasePath'));
     const users = await sqliteRepo.getAllUsers();
 
     res.render('todo-form', {

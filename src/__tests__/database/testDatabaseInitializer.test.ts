@@ -4,7 +4,7 @@
  */
 
 import { TestDatabaseInitializer, setupTestDatabase, createTempTestDatabase } from '../../database/testDatabaseInitializer';
-import { SqliteActivityLogRepository } from '../../repositories/sqliteActivityLogRepository';
+import { PartialCompositeRepository } from '../../repositories/PartialCompositeRepository';
 
 describe('TestDatabaseInitializer', () => {
   describe('基本的な初期化とクリーンアップ', () => {
@@ -14,7 +14,7 @@ describe('TestDatabaseInitializer', () => {
       const repository = await initializer.initialize();
       
       // リポジトリが正常に初期化されていることを確認
-      expect(repository).toBeInstanceOf(SqliteActivityLogRepository);
+      expect(repository).toBeInstanceOf(PartialCompositeRepository);
       expect(await repository.isConnected()).toBe(true);
       
       // パスが正しく設定されていることを確認
@@ -52,7 +52,7 @@ describe('TestDatabaseInitializer', () => {
     test('beforeEach/afterEach による自動セットアップ', async () => {
       const repository = getRepository();
       
-      expect(repository).toBeInstanceOf(SqliteActivityLogRepository);
+      expect(repository).toBeInstanceOf(PartialCompositeRepository);
       expect(await repository.isConnected()).toBe(true);
       expect(getPath()).toContain('test-testDatabaseInitializer-test-helper-test.db');
       
@@ -81,7 +81,7 @@ describe('TestDatabaseInitializer', () => {
     test('一時的なテストデータベースの作成と削除', async () => {
       const { repository, path, cleanup } = await createTempTestDatabase(__filename);
       
-      expect(repository).toBeInstanceOf(SqliteActivityLogRepository);
+      expect(repository).toBeInstanceOf(PartialCompositeRepository);
       expect(await repository.isConnected()).toBe(true);
       expect(path).toContain('temp-');
       

@@ -29,6 +29,14 @@ test-data/*.db-wal
 src/__tests__/**/*.db-shm
 src/__tests__/**/*.db-wal
 
+# テスト結果ファイル
+test-reports/
+test-results.txt
+test-failures.txt
+test-failures-quick.txt
+test-summary.txt
+test-success.txt
+
 # ログファイル
 logs/
 *.log
