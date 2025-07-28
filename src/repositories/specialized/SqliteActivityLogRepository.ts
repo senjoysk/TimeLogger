@@ -7,6 +7,10 @@
  * - 分析キャッシュ管理
  * - 業務日時処理
  * - タイムゾーン管理（ログ関連のみ）
+ * 
+ * @SRP-EXCEPTION: 統合リポジトリとして複数責務を実装中
+ * @SRP-REASON: IActivityLogRepository + 分析キャッシュ + タイムゾーン管理を統合
+ *              次回タスクでTDD方式による責務分離リファクタリング実施予定
  */
 
 import { DatabaseConnection } from '../base/DatabaseConnection';
@@ -17,7 +21,9 @@ import {
   AnalysisCache,
   CreateAnalysisCacheRequest,
   BusinessDateInfo,
-  DailyAnalysisResult
+  DailyAnalysisResult,
+  LogType,
+  MatchStatus
 } from '../../types/activityLog';
 import { TimezoneChange, TimezoneNotification, UserTimezone } from '../interfaces';
 import { AppError, ErrorType } from '../../utils/errorHandler';
@@ -55,15 +61,17 @@ export class SqliteActivityLogRepository implements IActivityLogRepository {
       
       const sql = `
         INSERT INTO activity_logs (
-          user_id, content, business_date, input_timestamp, updated_at,
+          id, user_id, content, business_date, input_timestamp, updated_at,
           start_time, end_time, total_minutes, confidence, analysis_method, 
           categories, analysis_warnings, log_type, match_status, 
           matched_log_id, activity_key, similarity_score,
           is_reminder_reply, time_range_start, time_range_end, context_type
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `;
 
+      const logId = 'log-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
       const values = [
+        logId,
         request.userId,
         request.content,
         request.businessDate,
@@ -87,7 +95,7 @@ export class SqliteActivityLogRepository implements IActivityLogRepository {
         request.contextType || 'NORMAL'
       ];
 
-      db.run(sql, values, function(err: any) {
+      db.run(sql, values, (err: Error | null) => {
         if (err) {
           reject(new AppError(`活動ログ保存エラー: ${err.message}`, ErrorType.DATABASE, { error: err }));
           return;
@@ -95,13 +103,13 @@ export class SqliteActivityLogRepository implements IActivityLogRepository {
 
         // 作成されたログを取得して返す
         const selectSql = 'SELECT * FROM activity_logs WHERE id = ?';
-        db.get(selectSql, [(this as any).lastID], (selectErr: any, row: any) => {
+        db.get(selectSql, [logId], (selectErr: Error | null, row: Record<string, unknown>) => {
           if (selectErr) {
             reject(new AppError(`保存後ログ取得エラー: ${selectErr.message}`, ErrorType.DATABASE, { error: selectErr }));
             return;
           }
 
-          resolve((this as any).mapRowToActivityLog(row));
+          resolve(this.mapRowToActivityLog(row));
         });
       });
     });
@@ -120,18 +128,18 @@ export class SqliteActivityLogRepository implements IActivityLogRepository {
       `;
       
       if (!includeDeleted) {
-        sql += ' AND deleted_at IS NULL';
+        sql += ' AND is_deleted = FALSE';
       }
       
       sql += ' ORDER BY input_timestamp ASC';
 
-      db.all(sql, [userId, businessDate], (err, rows: any[]) => {
+      db.all(sql, [userId, businessDate], (err: Error | null, rows: Record<string, unknown>[]) => {
         if (err) {
           reject(new AppError(`日別ログ取得エラー: ${err.message}`, ErrorType.DATABASE, { error: err }));
           return;
         }
 
-        resolve(rows.map(row => (this as any).mapRowToActivityLog(row)));
+        resolve(rows.map(row => this.mapRowToActivityLog(row)));
       });
     });
   }
@@ -149,18 +157,18 @@ export class SqliteActivityLogRepository implements IActivityLogRepository {
       `;
       
       if (!includeDeleted) {
-        sql += ' AND deleted_at IS NULL';
+        sql += ' AND is_deleted = FALSE';
       }
       
       sql += ' ORDER BY business_date ASC, input_timestamp ASC';
 
-      db.all(sql, [userId, startDate, endDate], (err, rows: any[]) => {
+      db.all(sql, [userId, startDate, endDate], (err: Error | null, rows: Record<string, unknown>[]) => {
         if (err) {
           reject(new AppError(`期間別ログ取得エラー: ${err.message}`, ErrorType.DATABASE, { error: err }));
           return;
         }
 
-        resolve(rows.map(row => (this as any).mapRowToActivityLog(row)));
+        resolve(rows.map(row => this.mapRowToActivityLog(row)));
       });
     });
   }
@@ -172,15 +180,15 @@ export class SqliteActivityLogRepository implements IActivityLogRepository {
     return new Promise((resolve, reject) => {
       const db = this.db.getDatabase();
       
-      const sql = 'SELECT * FROM activity_logs WHERE id = ? AND deleted_at IS NULL';
+      const sql = 'SELECT * FROM activity_logs WHERE id = ? AND is_deleted = FALSE';
       
-      db.get(sql, [id], (err, row: any) => {
+      db.get(sql, [id], (err: Error | null, row: Record<string, unknown>) => {
         if (err) {
           reject(new AppError(`ログ取得エラー: ${err.message}`, ErrorType.DATABASE, { error: err }));
           return;
         }
 
-        resolve(row ? (this as any).mapRowToActivityLog(row) : null);
+        resolve(row ? this.mapRowToActivityLog(row) : null);
       });
     });
   }
@@ -195,7 +203,7 @@ export class SqliteActivityLogRepository implements IActivityLogRepository {
       const sql = `UPDATE activity_logs SET content = ?, updated_at = ? WHERE id = ?`;
       const now = new Date().toISOString();
 
-      db.run(sql, [newContent, now, logId], function(err) {
+      db.run(sql, [newContent, now, logId], (err) => {
         if (err) {
           reject(new AppError(`ログ更新エラー: ${err.message}`, ErrorType.DATABASE, { error: err }));
           return;
@@ -203,7 +211,7 @@ export class SqliteActivityLogRepository implements IActivityLogRepository {
 
         // 更新されたログを取得して返す
         const selectSql = 'SELECT * FROM activity_logs WHERE id = ?';
-        db.get(selectSql, [logId], (selectErr, row: any) => {
+        db.get(selectSql, [logId], (selectErr: Error | null, row: Record<string, unknown>) => {
           if (selectErr) {
             reject(new AppError(`更新後ログ取得エラー: ${selectErr.message}`, ErrorType.DATABASE, { error: selectErr }));
             return;
@@ -214,7 +222,7 @@ export class SqliteActivityLogRepository implements IActivityLogRepository {
             return;
           }
 
-          resolve((this as any).mapRowToActivityLog(row));
+          resolve(this.mapRowToActivityLog(row));
         });
       });
     });
@@ -228,7 +236,7 @@ export class SqliteActivityLogRepository implements IActivityLogRepository {
       const db = this.db.getDatabase();
       
       const setClause: string[] = [];
-      const values: any[] = [];
+      const values: unknown[] = [];
 
       // 更新可能なフィールドのみを処理
       if (updates.content !== undefined) {
@@ -270,7 +278,7 @@ export class SqliteActivityLogRepository implements IActivityLogRepository {
 
       const sql = `UPDATE activity_logs SET ${setClause.join(', ')} WHERE id = ?`;
 
-      db.run(sql, values, function(err: any) {
+      db.run(sql, values, function(err: Error | null) {
         if (err) {
           reject(new AppError(`ログ更新エラー: ${err.message}`, ErrorType.DATABASE, { error: err }));
           return;
@@ -289,8 +297,8 @@ export class SqliteActivityLogRepository implements IActivityLogRepository {
       const db = this.db.getDatabase();
       
       // まず削除前のログを取得
-      const selectSql = 'SELECT * FROM activity_logs WHERE id = ? AND deleted_at IS NULL';
-      db.get(selectSql, [logId], (selectErr, row: any) => {
+      const selectSql = 'SELECT * FROM activity_logs WHERE id = ? AND is_deleted = FALSE';
+      db.get(selectSql, [logId], (selectErr: Error | null, row: Record<string, unknown>) => {
         if (selectErr) {
           reject(new AppError(`削除前ログ取得エラー: ${selectErr.message}`, ErrorType.DATABASE, { error: selectErr }));
           return;
@@ -302,16 +310,16 @@ export class SqliteActivityLogRepository implements IActivityLogRepository {
         }
 
         const now = new Date().toISOString();
-        const sql = 'UPDATE activity_logs SET deleted_at = ?, updated_at = ? WHERE id = ?';
+        const sql = 'UPDATE activity_logs SET is_deleted = TRUE, updated_at = ? WHERE id = ?';
 
-        db.run(sql, [now, now, logId], function(err) {
+        db.run(sql, [now, logId], (err) => {
           if (err) {
             reject(new AppError(`ログ削除エラー: ${err.message}`, ErrorType.DATABASE, { error: err }));
             return;
           }
 
           // 削除されたログを返す（isDeletedフラグを更新）
-          const deletedLog = (this as any).mapRowToActivityLog(row);
+          const deletedLog = this.mapRowToActivityLog(row);
           deletedLog.isDeleted = true;
           deletedLog.updatedAt = now;
           resolve(deletedLog);
@@ -332,13 +340,15 @@ export class SqliteActivityLogRepository implements IActivityLogRepository {
       const db = this.db.getDatabase();
       
       const sql = `
-        INSERT OR REPLACE INTO analysis_cache (
-          user_id, business_date, analysis_result, log_count, generated_at
-        ) VALUES (?, ?, ?, ?, ?)
+        INSERT OR REPLACE INTO daily_analysis_cache (
+          id, user_id, business_date, analysis_result, log_count, generated_at
+        ) VALUES (?, ?, ?, ?, ?, ?)
       `;
 
+      const cacheId = 'cache-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
       const now = new Date().toISOString();
       const values = [
+        cacheId,
         request.userId,
         request.businessDate,
         JSON.stringify(request.analysisResult),
@@ -346,14 +356,14 @@ export class SqliteActivityLogRepository implements IActivityLogRepository {
         now
       ];
 
-      db.run(sql, values, function(err: any) {
+      db.run(sql, values, function(err: Error | null) {
         if (err) {
           reject(new AppError(`分析キャッシュ保存エラー: ${err.message}`, ErrorType.DATABASE, { error: err }));
           return;
         }
 
         const analysisCache: AnalysisCache = {
-          id: this.lastID.toString(),
+          id: cacheId,
           userId: request.userId,
           businessDate: request.businessDate,
           analysisResult: request.analysisResult,
@@ -374,11 +384,11 @@ export class SqliteActivityLogRepository implements IActivityLogRepository {
       const db = this.db.getDatabase();
       
       const sql = `
-        SELECT * FROM analysis_cache 
+        SELECT * FROM daily_analysis_cache 
         WHERE user_id = ? AND business_date = ?
       `;
 
-      db.get(sql, [userId, businessDate], (err, row: any) => {
+      db.get(sql, [userId, businessDate], (err: Error | null, row: Record<string, unknown>) => {
         if (err) {
           reject(new AppError(`分析キャッシュ取得エラー: ${err.message}`, ErrorType.DATABASE, { error: err }));
           return;
@@ -390,12 +400,12 @@ export class SqliteActivityLogRepository implements IActivityLogRepository {
         }
 
         const cache: AnalysisCache = {
-          id: row.id.toString(),
-          userId: row.user_id,
-          businessDate: row.business_date,
-          analysisResult: JSON.parse(row.analysis_result),
-          logCount: row.log_count,
-          generatedAt: row.generated_at
+          id: String(row.id),
+          userId: String(row.user_id),
+          businessDate: String(row.business_date),
+          analysisResult: JSON.parse(String(row.analysis_result)),
+          logCount: Number(row.log_count),
+          generatedAt: String(row.generated_at)
         };
 
         resolve(cache);
@@ -411,7 +421,7 @@ export class SqliteActivityLogRepository implements IActivityLogRepository {
       const db = this.db.getDatabase();
       
       // 7日以上前のキャッシュを削除
-      const sql = `DELETE FROM analysis_cache WHERE generated_at <= datetime('now', '-7 days')`;
+      const sql = `DELETE FROM daily_analysis_cache WHERE generated_at <= datetime('now', '-7 days')`;
 
       db.run(sql, [], function(err) {
         if (err) {
@@ -456,8 +466,8 @@ export class SqliteActivityLogRepository implements IActivityLogRepository {
       const db = this.db.getDatabase();
       
       // まず削除済みログを取得
-      const selectSql = 'SELECT * FROM activity_logs WHERE id = ? AND deleted_at IS NOT NULL';
-      db.get(selectSql, [logId], (selectErr: any, row: any) => {
+      const selectSql = 'SELECT * FROM activity_logs WHERE id = ? AND is_deleted = TRUE';
+      db.get(selectSql, [logId], (selectErr: Error | null, row: Record<string, unknown>) => {
         if (selectErr) {
           reject(new AppError(`復元前ログ取得エラー: ${selectErr.message}`, ErrorType.DATABASE, { error: selectErr }));
           return;
@@ -469,16 +479,16 @@ export class SqliteActivityLogRepository implements IActivityLogRepository {
         }
 
         const now = new Date().toISOString();
-        const sql = 'UPDATE activity_logs SET deleted_at = NULL, updated_at = ? WHERE id = ?';
+        const sql = 'UPDATE activity_logs SET is_deleted = FALSE, updated_at = ? WHERE id = ?';
 
-        db.run(sql, [now, logId], function(err: any) {
+        db.run(sql, [now, logId], (err: Error | null) => {
           if (err) {
             reject(new AppError(`ログ復元エラー: ${err.message}`, ErrorType.DATABASE, { error: err }));
             return;
           }
 
           // 復元されたログを返す
-          const restoredLog = (this as any).mapRowToActivityLog(row);
+          const restoredLog = this.mapRowToActivityLog(row);
           restoredLog.isDeleted = false;
           restoredLog.updatedAt = now;
           resolve(restoredLog);
@@ -507,9 +517,9 @@ export class SqliteActivityLogRepository implements IActivityLogRepository {
     return new Promise((resolve, reject) => {
       const db = this.db.getDatabase();
       
-      const sql = 'DELETE FROM analysis_cache WHERE user_id = ? AND business_date = ?';
+      const sql = 'DELETE FROM daily_analysis_cache WHERE user_id = ? AND business_date = ?';
 
-      db.run(sql, [userId, businessDate], function(err: any) {
+      db.run(sql, [userId, businessDate], function(err: Error | null) {
         if (err) {
           reject(new AppError(`分析キャッシュ削除エラー: ${err.message}`, ErrorType.DATABASE, { error: err }));
           return;
@@ -537,16 +547,16 @@ export class SqliteActivityLogRepository implements IActivityLogRepository {
       
       let sql = 'SELECT COUNT(*) as count FROM activity_logs WHERE user_id = ?';
       if (!includeDeleted) {
-        sql += ' AND deleted_at IS NULL';
+        sql += ' AND is_deleted = FALSE';
       }
 
-      db.get(sql, [userId], (err: any, row: any) => {
+      db.get(sql, [userId], (err: Error | null, row: Record<string, unknown>) => {
         if (err) {
           reject(new AppError(`ログ数取得エラー: ${err.message}`, ErrorType.DATABASE, { error: err }));
           return;
         }
 
-        resolve(row.count || 0);
+        resolve(Number(row?.count) || 0);
       });
     });
   }
@@ -560,16 +570,16 @@ export class SqliteActivityLogRepository implements IActivityLogRepository {
       
       let sql = 'SELECT COUNT(*) as count FROM activity_logs WHERE user_id = ? AND business_date = ?';
       if (!includeDeleted) {
-        sql += ' AND deleted_at IS NULL';
+        sql += ' AND is_deleted = FALSE';
       }
 
-      db.get(sql, [userId, businessDate], (err: any, row: any) => {
+      db.get(sql, [userId, businessDate], (err: Error | null, row: Record<string, unknown>) => {
         if (err) {
           reject(new AppError(`日別ログ数取得エラー: ${err.message}`, ErrorType.DATABASE, { error: err }));
           return;
         }
 
-        resolve(row.count || 0);
+        resolve(Number(row?.count) || 0);
       });
     });
   }
@@ -630,15 +640,15 @@ export class SqliteActivityLogRepository implements IActivityLogRepository {
     return new Promise((resolve, reject) => {
       const db = this.db.getDatabase();
       
-      const sql = 'SELECT timezone FROM users WHERE user_id = ?';
+      const sql = 'SELECT timezone FROM user_settings WHERE user_id = ?';
       
-      db.get(sql, [userId], (err, row: any) => {
+      db.get(sql, [userId], (err: Error | null, row: Record<string, unknown>) => {
         if (err) {
           reject(new AppError(`タイムゾーン取得エラー: ${err.message}`, ErrorType.DATABASE, { error: err }));
           return;
         }
 
-        resolve(row ? row.timezone : null);
+        resolve(row ? String(row.timezone) : null);
       });
     });
   }
@@ -651,7 +661,7 @@ export class SqliteActivityLogRepository implements IActivityLogRepository {
       const db = this.db.getDatabase();
       
       const sql = `
-        INSERT OR REPLACE INTO users (user_id, timezone, updated_at)
+        INSERT OR REPLACE INTO user_settings (user_id, timezone, updated_at)
         VALUES (?, ?, ?)
       `;
 
@@ -673,17 +683,17 @@ export class SqliteActivityLogRepository implements IActivityLogRepository {
     return new Promise((resolve, reject) => {
       const db = this.db.getDatabase();
       
-      const sql = 'SELECT user_id, timezone FROM users WHERE timezone IS NOT NULL';
+      const sql = 'SELECT user_id, timezone FROM user_settings WHERE timezone IS NOT NULL';
       
-      db.all(sql, [], (err, rows: any[]) => {
+      db.all(sql, [], (err: Error | null, rows: Record<string, unknown>[]) => {
         if (err) {
           reject(new AppError(`スケジューラー用タイムゾーン取得エラー: ${err.message}`, ErrorType.DATABASE, { error: err }));
           return;
         }
 
         const timezones: UserTimezone[] = rows.map(row => ({
-          userId: row.user_id,
-          timezone: row.timezone
+          userId: String(row.user_id),
+          timezone: String(row.timezone)
         }));
 
         resolve(timezones);
@@ -698,27 +708,27 @@ export class SqliteActivityLogRepository implements IActivityLogRepository {
     return new Promise((resolve, reject) => {
       const db = this.db.getDatabase();
       
-      let sql = 'SELECT * FROM timezone_changes';
-      const params: any[] = [];
+      let sql = 'SELECT * FROM timezone_change_notifications';
+      const params: unknown[] = [];
       
       if (since) {
-        sql += ' WHERE updated_at > ?';
+        sql += ' WHERE changed_at > ?';
         params.push(since.toISOString());
       }
       
-      sql += ' ORDER BY updated_at DESC';
+      sql += ' ORDER BY changed_at DESC';
 
-      db.all(sql, params, (err, rows: any[]) => {
+      db.all(sql, params, (err: Error | null, rows: Record<string, unknown>[]) => {
         if (err) {
           reject(new AppError(`タイムゾーン変更履歴取得エラー: ${err.message}`, ErrorType.DATABASE, { error: err }));
           return;
         }
 
         const changes: TimezoneChange[] = rows.map(row => ({
-          user_id: row.user_id,
-          old_timezone: row.old_timezone,
-          new_timezone: row.new_timezone,
-          updated_at: row.updated_at
+          user_id: String(row.user_id),
+          old_timezone: String(row.old_timezone),
+          new_timezone: String(row.new_timezone),
+          updated_at: String(row.changed_at)
         }));
 
         resolve(changes);
@@ -734,24 +744,24 @@ export class SqliteActivityLogRepository implements IActivityLogRepository {
       const db = this.db.getDatabase();
       
       const sql = `
-        SELECT * FROM timezone_notifications 
+        SELECT * FROM timezone_change_notifications 
         WHERE processed = FALSE 
         ORDER BY changed_at ASC
       `;
 
-      db.all(sql, [], (err, rows: any[]) => {
+      db.all(sql, [], (err: Error | null, rows: Record<string, unknown>[]) => {
         if (err) {
           reject(new AppError(`未処理通知取得エラー: ${err.message}`, ErrorType.DATABASE, { error: err }));
           return;
         }
 
         const notifications: TimezoneNotification[] = rows.map(row => ({
-          id: row.id.toString(),
-          user_id: row.user_id,
-          old_timezone: row.old_timezone,
-          new_timezone: row.new_timezone,
-          changed_at: row.changed_at,
-          processed: row.processed === 1
+          id: String(row.id),
+          user_id: String(row.user_id),
+          old_timezone: String(row.old_timezone),
+          new_timezone: String(row.new_timezone),
+          changed_at: String(row.changed_at),
+          processed: Boolean(row.processed)
         }));
 
         resolve(notifications);
@@ -766,7 +776,7 @@ export class SqliteActivityLogRepository implements IActivityLogRepository {
     return new Promise((resolve, reject) => {
       const db = this.db.getDatabase();
       
-      const sql = 'UPDATE timezone_notifications SET processed = TRUE WHERE id = ?';
+      const sql = 'UPDATE timezone_change_notifications SET processed = TRUE WHERE id = ?';
 
       db.run(sql, [notificationId], function(err) {
         if (err) {
@@ -792,18 +802,18 @@ export class SqliteActivityLogRepository implements IActivityLogRepository {
       
       const sql = `
         SELECT * FROM activity_logs 
-        WHERE user_id = ? AND deleted_at IS NULL
+        WHERE user_id = ? AND is_deleted = FALSE
         ORDER BY input_timestamp DESC 
         LIMIT ?
       `;
 
-      db.all(sql, [userId, limit], (err: any, rows: any[]) => {
+      db.all(sql, [userId, limit], (err: Error | null, rows: Record<string, unknown>[]) => {
         if (err) {
           reject(new AppError(`最新ログ取得エラー: ${err.message}`, ErrorType.DATABASE, { error: err }));
           return;
         }
 
-        resolve(rows.map(row => (this as any).mapRowToActivityLog(row)));
+        resolve(rows.map(row => this.mapRowToActivityLog(row)));
       });
     });
   }
@@ -815,7 +825,7 @@ export class SqliteActivityLogRepository implements IActivityLogRepository {
     return new Promise((resolve, reject) => {
       const db = this.db.getDatabase();
       
-      const sql = `DELETE FROM analysis_cache WHERE generated_at <= datetime('now', '-${olderThanDays} days')`;
+      const sql = `DELETE FROM daily_analysis_cache WHERE generated_at <= datetime('now', '-${olderThanDays} days')`;
 
       db.run(sql, [], function(err) {
         if (err) {
@@ -929,7 +939,7 @@ export class SqliteActivityLogRepository implements IActivityLogRepository {
       const db = this.db.getDatabase();
       
       const setClause: string[] = [];
-      const values: any[] = [];
+      const values: unknown[] = [];
 
       if (matchInfo.matchStatus !== undefined) {
         setClause.push('match_status = ?');
@@ -950,7 +960,7 @@ export class SqliteActivityLogRepository implements IActivityLogRepository {
 
       const sql = `UPDATE activity_logs SET ${setClause.join(', ')} WHERE id = ?`;
 
-      db.run(sql, values, function(err: any) {
+      db.run(sql, values, function(err: Error | null) {
         if (err) {
           reject(new AppError(`ログマッチング更新エラー: ${err.message}`, ErrorType.DATABASE, { error: err }));
           return;
@@ -970,7 +980,7 @@ export class SqliteActivityLogRepository implements IActivityLogRepository {
       
       let sql = `
         SELECT * FROM activity_logs 
-        WHERE user_id = ? AND log_type = ? AND match_status = 'unmatched' AND deleted_at IS NULL
+        WHERE user_id = ? AND log_type = ? AND match_status = 'unmatched' AND is_deleted = FALSE
       `;
       const params = [userId, logType];
 
@@ -981,13 +991,13 @@ export class SqliteActivityLogRepository implements IActivityLogRepository {
 
       sql += ' ORDER BY input_timestamp ASC';
 
-      db.all(sql, params, (err: any, rows: any[]) => {
+      db.all(sql, params, (err: Error | null, rows: Record<string, unknown>[]) => {
         if (err) {
           reject(new AppError(`未マッチログ取得エラー: ${err.message}`, ErrorType.DATABASE, { error: err }));
           return;
         }
 
-        resolve(rows.map(row => (this as any).mapRowToActivityLog(row)));
+        resolve(rows.map(row => this.mapRowToActivityLog(row)));
       });
     });
   }
@@ -1017,8 +1027,8 @@ export class SqliteActivityLogRepository implements IActivityLogRepository {
         FROM activity_logs start_log
         JOIN activity_logs end_log ON start_log.matched_log_id = end_log.id
         WHERE start_log.user_id = ? AND start_log.log_type = 'start_only' 
-          AND start_log.match_status = 'matched' AND start_log.deleted_at IS NULL
-          AND end_log.deleted_at IS NULL
+          AND start_log.match_status = 'matched' AND start_log.is_deleted = FALSE
+          AND end_log.is_deleted = FALSE
       `;
       const params = [userId];
 
@@ -1029,21 +1039,21 @@ export class SqliteActivityLogRepository implements IActivityLogRepository {
 
       sql += ' ORDER BY start_log.input_timestamp ASC';
 
-      db.all(sql, params, (err: any, rows: any[]) => {
+      db.all(sql, params, (err: Error | null, rows: Record<string, unknown>[]) => {
         if (err) {
           reject(new AppError(`マッチングペア取得エラー: ${err.message}`, ErrorType.DATABASE, { error: err }));
           return;
         }
 
         const pairs = rows.map(row => {
-          const startLog = (this as any).mapRowToActivityLog(row);
-          const endLog = (this as any).mapRowToActivityLog({
+          const startLog = this.mapRowToActivityLog(row);
+          const endLog = this.mapRowToActivityLog({
             id: row.end_id,
             user_id: row.end_user_id,
             content: row.end_content,
             input_timestamp: row.end_input_timestamp,
             business_date: row.end_business_date,
-            deleted_at: row.end_is_deleted ? new Date().toISOString() : null,
+            is_deleted: row.end_is_deleted ? 1 : 0,
             created_at: row.end_created_at,
             updated_at: row.end_updated_at,
             start_time: row.end_start_time,
@@ -1089,27 +1099,27 @@ export class SqliteActivityLogRepository implements IActivityLogRepository {
       const db = this.db.getDatabase();
       
       const sql = `
-        SELECT user_id, username, timezone, registration_date, last_seen_at, 
+        SELECT user_id, username, timezone, first_seen as registration_date, last_seen, 
                is_active, created_at, updated_at
-        FROM users 
+        FROM user_settings 
         ORDER BY created_at DESC
       `;
 
-      db.all(sql, [], (err: any, rows: any[]) => {
+      db.all(sql, [], (err: Error | null, rows: Record<string, unknown>[]) => {
         if (err) {
           reject(new AppError(`全ユーザー取得エラー: ${err.message}`, ErrorType.DATABASE, { error: err }));
           return;
         }
 
         const users = rows.map(row => ({
-          userId: row.user_id,
-          username: row.username || undefined,
-          timezone: row.timezone || 'Asia/Tokyo',
-          registrationDate: row.registration_date || row.created_at,
-          lastSeenAt: row.last_seen_at || row.updated_at,
-          isActive: row.is_active === 1,
-          createdAt: row.created_at,
-          updatedAt: row.updated_at
+          userId: String(row.user_id),
+          username: row.username ? String(row.username) : undefined,
+          timezone: String(row.timezone || 'Asia/Tokyo'),
+          registrationDate: String(row.registration_date || row.created_at),
+          lastSeenAt: String(row.last_seen || row.updated_at),
+          isActive: Boolean(row.is_active),
+          createdAt: String(row.created_at),
+          updatedAt: String(row.updated_at)
         }));
 
         resolve(users);
@@ -1131,38 +1141,38 @@ export class SqliteActivityLogRepository implements IActivityLogRepository {
   /**
    * データベース行をActivityLogオブジェクトにマッピング
    */
-  private mapRowToActivityLog(row: any): ActivityLog {
+  private mapRowToActivityLog(row: Record<string, unknown>): ActivityLog {
     return {
-      id: row.id.toString(),
-      userId: row.user_id,
-      content: row.content,
-      inputTimestamp: row.input_timestamp,
-      businessDate: row.business_date,
-      isDeleted: row.deleted_at !== null,
-      createdAt: row.created_at,
-      updatedAt: row.updated_at,
+      id: String(row.id),
+      userId: String(row.user_id),
+      content: String(row.content),
+      inputTimestamp: String(row.input_timestamp),
+      businessDate: String(row.business_date),
+      isDeleted: Boolean(row.is_deleted),
+      createdAt: String(row.created_at),
+      updatedAt: String(row.updated_at),
       
       // リアルタイム分析結果
-      startTime: row.start_time,
-      endTime: row.end_time,
-      totalMinutes: row.total_minutes,
-      confidence: row.confidence,
-      analysisMethod: row.analysis_method,
-      categories: row.categories,
-      analysisWarnings: row.analysis_warnings,
+      startTime: row.start_time ? String(row.start_time) : undefined,
+      endTime: row.end_time ? String(row.end_time) : undefined,
+      totalMinutes: row.total_minutes ? Number(row.total_minutes) : undefined,
+      confidence: row.confidence ? Number(row.confidence) : undefined,
+      analysisMethod: row.analysis_method ? String(row.analysis_method) : undefined,
+      categories: row.categories ? String(row.categories) : undefined,
+      analysisWarnings: row.analysis_warnings ? String(row.analysis_warnings) : undefined,
 
       // 開始・終了ログマッチング機能
-      logType: row.log_type,
-      matchStatus: row.match_status,
-      matchedLogId: row.matched_log_id,
-      activityKey: row.activity_key,
-      similarityScore: row.similarity_score,
+      logType: row.log_type ? String(row.log_type) as LogType : undefined,
+      matchStatus: row.match_status ? String(row.match_status) as MatchStatus : undefined,
+      matchedLogId: row.matched_log_id ? String(row.matched_log_id) : undefined,
+      activityKey: row.activity_key ? String(row.activity_key) : undefined,
+      similarityScore: row.similarity_score ? Number(row.similarity_score) : undefined,
 
       // リマインダーReply機能
-      isReminderReply: row.is_reminder_reply === 1,
-      timeRangeStart: row.time_range_start,
-      timeRangeEnd: row.time_range_end,
-      contextType: row.context_type || 'NORMAL'
+      isReminderReply: Boolean(row.is_reminder_reply),
+      timeRangeStart: row.time_range_start ? String(row.time_range_start) : undefined,
+      timeRangeEnd: row.time_range_end ? String(row.time_range_end) : undefined,
+      contextType: row.context_type ? String(row.context_type) as 'REMINDER_REPLY' | 'POST_REMINDER' | 'NORMAL' : 'NORMAL'
     };
   }
 }

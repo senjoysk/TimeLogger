@@ -74,7 +74,7 @@ export class SqliteActivityPromptRepository implements IActivityPromptRepository
         now
       ];
 
-      db.run(sql, values, function(err: any) {
+      db.run(sql, values, function(err: Error | null) {
         if (err) {
           reject(new AppError(`活動促し設定作成エラー: ${err.message}`, ErrorType.DATABASE, { error: err }));
           return;
@@ -110,7 +110,7 @@ export class SqliteActivityPromptRepository implements IActivityPromptRepository
         WHERE user_id = ? AND prompt_enabled IS NOT NULL
       `;
 
-      db.get(sql, [userId], (err: any, row: any) => {
+      db.get(sql, [userId], (err: Error | null, row: Record<string, unknown>) => {
         if (err) {
           reject(new AppError(`活動促し設定取得エラー: ${err.message}`, ErrorType.DATABASE, { error: err }));
           return;
@@ -122,14 +122,14 @@ export class SqliteActivityPromptRepository implements IActivityPromptRepository
         }
 
         const settings: ActivityPromptSettings = {
-          userId: row.user_id,
-          isEnabled: row.prompt_enabled === 1,
-          startHour: row.prompt_start_hour,
-          startMinute: row.prompt_start_minute,
-          endHour: row.prompt_end_hour,
-          endMinute: row.prompt_end_minute,
-          createdAt: row.created_at,
-          updatedAt: row.updated_at
+          userId: row.user_id as string,
+          isEnabled: (row.prompt_enabled as number) === 1,
+          startHour: row.prompt_start_hour as number,
+          startMinute: row.prompt_start_minute as number,
+          endHour: row.prompt_end_hour as number,
+          endMinute: row.prompt_end_minute as number,
+          createdAt: row.created_at as string,
+          updatedAt: row.updated_at as string
         };
 
         resolve(settings);
@@ -145,7 +145,7 @@ export class SqliteActivityPromptRepository implements IActivityPromptRepository
       const db = this.db.getDatabase();
       
       const setClause: string[] = [];
-      const values: any[] = [];
+      const values: unknown[] = [];
 
       // 更新可能なフィールドのみを処理
       if (update.isEnabled !== undefined) {
@@ -175,7 +175,7 @@ export class SqliteActivityPromptRepository implements IActivityPromptRepository
 
       const sql = `UPDATE user_settings SET ${setClause.join(', ')} WHERE user_id = ?`;
 
-      db.run(sql, values, function(err: any) {
+      db.run(sql, values, function(err: Error | null) {
         if (err) {
           reject(new AppError(`活動促し設定更新エラー: ${err.message}`, ErrorType.DATABASE, { error: err }));
           return;
@@ -204,7 +204,7 @@ export class SqliteActivityPromptRepository implements IActivityPromptRepository
         WHERE user_id = ?
       `;
 
-      db.run(sql, [new Date().toISOString(), userId], function(err: any) {
+      db.run(sql, [new Date().toISOString(), userId], function(err: Error | null) {
         if (err) {
           reject(new AppError(`活動促し設定削除エラー: ${err.message}`, ErrorType.DATABASE, { error: err }));
           return;
@@ -234,21 +234,21 @@ export class SqliteActivityPromptRepository implements IActivityPromptRepository
         ORDER BY user_id
       `;
 
-      db.all(sql, [], (err: any, rows: any[]) => {
+      db.all(sql, [], (err: Error | null, rows: Record<string, unknown>[]) => {
         if (err) {
           reject(new AppError(`有効設定取得エラー: ${err.message}`, ErrorType.DATABASE, { error: err }));
           return;
         }
 
         const settings: ActivityPromptSettings[] = rows.map(row => ({
-          userId: row.user_id,
-          isEnabled: row.prompt_enabled === 1,
-          startHour: row.prompt_start_hour,
-          startMinute: row.prompt_start_minute,
-          endHour: row.prompt_end_hour,
-          endMinute: row.prompt_end_minute,
-          createdAt: row.created_at,
-          updatedAt: row.updated_at
+          userId: row.user_id as string,
+          isEnabled: (row.prompt_enabled as number) === 1,
+          startHour: row.prompt_start_hour as number,
+          startMinute: row.prompt_start_minute as number,
+          endHour: row.prompt_end_hour as number,
+          endMinute: row.prompt_end_minute as number,
+          createdAt: row.created_at as string,
+          updatedAt: row.updated_at as string
         }));
 
         resolve(settings);
@@ -281,13 +281,13 @@ export class SqliteActivityPromptRepository implements IActivityPromptRepository
 
       const values = [hour, hour, hour, hour, minute, hour, hour, minute];
 
-      db.all(sql, values, (err: any, rows: any[]) => {
+      db.all(sql, values, (err: Error | null, rows: Record<string, unknown>[]) => {
         if (err) {
           reject(new AppError(`通知対象ユーザー取得エラー: ${err.message}`, ErrorType.DATABASE, { error: err }));
           return;
         }
 
-        const userIds: string[] = rows.map(row => row.user_id);
+        const userIds: string[] = rows.map(row => row.user_id as string);
         resolve(userIds);
       });
     });
@@ -311,7 +311,7 @@ export class SqliteActivityPromptRepository implements IActivityPromptRepository
         WHERE user_id = ? AND prompt_enabled IS NOT NULL
       `;
 
-      db.run(sql, [new Date().toISOString(), userId], function(err: any) {
+      db.run(sql, [new Date().toISOString(), userId], function(err: Error | null) {
         if (err) {
           reject(new AppError(`活動促し有効化エラー: ${err.message}`, ErrorType.DATABASE, { error: err }));
           return;
@@ -336,7 +336,7 @@ export class SqliteActivityPromptRepository implements IActivityPromptRepository
         WHERE user_id = ?
       `;
 
-      db.run(sql, [new Date().toISOString(), userId], function(err: any) {
+      db.run(sql, [new Date().toISOString(), userId], function(err: Error | null) {
         if (err) {
           reject(new AppError(`活動促し無効化エラー: ${err.message}`, ErrorType.DATABASE, { error: err }));
           return;
@@ -363,13 +363,13 @@ export class SqliteActivityPromptRepository implements IActivityPromptRepository
         WHERE user_id = ? AND prompt_enabled IS NOT NULL
       `;
 
-      db.get(sql, [userId], (err: any, row: any) => {
+      db.get(sql, [userId], (err: Error | null, row: Record<string, unknown>) => {
         if (err) {
           reject(new AppError(`設定存在確認エラー: ${err.message}`, ErrorType.DATABASE, { error: err }));
           return;
         }
 
-        resolve((row.count || 0) > 0);
+        resolve(((row.count as number) || 0) > 0);
       });
     });
   }

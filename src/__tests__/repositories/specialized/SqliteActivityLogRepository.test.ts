@@ -4,7 +4,7 @@
  */
 
 import { SqliteActivityLogRepository } from '../../../repositories/specialized/SqliteActivityLogRepository';
-import { DatabaseConnection } from '../../../repositories/DatabaseConnection';
+import { DatabaseConnection } from '../../../repositories/base/DatabaseConnection';
 import { getTestDbPath, cleanupTestDatabase } from '../../../utils/testDatabasePath';
 import { CreateActivityLogRequest } from '../../../types/activityLog';
 
@@ -39,12 +39,12 @@ describe('SqliteActivityLogRepository専用テスト', () => {
       const request: CreateActivityLogRequest = {
         userId: 'test-user-1',
         content: 'テスト活動ログ',
-        activityType: 'WORK',
-        startTime: '09:00',
-        endTime: '10:00',
-        durationMinutes: 60,
         businessDate: '2024-01-15',
-        inputTimestamp: '2024-01-15T09:00:00Z'
+        inputTimestamp: '2024-01-15T09:00:00Z',
+        startTime: '2024-01-15T09:00:00Z',
+        endTime: '2024-01-15T10:00:00Z',
+        totalMinutes: 60,
+        categories: 'WORK'
       };
 
       const savedLog = await repository.saveLog(request);
@@ -53,8 +53,8 @@ describe('SqliteActivityLogRepository専用テスト', () => {
       expect(savedLog.id).toBeDefined();
       expect(savedLog.userId).toBe(request.userId);
       expect(savedLog.content).toBe(request.content);
-      expect(savedLog.activityType).toBe(request.activityType);
-      expect(savedLog.durationMinutes).toBe(request.durationMinutes);
+      expect(savedLog.categories).toBe(request.categories);
+      expect(savedLog.totalMinutes).toBe(request.totalMinutes);
     });
 
     test('日別ログを取得できる', async () => {
@@ -65,17 +65,17 @@ describe('SqliteActivityLogRepository専用テスト', () => {
       await repository.saveLog({
         userId,
         content: 'ログ1',
-        activityType: 'WORK',
         businessDate,
-        inputTimestamp: '2024-01-16T09:00:00Z'
+        inputTimestamp: '2024-01-16T09:00:00Z',
+        categories: 'WORK'
       });
 
       await repository.saveLog({
         userId,
         content: 'ログ2', 
-        activityType: 'BREAK',
         businessDate,
-        inputTimestamp: '2024-01-16T10:00:00Z'
+        inputTimestamp: '2024-01-16T10:00:00Z',
+        categories: 'BREAK'
       });
 
       const logs = await repository.getLogsByDate(userId, businessDate);
@@ -93,25 +93,25 @@ describe('SqliteActivityLogRepository専用テスト', () => {
       await repository.saveLog({
         userId,
         content: '1日目ログ',
-        activityType: 'WORK',
         businessDate: '2024-01-17',
-        inputTimestamp: '2024-01-17T09:00:00Z'
+        inputTimestamp: '2024-01-17T09:00:00Z',
+        categories: 'WORK'
       });
 
       await repository.saveLog({
         userId,
-        content: '2日目ログ',
-        activityType: 'WORK', 
+        content: '2日目ログ', 
         businessDate: '2024-01-18',
-        inputTimestamp: '2024-01-18T09:00:00Z'
+        inputTimestamp: '2024-01-18T09:00:00Z',
+        categories: 'WORK'
       });
 
       await repository.saveLog({
         userId,
         content: '3日目ログ',
-        activityType: 'WORK',
         businessDate: '2024-01-19',
-        inputTimestamp: '2024-01-19T09:00:00Z'
+        inputTimestamp: '2024-01-19T09:00:00Z',
+        categories: 'WORK'
       });
 
       const logs = await repository.getLogsByDateRange(userId, '2024-01-17', '2024-01-18');
@@ -125,32 +125,33 @@ describe('SqliteActivityLogRepository専用テスト', () => {
       const log = await repository.saveLog({
         userId: 'test-user-4',
         content: '元のログ',
-        activityType: 'WORK',
         businessDate: '2024-01-20',
-        inputTimestamp: '2024-01-20T09:00:00Z'
+        inputTimestamp: '2024-01-20T09:00:00Z',
+        categories: 'WORK'
       });
 
-      await repository.updateLog(log.id, {
+      // updateLogは現在contentのみ更新するので、updateLogFieldsを使用
+      await repository.updateLogFields(log.id, {
         content: '更新されたログ',
-        activityType: 'BREAK',
-        durationMinutes: 30
+        categories: 'BREAK',
+        totalMinutes: 30
       });
 
       const updatedLog = await repository.getLogById(log.id);
 
       expect(updatedLog).toBeDefined();
       expect(updatedLog!.content).toBe('更新されたログ');
-      expect(updatedLog!.activityType).toBe('BREAK');
-      expect(updatedLog!.durationMinutes).toBe(30);
+      expect(updatedLog!.categories).toBe('BREAK');
+      expect(updatedLog!.totalMinutes).toBe(30);
     });
 
     test('ログを論理削除できる', async () => {
       const log = await repository.saveLog({
         userId: 'test-user-5',
         content: '削除予定ログ',
-        activityType: 'WORK',
         businessDate: '2024-01-21',
-        inputTimestamp: '2024-01-21T09:00:00Z'
+        inputTimestamp: '2024-01-21T09:00:00Z',
+        categories: 'WORK'
       });
 
       // 削除前は取得できる
@@ -168,46 +169,62 @@ describe('SqliteActivityLogRepository専用テスト', () => {
 
   describe('分析キャッシュ管理', () => {
     test('分析キャッシュを保存・取得できる', async () => {
-      const cacheData = { summary: 'テストサマリー', score: 85 };
+      const analysisResult = {
+        businessDate: '2024-01-22',
+        totalLogCount: 1,
+        categories: [],
+        timeline: [],
+        timeDistribution: { totalEstimatedMinutes: 0, workingMinutes: 0, breakMinutes: 0, unaccountedMinutes: 0, overlapMinutes: 0 },
+        insights: { productivityScore: 85, workBalance: { focusTimeRatio: 0, meetingTimeRatio: 0, breakTimeRatio: 0, adminTimeRatio: 0 }, suggestions: [], highlights: [], motivation: 'テスト' },
+        warnings: [],
+        generatedAt: '2024-01-22T00:00:00Z'
+      };
       
       const savedCache = await repository.saveAnalysisCache({
         userId: 'test-user-6',
         businessDate: '2024-01-22',
-        cacheType: 'DAILY_SUMMARY',
-        cacheData,
-        expiresAt: '2024-01-23T00:00:00Z'
+        analysisResult,
+        logCount: 5
       });
 
       expect(savedCache).toBeDefined();
-      expect(savedCache.cacheData).toEqual(cacheData);
+      expect(savedCache.analysisResult).toEqual(analysisResult);
 
       const retrievedCache = await repository.getAnalysisCache(
         'test-user-6', 
-        '2024-01-22', 
-        'DAILY_SUMMARY'
+        '2024-01-22'
       );
 
       expect(retrievedCache).toBeDefined();
-      expect(retrievedCache!.cacheData).toEqual(cacheData);
+      expect(retrievedCache!.analysisResult).toEqual(analysisResult);
     });
 
-    test('期限切れキャッシュは取得されない', async () => {
-      // 過去の日時で期限切れキャッシュを作成
+    test('古いキャッシュを正常に保存・取得できる', async () => {
+      const analysisResult = {
+        businessDate: '2024-01-23',
+        totalLogCount: 1,
+        categories: [],
+        timeline: [],
+        timeDistribution: { totalEstimatedMinutes: 0, workingMinutes: 0, breakMinutes: 0, unaccountedMinutes: 0, overlapMinutes: 0 },
+        insights: { productivityScore: 75, workBalance: { focusTimeRatio: 0, meetingTimeRatio: 0, breakTimeRatio: 0, adminTimeRatio: 0 }, suggestions: [], highlights: [], motivation: 'テスト2' },
+        warnings: [],
+        generatedAt: '2024-01-23T00:00:00Z'
+      };
+      
       await repository.saveAnalysisCache({
         userId: 'test-user-7',
         businessDate: '2024-01-23',
-        cacheType: 'EXPIRED_TEST',
-        cacheData: { test: 'expired' },
-        expiresAt: '2024-01-01T00:00:00Z' // 過去の日時
+        analysisResult,
+        logCount: 3
       });
 
       const cache = await repository.getAnalysisCache(
         'test-user-7',
-        '2024-01-23', 
-        'EXPIRED_TEST'
+        '2024-01-23'
       );
 
-      expect(cache).toBeNull();
+      expect(cache).toBeDefined();
+      expect(cache!.analysisResult).toEqual(analysisResult);
     });
 
     test('期限切れキャッシュを削除できる', async () => {
@@ -228,18 +245,18 @@ describe('SqliteActivityLogRepository専用テスト', () => {
       await repository.saveLog({
         userId,
         content: '業務日時テストログ',
-        activityType: 'WORK',
         businessDate: new Date().toISOString().split('T')[0], // 今日の日付
-        inputTimestamp: new Date().toISOString()
+        inputTimestamp: new Date().toISOString(),
+        categories: 'WORK'
       });
 
       const businessDateInfo = await repository.getBusinessDateInfo(userId, timezone);
 
       expect(businessDateInfo).toBeDefined();
-      expect(businessDateInfo.userId).toBe(userId);
       expect(businessDateInfo.timezone).toBe(timezone);
-      expect(businessDateInfo.logCount).toBeGreaterThan(0);
-      expect(businessDateInfo.currentBusinessDate).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+      expect(businessDateInfo.businessDate).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+      expect(businessDateInfo.startTime).toBeDefined();
+      expect(businessDateInfo.endTime).toBeDefined();
     });
   });
 
@@ -290,8 +307,7 @@ describe('SqliteActivityLogRepository専用テスト', () => {
     test('存在しない分析キャッシュの取得はnullを返す', async () => {
       const cache = await repository.getAnalysisCache(
         'non-existent-user',
-        '2024-01-01',
-        'NON_EXISTENT_TYPE'
+        '2024-01-01'
       );
       expect(cache).toBeNull();
     });

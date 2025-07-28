@@ -100,7 +100,7 @@ describe('Test Setup', () => {
   });
 });
 
-describe.skip('TODO・活動ログ重複登録防止テスト', () => {
+describe('TODO・活動ログ重複登録防止テスト', () => {
   let integration: ActivityLoggingIntegration;
   let repository: SqliteActivityLogRepository;
   let testDbPath: string;
