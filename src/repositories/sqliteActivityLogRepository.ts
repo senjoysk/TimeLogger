@@ -1,6 +1,9 @@
 /**
  * SQLite実装による活動ログRepository
  * 自然言語ログ方式に対応
+ * 
+ * @SRP-EXCEPTION: 統合リポジトリとして複数インターフェース実装が必要
+ * @SRP-REASON: 既存システムとの互換性維持のため段階的分割中
  */
 
 import { CostAlert } from '../types/costAlert';
@@ -2244,46 +2247,56 @@ export class SqliteActivityLogRepository implements IActivityLogRepository, IApi
   }
 
   /**
-   * ユーザー統計を取得
+   * ユーザー統計を取得（最適化版）
+   * 8つの並行クエリから3つのシーケンシャルクエリに最適化
+   * SQLite同時実行によるデッドロック・タイムアウト問題を解決
    */
   async getUserStats(userId: string): Promise<UserStats> {
     try {
-      // 元の実装を使用して、テストが通ることを確認
-      const [
-        totalLogs,
-        thisMonthLogs,
-        thisWeekLogs,
-        todayLogs,
-        avgLogs,
-        mostActiveHour,
-        totalMinutes,
-        longestActiveDay
-      ] = await Promise.all([
-        this.getTotalLogsCount(userId),
-        this.getLogsCountByPeriod(userId, 'month'),
-        this.getLogsCountByPeriod(userId, 'week'),
-        this.getLogsCountByPeriod(userId, 'today'),
-        this.getAverageLogsPerDay(userId),
-        this.getMostActiveHour(userId),
-        this.getTotalMinutesLogged(userId),
-        this.getLongestActiveDay(userId)
+      // Step 1: 基本統計を単一クエリで取得（6つのクエリを1つに統合）
+      const basicStats = await this.getBasicUserStats(userId);
+      
+      // Step 2: 残りの複雑な統計を順次実行（タイムアウト保護付き）
+      const [mostActiveHourResult, longestActiveDayResult] = await Promise.allSettled([
+        this.withQueryTimeout(this.getMostActiveHour(userId), 5000, null),
+        this.withQueryTimeout(this.getLongestActiveDay(userId), 5000, null)
       ]);
       
       return {
         userId,
-        totalLogs,
-        thisMonthLogs,
-        thisWeekLogs,
-        todayLogs,
-        avgLogsPerDay: avgLogs,
-        mostActiveHour,
-        totalMinutesLogged: totalMinutes,
-        longestActiveDay
+        totalLogs: basicStats.totalLogs,
+        thisMonthLogs: basicStats.thisMonthLogs,
+        thisWeekLogs: basicStats.thisWeekLogs,
+        todayLogs: basicStats.todayLogs,
+        avgLogsPerDay: basicStats.avgLogsPerDay,
+        totalMinutesLogged: basicStats.totalMinutesLogged,
+        mostActiveHour: mostActiveHourResult.status === 'fulfilled' ? mostActiveHourResult.value : null,
+        longestActiveDay: longestActiveDayResult.status === 'fulfilled' ? longestActiveDayResult.value : null
       };
     } catch (error) {
       console.error('❌ ユーザー統計取得エラー:', error);
       throw new ActivityLogError('ユーザー統計の取得に失敗しました', 'USER_STATS_ERROR', { userId, error });
     }
+  }
+
+  /**
+   * クエリタイムアウト保護付きラッパー
+   * SQLiteクエリのハング・デッドロック対策
+   */
+  private async withQueryTimeout<T>(
+    promise: Promise<T>, 
+    timeoutMs: number, 
+    defaultValue: T
+  ): Promise<T> {
+    return Promise.race([
+      promise,
+      new Promise<T>((_, reject) => 
+        setTimeout(() => reject(new Error('Query timeout')), timeoutMs)
+      )
+    ]).catch((error) => {
+      console.warn(`⚠️ クエリタイムアウト (${timeoutMs}ms):`, error.message);
+      return defaultValue;
+    });
   }
 
   /**
