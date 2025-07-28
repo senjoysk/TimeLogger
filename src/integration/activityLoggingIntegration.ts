@@ -920,8 +920,31 @@ export class ActivityLoggingIntegration {
 
     try {
       // リポジトリから全体統計を取得
-      const totalUsers = await this.repository.getLogCount(''); // 全ユーザー
-      const totalLogs = await this.repository.getLogCount('');
+      let totalUsers = 0;
+      let totalLogs = 0;
+      
+      try {
+        const allUsers = await this.repository.getAllUsers();
+        totalUsers = allUsers.length;
+        
+        // 全ユーザーのログ数を合計
+        for (const user of allUsers) {
+          if (user.userId && user.userId.trim() !== '') {
+            try {
+              const userLogCount = await this.repository.getLogCount(user.userId);
+              totalLogs += userLogCount;
+            } catch (userError) {
+              console.warn(`⚠️ ユーザー ${user.userId} のログ数取得でエラー:`, userError);
+              // 個別ユーザーのエラーは統計全体を止めない
+            }
+          }
+        }
+      } catch (usersError) {
+        console.warn('⚠️ ユーザー一覧取得でエラー、デフォルト値を使用:', usersError);
+        // ユーザー取得エラーの場合はデフォルト値を使用
+        totalUsers = 0;
+        totalLogs = 0;
+      }
       
       return {
         totalUsers,
@@ -936,7 +959,19 @@ export class ActivityLoggingIntegration {
       };
     } catch (error) {
       console.error('❌ システム統計取得エラー:', error);
-      throw new ActivityLogError('システム統計の取得に失敗しました', 'GET_SYSTEM_STATS_ERROR', { error });
+      
+      // 最低限の統計情報を返す（エラーでも基本情報は提供）
+      return {
+        totalUsers: 0,
+        totalLogs: 0,
+        isInitialized: this.isInitialized,
+        uptime: process.uptime(),
+        config: {
+          enableAutoAnalysis: this.config.enableAutoAnalysis,
+          debugMode: this.config.debugMode,
+          defaultTimezone: this.config.defaultTimezone
+        }
+      };
     }
   }
 

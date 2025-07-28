@@ -40,15 +40,9 @@ describe('活動記録システム統合テスト', () => {
     // 環境変数を明示的に設定
     process.env.USER_TIMEZONE = 'Asia/Tokyo';
     
-    // テストデータディレクトリ作成とDBファイル削除
-    const testDir = path.dirname(testDbPath);
-    if (!fs.existsSync(testDir)) {
-      fs.mkdirSync(testDir, { recursive: true });
-    }
-    cleanupTestDatabase(testDbPath);
-    
+    // パフォーマンス最適化: メモリDBを使用
     const config = createDefaultConfig(
-      testDbPath, // テスト用一時ファイルDB
+      ':memory:', // メモリDBで高速化
       'test-api-key'
     );
     config.debugMode = true;
@@ -70,9 +64,7 @@ describe('活動記録システム統合テスト', () => {
       console.error('❌ 統合システムシャットダウンエラー:', error);
     }
     
-    // テストデータベースのクリーンアップ
-    cleanupTestDatabase(testDbPath);
-    
+    // メモリDBのため、ファイルクリーンアップは不要
     // 未完了の非同期処理を待つ
     await new Promise(resolve => setImmediate(resolve));
     

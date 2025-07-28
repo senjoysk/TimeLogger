@@ -103,20 +103,16 @@ describe('Test Setup', () => {
 describe('TODO・活動ログ重複登録防止テスト', () => {
   let integration: ActivityLoggingIntegration;
   let repository: PartialCompositeRepository;
-  let testDbPath: string;
   let consoleSpy: jest.SpyInstance;
 
   beforeEach(async () => {
     // console.errorをモックしてエラーログをキャプチャ
     consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
 
-    // テスト用データベースの準備
-    testDbPath = getTestDbPath(__filename);
-    cleanupTestDatabase(testDbPath);
-
+    // パフォーマンス最適化: メモリDBを使用
     // 統合システムの初期化
     const config: ActivityLoggingConfig = {
-      databasePath: testDbPath,
+      databasePath: ':memory:',
       geminiApiKey: 'test-api-key',
       debugMode: false,
       defaultTimezone: 'Asia/Tokyo',
@@ -134,8 +130,8 @@ describe('TODO・活動ログ重複登録防止テスト', () => {
       console.log('統合システム初期化エラー:', error);
       console.log('エラーの詳細:', JSON.stringify(error, null, 2));
       console.log('設定:', JSON.stringify(config, null, 2));
-      console.log('データベースパス:', testDbPath);
-      console.log('テストディレクトリ存在:', fs.existsSync(path.dirname(testDbPath)));
+      console.log('データベース: メモリDB使用');
+      console.log('パフォーマンス最適化モード: 有効');
       
       // より詳細なエラー情報を提供
       if (error instanceof Error) {
@@ -183,8 +179,7 @@ describe('TODO・活動ログ重複登録防止テスト', () => {
       }
     }
     
-    // テストデータベースファイルを削除
-    cleanupTestDatabase(testDbPath);
+    // メモリDBのため、ファイルクリーンアップは不要
   });
 
   test('通常メッセージはAI分類のみ実行され、活動ログに自動登録されない', async () => {

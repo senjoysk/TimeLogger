@@ -71,7 +71,7 @@ export class SharedTestDatabase {
     }
   }
 
-  async getRepository(): Promise<SqliteActivityLogRepository> {
+  async getRepository(): Promise<PartialCompositeRepository> {
     if (!this.repository) {
       throw new Error('SharedTestDatabase: リポジトリが初期化されていません');
     }
@@ -91,10 +91,10 @@ export class SharedTestDatabase {
     }
 
     try {
-      // テストデータのクリーンアップ（バッチ処理で高速化）
+      // パフォーマンス最適化: 効率的なデータクリーンアップ
       const cleanupQueries = [
         'DELETE FROM activity_logs',
-        'DELETE FROM user_settings',
+        'DELETE FROM user_settings', 
         'DELETE FROM todo_tasks',
         'DELETE FROM message_classifications',
         'DELETE FROM api_costs',
@@ -133,6 +133,37 @@ export class SharedTestDatabase {
       console.log('✅ SharedTestDatabase破棄完了');
     } catch (error) {
       console.error('❌ SharedTestDatabase破棄エラー:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * パフォーマンス最適化: 高速データリセット
+   * 完全なシャットダウンではなく、データのみクリアして再利用
+   */
+  async fastReset(): Promise<void> {
+    if (!this.repository) {
+      return;
+    }
+
+    try {
+      // トランザクション内で全テーブルを高速クリア
+      await this.repository.withTransaction(async () => {
+        const resetQueries = [
+          'DELETE FROM activity_logs',
+          'DELETE FROM user_settings',
+          'DELETE FROM todo_tasks', 
+          'DELETE FROM message_classifications',
+          'DELETE FROM api_costs',
+          'DELETE FROM daily_analysis_cache'
+        ];
+
+        for (const query of resetQueries) {
+          await this.repository!.getDatabase().run(query);
+        }
+      });
+    } catch (error) {
+      console.error('❌ SharedTestDatabase 高速リセットエラー:', error);
       throw error;
     }
   }

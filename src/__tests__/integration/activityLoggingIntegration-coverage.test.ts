@@ -37,14 +37,10 @@ class ExtendedMockMessage {
 
 describe('ActivityLoggingIntegration Coverage Tests', () => {
   let integration: ActivityLoggingIntegration;
-  let testDbPath: string;
 
   beforeAll(async () => {
-    // テスト用データベース設定
-    testDbPath = getTestDbPath(__filename);
-    cleanupTestDatabase(testDbPath);
-
-    const config = createDefaultConfig(testDbPath, 'test-api-key');
+    // パフォーマンス最適化: メモリDBを使用
+    const config = createDefaultConfig(':memory:', 'test-api-key');
     config.debugMode = true;
     config.enableAutoAnalysis = false;
     
@@ -145,14 +141,19 @@ describe('ActivityLoggingIntegration Coverage Tests', () => {
 
   describe('システム統計とモニタリング', () => {
     test('システム統計の詳細取得', async () => {
-      const stats = await integration.getSystemStats();
+      try {
+        const stats = await integration.getSystemStats();
       
-      expect(stats).toHaveProperty('totalLogs');
-      expect(stats).toHaveProperty('isInitialized');
-      expect(stats).toHaveProperty('uptime');
-      expect(stats.isInitialized).toBe(true);
-      expect(typeof stats.totalLogs).toBe('number');
-      expect(stats.totalLogs).toBeGreaterThanOrEqual(0);
+        expect(stats).toHaveProperty('totalLogs');
+        expect(stats).toHaveProperty('isInitialized');
+        expect(stats).toHaveProperty('uptime');
+        expect(stats.isInitialized).toBe(true);
+        expect(typeof stats.totalLogs).toBe('number');
+        expect(stats.totalLogs).toBeGreaterThanOrEqual(0);
+      } catch (error) {
+        console.error('❌ Coverage テストでのシステム統計取得エラー:', error);
+        throw error;
+      }
     });
 
     test('設定情報の安全な取得', () => {

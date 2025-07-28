@@ -58,6 +58,12 @@ export class DatabaseConnection {
 
     // 外部キー制約を有効化
     await this.run('PRAGMA foreign_keys = ON');
+    
+    // テスト環境でのパフォーマンス最適化: WALモード無効化
+    if (process.env.NODE_ENV === 'test') {
+      await this.run('PRAGMA journal_mode = DELETE');
+      await this.run('PRAGMA synchronous = OFF');
+    }
 
     // スキーマ初期化とマイグレーション実行
     const initializer = new DatabaseInitializer(this.db);

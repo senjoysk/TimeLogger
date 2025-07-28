@@ -88,11 +88,8 @@ describe('TODO機能 End-to-End テスト', () => {
   let config: ActivityLoggingConfig;
 
   beforeAll(async () => {
-    // テスト用データベースパスを設定
-    testDatabasePath = getTestDbPath(__filename);
-    
-    // 既存のテストDBを削除
-    cleanupTestDatabase(testDatabasePath);
+    // パフォーマンス最適化: メモリDBを使用
+    testDatabasePath = ':memory:';
 
     config = {
       databasePath: testDatabasePath,
@@ -161,8 +158,7 @@ describe('TODO機能 End-to-End テスト', () => {
   });
 
   afterAll(() => {
-    // テストDB削除
-    cleanupTestDatabase(testDatabasePath);
+    // メモリDBのため、ファイルクリーンアップは不要
   });
 
   describe('メッセージ分類からTODO作成までの統合フロー', () => {

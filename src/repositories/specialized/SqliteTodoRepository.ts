@@ -123,7 +123,10 @@ export class SqliteTodoRepository implements ITodoRepository {
 
     // ソート
     if (options?.orderBy) {
-      sql += ` ORDER BY ${options.orderBy} DESC`;
+      const orderByColumn = options.orderBy === 'created' ? 'created_at' : 
+                           options.orderBy === 'priority' ? 'priority' :
+                           options.orderBy === 'due_date' ? 'due_date' : 'created_at';
+      sql += ` ORDER BY ${orderByColumn} DESC`;
     } else {
       sql += ' ORDER BY created_at DESC';
     }

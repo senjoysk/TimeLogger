@@ -14,6 +14,7 @@ export class MigrationManager {
   private migrationsPath: string;
   private backupManager: BackupManager;
   private dbPath: string;
+  private static migrationCache: Map<string, boolean> = new Map();
 
   constructor(db: Database, dbPath?: string) {
     this.db = db;

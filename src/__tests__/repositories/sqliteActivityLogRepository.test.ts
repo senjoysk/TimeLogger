@@ -20,23 +20,22 @@ describe('PartialCompositeRepository (旧SqliteActivityLogRepository)', () => {
   const mockTimezone = 'Asia/Tokyo';
 
   beforeAll(async () => {
-    // テスト用データベースが存在する場合は削除
-    cleanupTestDatabase(testDbPath);
+    // メモリDBのため、ファイルクリーンアップは不要
   });
 
   beforeEach(async () => {
-    repository = new PartialCompositeRepository(testDbPath);
+    // パフォーマンス最適化: メモリDBを使用
+    repository = new PartialCompositeRepository(':memory:');
     await repository.initializeDatabase();
   });
 
   afterEach(async () => {
     await repository.close();
-    cleanupTestDatabase(testDbPath);
+    // メモリDBのため、ファイルクリーンアップは不要
   });
 
   afterAll(async () => {
-    // クリーンアップ
-    cleanupTestDatabase(testDbPath);
+    // メモリDBのため、ファイルクリーンアップは不要
   });
 
   describe('活動ログ機能', () => {

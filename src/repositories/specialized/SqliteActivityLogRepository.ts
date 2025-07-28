@@ -630,7 +630,7 @@ export class SqliteActivityLogRepository implements IActivityLogRepository {
     return new Promise((resolve, reject) => {
       const db = this.db.getDatabase();
       
-      const sql = 'SELECT timezone FROM users WHERE user_id = ?';
+      const sql = 'SELECT timezone FROM user_settings WHERE user_id = ?';
       
       db.get(sql, [userId], (err, row: any) => {
         if (err) {
@@ -651,7 +651,7 @@ export class SqliteActivityLogRepository implements IActivityLogRepository {
       const db = this.db.getDatabase();
       
       const sql = `
-        INSERT OR REPLACE INTO users (user_id, timezone, updated_at)
+        INSERT OR REPLACE INTO user_settings (user_id, timezone, updated_at)
         VALUES (?, ?, ?)
       `;
 

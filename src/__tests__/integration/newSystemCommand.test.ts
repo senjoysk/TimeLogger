@@ -11,12 +11,9 @@ describe('新システム統合コマンド', () => {
   const testDbPath = getTestDbPath(__filename);
 
   beforeAll(async () => {
-    // テスト用データベースファイルを削除（既存の場合）
-    cleanupTestDatabase(testDbPath);
-
-    // 統合システムを初期化
+    // パフォーマンス最適化: メモリDBを使用
     const config = createDefaultConfig(
-      testDbPath,
+      ':memory:',
       'test-api-key'
     );
     
@@ -29,8 +26,7 @@ describe('新システム統合コマンド', () => {
       await integration.shutdown();
     }
     
-    // テスト用データベースファイルを削除
-    cleanupTestDatabase(testDbPath);
+    // メモリDBのため、ファイルクリーンアップは不要
   });
 
   test('detectGapsFromAnalysisメソッドが正しく実装されている', async () => {

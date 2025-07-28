@@ -202,14 +202,14 @@ export class SqliteUserRepository implements IUserRepository {
    */
   private mapRowToUserInfo(row: UserRegistrationRow): UserInfo {
     return {
-      userId: row.user_id,
+      userId: row.user_id || '',
       username: row.username,
-      timezone: row.timezone,
-      registrationDate: row.first_seen,
-      lastSeenAt: row.last_seen,
+      timezone: row.timezone || 'Asia/Tokyo',
+      registrationDate: row.first_seen || new Date().toISOString(),
+      lastSeenAt: row.last_seen || new Date().toISOString(),
       isActive: row.is_active === 1,
-      createdAt: row.created_at,
-      updatedAt: row.updated_at
+      createdAt: row.created_at || new Date().toISOString(),
+      updatedAt: row.updated_at || new Date().toISOString()
     };
   }
 }
