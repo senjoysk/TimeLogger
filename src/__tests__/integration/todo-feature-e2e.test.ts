@@ -13,7 +13,7 @@ import { Todo } from '../../types/todo';
 import { ITodoRepository } from '../../repositories/interfaces';
 import { SqliteTodoRepository } from '../../repositories/specialized/SqliteTodoRepository';
 import { MockGeminiService } from '../mocks/mockGeminiService';
-import { getTestDbPath, cleanupTestDatabase } from '../../utils/testDatabasePath';
+import { TestDatabaseInitializer } from '../../database/testDatabaseInitializer';
 
 // E2Eテスト用のモッククラス
 class MockDiscordMessage {
@@ -84,18 +84,18 @@ describe('TODO機能 End-to-End テスト', () => {
   // タイムアウトを30秒に延長
   jest.setTimeout(30000);
   let integration: ActivityLoggingIntegration;
-  let testDatabasePath: string;
+  let testDbInitializer: TestDatabaseInitializer;
   let config: ActivityLoggingConfig;
 
-  beforeAll(async () => {
-    // テスト用データベースパスを設定
-    testDatabasePath = getTestDbPath(__filename);
+  beforeEach(async () => {
+    // 各テストで独立したデータベースを使用（固有のDB作成）
+    const timestamp = Date.now();
+    const randomId = Math.random().toString(36).substr(2, 9);
+    testDbInitializer = new TestDatabaseInitializer(__filename, `e2e-${timestamp}-${randomId}`);
+    await testDbInitializer.initialize();
     
-    // 既存のテストDBを削除
-    cleanupTestDatabase(testDatabasePath);
-
     config = {
-      databasePath: testDatabasePath,
+      databasePath: testDbInitializer.getPath(),
       geminiApiKey: process.env.GOOGLE_GEMINI_API_KEY || 'test-key',
       debugMode: true,
       defaultTimezone: 'Asia/Tokyo',
@@ -103,9 +103,7 @@ describe('TODO機能 End-to-End テスト', () => {
       cacheValidityMinutes: 10,
       targetUserId: 'test-user-123'
     };
-  });
-
-  beforeEach(async () => {
+    
     integration = new ActivityLoggingIntegration(config);
     try {
       await integration.initialize();
@@ -151,18 +149,19 @@ describe('TODO機能 End-to-End テスト', () => {
     try {
       if (integration) {
         await integration.shutdown();
+        integration = null as any;
       }
     } catch (error) {
       console.error('❌ E2Eテストクリーンアップエラー:', error);
     }
     
-    // 非同期処理の完了を待つ
+    // テストデータベースの完全クリーンアップ
+    if (testDbInitializer) {
+      await testDbInitializer.cleanup();
+    }
+    
+    // 非同期処理の完了を確実に待つ
     await new Promise(resolve => setImmediate(resolve));
-  });
-
-  afterAll(() => {
-    // テストDB削除
-    cleanupTestDatabase(testDatabasePath);
   });
 
   describe('メッセージ分類からTODO作成までの統合フロー', () => {

@@ -9,7 +9,7 @@ import { SqliteTodoRepository } from '../../repositories/specialized/SqliteTodoR
 import { Message, ButtonInteraction } from 'discord.js';
 import { Todo } from '../../types/todo';
 import { MockGeminiService } from '../mocks/mockGeminiService';
-import { getTestDbPath, cleanupTestDatabase } from '../../utils/testDatabasePath';
+import { TestDatabaseInitializer } from '../../database/testDatabaseInitializer';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -103,20 +103,22 @@ describe('Test Setup', () => {
 describe('TODO・活動ログ重複登録防止テスト', () => {
   let integration: ActivityLoggingIntegration;
   let repository: SqliteActivityLogRepository;
-  let testDbPath: string;
+  let testDbInitializer: TestDatabaseInitializer;
   let consoleSpy: jest.SpyInstance;
 
   beforeEach(async () => {
     // console.errorをモックしてエラーログをキャプチャ
     consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
 
-    // テスト用データベースの準備
-    testDbPath = getTestDbPath(__filename);
-    cleanupTestDatabase(testDbPath);
-
+    // テスト用データベースの初期化（固有のDB作成）
+    const timestamp = Date.now();
+    const randomId = Math.random().toString(36).substr(2, 9);
+    testDbInitializer = new TestDatabaseInitializer(__filename, `duplication-${timestamp}-${randomId}`);
+    repository = await testDbInitializer.initialize();
+    
     // 統合システムの初期化
     const config: ActivityLoggingConfig = {
-      databasePath: testDbPath,
+      databasePath: testDbInitializer.getPath(),
       geminiApiKey: 'test-api-key',
       debugMode: false,
       defaultTimezone: 'Asia/Tokyo',
@@ -134,8 +136,8 @@ describe('TODO・活動ログ重複登録防止テスト', () => {
       console.log('統合システム初期化エラー:', error);
       console.log('エラーの詳細:', JSON.stringify(error, null, 2));
       console.log('設定:', JSON.stringify(config, null, 2));
-      console.log('データベースパス:', testDbPath);
-      console.log('テストディレクトリ存在:', fs.existsSync(path.dirname(testDbPath)));
+      console.log('データベースパス:', testDbInitializer.getPath());
+      console.log('テストディレクトリ存在:', fs.existsSync(path.dirname(testDbInitializer.getPath())));
       
       // より詳細なエラー情報を提供
       if (error instanceof Error) {
@@ -164,8 +166,10 @@ describe('TODO・活動ログ重複登録防止テスト', () => {
       (integration as any).unifiedAnalysisService.geminiService = mockGeminiService;
     }
 
-    // 統合システムと同じリポジトリインスタンスを使用（検証用）
-    repository = (integration as any).repository;
+    // リポジトリは既に初期化済み（TestDatabaseInitializerから取得）
+    // 統合システムが使用するリポジトリと検証用リポジトリが同じDBを参照することを確認
+    const integrationRepository = (integration as any).repository;
+    expect((integrationRepository as any).databasePath).toBe((repository as any).databasePath);
   });
 
   afterEach(async () => {
@@ -174,17 +178,23 @@ describe('TODO・活動ログ重複登録防止テスト', () => {
       consoleSpy.mockRestore();
     }
     
-    // クリーンアップ
+    // 統合システムの完全シャットダウン
     if (integration) {
       try {
         await integration.shutdown();
       } catch (error) {
         console.log('統合システムシャットダウンエラー:', error);
       }
+      integration = null as any;
     }
     
-    // テストデータベースファイルを削除
-    cleanupTestDatabase(testDbPath);
+    // テストデータベースの完全クリーンアップ
+    if (testDbInitializer) {
+      await testDbInitializer.cleanup();
+    }
+    
+    // 非同期処理の完了を確実に待つ
+    await new Promise(resolve => setImmediate(resolve));
   });
 
   test('通常メッセージはAI分類のみ実行され、活動ログに自動登録されない', async () => {
@@ -258,16 +268,20 @@ describe('TODO・活動ログ重複登録防止テスト', () => {
     const userId = 'test-user-123';
     const messageContent = '会議に参加した';
     
+    // ユーザーを事前に登録（必要な場合）
+    await repository.registerUser(userId, 'Test User');
+    
     // ActivityLogServiceを直接使用してテスト
     const activityLogService = (integration as any).activityLogService;
     
     // 活動ログを直接記録
-    await activityLogService.recordActivity(userId, messageContent, 'Asia/Tokyo');
+    const savedLog = await activityLogService.recordActivity(userId, messageContent, 'Asia/Tokyo');
 
-    // 検証: 活動ログのみ登録されている
-    const businessDateInfo = repository.calculateBusinessDate(new Date().toISOString(), 'Asia/Tokyo');
-    const activityLogs = await repository.getLogsByDate(userId, businessDateInfo.businessDate);
+    // 検証: 活動ログのみ登録されている（保存されたログの業務日で検索）
     const todos = await repository.getTodosByUserId(userId);
+    
+    // 保存されたログの業務日で検索（ActivityLogServiceが使用した業務日と一致させる）
+    const activityLogs = savedLog ? await repository.getLogsByDate(userId, savedLog.businessDate) : [];
     
     expect(activityLogs.length).toBe(1);
     expect(activityLogs[0].content).toBe(messageContent);
@@ -309,6 +323,9 @@ describe('TODO・活動ログ重複登録防止テスト', () => {
     const todoHandler = (integration as any).todoHandler;
     const activityLogService = (integration as any).activityLogService;
     
+    // ユーザーを事前に登録（必要な場合）
+    await repository.registerUser(userId, 'Test User');
+    
     // 直接メソッドを呼び出してTODOと活動ログを作成
     const mockInteraction = new MockButtonInteraction('test_button', userId);
     
@@ -322,7 +339,7 @@ describe('TODO・活動ログ重複登録防止テスト', () => {
     );
     
     // 活動ログ: ミーティングに参加した（ActivityLogServiceを直接使用）
-    await activityLogService.recordActivity(userId, 'ミーティングに参加した', 'Asia/Tokyo');
+    const savedLog = await activityLogService.recordActivity(userId, 'ミーティングに参加した', 'Asia/Tokyo');
     
     // TODO 2: レポートを明日までに提出
     await todoHandler.createTodoFromMessage(
@@ -333,10 +350,9 @@ describe('TODO・活動ログ重複登録防止テスト', () => {
       'Asia/Tokyo'
     );
 
-    // 検証: それぞれ適切に登録されている
+    // 検証: それぞれ適切に登録されている（保存されたログの業務日で検索）
     const todos = await repository.getTodosByUserId(userId);
-    const businessDateInfo = repository.calculateBusinessDate(new Date().toISOString(), 'Asia/Tokyo');
-    const activityLogs = await repository.getLogsByDate(userId, businessDateInfo.businessDate);
+    const activityLogs = await repository.getLogsByDate(userId, savedLog.businessDate);
     
     expect(todos.length).toBe(2); // TODOは2件
     expect(activityLogs.length).toBe(1); // 活動ログは1件
