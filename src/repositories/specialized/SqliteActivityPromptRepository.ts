@@ -49,7 +49,7 @@ export class SqliteActivityPromptRepository implements IActivityPromptRepository
       const db = this.db.getDatabase();
       
       const sql = `
-        INSERT INTO users (
+        INSERT INTO user_settings (
           user_id, prompt_enabled, prompt_start_hour, prompt_start_minute, 
           prompt_end_hour, prompt_end_minute, created_at, updated_at
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
@@ -106,7 +106,7 @@ export class SqliteActivityPromptRepository implements IActivityPromptRepository
       const sql = `
         SELECT user_id, prompt_enabled, prompt_start_hour, prompt_start_minute,
                prompt_end_hour, prompt_end_minute, created_at, updated_at
-        FROM users 
+        FROM user_settings 
         WHERE user_id = ? AND prompt_enabled IS NOT NULL
       `;
 
@@ -173,7 +173,7 @@ export class SqliteActivityPromptRepository implements IActivityPromptRepository
       values.push(new Date().toISOString());
       values.push(userId);
 
-      const sql = `UPDATE users SET ${setClause.join(', ')} WHERE user_id = ?`;
+      const sql = `UPDATE user_settings SET ${setClause.join(', ')} WHERE user_id = ?`;
 
       db.run(sql, values, function(err: any) {
         if (err) {
@@ -194,7 +194,7 @@ export class SqliteActivityPromptRepository implements IActivityPromptRepository
       const db = this.db.getDatabase();
       
       const sql = `
-        UPDATE users SET 
+        UPDATE user_settings SET 
           prompt_enabled = NULL,
           prompt_start_hour = NULL,
           prompt_start_minute = NULL,
@@ -229,7 +229,7 @@ export class SqliteActivityPromptRepository implements IActivityPromptRepository
       const sql = `
         SELECT user_id, prompt_enabled, prompt_start_hour, prompt_start_minute,
                prompt_end_hour, prompt_end_minute, created_at, updated_at
-        FROM users 
+        FROM user_settings 
         WHERE prompt_enabled = 1
         ORDER BY user_id
       `;
@@ -268,7 +268,7 @@ export class SqliteActivityPromptRepository implements IActivityPromptRepository
       const db = this.db.getDatabase();
       
       const sql = `
-        SELECT user_id FROM users 
+        SELECT user_id FROM user_settings 
         WHERE prompt_enabled = 1 
           AND prompt_start_hour <= ? 
           AND prompt_end_hour >= ?
@@ -305,7 +305,7 @@ export class SqliteActivityPromptRepository implements IActivityPromptRepository
       const db = this.db.getDatabase();
       
       const sql = `
-        UPDATE users SET 
+        UPDATE user_settings SET 
           prompt_enabled = 1, 
           updated_at = ? 
         WHERE user_id = ? AND prompt_enabled IS NOT NULL
@@ -330,7 +330,7 @@ export class SqliteActivityPromptRepository implements IActivityPromptRepository
       const db = this.db.getDatabase();
       
       const sql = `
-        UPDATE users SET 
+        UPDATE user_settings SET 
           prompt_enabled = 0, 
           updated_at = ? 
         WHERE user_id = ?
@@ -359,7 +359,7 @@ export class SqliteActivityPromptRepository implements IActivityPromptRepository
       const db = this.db.getDatabase();
       
       const sql = `
-        SELECT COUNT(*) as count FROM users 
+        SELECT COUNT(*) as count FROM user_settings 
         WHERE user_id = ? AND prompt_enabled IS NOT NULL
       `;
 

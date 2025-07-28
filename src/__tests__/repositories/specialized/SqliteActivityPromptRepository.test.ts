@@ -234,7 +234,7 @@ describe('SqliteActivityPromptRepository専用テスト', () => {
       const userIds = await repository.getUsersToPromptAt(10, 30);
 
       expect(userIds).toContain('time-test-user-1'); // 9:00-18:00 → 対象
-      expect(userIds).not.toContain('time-test-user-2'); // 8:30-17:30 → 対象外（17:30 < 10:30は不正）
+      expect(userIds).toContain('time-test-user-2'); // 8:30-17:30 → 対象（10:30は範囲内）
       expect(userIds).toContain('time-test-user-3'); // 10:00-16:00 → 対象
       expect(userIds).not.toContain('time-test-disabled'); // 無効 → 対象外
     });
