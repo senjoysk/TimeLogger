@@ -4,7 +4,7 @@
  */
 
 import { ActivityLoggingIntegration, ActivityLoggingConfig } from '../../integration/activityLoggingIntegration';
-import { SqliteActivityLogRepository } from '../../repositories/sqliteActivityLogRepository';
+import { PartialCompositeRepository } from '../../repositories/PartialCompositeRepository';
 import { SqliteTodoRepository } from '../../repositories/specialized/SqliteTodoRepository';
 import { Message, ButtonInteraction } from 'discord.js';
 import { Todo } from '../../types/todo';
@@ -93,16 +93,16 @@ describe('Test Setup', () => {
     
     expect(process.env.NODE_ENV).toBe('test');
     expect(typeof ActivityLoggingIntegration).toBe('function');
-    expect(typeof SqliteActivityLogRepository).toBe('function');
+    expect(typeof PartialCompositeRepository).toBe('function');
     
     // スパイをクリーンアップ
     consoleSpy.mockRestore();
   });
 });
 
-describe.skip('TODO・活動ログ重複登録防止テスト', () => {
+describe('TODO・活動ログ重複登録防止テスト', () => {
   let integration: ActivityLoggingIntegration;
-  let repository: SqliteActivityLogRepository;
+  let repository: PartialCompositeRepository;
   let testDbPath: string;
   let consoleSpy: jest.SpyInstance;
 

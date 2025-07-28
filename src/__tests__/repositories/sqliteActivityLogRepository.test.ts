@@ -4,7 +4,7 @@
  */
 
 import { describe, test, expect, beforeEach, afterEach, beforeAll, afterAll } from '@jest/globals';
-import { SqliteActivityLogRepository } from '../../repositories/sqliteActivityLogRepository';
+import { PartialCompositeRepository } from '../../repositories/PartialCompositeRepository';
 import { 
   ActivityLog, 
   CreateActivityLogRequest,
@@ -13,8 +13,8 @@ import {
 import * as fs from 'fs';
 import { getTestDbPath, cleanupTestDatabase } from '../../utils/testDatabasePath';
 
-describe('SqliteActivityLogRepository', () => {
-  let repository: SqliteActivityLogRepository;
+describe('PartialCompositeRepository (旧SqliteActivityLogRepository)', () => {
+  let repository: PartialCompositeRepository;
   const testDbPath = getTestDbPath(__filename);
   const mockUserId = 'test-user-123';
   const mockTimezone = 'Asia/Tokyo';
@@ -25,7 +25,7 @@ describe('SqliteActivityLogRepository', () => {
   });
 
   beforeEach(async () => {
-    repository = new SqliteActivityLogRepository(testDbPath);
+    repository = new PartialCompositeRepository(testDbPath);
     await repository.initializeDatabase();
   });
 

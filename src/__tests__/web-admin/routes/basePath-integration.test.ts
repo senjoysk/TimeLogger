@@ -11,7 +11,7 @@ import { IntegratedServer } from '../../../server';
 import { AdminServer } from '../../../web-admin/server';
 import { getTestDbPath, cleanupTestDatabase } from '../../../utils/testDatabasePath';
 
-describe.skip('basePath統合テスト', () => {
+describe('basePath統合テスト', () => {
   const testDbPath = getTestDbPath(__filename);
   let adminServer: AdminServer;
   let integratedServer: IntegratedServer;

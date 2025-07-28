@@ -5,7 +5,7 @@
 
 import { Scheduler } from '../scheduler';
 import { TaskLoggerBot } from '../bot';
-import { SqliteActivityLogRepository } from '../repositories/sqliteActivityLogRepository';
+import { PartialCompositeRepository } from '../repositories/PartialCompositeRepository';
 import { ISchedulerService, ILogger, ITimeProvider, IConfigService } from '../interfaces/dependencies';
 import { ActivityPromptSettings } from '../types/activityPrompt';
 
@@ -18,13 +18,13 @@ interface MockActivityPromptRepository {
 // モック用Bot
 interface MockTaskLoggerBot {
   sendActivityPromptToUser: jest.Mock<Promise<void>, [string, string]>;
-  getRepository: jest.Mock<SqliteActivityLogRepository>;
+  getRepository: jest.Mock<PartialCompositeRepository>;
 }
 
 describe('🔴 Red Phase: Scheduler活動促し機能', () => {
   let scheduler: Scheduler;
   let mockBot: MockTaskLoggerBot;
-  let mockRepository: SqliteActivityLogRepository;
+  let mockRepository: PartialCompositeRepository;
   let mockSchedulerService: jest.Mocked<ISchedulerService>;
   let mockLogger: jest.Mocked<ILogger>;
   let mockTimeProvider: jest.Mocked<ITimeProvider>;

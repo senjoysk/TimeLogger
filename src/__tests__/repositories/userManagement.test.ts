@@ -4,7 +4,7 @@
  */
 
 import { describe, test, expect, beforeEach, afterEach } from '@jest/globals';
-import { SqliteActivityLogRepository } from '../../repositories/sqliteActivityLogRepository';
+import { PartialCompositeRepository } from '../../repositories/PartialCompositeRepository';
 import { UserInfo, UserStats } from '../../repositories/interfaces';
 import { Database } from 'sqlite3';
 import { format } from 'date-fns-tz';
@@ -12,7 +12,7 @@ import { ConfigService } from '../../services/configService';
 import { getTestDbPath, cleanupTestDatabase } from '../../utils/testDatabasePath';
 
 describe('Phase 3: ユーザー管理機能テスト', () => {
-  let repository: SqliteActivityLogRepository;
+  let repository: PartialCompositeRepository;
   let testDbPath: string;
   let configService: ConfigService;
 
@@ -24,7 +24,7 @@ describe('Phase 3: ユーザー管理機能テスト', () => {
     // ConfigServiceを初期化
     configService = new ConfigService();
     
-    repository = new SqliteActivityLogRepository(testDbPath);
+    repository = new PartialCompositeRepository(testDbPath);
     await repository.initializeDatabase();
   });
 

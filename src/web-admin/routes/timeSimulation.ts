@@ -10,7 +10,7 @@ import { TimeSimulationService } from '../services/timeSimulationService';
 import { MockTimeProvider } from '../../factories';
 import { TimeSetRequest } from '../types/testing';
 import { ActivityPromptRepository } from '../../repositories/activityPromptRepository';
-import { SqliteActivityLogRepository } from '../../repositories/sqliteActivityLogRepository';
+import { PartialCompositeRepository } from '../../repositories/PartialCompositeRepository';
 import { IDiscordBot } from '../../interfaces/dependencies';
 // Express Request型の拡張を読み込み
 import '../middleware/timezoneMiddleware';

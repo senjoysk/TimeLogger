@@ -5,15 +5,15 @@
 
 import { TodoManagementService } from '../../../web-admin/services/todoManagementService';
 import { AdminRepository } from '../../../web-admin/repositories/adminRepository';
-import { SqliteActivityLogRepository } from '../../../repositories/sqliteActivityLogRepository';
+import { PartialCompositeRepository } from '../../../repositories/PartialCompositeRepository';
 import { TodoTask, TodoStatus, TodoPriority } from '../../../types/todo';
 import { getTestDbPath } from '../../../utils/testDatabasePath';
 
 // モック
 jest.mock('../../../web-admin/repositories/adminRepository');
-jest.mock('../../../repositories/sqliteActivityLogRepository');
+jest.mock('../../../repositories/PartialCompositeRepository');
 const mockAdminRepository = AdminRepository as jest.MockedClass<typeof AdminRepository>;
-const mockSqliteRepo = SqliteActivityLogRepository as jest.MockedClass<typeof SqliteActivityLogRepository>;
+const mockSqliteRepo = PartialCompositeRepository as jest.MockedClass<typeof PartialCompositeRepository>;
 
 describe('TodoManagementService', () => {
   let service: TodoManagementService;

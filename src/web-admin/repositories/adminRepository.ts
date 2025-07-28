@@ -5,7 +5,7 @@
 
 import { IAdminRepository } from '../interfaces/adminInterfaces';
 import { SearchFilters, PaginationOptions } from '../types/admin';
-import { SqliteActivityLogRepository } from '../../repositories/sqliteActivityLogRepository';
+import { PartialCompositeRepository } from '../../repositories/PartialCompositeRepository';
 import { IUnifiedRepository } from '../../repositories/interfaces';
 import { TodoTask, TodoStatus, TodoPriority, Todo } from '../../types/todo';
 import { v4 as uuidv4 } from 'uuid';

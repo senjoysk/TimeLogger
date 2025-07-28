@@ -10,7 +10,7 @@ import { AdminService } from './services/adminService';
 import { IAdminService } from './interfaces/adminInterfaces';
 import { SecurityService, ISecurityService } from './services/securityService';
 import { AdminRepository } from './repositories/adminRepository';
-import { SqliteActivityLogRepository } from '../repositories/sqliteActivityLogRepository';
+import { PartialCompositeRepository } from '../repositories/PartialCompositeRepository';
 import { IUnifiedRepository } from '../repositories/interfaces';
 import { createTimezoneMiddleware } from './middleware/timezoneMiddleware';
 import { createRoutes } from './routes';
@@ -31,7 +31,7 @@ export class AdminServer {
     this.app = express();
     
     // サービスの初期化
-    this.sqliteRepo = new SqliteActivityLogRepository(databasePath);
+    this.sqliteRepo = new PartialCompositeRepository(databasePath);
     console.log(`[AdminServer] Repository created for: ${databasePath}`);
     const adminRepo = new AdminRepository(this.sqliteRepo);
     this.adminService = new AdminService(adminRepo);

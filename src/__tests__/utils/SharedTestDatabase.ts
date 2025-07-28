@@ -3,14 +3,14 @@
  * テストパフォーマンス向上のため、データベース初期化を最適化
  */
 
-import { SqliteActivityLogRepository } from '../../repositories/sqliteActivityLogRepository';
+import { PartialCompositeRepository } from '../../repositories/PartialCompositeRepository';
 import { ActivityLoggingIntegration, ActivityLoggingConfig } from '../../integration/activityLoggingIntegration';
 import * as path from 'path';
 import * as fs from 'fs';
 
 export class SharedTestDatabase {
   private static instance: SharedTestDatabase | null = null;
-  private repository: SqliteActivityLogRepository | null = null;
+  private repository: PartialCompositeRepository | null = null;
   private integration: ActivityLoggingIntegration | null = null;
   private testDbPath: string = '';
   private isInitialized: boolean = false;
@@ -45,7 +45,7 @@ export class SharedTestDatabase {
       }
 
       // 統合リポジトリの初期化（メモリDBで高速化）
-      this.repository = new SqliteActivityLogRepository(':memory:');
+      this.repository = new PartialCompositeRepository(':memory:');
       await this.repository.initializeDatabase();
 
       // 統合クラスの初期化（テスト用に最適化）

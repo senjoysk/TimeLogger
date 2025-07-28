@@ -5,7 +5,7 @@
 
 import * as fs from 'fs';
 import { Database } from 'sqlite3';
-import { SqliteActivityLogRepository } from '../repositories/sqliteActivityLogRepository';
+import { PartialCompositeRepository } from '../repositories/PartialCompositeRepository';
 import { IUnifiedRepository } from '../repositories/interfaces';
 import { ActivityLogError } from '../types/activityLog';
 
@@ -174,7 +174,7 @@ export class SystemMigrator {
     this.oldDb = new Database(this.config.oldDatabasePath);
     
     // 新データベース接続
-    this.newRepository = new SqliteActivityLogRepository(this.config.newDatabasePath);
+    this.newRepository = new PartialCompositeRepository(this.config.newDatabasePath);
     // Repository is initialized in constructor
 
     this.log('✅ データベース接続完了');

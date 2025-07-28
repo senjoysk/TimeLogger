@@ -3,12 +3,12 @@
  * TDD Refactor Phase - 実際のDB実装をテスト
  */
 
-import { SqliteActivityLogRepository } from '../../repositories/sqliteActivityLogRepository';
+import { PartialCompositeRepository } from '../../repositories/PartialCompositeRepository';
 import { CreateTodoRequest, TodoStatus, Todo } from '../../types/todo';
 import { getTestDbPath, cleanupTestDatabase } from '../../utils/testDatabasePath';
 
-describe('SqliteActivityLogRepository TODO機能', () => {
-  let repository: SqliteActivityLogRepository;
+describe('PartialCompositeRepository TODO機能 (旧SqliteActivityLogRepository)', () => {
+  let repository: PartialCompositeRepository;
   let testDbPath: string;
 
   beforeEach(async () => {
@@ -16,7 +16,7 @@ describe('SqliteActivityLogRepository TODO機能', () => {
     testDbPath = getTestDbPath(__filename);
     cleanupTestDatabase(testDbPath);
 
-    repository = new SqliteActivityLogRepository(testDbPath);
+    repository = new PartialCompositeRepository(testDbPath);
     
     // 直接スキーマを実行（initializeDatabaseの代わり）
     const runQuery = (repository as any).runQuery.bind(repository);

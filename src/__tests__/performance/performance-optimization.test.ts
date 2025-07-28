@@ -3,13 +3,13 @@
  * メモリ内フィルタリング vs DB直接クエリの性能比較
  */
 
-import { SqliteActivityLogRepository } from '../../repositories/sqliteActivityLogRepository';
+import { PartialCompositeRepository } from '../../repositories/PartialCompositeRepository';
 import { CreateTodoRequest, TodoStatus } from '../../types/todo';
 import { performance } from 'perf_hooks';
 import { getTestDbPath, cleanupTestDatabase } from '../../utils/testDatabasePath';
 
 describe('パフォーマンス最適化テスト', () => {
-  let repository: SqliteActivityLogRepository;
+  let repository: PartialCompositeRepository;
   const TEST_DB_PATH = getTestDbPath(__filename);
   const TEST_USER_ID = 'perf-test-user';
 
@@ -17,7 +17,7 @@ describe('パフォーマンス最適化テスト', () => {
     // テスト用データベース初期化
     cleanupTestDatabase(TEST_DB_PATH);
     
-    repository = new SqliteActivityLogRepository(TEST_DB_PATH);
+    repository = new PartialCompositeRepository(TEST_DB_PATH);
     await repository.initializeDatabase();
 
     // パフォーマンステスト用のサンプルデータ作成

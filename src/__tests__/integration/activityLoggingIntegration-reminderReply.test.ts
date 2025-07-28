@@ -1,11 +1,11 @@
 import { ActivityLoggingIntegration } from '../../integration/activityLoggingIntegration';
 import { Message } from 'discord.js';
-import { SqliteActivityLogRepository } from '../../repositories/sqliteActivityLogRepository';
+import { PartialCompositeRepository } from '../../repositories/PartialCompositeRepository';
 
 // 🟢 Green Phase: ActivityLoggingIntegrationでのリマインダーReply処理テスト
 describe('🟢 Green Phase: ActivityLoggingIntegration ReminderReply機能', () => {
   let integration: ActivityLoggingIntegration;
-  let mockRepository: jest.Mocked<SqliteActivityLogRepository>;
+  let mockRepository: jest.Mocked<PartialCompositeRepository>;
   let mockMessage: any;
   let mockReferencedMessage: any;
 

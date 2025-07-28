@@ -4,7 +4,7 @@
  */
 
 import { ActivityLogService } from '../../services/activityLogService';
-import { SqliteActivityLogRepository } from '../../repositories/sqliteActivityLogRepository';
+import { PartialCompositeRepository } from '../../repositories/PartialCompositeRepository';
 import { GeminiService } from '../../services/geminiService';
 import { ActivityLog } from '../../types/activityLog';
 import * as fs from 'fs';
@@ -12,7 +12,7 @@ import * as path from 'path';
 
 describe('ActivityLogService Integration - Matching Features', () => {
   let service: ActivityLogService;
-  let repository: SqliteActivityLogRepository;
+  let repository: PartialCompositeRepository;
   let geminiService: jest.Mocked<GeminiService>;
   const testDbPath = ':memory:'; // インメモリDB
 
@@ -27,7 +27,7 @@ describe('ActivityLogService Integration - Matching Features', () => {
     } as any;
 
     // テスト用リポジトリとサービスの初期化
-    repository = new SqliteActivityLogRepository(testDbPath);
+    repository = new PartialCompositeRepository(testDbPath);
     await repository.initializeDatabase();
     
     service = new ActivityLogService(repository, geminiService);

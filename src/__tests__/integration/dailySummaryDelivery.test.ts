@@ -6,7 +6,7 @@
  */
 
 import { TaskLoggerBot } from '../../bot';
-import { SqliteActivityLogRepository } from '../../repositories/sqliteActivityLogRepository';
+import { PartialCompositeRepository } from '../../repositories/PartialCompositeRepository';
 import { SharedTestDatabase } from '../utils/SharedTestDatabase';
 import { toZonedTime } from 'date-fns-tz';
 

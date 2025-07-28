@@ -80,7 +80,7 @@ class MockDiscordButtonInteraction {
   }
 }
 
-describe.skip('TODO機能 End-to-End テスト', () => {
+describe('TODO機能 End-to-End テスト', () => {
   // タイムアウトを30秒に延長
   jest.setTimeout(30000);
   let integration: ActivityLoggingIntegration;
