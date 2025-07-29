@@ -940,3 +940,129 @@ sqlite3 data/app.db ".schema todo_tasks"
 - **ログ記録**: 運用時のトラブルシューティング支援
 
 **🌐 管理Webアプリケーションは、セキュリティ・UX・保守性を重視した堅牢な管理インターフェースです**
+
+## 🚨 エラー処理規約（必須遵守）
+
+### 統一されたエラー処理の実装
+
+#### 1. **AppError派生クラスの使用（必須）**
+すべてのエラーは`AppError`またはその派生クラスを使用してください。
+
+```typescript
+// ❌ 悪い例: 標準Errorの使用
+throw new Error('データベースエラー');
+
+// ✅ 良い例: AppError派生クラスの使用
+import { DatabaseError } from '../errors';
+throw new DatabaseError('データベース接続に失敗しました', {
+  operation: 'connect',
+  userId: user.id
+});
+```
+
+#### 2. **catch節でのルール（厳守）**
+
+##### ルール1: エラーのログ記録
+```typescript
+// ❌ 悪い例: console.errorの使用
+catch (error) {
+  console.error('エラー:', error);
+}
+
+// ✅ 良い例: ロガーサービスの使用
+import { logger } from '../utils/logger';
+catch (error) {
+  const appError = new DatabaseError('処理に失敗しました', {
+    operation: 'save',
+    error
+  }, error instanceof Error ? error : undefined);
+  
+  logger.error('DATABASE', 'データ保存エラー', appError);
+  throw appError; // 必ず再スロー
+}
+```
+
+##### ルール2: エラーの握りつぶし禁止
+```typescript
+// ❌ 悪い例: エラーを握りつぶす
+catch (error) {
+  console.log('エラーが発生しましたが続行します');
+  // エラーを無視して処理を続行
+}
+
+// ✅ 良い例: 適切なエラー処理
+catch (error) {
+  const appError = new ApiError('API呼び出しに失敗', { error });
+  logger.error('API', 'API呼び出しエラー', appError);
+  
+  // 復旧可能な場合はリトライ
+  if (isRetryable(error)) {
+    return retry();
+  }
+  
+  // 復旧不可能な場合は必ず再スロー
+  throw appError;
+}
+```
+
+##### ルール3: withErrorHandlingの活用
+```typescript
+// 非同期処理でのエラーハンドリング
+import { withErrorHandling, ErrorType } from '../utils/errorHandler';
+
+const result = await withErrorHandling(
+  async () => {
+    return await database.query(sql);
+  },
+  ErrorType.DATABASE,
+  { operation: 'query', sql }
+);
+```
+
+#### 3. **利用可能なエラークラス**
+
+```typescript
+import {
+  DatabaseError,      // データベース関連
+  ApiError,          // 外部API関連
+  ValidationError,   // バリデーション
+  DiscordError,      // Discord API関連
+  SystemError,       // システムエラー
+  NotFoundError,     // リソース不在
+  TimeoutError,      // タイムアウト
+  AuthenticationError, // 認証エラー
+  ConfigurationError, // 設定エラー
+  NotImplementedError // 未実装
+} from '../errors';
+```
+
+#### 4. **ログレベルの使い分け**
+
+```typescript
+import { logger } from '../utils/logger';
+
+// デバッグ情報
+logger.debug('PROCESS', '処理開始', { userId });
+
+// 一般情報
+logger.info('PROCESS', '処理完了', { count: 10 });
+
+// 警告
+logger.warn('API', 'レート制限に近づいています', { remaining: 5 });
+
+// エラー
+logger.error('DATABASE', 'クエリ実行失敗', error, { sql });
+
+// 成功
+logger.success('SYNC', '同期完了', { records: 100 });
+```
+
+### エラー処理チェックリスト
+
+- [ ] すべてのエラーは`AppError`派生クラスを使用
+- [ ] `console.error`の使用禁止（`logger.error`を使用）
+- [ ] catch節でエラーを握りつぶさない
+- [ ] 必要に応じてエラーを再スロー
+- [ ] エラーコンテキスト情報を適切に含める
+- [ ] 適切なエラータイプを選択
+- [ ] ユーザー向けメッセージとログメッセージを区別

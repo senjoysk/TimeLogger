@@ -1,17 +1,28 @@
 import { ErrorHandler, ErrorType, AppError, withErrorHandling } from '../../utils/errorHandler';
+import { logger } from '../../utils/logger';
+
+// loggerをモック化
+jest.mock('../../utils/logger', () => ({
+  logger: {
+    debug: jest.fn(),
+    info: jest.fn(),
+    warn: jest.fn(),
+    error: jest.fn(),
+    success: jest.fn()
+  }
+}));
 
 describe('ErrorHandler', () => {
   // console出力をモック化
-  let consoleErrorSpy: jest.SpyInstance;
   let consoleLogSpy: jest.SpyInstance;
 
   beforeEach(() => {
-    consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation();
     consoleLogSpy = jest.spyOn(console, 'log').mockImplementation();
+    // 各テストの前にモックをリセット
+    jest.clearAllMocks();
   });
 
   afterEach(() => {
-    consoleErrorSpy.mockRestore();
     consoleLogSpy.mockRestore();
   });
 
@@ -54,9 +65,15 @@ describe('ErrorHandler', () => {
       const message = ErrorHandler.handle(error);
 
       expect(message).toBe('データベースの処理中にエラーが発生しました。しばらく時間をおいて再度お試しください。');
-      expect(consoleErrorSpy).toHaveBeenCalledWith(
-        expect.stringContaining('[DATABASE] データベースエラー'),
-        expect.any(Object)
+      // logger.errorが呼ばれたことを確認
+      expect(logger.error).toHaveBeenCalledWith(
+        'DATABASE',
+        'データベースエラー',
+        error,
+        expect.objectContaining({
+          timestamp: expect.any(String),
+          context: expect.objectContaining({ userId: 'test-user' })
+        })
       );
     });
 
@@ -74,11 +91,13 @@ describe('ErrorHandler', () => {
     test('予期しないエラーが適切に処理される', () => {
       const error = new Error('予期しないエラー');
 
-      const message = ErrorHandler.handle(error);
-
-      expect(message).toBe('システムエラーが発生しました。しばらく時間をおいて再度お試しください。');
-      expect(consoleErrorSpy).toHaveBeenCalledWith(
-        expect.stringContaining('予期しないエラーが発生しました'),
+      // 予期しないエラーは再スローされる
+      expect(() => ErrorHandler.handle(error)).toThrow(error);
+      
+      // logger.errorが呼ばれたことを確認
+      expect(logger.error).toHaveBeenCalledWith(
+        'SYSTEM',
+        '予期しないエラーが発生しました',
         error
       );
     });
@@ -102,8 +121,9 @@ describe('ErrorHandler', () => {
     test('logDebugが正しく動作する', () => {
       ErrorHandler.logDebug('TestOperation', 'デバッグメッセージ', { key: 'value' });
 
-      expect(consoleLogSpy).toHaveBeenCalledWith(
-        '🔧 [DEBUG] TestOperation: デバッグメッセージ',
+      expect(logger.debug).toHaveBeenCalledWith(
+        'TestOperation',
+        'デバッグメッセージ',
         { key: 'value' }
       );
     });
@@ -111,18 +131,20 @@ describe('ErrorHandler', () => {
     test('logInfoが正しく動作する', () => {
       ErrorHandler.logInfo('TestOperation', '情報メッセージ');
 
-      expect(consoleLogSpy).toHaveBeenCalledWith(
-        'ℹ️ [INFO] TestOperation: 情報メッセージ',
-        ''
+      expect(logger.info).toHaveBeenCalledWith(
+        'TestOperation',
+        '情報メッセージ',
+        undefined
       );
     });
 
     test('logSuccessが正しく動作する', () => {
       ErrorHandler.logSuccess('TestOperation', '成功メッセージ');
 
-      expect(consoleLogSpy).toHaveBeenCalledWith(
-        '✅ [SUCCESS] TestOperation: 成功メッセージ',
-        ''
+      expect(logger.success).toHaveBeenCalledWith(
+        'TestOperation',
+        '成功メッセージ',
+        undefined
       );
     });
   });

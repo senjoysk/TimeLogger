@@ -49,6 +49,21 @@ echo "✅ ファイルサイズチェック通過"
 # 依存性注入とany型使用のチェック
 ./scripts/code-review/dependency-injection-check.sh
 
+# 🆕 エラー処理規約チェック
+echo "🔍 Pre-commit check: エラー処理規約チェック..."
+./scripts/code-review/error-handling-check.sh
+
+if [ $? -ne 0 ]; then
+    echo ""
+    echo "🚨 コミットが阻止されました！"
+    echo "🛠️ エラー処理規約違反が検出されました。"
+    echo "📋 CLAUDE.md のエラー処理規約セクションを確認して修正してください。"
+    echo ""
+    exit 1
+fi
+
+echo "✅ エラー処理規約チェック通過"
+
 # データベースパス妥当性チェック
 echo "🔍 Pre-commit check: データベースパス妥当性確認..."
 npm run check:database-paths

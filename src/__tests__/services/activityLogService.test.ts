@@ -52,6 +52,10 @@ describe('ActivityLogService', () => {
     // モックをリセット
     jest.clearAllMocks();
     
+    // 固定の日時を設定（2025-07-29 10:00:00 UTC）
+    jest.useFakeTimers();
+    jest.setSystemTime(new Date('2025-07-29T10:00:00.000Z'));
+    
     // サービスインスタンスを作成（GeminiServiceモックも追加）
     const mockGeminiService = {} as any; // 簡易モック
     service = new ActivityLogService(mockRepository as any, mockGeminiService);
@@ -67,6 +71,7 @@ describe('ActivityLogService', () => {
 
   afterEach(() => {
     jest.clearAllMocks();
+    jest.useRealTimers();
   });
 
   describe('recordActivity', () => {

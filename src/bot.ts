@@ -36,6 +36,9 @@ import { ITimezoneService } from './services/interfaces/ITimezoneService';
 import { PromptCommandHandler } from './handlers/promptCommandHandler';
 import { IActivityPromptRepository } from './repositories/interfaces';
 import { ACTIVITY_PROMPT_VALIDATION } from './types/activityPrompt';
+import { DatabaseError, SystemError, DiscordError, TimeoutError, NotFoundError } from './errors';
+import { ErrorHandler } from './utils/errorHandler';
+import { logger } from './utils/logger';
 
 /**
  * DI依存関係オプション
@@ -146,6 +149,12 @@ export class TaskLoggerBot {
         databaseConnected = true;
       }
     } catch (error) {
+      const dbError = new DatabaseError('データベース接続エラー', {
+        operation: 'checkSystemHealth',
+        error
+      }, error instanceof Error ? error : undefined);
+      
+      logger.error('HEALTH_CHECK', 'データベース接続エラー', dbError);
       issues.push(`データベース接続エラー: ${String(error)}`);
     }
     
@@ -212,7 +221,9 @@ export class TaskLoggerBot {
    * システムエラーハンドリング
    */
   private async handleSystemError(healthStatus: HealthStatus): Promise<void> {
-    console.error('🚨 システムエラー検知:', healthStatus);
+    logger.error('SYSTEM_ERROR', 'システムエラー検知', undefined, {
+      healthStatus: healthStatus as unknown as Record<string, unknown>
+    });
     
     // 重大なエラーかどうかを判定
     const isCriticalError = this.isCriticalError(healthStatus);
@@ -299,7 +310,14 @@ export class TaskLoggerBot {
       await this.sendDirectMessage(adminUserId, fullMessage);
       console.log(`📢 管理者通知送信完了: ${adminUserId}`);
     } catch (error) {
-      console.error('❌ 管理者通知送信エラー:', error);
+      const notifyError = new SystemError('管理者通知送信エラー', {
+        operation: 'sendAdminNotification',
+        error
+      }, error instanceof Error ? error : undefined);
+      
+      logger.error('ADMIN_NOTIFY', '管理者通知送信エラー', notifyError);
+      // 通知エラーは握りつぶさず再スロー
+      throw notifyError;
     }
   }
   
@@ -317,7 +335,13 @@ export class TaskLoggerBot {
           await this.client.login(config.discord.token);
         }
       } catch (error) {
-        console.error('❌ Discord再接続失敗:', error);
+        const discordError = new DiscordError('Discord再接続失敗', {
+          operation: 'recoverDiscordConnection',
+          error
+        }, error instanceof Error ? error : undefined);
+        
+        logger.error('DISCORD_RECOVERY', 'Discord再接続失敗', discordError);
+        throw discordError;
       }
     }
     
@@ -327,7 +351,13 @@ export class TaskLoggerBot {
         console.log('🔄 活動記録システム再初期化を試行中...');
         await this.initializeActivityLogging();
       } catch (error) {
-        console.error('❌ 活動記録システム再初期化失敗:', error);
+        const initError = new SystemError('活動記録システム再初期化失敗', {
+          operation: 'recoverActivityLogging',
+          error
+        }, error instanceof Error ? error : undefined);
+        
+        logger.error('ACTIVITY_LOGGING_RECOVERY', '活動記録システム再初期化失敗', initError);
+        throw initError;
       }
     }
     
@@ -370,8 +400,13 @@ export class TaskLoggerBot {
       
       
     } catch (error) {
-      console.error('❌ 新システム統合エラー:', error);
-      throw error; // 新システムの初期化に失敗したら起動を停止
+      const integrationError = new SystemError('新システム統合エラー', {
+        operation: 'initializeActivityLogging',
+        error
+      }, error instanceof Error ? error : undefined);
+      
+      logger.error('INTEGRATION', '新システム統合エラー', integrationError);
+      throw integrationError; // 新システムの初期化に失敗したら起動を停止
     }
   }
 
@@ -391,8 +426,13 @@ export class TaskLoggerBot {
       
       console.log('✅ Discord Bot が正常に起動しました');
     } catch (error) {
-      console.error('❌ Discord Bot の起動に失敗しました:', error);
-      throw error;
+      const startError = new SystemError('Discord Bot の起動に失敗しました', {
+        operation: 'start',
+        error
+      }, error instanceof Error ? error : undefined);
+      
+      logger.error('BOT_START', 'Discord Bot の起動に失敗しました', startError);
+      throw startError;
     }
   }
 
@@ -411,7 +451,14 @@ export class TaskLoggerBot {
         await this.activityLoggingIntegration.shutdown();
         console.log('✅ 活動記録システムのシャットダウン完了');
       } catch (error) {
-        console.error('❌ 活動記録システムシャットダウンエラー:', error);
+        const shutdownError = new SystemError('活動記録システムシャットダウンエラー', {
+          operation: 'shutdown',
+          error
+        }, error instanceof Error ? error : undefined);
+        
+        logger.error('SHUTDOWN', '活動記録システムシャットダウンエラー', shutdownError);
+        // シャットダウン時のエラーは握りつぶさず再スロー
+        throw shutdownError;
       }
     }
     
@@ -438,7 +485,11 @@ export class TaskLoggerBot {
 
     // エラー処理
     this.client.on('error', (error) => {
-      console.error('Discord Bot エラー:', error);
+      const botError = new SystemError('Discord Bot エラー', {
+        operation: 'discord_error',
+        error
+      }, error instanceof Error ? error : undefined);
+      logger.error('DISCORD', 'Discord Bot エラー', botError);
     });
   }
 
@@ -471,7 +522,13 @@ export class TaskLoggerBot {
 
       console.log('✅ 全ユーザーへの日次サマリー送信完了');
     } catch (error) {
-      console.error('❌ 全ユーザーへの日次サマリー送信エラー:', error);
+      const summaryError = new SystemError('全ユーザーへの日次サマリー送信エラー', {
+        operation: 'sendDailySummaryToAllUsers',
+        error
+      }, error instanceof Error ? error : undefined);
+      
+      logger.error('SUMMARY', '全ユーザーへの日次サマリー送信エラー', summaryError);
+      throw summaryError;
     }
   }
 
@@ -485,7 +542,14 @@ export class TaskLoggerBot {
       const timezone = await this.getUserTimezone(userId);
       await this.sendDailySummaryToUser(userId, timezone);
     } catch (error) {
-      console.error(`❌ ユーザー ${userId} への日次サマリー送信エラー:`, error);
+      const userSummaryError = new SystemError(`ユーザー ${userId} への日次サマリー送信エラー`, {
+        operation: 'sendDailySummaryForUser',
+        userId,
+        error
+      }, error instanceof Error ? error : undefined);
+      
+      logger.error('SUMMARY', `ユーザー ${userId} への日次サマリー送信エラー`, userSummaryError);
+      throw userSummaryError;
     }
   }
 
@@ -496,16 +560,23 @@ export class TaskLoggerBot {
     try {
       const user = await this.client.users.fetch(userId);
       if (!user) {
-        console.error(`❌ ユーザーが見つかりません: ${userId}`);
-        return;
+        const notFoundError = new NotFoundError(`ユーザー: ${userId}`, { userId });
+        logger.error('DISCORD', `ユーザーが見つかりません: ${userId}`, notFoundError);
+        throw notFoundError;
       }
 
       const dmChannel = await user.createDM();
       await dmChannel.send(message);
       console.log(`✅ ${userId} にダイレクトメッセージを送信しました`);
     } catch (error) {
-      console.error(`❌ ${userId} へのダイレクトメッセージ送信エラー:`, error);
-      throw error;
+      const dmError = new DiscordError(`${userId} へのダイレクトメッセージ送信エラー`, {
+        operation: 'sendDirectMessage',
+        userId,
+        error
+      }, error instanceof Error ? error : undefined);
+      
+      logger.error('DISCORD', `${userId} へのダイレクトメッセージ送信エラー`, dmError);
+      throw dmError;
     }
   }
 
@@ -516,8 +587,9 @@ export class TaskLoggerBot {
     try {
       const user = await this.client.users.fetch(userId);
       if (!user) {
-        console.error(`❌ ユーザーが見つかりません: ${userId}`);
-        return;
+        const notFoundError = new NotFoundError(`ユーザー: ${userId}`, { userId });
+        logger.error('DISCORD', `ユーザーが見つかりません: ${userId}`, notFoundError);
+        throw notFoundError;
       }
 
       // サマリー時刻かチェック
@@ -549,7 +621,13 @@ export class TaskLoggerBot {
         await dmChannel.send(summaryText);
         console.log(`✅ ${userId} に日次サマリーを送信しました`);
       } catch (summaryError) {
-        console.error(`❌ ${userId} のサマリー生成エラー:`, summaryError);
+        const genError = new SystemError(`${userId} のサマリー生成エラー`, {
+          operation: 'generateDailySummaryText',
+          userId,
+          error: summaryError
+        }, summaryError instanceof Error ? summaryError : undefined);
+        
+        logger.error('SUMMARY', `${userId} のサマリー生成エラー`, genError);
         
         // フォールバック: シンプルなメッセージ
         const fallbackMessage = '🌅 今日一日お疲れさまでした！\n\n' +
@@ -560,7 +638,15 @@ export class TaskLoggerBot {
       this.status.lastSummaryTime = new Date();
       
     } catch (error) {
-      console.error(`❌ ${userId} への日次サマリー送信エラー:`, error);
+      const sendError = new SystemError(`${userId} への日次サマリー送信エラー`, {
+        operation: 'sendDailySummaryToUser',
+        userId,
+        timezone,
+        error
+      }, error instanceof Error ? error : undefined);
+      
+      logger.error('SUMMARY', `${userId} への日次サマリー送信エラー`, sendError);
+      throw sendError;
     }
   }
 
@@ -599,8 +685,13 @@ export class TaskLoggerBot {
         updatedAt: now
       }));
     } catch (error) {
-      console.error('❌ 登録ユーザー取得エラー:', error);
-      return [];
+      const fetchError = new DatabaseError('登録ユーザー取得エラー', {
+        operation: 'getRegisteredUsers',
+        error
+      }, error instanceof Error ? error : undefined);
+      
+      logger.error('DATABASE', '登録ユーザー取得エラー', fetchError);
+      throw fetchError;
     }
   }
 
@@ -617,7 +708,8 @@ export class TaskLoggerBot {
       const timezone = await this.getUserTimezone(userId);
       return await this.activityLoggingIntegration.generateDailySummaryText(userId, timezone);
     } catch (error) {
-      console.error(`❌ ${userId} のサマリープレビュー生成エラー:`, error);
+      logger.error('SUMMARY', `${userId} のサマリープレビュー生成エラー`, error, { userId });
+      // プレビュー生成エラーの場合はフォールバックメッセージを返す
       return '🌅 今日一日お疲れさまでした！\n\nサマリーの詳細を確認するには `!summary` コマンドをお使いください。';
     }
   }
@@ -629,8 +721,9 @@ export class TaskLoggerBot {
     try {
       const user = await this.client.users.fetch(userId);
       if (!user) {
-        console.error(`❌ ユーザーが見つかりません: ${userId}`);
-        return;
+        const notFoundError = new NotFoundError(`ユーザー: ${userId}`, { userId });
+        logger.error('DISCORD', `ユーザーが見つかりません: ${userId}`, notFoundError);
+        throw notFoundError;
       }
 
       console.log(`⏰ ${userId} (${timezone}): テストモード - 時刻チェックをスキップして送信開始`);
@@ -649,7 +742,7 @@ export class TaskLoggerBot {
         await dmChannel.send(summaryText + '\n\n（テストモードで送信）');
         console.log(`✅ ${userId} に日次サマリーを送信しました（テストモード）`);
       } catch (summaryError) {
-        console.error(`❌ ${userId} のサマリー生成エラー:`, summaryError);
+        logger.error('SUMMARY', `${userId} のサマリー生成エラー`, summaryError, { userId });
         
         // フォールバック: シンプルなメッセージ
         const fallbackMessage = '🌅 今日一日お疲れさまでした！\n\n' +
@@ -660,8 +753,8 @@ export class TaskLoggerBot {
       this.status.lastSummaryTime = new Date();
       
     } catch (error) {
-      console.error(`❌ ${userId} へのサマリー送信エラー（テストモード）:`, error);
-      throw error;
+      logger.error('SUMMARY', `${userId} へのサマリー送信エラー（テストモード）`, error, { userId, mode: 'test' });
+      throw new DiscordError(`サマリー送信に失敗しました: ${error instanceof Error ? error.message : String(error)}`, { userId, mode: 'test', originalError: error });
     }
   }
 
@@ -684,7 +777,8 @@ export class TaskLoggerBot {
       const user = users.find(u => u.user_id === userId);
       return user?.timezone || this.getSystemDefaultTimezone();
     } catch (error) {
-      console.error(`❌ ${userId} のタイムゾーン取得エラー:`, error);
+      logger.error('TIMEZONE', `${userId} のタイムゾーン取得エラー`, error, { userId });
+      // デフォルト値を返すのでエラーは再スローしない
       return this.getSystemDefaultTimezone();
     }
   }
@@ -722,7 +816,8 @@ export class TaskLoggerBot {
 
       console.log('✅ 全ユーザーへのAPIコストレポート送信完了');
     } catch (error) {
-      console.error('❌ 全ユーザーへのAPIコストレポート送信エラー:', error);
+      logger.error('API_COST', '全ユーザーへのAPIコストレポート送信エラー', error);
+      throw new SystemError(`APIコストレポート送信に失敗しました: ${error instanceof Error ? error.message : String(error)}`, { originalError: error });
     }
   }
 
@@ -733,8 +828,9 @@ export class TaskLoggerBot {
     try {
       const user = await this.client.users.fetch(userId);
       if (!user) {
-        console.error(`❌ ユーザーが見つかりません: ${userId}`);
-        return;
+        const notFoundError = new NotFoundError(`ユーザー: ${userId}`, { userId });
+        logger.error('DISCORD', `ユーザーが見つかりません: ${userId}`, notFoundError);
+        throw notFoundError;
       }
 
       // コストレポート時刻かチェック
@@ -764,7 +860,8 @@ export class TaskLoggerBot {
       await dmChannel.send(report);
       console.log(`✅ ${userId} にAPIコストレポートを送信しました`);
     } catch (error) {
-      console.error(`❌ ${userId} へのAPIコストレポート送信エラー:`, error);
+      logger.error('API_COST', `${userId} へのAPIコストレポート送信エラー`, error, { userId, timezone });
+      throw new DiscordError(`APIコストレポート送信に失敗しました: ${error instanceof Error ? error.message : String(error)}`, { userId, timezone, originalError: error });
     }
   }
 
@@ -805,13 +902,15 @@ export class TaskLoggerBot {
           await dmChannel.send(`🚨 **コスト警告** 🚨\n${message}`);
           console.log(`✅ ${user.userId} にコスト警告を送信しました`);
         } catch (error) {
-          console.error(`❌ ${user.userId} へのコスト警告送信エラー:`, error);
+          logger.error('COST_ALERT', `${user.userId} へのコスト警告送信エラー`, error, { userId: user.userId });
+          // 個別のエラーは続行する
         }
       }
 
       console.log('✅ 全ユーザーへのコスト警告送信完了');
     } catch (error) {
-      console.error('❌ 全ユーザーへのコスト警告送信エラー:', error);
+      logger.error('COST_ALERT', '全ユーザーへのコスト警告送信エラー', error);
+      throw new SystemError(`コスト警告送信に失敗しました: ${error instanceof Error ? error.message : String(error)}`, { originalError: error });
     }
   }
 
@@ -872,7 +971,7 @@ export class TaskLoggerBot {
     
     while (!this.isSystemInitialized()) {
       if (Date.now() - startTime > timeoutMs) {
-        throw new Error('システム初期化がタイムアウトしました');
+        throw new TimeoutError('システム初期化', timeoutMs);
       }
       await new Promise(resolve => setTimeout(resolve, 100));
     }
@@ -884,12 +983,16 @@ export class TaskLoggerBot {
   private async initializePromptCommandHandler(): Promise<void> {
     try {
       if (!this.activityLoggingIntegration) {
-        throw new Error('ActivityLoggingIntegrationが初期化されていません');
+        throw new SystemError('ActivityLoggingIntegrationが初期化されていません', {
+          operation: 'getPromptCommandHandler'
+        });
       }
 
       const repository = this.activityLoggingIntegration.getRepository();
       if (!repository) {
-        throw new Error('Repositoryが取得できません');
+        throw new SystemError('Repositoryが取得できません', {
+          operation: 'getPromptCommandHandler'
+        });
       }
 
       // PromptCommandHandlerを初期化（PartialCompositeRepositoryを直接使用）
@@ -897,8 +1000,8 @@ export class TaskLoggerBot {
       
       console.log('✅ 活動促しコマンドハンドラーを初期化しました');
     } catch (error) {
-      console.error('❌ 活動促しコマンドハンドラーの初期化に失敗:', error);
-      throw error;
+      logger.error('INITIALIZATION', '活動促しコマンドハンドラーの初期化に失敗', error);
+      throw new SystemError(`活動促しコマンドハンドラーの初期化に失敗しました: ${error instanceof Error ? error.message : String(error)}`, { originalError: error });
     }
   }
 

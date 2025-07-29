@@ -2,6 +2,8 @@
  * エラーハンドリングユーティリティ
  * 統一されたエラー処理とログ出力を提供
  */
+import { logger, ILogger } from './logger';
+
 export enum ErrorType {
   DATABASE = 'DATABASE',
   API = 'API',
@@ -82,6 +84,8 @@ export class AppError extends Error {
  * エラーのログ出力とユーザー向けメッセージの生成を担当
  */
 export class ErrorHandler {
+  private static logger: ILogger = logger;
+
   /**
    * エラーをログ出力し、ユーザー向けメッセージを生成
    * @param error エラーオブジェクト
@@ -93,8 +97,10 @@ export class ErrorHandler {
     }
 
     // 予期しないエラーの場合
-    console.error('❌ [SYSTEM] 予期しないエラーが発生しました:', error);
-    return 'システムエラーが発生しました。しばらく時間をおいて再度お試しください。';
+    this.logger.error('SYSTEM', '予期しないエラーが発生しました', error);
+    
+    // 予期しないエラーは必ず再スローして上位に伝播
+    throw error;
   }
 
   /**
@@ -102,10 +108,9 @@ export class ErrorHandler {
    */
   private static handleAppError(error: AppError): string {
     // 詳細ログの出力
-    console.error(`❌ [${error.type}] ${error.message}`, {
+    this.logger.error(error.type, error.message, error, {
       timestamp: error.timestamp.toISOString(),
-      context: error.context,
-      stack: error.stack
+      context: error.context
     });
 
     // エラータイプに応じたユーザー向けメッセージを生成
@@ -137,7 +142,7 @@ export class ErrorHandler {
    * @param data 追加データ
    */
   public static logDebug(operation: string, message: string, data?: LogData): void {
-    console.log(`🔧 [DEBUG] ${operation}: ${message}`, data ? data : '');
+    this.logger.debug(operation, message, data as Record<string, unknown>);
   }
 
   /**
@@ -147,7 +152,7 @@ export class ErrorHandler {
    * @param data 追加データ
    */
   public static logInfo(operation: string, message: string, data?: LogData): void {
-    console.log(`ℹ️ [INFO] ${operation}: ${message}`, data ? data : '');
+    this.logger.info(operation, message, data as Record<string, unknown>);
   }
 
   /**
@@ -157,7 +162,7 @@ export class ErrorHandler {
    * @param data 追加データ
    */
   public static logSuccess(operation: string, message: string, data?: LogData): void {
-    console.log(`✅ [SUCCESS] ${operation}: ${message}`, data ? data : '');
+    this.logger.success(operation, message, data as Record<string, unknown>);
   }
 }
 
