@@ -56,11 +56,11 @@ describe('ActivityLogService', () => {
     const mockGeminiService = {} as any; // 簡易モック
     service = new ActivityLogService(mockRepository as any, mockGeminiService);
 
-    // 基本的なモック設定
+    // 基本的なモック設定（今日の日付: 2025-07-29）
     mockRepository.calculateBusinessDate.mockReturnValue({
-      businessDate: '2025-06-29',
-      startTime: '2025-06-28T20:00:00.000Z',
-      endTime: '2025-06-29T19:59:59.999Z',
+      businessDate: '2025-07-29',
+      startTime: '2025-07-28T20:00:00.000Z',
+      endTime: '2025-07-29T19:59:59.999Z',
       timezone: mockTimezone
     });
   });
@@ -77,11 +77,11 @@ describe('ActivityLogService', () => {
         id: 'test-log-id',
         userId: mockUserId,
         content,
-        inputTimestamp: '2025-06-29T10:00:00.000Z',
-        businessDate: '2025-06-29',
+        inputTimestamp: '2025-07-29T10:00:00.000Z',
+        businessDate: '2025-07-29',
         isDeleted: false,
-        createdAt: '2025-06-29T10:00:00.000Z',
-        updatedAt: '2025-06-29T10:00:00.000Z'
+        createdAt: '2025-07-29T10:00:00.000Z',
+        updatedAt: '2025-07-29T10:00:00.000Z'
       };
 
       mockRepository.saveLog.mockResolvedValue(expectedLog);
@@ -95,7 +95,7 @@ describe('ActivityLogService', () => {
         expect.objectContaining({
           userId: mockUserId,
           content: content,
-          businessDate: '2025-06-29'
+          businessDate: '2025-07-29'
         })
       );
     });
@@ -124,7 +124,7 @@ describe('ActivityLogService', () => {
     test('Repository エラーが適切に処理される', async () => {
       // Arrange
       const content = 'テスト活動';
-      mockRepository.saveLog.mockRejectedValue(new Error('Database error'));
+      mockRepository.saveLog.mockRejectedValue(new ActivityLogError('Database error', 'SAVE_ERROR'));
 
       // Act & Assert
       await expect(service.recordActivity(mockUserId, content, mockTimezone))
@@ -136,27 +136,27 @@ describe('ActivityLogService', () => {
   describe('getLogsForDate', () => {
     test('指定日のログが取得される', async () => {
       // Arrange
-      const targetDate = '2025-06-29';
+      const targetDate = '2025-07-29';
       const expectedLogs: ActivityLog[] = [
         {
           id: 'log-1',
           userId: mockUserId,
           content: 'ログ1',
-          inputTimestamp: '2025-06-29T09:00:00.000Z',
+          inputTimestamp: '2025-07-29T09:00:00.000Z',
           businessDate: targetDate,
           isDeleted: false,
-          createdAt: '2025-06-29T09:00:00.000Z',
-          updatedAt: '2025-06-29T09:00:00.000Z'
+          createdAt: '2025-07-29T09:00:00.000Z',
+          updatedAt: '2025-07-29T09:00:00.000Z'
         },
         {
           id: 'log-2',
           userId: mockUserId,
           content: 'ログ2',
-          inputTimestamp: '2025-06-29T10:00:00.000Z',
+          inputTimestamp: '2025-07-29T10:00:00.000Z',
           businessDate: targetDate,
           isDeleted: false,
-          createdAt: '2025-06-29T10:00:00.000Z',
-          updatedAt: '2025-06-29T10:00:00.000Z'
+          createdAt: '2025-07-29T10:00:00.000Z',
+          updatedAt: '2025-07-29T10:00:00.000Z'
         }
       ];
 
@@ -167,7 +167,7 @@ describe('ActivityLogService', () => {
 
       // Assert
       expect(result).toEqual(expectedLogs);
-      expect(mockRepository.getLogsByDate).toHaveBeenCalledWith(mockUserId, targetDate);
+      expect(mockRepository.getLogsByDate).toHaveBeenCalledWith(mockUserId, targetDate, false);
     });
 
     test('日付未指定時は今日の日付が使用される', async () => {
@@ -178,7 +178,7 @@ describe('ActivityLogService', () => {
       await service.getLogsForDate(mockUserId, undefined, mockTimezone);
 
       // Assert
-      expect(mockRepository.getLogsByDate).toHaveBeenCalledWith(mockUserId, '2025-06-29');
+      expect(mockRepository.getLogsByDate).toHaveBeenCalledWith(mockUserId, '2025-07-29', false);
     });
   });
 
@@ -197,17 +197,17 @@ describe('ActivityLogService', () => {
         id: logId,
         userId: mockUserId,
         content: '編集前の内容',
-        inputTimestamp: '2025-06-29T10:00:00.000Z',
-        businessDate: '2025-06-29',
+        inputTimestamp: '2025-07-29T10:00:00.000Z',
+        businessDate: '2025-07-29',
         isDeleted: false,
-        createdAt: '2025-06-29T10:00:00.000Z',
-        updatedAt: '2025-06-29T10:00:00.000Z'
+        createdAt: '2025-07-29T10:00:00.000Z',
+        updatedAt: '2025-07-29T10:00:00.000Z'
       };
 
       const updatedLog: ActivityLog = {
         ...existingLog,
         content: newContent,
-        updatedAt: '2025-06-29T11:00:00.000Z'
+        updatedAt: '2025-07-29T11:00:00.000Z'
       };
 
       mockRepository.getLogById.mockResolvedValue(existingLog);
@@ -243,11 +243,11 @@ describe('ActivityLogService', () => {
         id: 'deleted-log-id',
         userId: mockUserId,
         content: '削除済みログ',
-        inputTimestamp: '2025-06-29T10:00:00.000Z',
-        businessDate: '2025-06-29',
+        inputTimestamp: '2025-07-29T10:00:00.000Z',
+        businessDate: '2025-07-29',
         isDeleted: true,
-        createdAt: '2025-06-29T10:00:00.000Z',
-        updatedAt: '2025-06-29T10:00:00.000Z'
+        createdAt: '2025-07-29T10:00:00.000Z',
+        updatedAt: '2025-07-29T10:00:00.000Z'
       };
 
       const editRequest: EditLogRequest = {
@@ -292,17 +292,17 @@ describe('ActivityLogService', () => {
         id: logId,
         userId: mockUserId,
         content: 'テストログ',
-        inputTimestamp: '2025-06-29T10:00:00.000Z',
-        businessDate: '2025-06-29',
+        inputTimestamp: '2025-07-29T10:00:00.000Z',
+        businessDate: '2025-07-29',
         isDeleted: false,
-        createdAt: '2025-06-29T10:00:00.000Z',
-        updatedAt: '2025-06-29T10:00:00.000Z'
+        createdAt: '2025-07-29T10:00:00.000Z',
+        updatedAt: '2025-07-29T10:00:00.000Z'
       };
 
       const deletedLog: ActivityLog = {
         ...existingLog,
         isDeleted: true,
-        updatedAt: '2025-06-29T11:00:00.000Z'
+        updatedAt: '2025-07-29T11:00:00.000Z'
       };
 
       mockRepository.getLogById.mockResolvedValue(existingLog);
@@ -337,11 +337,11 @@ describe('ActivityLogService', () => {
         id: 'deleted-log-id',
         userId: mockUserId,
         content: '削除済みログ',
-        inputTimestamp: '2025-06-29T10:00:00.000Z',
-        businessDate: '2025-06-29',
+        inputTimestamp: '2025-07-29T10:00:00.000Z',
+        businessDate: '2025-07-29',
         isDeleted: true,
-        createdAt: '2025-06-29T10:00:00.000Z',
-        updatedAt: '2025-06-29T10:00:00.000Z'
+        createdAt: '2025-07-29T10:00:00.000Z',
+        updatedAt: '2025-07-29T10:00:00.000Z'
       };
 
       const deleteRequest: DeleteLogRequest = {
@@ -386,21 +386,21 @@ describe('ActivityLogService', () => {
           id: 'log-1',
           userId: mockUserId,
           content: 'プログラミングをしていました',
-          inputTimestamp: '2025-06-29T01:30:00.000Z', // 10:30 JST
-          businessDate: '2025-06-29',
+          inputTimestamp: '2025-07-29T01:30:00.000Z', // 10:30 JST
+          businessDate: '2025-07-29',
           isDeleted: false,
-          createdAt: '2025-06-29T01:30:00.000Z',
-          updatedAt: '2025-06-29T01:30:00.000Z'
+          createdAt: '2025-07-29T01:30:00.000Z',
+          updatedAt: '2025-07-29T01:30:00.000Z'
         },
         {
           id: 'log-2',
           userId: mockUserId,
           content: '会議に参加していました。非常に長い内容のテストケースです。50文字を超える場合は切り詰められる予定です。',
-          inputTimestamp: '2025-06-29T02:00:00.000Z', // 11:00 JST
-          businessDate: '2025-06-29',
+          inputTimestamp: '2025-07-29T02:00:00.000Z', // 11:00 JST
+          businessDate: '2025-07-29',
           isDeleted: false,
-          createdAt: '2025-06-29T02:00:00.000Z',
-          updatedAt: '2025-06-29T02:00:00.000Z'
+          createdAt: '2025-07-29T02:00:00.000Z',
+          updatedAt: '2025-07-29T02:00:00.000Z'
         }
       ];
 
@@ -432,16 +432,16 @@ describe('ActivityLogService', () => {
       // Assert
       expect(mockRepository.calculateBusinessDate).toHaveBeenCalled();
       expect(result).toEqual({
-        businessDate: '2025-06-29',
-        startTime: '2025-06-28T20:00:00.000Z',
-        endTime: '2025-06-29T19:59:59.999Z',
+        businessDate: '2025-07-29',
+        startTime: '2025-07-28T20:00:00.000Z',
+        endTime: '2025-07-29T19:59:59.999Z',
         timezone: mockTimezone
       });
     });
 
     test('特定日時の業務日が計算される', () => {
       // Arrange
-      const targetDate = '2025-06-29T15:00:00.000Z';
+      const targetDate = '2025-07-29T15:00:00.000Z';
 
       // Act
       service.calculateBusinessDate(mockTimezone, targetDate);
