@@ -49,8 +49,8 @@ describe('GeminiService ReminderContext機能（実装済み）', () => {
         end: new Date('2024-01-15T11:30:00Z')
       };
 
-      // parseClassificationResponseをモックしてfallback動作をテスト
-      jest.spyOn(geminiService as any, 'parseClassificationResponse').mockReturnValue({
+      // ReminderContextServiceのparseClassificationResponseをモックしてfallback動作をテスト
+      jest.spyOn(geminiService['reminderContext'] as any, 'parseClassificationResponse').mockReturnValue({
         classification: 'UNCERTAIN',
         confidence: 0.9,
         priority: 3,
@@ -70,8 +70,8 @@ describe('GeminiService ReminderContext機能（実装済み）', () => {
         }
       };
       
-      // modelのgenerateContentメソッドをモック
-      const generateContentSpy = jest.spyOn(geminiService['model'], 'generateContent');
+      // apiClientのgenerateContentメソッドをモック
+      const generateContentSpy = jest.spyOn(geminiService['apiClient'], 'generateContent');
       generateContentSpy.mockResolvedValue(mockResponse as any);
 
       const result = await geminiService.classifyMessageWithReminderContext(
@@ -94,8 +94,8 @@ describe('GeminiService ReminderContext機能（実装済み）', () => {
       const reminderTime = new Date('2024-01-15T11:30:00Z');
       const timeDiff = 3; // 3分後
 
-      // parseClassificationResponseをモック
-      jest.spyOn(geminiService as any, 'parseClassificationResponse').mockReturnValue({
+      // ReminderContextServiceのparseClassificationResponseをモック
+      jest.spyOn(geminiService['reminderContext'] as any, 'parseClassificationResponse').mockReturnValue({
         classification: 'UNCERTAIN',
         confidence: 0.8,
         priority: 3,
@@ -115,8 +115,8 @@ describe('GeminiService ReminderContext機能（実装済み）', () => {
         }
       };
       
-      // modelのgenerateContentメソッドをモック
-      const generateContentSpy = jest.spyOn(geminiService['model'], 'generateContent');
+      // apiClientのgenerateContentメソッドをモック
+      const generateContentSpy = jest.spyOn(geminiService['apiClient'], 'generateContent');
       generateContentSpy.mockResolvedValue(mockResponse as any);
 
       const result = await geminiService.classifyMessageWithNearbyReminderContext(
