@@ -384,18 +384,27 @@ npm run test:coverage      # カバレッジ確認（45.5%以上維持）
 
 ### タスク完了前の品質ゲート
 ```bash
+# 🚨 最重要: Claude Codeはタスク完了前に必ずこれを実行すること
+
 # 1. ビルド確認
 npm run build
 
-# 2. 全テスト実行（統合テスト含む）
-npm test
+# 2. 改良されたテスト実行と失敗分析（推奨）
+./scripts/test-analysis.sh
 
-# 3. 統合テスト確認（追加確認）
-npm run test:integration
+# 3. または従来のテスト実行
+npm test                   # 全テスト実行（統合テスト含む）
+npm run test:integration   # 統合テスト確認（追加確認）
 
 # 4. 全テスト成功を確認してから完了報告
 echo "✅ 全テスト成功: タスク完了"
 ```
+
+#### test-analysis.shの優位性
+- **失敗分析自動化**: テスト失敗時に詳細な失敗情報を自動抽出
+- **失敗サマリー**: 失敗したテストスイートと具体的なエラー内容を整理
+- **レポート生成**: `test-reports/`ディレクトリに詳細ログを保存
+- **Pre-commitフック統合**: Huskyによる自動品質チェックで使用中
 
 ### 実行タイミング
 - **タスク実装完了後**: コードの実装やファイル変更が完了した時点
@@ -413,10 +422,26 @@ echo "✅ 全テスト成功: タスク完了"
 
 #### develop → staging デプロイ前
 ```bash
-npm run quality:check      # 品質チェック統合実行
-npm run test:integration   # 統合テスト実行
-# ✅ 全テスト成功後にdevelopブランチpush
+# Pre-commitフックが自動実行（推奨）
+git commit -m "変更内容"
+
+# または手動実行
+npm run build               # TypeScriptビルド
+./scripts/test-analysis.sh  # テスト実行と失敗分析
+./scripts/code-review/srp-violation-check.sh      # SRP違反チェック
+./scripts/code-review/file-size-check.sh          # ファイルサイズ監視
+./scripts/code-review/dependency-injection-check.sh # DI品質チェック
+npm run check:database-paths # データベースパス妥当性チェック
+
+# ✅ 全チェック通過後にdevelopブランチpush
 ```
+
+#### 改良されたPre-commitフック
+- **多層品質チェック**: ビルド→テスト→コード品質→設計原則の包括的検証
+- **失敗分析自動化**: テスト失敗時の詳細情報自動抽出
+- **SRP違反検出**: 単一責任原則違反の自動検出（例外許可機能付き）
+- **ファイルサイズ監視**: 巨大ファイルの早期発見と分割推奨
+- **依存性注入チェック**: any型使用とDIパターンの品質確認
 
 #### main → production デプロイ前
 ```bash
@@ -453,18 +478,20 @@ staging環境のDiscord Botで以下のコマンドを確認：
 
 ## アーキテクチャ概要
 
-### 🏗️ システム構成
+### 🏗️ システム構成（2024年12月更新）
 1. **ActivityLoggingIntegration**: メインシステム統合クラス
-2. **SqliteActivityLogRepository**: 統合データベースリポジトリ（活動ログ + APIコスト監視）
-3. **ICommandHandler**: コマンド処理の抽象化インターフェース
-4. **GeminiService**: AI分析サービス（Google Gemini 1.5 Flash）
-5. **Error Handling**: AppError と withErrorHandling による統一エラー処理
+2. **PartialCompositeRepository**: 統合データベースリポジトリ（専用リポジトリを統合）
+3. **専用リポジトリ群**: SqliteActivityLogRepository, SqliteActivityPromptRepository等
+4. **ICommandHandler**: コマンド処理の抽象化インターフェース
+5. **GeminiService**: AI分析サービス（Google Gemini 2.0 Flash）
+6. **Error Handling**: AppError と withErrorHandling による統一エラー処理
 
 ### 主要コンポーネント
 
 #### 統合システム（最重要）
 - **ActivityLoggingIntegration**: 全体の初期化とメッセージルーティング
-- **SqliteActivityLogRepository**: データアクセス層の統合実装
+- **PartialCompositeRepository**: データアクセス層の統合実装（Phase 4完了）
+- **専用リポジトリ**: 各機能専用の軽量実装（単一責任原則遵守）
 
 #### コマンドシステム
 - **ICommandHandler**: コマンド処理の統一インターフェース

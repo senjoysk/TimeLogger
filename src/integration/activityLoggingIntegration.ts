@@ -17,7 +17,9 @@ import { SummaryHandler } from '../handlers/summaryHandler';
 import { LogsCommandHandler } from '../handlers/logsCommandHandler';
 import { TimezoneHandler } from '../handlers/timezoneHandler';
 import { UnmatchedCommandHandler } from '../handlers/unmatchedCommandHandler';
-import { TodoCommandHandler } from '../handlers/todoCommandHandler';
+import { TodoCrudHandler } from '../handlers/todoCrudHandler';
+import { MessageClassificationHandler } from '../handlers/messageClassificationHandler';
+import { TodoInteractionHandler } from '../handlers/todoInteractionHandler';
 import { ProfileCommandHandler } from '../handlers/profileCommandHandler';
 import { MemoCommandHandler } from '../handlers/memoCommandHandler';
 import { IGeminiService } from '../services/interfaces/IGeminiService';
@@ -89,7 +91,9 @@ export class ActivityLoggingIntegration {
   private timezoneHandler!: TimezoneHandler;
   private gapHandler!: GapHandler;
   private unmatchedHandler!: UnmatchedCommandHandler;
-  private todoHandler!: TodoCommandHandler;
+  private todoCrudHandler!: TodoCrudHandler;
+  private messageClassificationHandler!: MessageClassificationHandler;
+  private todoInteractionHandler!: TodoInteractionHandler;
   private profileHandler!: ProfileCommandHandler;
   private memoHandler!: MemoCommandHandler;
   private messageSelectionHandler!: MessageSelectionHandler;
@@ -207,14 +211,15 @@ export class ActivityLoggingIntegration {
       );
       this.unmatchedHandler = new UnmatchedCommandHandler(this.activityLogService);
       
-      // TODO機能ハンドラーの初期化
-      this.todoHandler = new TodoCommandHandler(
+      // TODO機能ハンドラーの初期化（分割版）
+      this.todoCrudHandler = new TodoCrudHandler(this.repository);
+      this.messageClassificationHandler = new MessageClassificationHandler(
         this.repository, // ITodoRepository
         this.repository, // IMessageClassificationRepository  
         this.geminiService,
-        this.messageClassificationService,
-        this.activityLogService // 活動ログサービスを注入
+        this.messageClassificationService
       );
+      this.todoInteractionHandler = new TodoInteractionHandler(this.repository);
       
       // プロファイル機能ハンドラーの初期化
       this.profileHandler = new ProfileCommandHandler(this.repository);
@@ -522,7 +527,7 @@ export class ActivityLoggingIntegration {
       case 'todo':
       case 'タスク':
         console.log(`📋 todoコマンド実行: ユーザー=${userId}, タイムゾーン=${timezone}`);
-        await this.todoHandler.handleCommand(message, userId, args, timezone);
+        await this.todoCrudHandler.handleCommand(message, userId, args, timezone);
         break;
 
       case 'profile':
@@ -568,9 +573,11 @@ export class ActivityLoggingIntegration {
       if (interaction.customId.startsWith('select_')) {
         // MessageSelectionHandlerに委譲
         await this.messageSelectionHandler.handleButtonInteraction(interaction, userId, timezone);
+      } else if (interaction.customId.startsWith('todo_')) {
+        // TodoInteractionHandlerに委譲
+        await this.handleTodoButtonInteraction(interaction, userId, timezone);
       } else {
-        // TODOハンドラーに委譲（既存機能）
-        await this.todoHandler.handleButtonInteraction(interaction, userId, timezone);
+        console.log('⚠️ 未知のボタンインタラクション:', interaction.customId);
       }
       
     } catch (error) {
@@ -586,6 +593,34 @@ export class ActivityLoggingIntegration {
           console.error('❌ エラー返信失敗:', replyError);
         }
       }
+    }
+  }
+
+  /**
+   * TODOボタンインタラクションを処理
+   */
+  private async handleTodoButtonInteraction(interaction: ButtonInteraction, userId: string, timezone: string): Promise<void> {
+    console.log(`🔘 TODOボタンインタラクション: ${userId} ${interaction.customId}`);
+
+    // カスタムIDを解析
+    const idParts = interaction.customId.split('_');
+    const action = idParts[0]; // 'todo'
+    const type = idParts[1]; // 'page', 'complete', 'start', 'delete' など
+    
+    if (action !== 'todo') {
+      await interaction.reply({ content: '❌ 無効なボタン操作です。', ephemeral: true });
+      return;
+    }
+
+    // ページネーションボタンの処理
+    if (type === 'page') {
+      const pageAction = idParts[2]; // prev または next
+      const currentPage = parseInt(idParts[3]);
+      await this.todoInteractionHandler.handlePaginationInteraction(interaction, pageAction, currentPage, userId);
+    } else {
+      // TODOアクションの場合、todoIdは第3要素以降のすべて
+      const todoId = idParts.slice(2).join('_');
+      await this.todoInteractionHandler.handleTodoActionButton(interaction, type, todoId, userId, timezone);
     }
   }
 
@@ -815,10 +850,10 @@ export class ActivityLoggingIntegration {
       this.pendingAnalysisTasks.clear();
       console.log('✅ 非同期分析タスクをクリーンアップしました');
 
-      // TODOハンドラーのクリーンアップ
-      if (this.todoHandler && typeof this.todoHandler.destroy === 'function') {
-        this.todoHandler.destroy();
-        console.log('✅ TODOハンドラーをクリーンアップしました');
+      // TODOハンドラーのクリーンアップ（分割版）
+      if (this.messageClassificationHandler && typeof this.messageClassificationHandler.destroy === 'function') {
+        this.messageClassificationHandler.destroy();
+        console.log('✅ メッセージ分類ハンドラーをクリーンアップしました');
       }
 
       if (this.repository) {
@@ -1108,10 +1143,10 @@ export class ActivityLoggingIntegration {
     try {
       console.log('🧹 活動記録システムのクリーンアップ開始...');
 
-      // TODO機能ハンドラーのクリーンアップ
-      if (this.todoHandler && typeof this.todoHandler.destroy === 'function') {
-        this.todoHandler.destroy();
-        console.log('✅ TODO機能ハンドラークリーンアップ完了');
+      // TODO機能ハンドラーのクリーンアップ（分割版）
+      if (this.messageClassificationHandler && typeof this.messageClassificationHandler.destroy === 'function') {
+        this.messageClassificationHandler.destroy();
+        console.log('✅ メッセージ分類ハンドラークリーンアップ完了');
       }
 
       // データベースリポジトリのクリーンアップ

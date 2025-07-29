@@ -3,6 +3,11 @@
  */
 
 /**
+ * TODOコマンドの種類
+ */
+export type TodoCommandType = 'list' | 'add' | 'done' | 'edit' | 'delete' | 'search' | 'help';
+
+/**
  * TODOステータス
  */
 export type TodoStatus = 'pending' | 'in_progress' | 'completed' | 'cancelled';
