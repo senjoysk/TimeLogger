@@ -9,7 +9,7 @@ import { Router, Request, Response } from 'express';
 import { TimeSimulationService } from '../services/timeSimulationService';
 import { MockTimeProvider } from '../../factories';
 import { TimeSetRequest } from '../types/testing';
-import { ActivityPromptRepository } from '../../repositories/activityPromptRepository';
+import { IActivityPromptRepository } from '../../repositories/interfaces';
 import { PartialCompositeRepository } from '../../repositories/PartialCompositeRepository';
 import { IDiscordBot } from '../../interfaces/dependencies';
 // Express Request型の拡張を読み込み
@@ -24,13 +24,13 @@ export function createTimeSimulationRouter(bot: IDiscordBot | null = null): Rout
   // TimeSimulationServiceはシングルトンのTimeProviderServiceを使用
   const timeSimulationService = new TimeSimulationService();
   
-  // 手動リマインダー機能用のリポジトリ初期化
-  let activityPromptRepository: ActivityPromptRepository | null = null;
+  // 手動リマインダー機能用のリポジトリ初期化（PartialCompositeRepositoryを直接使用）
+  let activityPromptRepository: IActivityPromptRepository | null = null;
   if (bot && bot.getRepository) {
     try {
       const repository = bot.getRepository();
-      if (repository && repository.getDatabase) {
-        activityPromptRepository = new ActivityPromptRepository(repository.getDatabase());
+      if (repository) {
+        activityPromptRepository = repository as unknown as IActivityPromptRepository; // PartialCompositeRepository implements both interfaces
       }
     } catch (error) {
       console.warn('ActivityPromptRepository初期化に失敗:', error);

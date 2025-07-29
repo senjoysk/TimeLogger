@@ -8,7 +8,7 @@ import { TodoCommandHandler } from '../../handlers/todoCommandHandler';
 import { MessageClassificationService } from '../../services/messageClassificationService';
 
 // モックDependencies
-jest.mock('../../repositories/sqliteActivityLogRepository');
+jest.mock('../../repositories/PartialCompositeRepository');
 jest.mock('../../services/activityLogService');
 jest.mock('../../services/geminiService');
 jest.mock('../../services/messageClassificationService');

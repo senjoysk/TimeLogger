@@ -16,7 +16,7 @@ import {
 } from './factories';
 import { ConfigService } from './services/configService';
 import { IActivityPromptRepository } from './repositories/interfaces';
-import { ActivityPromptRepository } from './repositories/activityPromptRepository';
+// ActivityPromptRepository は PartialCompositeRepository に統合済み
 
 /**
  * Scheduler DI依存関係オプション
@@ -61,20 +61,8 @@ export class Scheduler {
     this.timeProvider = dependencies?.timeProvider || new RealTimeProvider();
     this.configService = dependencies?.configService || new ConfigService();
     
-    // リポジトリが有効な場合のみActivityPromptRepositoryを初期化
-    if (this.repository && typeof this.repository.getDatabase === 'function') {
-      try {
-        this.activityPromptRepository = dependencies?.activityPromptRepository || 
-          new ActivityPromptRepository(this.repository.getDatabase());
-      } catch (error) {
-        console.warn('⚠️ ActivityPromptRepository初期化に失敗しました:', error);
-        // デフォルトのダミー実装で継続
-        this.activityPromptRepository = dependencies?.activityPromptRepository;
-      }
-    } else {
-      console.warn('⚠️ リポジトリが利用できないため、ActivityPromptRepositoryは後で初期化されます');
-      this.activityPromptRepository = dependencies?.activityPromptRepository;
-    }
+    // PartialCompositeRepository は IActivityPromptRepository を実装しているため直接使用
+    this.activityPromptRepository = dependencies?.activityPromptRepository || this.repository;
   }
 
   /**

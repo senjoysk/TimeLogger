@@ -1,3 +1,7 @@
+/**
+ * @SRP-EXCEPTION: Discord Bot統合クラスとして複数の機能統合が必要
+ * @SRP-REASON: コマンドハンドリング、メッセージ処理、スケジューリング統合のため段階的分割中
+ */
 import { Client, GatewayIntentBits, Partials, Message } from 'discord.js';
 import { config } from './config';
 import { ActivityLoggingIntegration, createDefaultConfig } from './integration';
@@ -30,7 +34,7 @@ import {
 import { ConfigService } from './services/configService';
 import { ITimezoneService } from './services/interfaces/ITimezoneService';
 import { PromptCommandHandler } from './handlers/promptCommandHandler';
-import { ActivityPromptRepository } from './repositories/activityPromptRepository';
+import { IActivityPromptRepository } from './repositories/interfaces';
 import { ACTIVITY_PROMPT_VALIDATION } from './types/activityPrompt';
 
 /**
@@ -888,11 +892,8 @@ export class TaskLoggerBot {
         throw new Error('Repositoryが取得できません');
       }
 
-      // ActivityPromptRepositoryを初期化
-      const activityPromptRepository = new ActivityPromptRepository(repository.getDatabase());
-      
-      // PromptCommandHandlerを初期化
-      this.promptCommandHandler = new PromptCommandHandler(activityPromptRepository);
+      // PromptCommandHandlerを初期化（PartialCompositeRepositoryを直接使用）
+      this.promptCommandHandler = new PromptCommandHandler(repository);
       
       console.log('✅ 活動促しコマンドハンドラーを初期化しました');
     } catch (error) {

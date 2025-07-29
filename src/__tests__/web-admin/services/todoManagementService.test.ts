@@ -1,19 +1,22 @@
 /**
  * TodoManagementService単体テスト
  * Phase 2: TODO管理機能のTDD実装
+ * 
+ * @SRP-EXCEPTION: TODO管理機能の包括的テストスイートとして複数操作テストが必要
+ * @SRP-REASON: CRUD、一括操作、バリデーション、検索の統合テストのため分割予定
  */
 
 import { TodoManagementService } from '../../../web-admin/services/todoManagementService';
 import { AdminRepository } from '../../../web-admin/repositories/adminRepository';
-import { SqliteActivityLogRepository } from '../../../repositories/sqliteActivityLogRepository';
+import { PartialCompositeRepository } from '../../../repositories/PartialCompositeRepository';
 import { TodoTask, TodoStatus, TodoPriority } from '../../../types/todo';
 import { getTestDbPath } from '../../../utils/testDatabasePath';
 
 // モック
 jest.mock('../../../web-admin/repositories/adminRepository');
-jest.mock('../../../repositories/sqliteActivityLogRepository');
+jest.mock('../../../repositories/PartialCompositeRepository');
 const mockAdminRepository = AdminRepository as jest.MockedClass<typeof AdminRepository>;
-const mockSqliteRepo = SqliteActivityLogRepository as jest.MockedClass<typeof SqliteActivityLogRepository>;
+const mockSqliteRepo = PartialCompositeRepository as jest.MockedClass<typeof PartialCompositeRepository>;
 
 describe('TodoManagementService', () => {
   let service: TodoManagementService;
@@ -21,7 +24,7 @@ describe('TodoManagementService', () => {
 
   beforeEach(async () => {
     const testDbPath = getTestDbPath(__filename);
-    const mockSqliteInstance = new mockSqliteRepo(testDbPath) as jest.Mocked<SqliteActivityLogRepository>;
+    const mockSqliteInstance = new mockSqliteRepo(testDbPath) as jest.Mocked<PartialCompositeRepository>;
     // モックのメソッドを設定
     mockSqliteInstance.initializeDatabase = jest.fn().mockResolvedValue(undefined);
     
