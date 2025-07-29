@@ -4,7 +4,7 @@
  */
 
 import { describe, test, expect, beforeEach, afterEach, beforeAll, afterAll } from '@jest/globals';
-import { SqliteActivityLogRepository } from '../../repositories/sqliteActivityLogRepository';
+import { PartialCompositeRepository } from '../../repositories/PartialCompositeRepository';
 import { 
   ActivityLog, 
   CreateActivityLogRequest,
@@ -13,8 +13,8 @@ import {
 import * as fs from 'fs';
 import { getTestDbPath, cleanupTestDatabase } from '../../utils/testDatabasePath';
 
-describe('SqliteActivityLogRepository', () => {
-  let repository: SqliteActivityLogRepository;
+describe('PartialCompositeRepository', () => {
+  let repository: PartialCompositeRepository;
   const testDbPath = getTestDbPath(__filename);
   const mockUserId = 'test-user-123';
   const mockTimezone = 'Asia/Tokyo';
@@ -25,7 +25,7 @@ describe('SqliteActivityLogRepository', () => {
   });
 
   beforeEach(async () => {
-    repository = new SqliteActivityLogRepository(testDbPath);
+    repository = new PartialCompositeRepository(testDbPath);
     await repository.initializeDatabase();
   });
 
@@ -160,9 +160,9 @@ describe('SqliteActivityLogRepository', () => {
         // 少し待ってから統計取得（非同期処理考慮）
         await new Promise(resolve => setTimeout(resolve, 100));
         
-        // デバッグ: 直接データベースからapi_costsテーブルの内容を確認
-        const allRecords = await (repository as any).allQuery('SELECT * FROM api_costs ORDER BY timestamp DESC LIMIT 10');
-        console.log('🔍 api_costsテーブル全レコード:', JSON.stringify(allRecords, null, 2));
+        // デバッグ: 直接データベースから今日の統計を確認
+        const todayStats = await repository.getTodayStats(mockTimezone);
+        console.log('🔍 今日の統計:', JSON.stringify(todayStats, null, 2));
 
         // Assert
         const stats = await repository.getTodayStats(mockTimezone);

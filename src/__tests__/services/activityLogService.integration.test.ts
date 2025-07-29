@@ -4,7 +4,7 @@
  */
 
 import { ActivityLogService } from '../../services/activityLogService';
-import { SqliteActivityLogRepository } from '../../repositories/sqliteActivityLogRepository';
+import { PartialCompositeRepository } from '../../repositories/PartialCompositeRepository';
 import { GeminiService } from '../../services/geminiService';
 import { ActivityLog } from '../../types/activityLog';
 import * as fs from 'fs';
@@ -12,7 +12,7 @@ import * as path from 'path';
 
 describe('ActivityLogService Integration - Matching Features', () => {
   let service: ActivityLogService;
-  let repository: SqliteActivityLogRepository;
+  let repository: PartialCompositeRepository;
   let geminiService: jest.Mocked<GeminiService>;
   const testDbPath = ':memory:'; // インメモリDB
 
@@ -27,11 +27,48 @@ describe('ActivityLogService Integration - Matching Features', () => {
     } as any;
 
     // テスト用リポジトリとサービスの初期化
-    repository = new SqliteActivityLogRepository(testDbPath);
+    repository = new PartialCompositeRepository(testDbPath);
     await repository.initializeDatabase();
+    
+    // テストデータを完全にクリーンアップ
+    await cleanupTestData();
     
     service = new ActivityLogService(repository, geminiService);
   });
+
+  afterEach(async () => {
+    // テスト後のクリーンアップ
+    await cleanupTestData();
+    await repository.close();
+  });
+
+  // テストデータクリーンアップ用ヘルパー関数
+  async function cleanupTestData(): Promise<void> {
+    try {
+      // 全ユーザーを取得してデータを削除
+      const users = await repository.getAllUsers();
+      for (const user of users) {
+        // 全ログを削除
+        const logs = await repository.getLogsByDateRange(
+          user.userId, 
+          '1900-01-01', 
+          '2100-12-31'
+        );
+        for (const log of logs) {
+          await repository.permanentDeleteLog(log.id);
+        }
+        
+        // 全TODOを削除
+        const todos = await repository.getTodosByUserId(user.userId);
+        for (const todo of todos) {
+          await repository.deleteTodo(todo.id);
+        }
+      }
+    } catch (error) {
+      // エラーが発生してもテストを継続
+      console.warn('テストデータクリーンアップで軽微なエラー:', error);
+    }
+  }
 
   describe('🔴 Red: ログタイプ分析と記録機能', () => {
     it('開始ログを正しく記録し、ログタイプを判定する', async () => {

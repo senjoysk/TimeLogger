@@ -1,6 +1,20 @@
 # コード品質チェック
 npm run build
-npm test
+
+# テスト実行と失敗分析
+echo "🧪 Pre-commit check: テスト実行と失敗分析..."
+./scripts/test-analysis.sh
+
+if [ $? -ne 0 ]; then
+    echo ""
+    echo "🚨 コミットが阻止されました！"
+    echo "❌ テストに失敗しました。"
+    echo "📋 test-reports/ディレクトリ内の詳細ログを確認してください。"
+    echo ""
+    exit 1
+fi
+
+echo "✅ 全テスト成功"
 
 # 🆕 SRP（単一責任原則）違反チェック
 echo "🔍 Pre-commit check: SRP違反チェック..."

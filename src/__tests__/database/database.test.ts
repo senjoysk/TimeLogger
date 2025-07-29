@@ -3,13 +3,13 @@
  * Phase 4: 重要コンポーネントのテストカバレッジ向上
  */
 
-import { SqliteActivityLogRepository } from '../../repositories/sqliteActivityLogRepository';
+import { PartialCompositeRepository } from '../../repositories/PartialCompositeRepository';
 import { getTestDbPath, cleanupTestDatabase } from '../../utils/testDatabasePath';
 import * as fs from 'fs';
 
 describe('Database Initialization', () => {
   let testDbPath: string;
-  let repository: SqliteActivityLogRepository;
+  let repository: PartialCompositeRepository;
 
   beforeEach(() => {
     // テスト用データベースパスを設定
@@ -31,7 +31,7 @@ describe('Database Initialization', () => {
 
   describe('データベース初期化', () => {
     test('新しいデータベースファイルが作成される', async () => {
-      repository = new SqliteActivityLogRepository(testDbPath);
+      repository = new PartialCompositeRepository(testDbPath);
       await repository.initializeDatabase();
       
       expect(fs.existsSync(testDbPath)).toBe(true);
@@ -39,19 +39,19 @@ describe('Database Initialization', () => {
 
     test('既存のデータベースファイルに接続できる', async () => {
       // 最初にデータベースを作成
-      repository = new SqliteActivityLogRepository(testDbPath);
+      repository = new PartialCompositeRepository(testDbPath);
       await repository.initializeDatabase();
       await repository.close();
       
       // 既存ファイルに再接続
-      repository = new SqliteActivityLogRepository(testDbPath);
+      repository = new PartialCompositeRepository(testDbPath);
       await repository.initializeDatabase();
       
       expect(fs.existsSync(testDbPath)).toBe(true);
     });
 
     test('スキーマが正しく作成される', async () => {
-      repository = new SqliteActivityLogRepository(testDbPath);
+      repository = new PartialCompositeRepository(testDbPath);
       await repository.initializeDatabase();
       
       // データベースファイルが存在し、テーブルが作成されることを確認
@@ -73,7 +73,7 @@ describe('Database Initialization', () => {
 
   describe('データベース操作機能', () => {
     beforeEach(async () => {
-      repository = new SqliteActivityLogRepository(testDbPath);
+      repository = new PartialCompositeRepository(testDbPath);
       await repository.initializeDatabase();
     });
 
@@ -132,7 +132,7 @@ describe('Database Initialization', () => {
 
   describe('データ操作の信頼性', () => {
     test('同一ユーザーのタイムゾーン更新', async () => {
-      repository = new SqliteActivityLogRepository(testDbPath);
+      repository = new PartialCompositeRepository(testDbPath);
       await repository.initializeDatabase();
       
       const userId = 'test-user';
@@ -146,7 +146,7 @@ describe('Database Initialization', () => {
     });
 
     test('ログ更新機能', async () => {
-      repository = new SqliteActivityLogRepository(testDbPath);
+      repository = new PartialCompositeRepository(testDbPath);
       await repository.initializeDatabase();
       
       // ログ作成

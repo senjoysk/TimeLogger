@@ -11,7 +11,7 @@ import {
   ITimeProvider,
   IConfigService 
 } from '../interfaces/dependencies';
-import { SqliteActivityLogRepository } from '../repositories/sqliteActivityLogRepository';
+import { PartialCompositeRepository } from '../repositories/PartialCompositeRepository';
 
 // モック依存関係の作成
 const createMockSchedulerService = (): ISchedulerService => ({

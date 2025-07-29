@@ -3,14 +3,14 @@
  * テストパフォーマンス向上のため、データベース初期化を最適化
  */
 
-import { SqliteActivityLogRepository } from '../../repositories/sqliteActivityLogRepository';
+import { PartialCompositeRepository } from '../../repositories/PartialCompositeRepository';
 import { ActivityLoggingIntegration, ActivityLoggingConfig } from '../../integration/activityLoggingIntegration';
 import * as path from 'path';
 import * as fs from 'fs';
 
 export class SharedTestDatabase {
   private static instance: SharedTestDatabase | null = null;
-  private repository: SqliteActivityLogRepository | null = null;
+  private repository: PartialCompositeRepository | null = null;
   private integration: ActivityLoggingIntegration | null = null;
   private testDbPath: string = '';
   private isInitialized: boolean = false;
@@ -45,7 +45,7 @@ export class SharedTestDatabase {
       }
 
       // 統合リポジトリの初期化（メモリDBで高速化）
-      this.repository = new SqliteActivityLogRepository(':memory:');
+      this.repository = new PartialCompositeRepository(':memory:');
       await this.repository.initializeDatabase();
 
       // 統合クラスの初期化（テスト用に最適化）
@@ -71,7 +71,7 @@ export class SharedTestDatabase {
     }
   }
 
-  async getRepository(): Promise<SqliteActivityLogRepository> {
+  async getRepository(): Promise<PartialCompositeRepository> {
     if (!this.repository) {
       throw new Error('SharedTestDatabase: リポジトリが初期化されていません');
     }
@@ -91,22 +91,31 @@ export class SharedTestDatabase {
     }
 
     try {
-      // テストデータのクリーンアップ（バッチ処理で高速化）
-      const cleanupQueries = [
-        'DELETE FROM activity_logs',
-        'DELETE FROM user_settings',
-        'DELETE FROM todo_tasks',
-        'DELETE FROM message_classifications',
-        'DELETE FROM api_costs',
-        'DELETE FROM daily_analysis_cache'
-      ];
-
-      // 順次実行で安定性向上（SQLiteの排他制御を考慮）
-      for (const query of cleanupQueries) {
-        await (this.repository as any).runQuery(query);
+      // テストデータのクリーンアップ（PartialCompositeRepositoryの専用メソッド使用）
+      // 全テーブルのデータを安全に削除
+      
+      // ActivityLogsのクリーンアップ（存在するユーザーを取得してログ削除）
+      const users = await this.repository.getAllUsers();
+      for (const user of users) {
+        const logs = await this.repository.getLogsByDateRange(
+          user.userId, 
+          '1900-01-01', 
+          '2100-12-31'
+        );
+        for (const log of logs) {
+          await this.repository.permanentDeleteLog(log.id);
+        }
       }
       
-      console.log('✅ テストデータクリーンアップ完了（順次処理）');
+      // TODOのクリーンアップ
+      for (const user of users) {
+        const todos = await this.repository.getTodosByUserId(user.userId);
+        for (const todo of todos) {
+          await this.repository.deleteTodo(todo.id);
+        }
+      }
+      
+      console.log('✅ テストデータクリーンアップ完了（専用メソッド使用）');
     } catch (error) {
       console.error('❌ テストデータクリーンアップエラー:', error);
       throw error;

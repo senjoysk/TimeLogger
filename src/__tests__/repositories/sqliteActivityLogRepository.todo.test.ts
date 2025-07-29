@@ -3,12 +3,12 @@
  * TDD Refactor Phase - 実際のDB実装をテスト
  */
 
-import { SqliteActivityLogRepository } from '../../repositories/sqliteActivityLogRepository';
+import { PartialCompositeRepository } from '../../repositories/PartialCompositeRepository';
 import { CreateTodoRequest, TodoStatus, Todo } from '../../types/todo';
 import { getTestDbPath, cleanupTestDatabase } from '../../utils/testDatabasePath';
 
-describe('SqliteActivityLogRepository TODO機能', () => {
-  let repository: SqliteActivityLogRepository;
+describe('PartialCompositeRepository TODO機能', () => {
+  let repository: PartialCompositeRepository;
   let testDbPath: string;
 
   beforeEach(async () => {
@@ -16,37 +16,51 @@ describe('SqliteActivityLogRepository TODO機能', () => {
     testDbPath = getTestDbPath(__filename);
     cleanupTestDatabase(testDbPath);
 
-    repository = new SqliteActivityLogRepository(testDbPath);
+    repository = new PartialCompositeRepository(testDbPath);
     
-    // 直接スキーマを実行（initializeDatabaseの代わり）
-    const runQuery = (repository as any).runQuery.bind(repository);
+    // PartialCompositeRepositoryの標準初期化を使用
+    await repository.initializeDatabase();
     
-    // 完全なTODOテーブル作成（本番スキーマと同じ）
-    await runQuery(`
-      CREATE TABLE IF NOT EXISTS todo_tasks (
-          id TEXT PRIMARY KEY,
-          user_id TEXT NOT NULL,
-          content TEXT NOT NULL,
-          status TEXT DEFAULT 'pending' CHECK (status IN ('pending', 'in_progress', 'completed', 'cancelled')),
-          priority INTEGER DEFAULT 0,
-          due_date TEXT,
-          created_at TEXT NOT NULL DEFAULT (datetime('now', 'utc')),
-          updated_at TEXT NOT NULL DEFAULT (datetime('now', 'utc')),
-          completed_at TEXT,
-          source_type TEXT DEFAULT 'manual' CHECK (source_type IN ('manual', 'ai_suggested', 'activity_derived', 'ai_classified')),
-          related_activity_id TEXT,
-          ai_confidence REAL,
-          is_deleted BOOLEAN DEFAULT FALSE
-      )
-    `);
+    // テストデータを完全にクリーンアップ
+    await cleanupAllTestData();
   });
 
   afterEach(async () => {
+    // テスト後のクリーンアップ
+    await cleanupAllTestData();
     await repository.close();
     
     // テストファイルを削除
     cleanupTestDatabase(testDbPath);
   });
+
+  // テストデータクリーンアップ用ヘルパー関数
+  async function cleanupAllTestData(): Promise<void> {
+    try {
+      // 全ユーザーを取得してデータを削除
+      const users = await repository.getAllUsers();
+      for (const user of users) {
+        // 全ログを削除
+        const logs = await repository.getLogsByDateRange(
+          user.userId, 
+          '1900-01-01', 
+          '2100-12-31'
+        );
+        for (const log of logs) {
+          await repository.permanentDeleteLog(log.id);
+        }
+        
+        // 全TODOを削除
+        const todos = await repository.getTodosByUserId(user.userId);
+        for (const todo of todos) {
+          await repository.deleteTodo(todo.id);
+        }
+      }
+    } catch (error) {
+      // エラーが発生してもテストを継続
+      console.warn('テストデータクリーンアップで軽微なエラー:', error);
+    }
+  }
 
   describe('createTodo', () => {
     test('新しいTODOを作成できる', async () => {
@@ -71,20 +85,28 @@ describe('SqliteActivityLogRepository TODO機能', () => {
     });
 
     test('AI提案によるTODOを作成できる', async () => {
+      // まず関連するアクティビティログを作成
+      const activityResult = await repository.saveLog({
+        userId: 'user123',
+        content: '関連する活動ログ',
+        inputTimestamp: new Date().toISOString(),
+        businessDate: new Date().toISOString().split('T')[0]
+      });
+
       const request: CreateTodoRequest = {
         userId: 'user123',
         content: 'AI提案タスク',
         priority: 1,
         sourceType: 'ai_suggested',
         aiConfidence: 0.85,
-        relatedActivityId: 'activity123'
+        relatedActivityId: activityResult.id
       };
 
       const result = await repository.createTodo(request);
 
       expect(result.sourceType).toBe('ai_suggested');
       expect(result.aiConfidence).toBe(0.85);
-      expect(result.relatedActivityId).toBe('activity123');
+      expect(result.relatedActivityId).toBe(activityResult.id);
     });
   });
 
@@ -270,19 +292,25 @@ describe('SqliteActivityLogRepository TODO機能', () => {
 
   describe('getTodosByActivityId', () => {
     test('活動IDに関連するTODOを取得できる', async () => {
-      const activityId = 'activity123';
+      // まず関連するアクティビティログを作成
+      const activityResult = await repository.saveLog({
+        userId: 'user123',
+        content: '関連する活動ログ',
+        inputTimestamp: new Date().toISOString(),
+        businessDate: new Date().toISOString().split('T')[0]
+      });
       
       await repository.createTodo({ 
         userId: 'user123', 
         content: 'タスク1', 
-        relatedActivityId: activityId 
+        relatedActivityId: activityResult.id 
       });
       await repository.createTodo({ userId: 'user123', content: 'タスク2' }); // 関連なし
       
-      const results = await repository.getTodosByActivityId(activityId);
+      const results = await repository.getTodosByActivityId(activityResult.id);
 
       expect(results.length).toBe(1);
-      expect(results[0].relatedActivityId).toBe(activityId);
+      expect(results[0].relatedActivityId).toBe(activityResult.id);
     });
   });
 });

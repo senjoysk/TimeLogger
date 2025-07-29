@@ -6,7 +6,7 @@
  */
 
 import { TaskLoggerBot } from '../../bot';
-import { SqliteActivityLogRepository } from '../../repositories/sqliteActivityLogRepository';
+import { PartialCompositeRepository } from '../../repositories/PartialCompositeRepository';
 import { SharedTestDatabase } from '../utils/SharedTestDatabase';
 import { toZonedTime } from 'date-fns-tz';
 
@@ -43,7 +43,7 @@ jest.mock('discord.js', () => ({
 
 describe('日次サマリー送信の統合テスト', () => {
   let bot: TaskLoggerBot;
-  let repository: SqliteActivityLogRepository;
+  let repository: PartialCompositeRepository;
   let testDb: SharedTestDatabase;
 
   beforeEach(async () => {
@@ -57,11 +57,14 @@ describe('日次サマリー送信の統合テスト', () => {
     const integration = await testDb.getIntegration();
     (bot as any).activityLoggingIntegration = integration;
     
-    // テストデータをクリーンアップ
+    // テストデータをクリーンアップ（2回実行して確実にクリーン）
+    await testDb.cleanupForTest();
     await testDb.cleanupForTest();
   });
 
   afterEach(async () => {
+    // テスト後の徹底的なクリーンアップ
+    await testDb.cleanupForTest();
     await testDb.cleanupForTest();
     
     // Dateモックをクリアして元に戻す

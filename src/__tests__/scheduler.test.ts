@@ -5,7 +5,7 @@
 
 import { Scheduler } from '../scheduler';
 import { TaskLoggerBot } from '../bot';
-import { SqliteActivityLogRepository } from '../repositories/sqliteActivityLogRepository';
+import { PartialCompositeRepository } from '../repositories/PartialCompositeRepository';
 import * as cron from 'node-cron';
 
 // node-cron のモック
@@ -27,9 +27,9 @@ jest.mock('../bot', () => ({
   }))
 }));
 
-// SqliteActivityLogRepository のモック
-jest.mock('../repositories/sqliteActivityLogRepository', () => ({
-  SqliteActivityLogRepository: jest.fn().mockImplementation(() => ({
+// PartialCompositeRepository のモック
+jest.mock('../repositories/PartialCompositeRepository', () => ({
+  PartialCompositeRepository: jest.fn().mockImplementation(() => ({
     getAllUsers: jest.fn().mockResolvedValue([
       { user_id: 'user1', timezone: 'Asia/Tokyo' },
       { user_id: 'user2', timezone: 'America/New_York' }
@@ -44,7 +44,7 @@ jest.mock('../repositories/sqliteActivityLogRepository', () => ({
 describe('Scheduler', () => {
   let scheduler: Scheduler;
   let mockBot: jest.Mocked<TaskLoggerBot>;
-  let mockRepository: jest.Mocked<SqliteActivityLogRepository>;
+  let mockRepository: jest.Mocked<PartialCompositeRepository>;
 
   beforeEach(() => {
     // モックをリセット

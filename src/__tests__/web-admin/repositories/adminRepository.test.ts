@@ -4,24 +4,62 @@
  */
 
 import { AdminRepository } from '../../../web-admin/repositories/adminRepository';
-import { SqliteActivityLogRepository } from '../../../repositories/sqliteActivityLogRepository';
+import { PartialCompositeRepository } from '../../../repositories/PartialCompositeRepository';
 import { TodoTask, TodoStatus, TodoPriority } from '../../../types/todo';
 import { getTestDbPath, cleanupTestDatabase } from '../../../utils/testDatabasePath';
 
 describe('AdminRepository TODO管理機能拡張', () => {
   let repository: AdminRepository;
-  let sqliteRepo: SqliteActivityLogRepository;
+  let sqliteRepo: PartialCompositeRepository;
   const testDbPath = getTestDbPath(__filename);
 
   beforeEach(async () => {
     // テスト用DBファイルが存在する場合は削除して新規作成
     cleanupTestDatabase(testDbPath);
     
-    sqliteRepo = new SqliteActivityLogRepository(testDbPath);
+    sqliteRepo = new PartialCompositeRepository(testDbPath);
     // 軽量なスキーマ初期化を確実に実行
     await sqliteRepo.ensureSchema();
     repository = new AdminRepository(sqliteRepo);
+    
+    // テストデータを完全にクリーンアップ
+    await cleanupAllTestData();
   });
+
+  afterEach(async () => {
+    // テスト後のクリーンアップ
+    await cleanupAllTestData();
+    await sqliteRepo.close();
+    cleanupTestDatabase(testDbPath);
+  });
+
+  // テストデータクリーンアップ用ヘルパー関数
+  async function cleanupAllTestData(): Promise<void> {
+    try {
+      // 全ユーザーを取得してデータを削除
+      const users = await sqliteRepo.getAllUsers();
+      for (const user of users) {
+        // 全ログを削除
+        const logs = await sqliteRepo.getLogsByDateRange(
+          user.userId, 
+          '1900-01-01', 
+          '2100-12-31'
+        );
+        for (const log of logs) {
+          await sqliteRepo.permanentDeleteLog(log.id);
+        }
+        
+        // 全TODOを削除
+        const todos = await sqliteRepo.getTodosByUserId(user.userId);
+        for (const todo of todos) {
+          await sqliteRepo.deleteTodo(todo.id);
+        }
+      }
+    } catch (error) {
+      // エラーが発生してもテストを継続
+      console.warn('テストデータクリーンアップで軽微なエラー:', error);
+    }
+  }
 
   describe('🔴 Red Phase 2-1: TODO CRUD操作', () => {
     test('新しいTODOタスクを作成できる', async () => {

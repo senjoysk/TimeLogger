@@ -7,7 +7,7 @@
 
 const { RealTimeActivityAnalyzer } = require('../../dist/services/realTimeActivityAnalyzer');
 const { GeminiService } = require('../../dist/services/geminiService');
-const { SqliteActivityLogRepository } = require('../../dist/repositories/sqliteActivityLogRepository');
+const { PartialCompositeRepository } = require('../../dist/repositories/PartialCompositeRepository');
 const { config } = require('dotenv');
 
 // 環境変数読み込み
@@ -68,7 +68,7 @@ async function runBenchmark() {
   console.log(`Memory: ${Math.round(require('os').totalmem() / 1024 / 1024 / 1024)}GB\n`);
   
   // 初期化
-  const repository = new SqliteActivityLogRepository(':memory:');
+  const repository = new PartialCompositeRepository(':memory:');
   await repository.initializeDatabase();
   const geminiService = new GeminiService(repository);
   const analyzer = new RealTimeActivityAnalyzer(geminiService);

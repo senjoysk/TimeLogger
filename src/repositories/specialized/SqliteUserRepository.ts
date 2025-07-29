@@ -116,12 +116,12 @@ export class SqliteUserRepository implements IUserRepository {
       const statsRow = await this.dbConnection.get<UserStatsAggregateRow>(`
         SELECT 
           COUNT(*) as total_logs,
-          COUNT(CASE WHEN DATE(input_timestamp) = DATE('now', 'localtime') THEN 1 END) as today_logs,
-          COUNT(CASE WHEN DATE(input_timestamp) >= DATE('now', 'localtime', '-7 days') THEN 1 END) as this_week_logs,
-          COUNT(CASE WHEN DATE(input_timestamp) >= DATE('now', 'localtime', 'start of month') THEN 1 END) as this_month_logs,
+          COUNT(CASE WHEN business_date = DATE('now', 'localtime') THEN 1 END) as today_logs,
+          COUNT(CASE WHEN business_date >= DATE('now', 'localtime', '-7 days') THEN 1 END) as this_week_logs,
+          COUNT(CASE WHEN business_date >= DATE('now', 'localtime', 'start of month') THEN 1 END) as this_month_logs,
           ROUND(
             CAST(COUNT(*) AS REAL) / 
-            CAST(JULIANDAY('now') - JULIANDAY(MIN(input_timestamp)) + 1 AS REAL), 2
+            CAST(JULIANDAY('now') - JULIANDAY(MIN(business_date)) + 1 AS REAL), 2
           ) as avg_logs_per_day,
           COALESCE(SUM(total_minutes), 0) as total_minutes
         FROM activity_logs 
@@ -140,10 +140,10 @@ export class SqliteUserRepository implements IUserRepository {
 
       // 最もアクティブな日を取得
       const longestActiveDayRow = await this.dbConnection.get<{ date: string; log_count: number }>(`
-        SELECT DATE(input_timestamp) as date, COUNT(*) as log_count
+        SELECT business_date as date, COUNT(*) as log_count
         FROM activity_logs 
         WHERE user_id = ? AND is_deleted = 0
-        GROUP BY DATE(input_timestamp)
+        GROUP BY business_date
         ORDER BY COUNT(*) DESC
         LIMIT 1
       `, [userId]);
