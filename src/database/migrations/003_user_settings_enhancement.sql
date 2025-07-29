@@ -35,12 +35,5 @@ CREATE INDEX IF NOT EXISTS idx_user_settings_is_active ON user_settings(is_activ
 -- Step 6: 複合インデックス（頻繁に使用される検索条件）
 CREATE INDEX IF NOT EXISTS idx_user_settings_active_last_seen ON user_settings(is_active, last_seen);
 
--- Step 7: 既存データの初期化（マイグレーション実行時）
--- 既存のuser_settingsレコードに対して、初期値を設定
-UPDATE user_settings 
-SET 
-  username = 'Unknown User',
-  first_seen = created_at,
-  last_seen = updated_at,
-  is_active = TRUE
-WHERE username IS NULL;
+-- Step 7: 既存データの初期化は次のマイグレーション(003b)で実行
+-- UPDATE文は同時実行時のデッドロックを避けるため、別のマイグレーションに分離
