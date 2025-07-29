@@ -29,7 +29,9 @@ WORKDIR /app
 COPY package*.json ./
 
 # 本番用の依存関係のみインストール
-RUN npm ci --production
+# prepareスクリプトをスキップし、その後必要なビルドを実行
+RUN npm ci --production --ignore-scripts && \
+    npm rebuild
 
 # ビルド済みのファイルをコピー
 COPY --from=builder /app/dist ./dist
