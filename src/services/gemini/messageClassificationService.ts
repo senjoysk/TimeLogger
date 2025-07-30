@@ -8,6 +8,7 @@ import { ApiCostMonitor } from '../apiCostMonitor';
 import { ClassificationResult, MessageClassification } from '../../types/todo';
 import { ClassificationAIResponse } from '../../types/aiResponse';
 import { withErrorHandling, ErrorType } from '../../utils/errorHandler';
+import { logger } from '../../utils/logger';
 
 /**
  * メッセージ分類サービスインターフェース
@@ -38,15 +39,15 @@ export class MessageClassificationService implements IMessageClassificationServi
     try {
       return await withErrorHandling(
         async () => {
-          console.log(`🤖 メッセージ分類開始: "${message.substring(0, 50)}..."`);
+          logger.info('MESSAGE_CLASSIFIER', `🤖 メッセージ分類開始: "${message.substring(0, 50)}..."`);
 
           const prompt = this.buildClassificationPrompt(message);
           
           // プロンプトのログ出力
-          console.log('📤 [Gemini API] 通常メッセージ分類プロンプト:');
-          console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-          console.log(prompt);
-          console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+          logger.debug('MESSAGE_CLASSIFIER', '📤 [Gemini API] 通常メッセージ分類プロンプト:');
+          logger.debug('MESSAGE_CLASSIFIER', '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+          logger.debug('MESSAGE_CLASSIFIER', prompt);
+          logger.debug('MESSAGE_CLASSIFIER', '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
           
           // Gemini API 呼び出し
           const result = await this.geminiClient.generateContent(prompt);
@@ -61,14 +62,14 @@ export class MessageClassificationService implements IMessageClassificationServi
           const responseText = response.text();
           
           // レスポンスのログ出力
-          console.log('📥 [Gemini API] 通常メッセージ分類レスポンス:');
-          console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-          console.log(responseText);
-          console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+          logger.debug('MESSAGE_CLASSIFIER', '📥 [Gemini API] 通常メッセージ分類レスポンス:');
+          logger.debug('MESSAGE_CLASSIFIER', '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+          logger.debug('MESSAGE_CLASSIFIER', responseText);
+          logger.debug('MESSAGE_CLASSIFIER', '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
           
           const classification = this.parseClassificationResponse(responseText);
           
-          console.log('✅ メッセージ分類完了:', classification);
+          logger.info('MESSAGE_CLASSIFIER', '✅ メッセージ分類完了:', { classification });
           return classification;
         },
         ErrorType.API,
@@ -80,7 +81,7 @@ export class MessageClassificationService implements IMessageClassificationServi
       );
     } catch (error) {
       // エラー時はフォールバック分類を返す
-      console.log('🔄 フォールバック分類を実行');
+      logger.info('MESSAGE_CLASSIFIER', '🔄 フォールバック分類を実行');
       return this.fallbackClassification(message);
     }
   }
@@ -131,7 +132,7 @@ export class MessageClassificationService implements IMessageClassificationServi
       ];
       
       if (!validClassifications.includes(parsed.classification)) {
-        console.warn(`無効な分類: ${parsed.classification}, デフォルトを使用`);
+        logger.warn('MESSAGE_CLASSIFIER', `無効な分類: ${parsed.classification}, デフォルトを使用`);
         parsed.classification = 'UNCERTAIN';
       }
 
@@ -150,8 +151,8 @@ export class MessageClassificationService implements IMessageClassificationServi
       };
 
     } catch (error) {
-      console.error('分類レスポンスのパースエラー:', error);
-      console.log('元のレスポンス:', response);
+      logger.error('MESSAGE_CLASSIFIER', '分類レスポンスのパースエラー:', error as Error);
+      logger.debug('MESSAGE_CLASSIFIER', '元のレスポンス:', { response });
       
       // パースエラー時はデフォルト値を返す
       return {

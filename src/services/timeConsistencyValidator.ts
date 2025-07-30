@@ -14,6 +14,7 @@ import {
   RealTimeAnalysisError,
   RealTimeAnalysisErrorCode
 } from '../types/realTimeAnalysis';
+import { logger } from '../utils/logger';
 
 /**
  * 時刻整合性検証クラス
@@ -30,7 +31,7 @@ export class TimeConsistencyValidator {
     originalInput: string
   ): Promise<ValidationResult> {
     try {
-      console.log('🔍 時刻整合性検証開始...');
+      logger.info('TIME_VALIDATOR', '🔍 時刻整合性検証開始...');
       
       const warnings: AnalysisWarning[] = [];
       
@@ -60,11 +61,11 @@ export class TimeConsistencyValidator {
         validationSummary: this.createValidationSummary(warnings, overallConfidence)
       };
       
-      console.log(`✅ 整合性検証完了: ${warnings.length}件の警告, 信頼度: ${overallConfidence}`);
+      logger.info('TIME_VALIDATOR', `✅ 整合性検証完了: ${warnings.length}件の警告, 信頼度: ${overallConfidence}`);
       return result;
       
     } catch (error) {
-      console.error('❌ 整合性検証エラー:', error);
+      logger.error('TIME_VALIDATOR', '❌ 整合性検証エラー:', error as Error);
       throw new RealTimeAnalysisError(
         '時刻整合性の検証に失敗しました',
         RealTimeAnalysisErrorCode.VALIDATION_FAILED,

@@ -5,6 +5,7 @@
 
 import * as path from 'path';
 import * as fs from 'fs';
+import { logger } from './logger';
 
 /**
  * テスト用データベースパス設定
@@ -75,7 +76,7 @@ export class TestDatabasePath {
       try {
         fs.unlinkSync(dbPath);
       } catch (error) {
-        console.warn(`テストDB削除失敗: ${dbPath}`, error);
+        logger.warn('TEST_DB', `テストDB削除失敗: ${dbPath}`, { error });
       }
     }
   }
@@ -107,7 +108,7 @@ export class TestDatabasePath {
           this.cleanup(filePath);
         });
     } catch (error) {
-      console.warn(`パターンベースクリーンアップ失敗: ${pattern}`, error);
+      logger.warn('TEST_DB', `パターンベースクリーンアップ失敗: ${pattern}`, { error });
     }
   }
 

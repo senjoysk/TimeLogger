@@ -3,6 +3,7 @@
  */
 
 import { Router } from 'express';
+import { logger } from '../../utils/logger';
 import { AdminService } from '../services/adminService';
 import { IAdminService } from '../interfaces/adminInterfaces';
 import { SecurityService, ISecurityService } from '../services/securityService';
@@ -26,7 +27,7 @@ export function createDashboardRoutes(adminService: IAdminService, securityServi
               ...summary
             };
           } catch (error) {
-            console.error(`Error getting summary for table ${table.name}:`, error);
+            logger.error('WEB_ADMIN', `Error getting summary for table ${table.name}:`, error);
             return {
               ...table,
               totalCount: 0,
@@ -45,7 +46,7 @@ export function createDashboardRoutes(adminService: IAdminService, securityServi
         adminTimezone: res.locals.adminTimezone
       });
     } catch (error) {
-      console.error('Dashboard error:', error);
+      logger.error('WEB_ADMIN', 'Dashboard error:', error);
       res.status(500).render('error', {
         title: 'Error',
         message: 'ダッシュボードの読み込みに失敗しました',

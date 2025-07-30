@@ -8,6 +8,7 @@ import basicAuth from 'express-basic-auth';
 import path from 'path';
 import { AdminServer } from './web-admin/server';
 import { IDiscordBot } from './interfaces/dependencies';
+import { logger } from './utils/logger';
 
 export class IntegratedServer {
   private app: express.Application;
@@ -116,9 +117,9 @@ export class IntegratedServer {
     
     return new Promise((resolve) => {
       this.app.listen(this.port, () => {
-        console.log(`🌐 統合HTTPサーバー起動: http://localhost:${this.port}`);
-        console.log(`📊 Admin Panel: http://localhost:${this.port}/admin`);
-        console.log(`🏥 Health Check: http://localhost:${this.port}/health`);
+        logger.info('HTTP_SERVER', `🌐 統合HTTPサーバー起動: http://localhost:${this.port}`);
+        logger.info('HTTP_SERVER', `📊 Admin Panel: http://localhost:${this.port}/admin`);
+        logger.info('HTTP_SERVER', `🏥 Health Check: http://localhost:${this.port}/health`);
         resolve();
       });
     });

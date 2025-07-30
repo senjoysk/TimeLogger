@@ -7,6 +7,7 @@ import { Message } from 'discord.js';
 import { toZonedTime, format } from 'date-fns-tz';
 import { IActivityLogService } from '../services/activityLogService';
 import { ActivityLog, ActivityLogError } from '../types/activityLog';
+import { logger } from '../utils/logger';
 import { Todo } from '../types/todo';
 
 /**
@@ -61,7 +62,7 @@ export class SummaryHandler implements ISummaryHandler {
    */
   async handle(message: Message, userId: string, args: string[], timezone: string): Promise<void> {
     try {
-      console.log(`📊 サマリーコマンド処理開始: ${userId} ${args.join(' ')}`);
+      logger.debug('HANDLER', `📊 サマリーコマンド処理開始: ${userId} ${args.join(' ')}`);
 
       // コマンドを解析
       const parsedCommand = this.parseSummaryCommand(args, timezone);
@@ -86,7 +87,7 @@ export class SummaryHandler implements ISummaryHandler {
           await this.generateSimpleSummary(message, userId, { type: 'today' }, timezone);
       }
     } catch (error) {
-      console.error('❌ サマリーコマンド処理エラー:', error);
+      logger.error('HANDLER', '❌ サマリーコマンド処理エラー:', error);
       
       const errorMessage = error instanceof ActivityLogError 
         ? `❌ ${error.message}`
@@ -125,9 +126,9 @@ export class SummaryHandler implements ISummaryHandler {
       
       await progressMessage.edit(formattedSummary);
       
-      console.log(`📊 シンプルサマリー生成完了: ${userId} ${targetDate}`);
+      logger.debug('HANDLER', `📊 シンプルサマリー生成完了: ${userId} ${targetDate}`);
     } catch (error) {
-      console.error('❌ サマリー生成エラー:', error);
+      logger.error('HANDLER', '❌ サマリー生成エラー:', error);
       throw error instanceof ActivityLogError ? error :
         new ActivityLogError('サマリーの生成に失敗しました', 'GENERATE_SUMMARY_ERROR', { error });
     }
@@ -275,7 +276,7 @@ export class SummaryHandler implements ISummaryHandler {
       // 実際の日付を表示（yyyy/MM/dd形式）
       return format(localDate, 'yyyy/MM/dd', { timeZone: timezone });
     } catch (error) {
-      console.error('❌ 日付フォーマットエラー:', error);
+      logger.error('HANDLER', '❌ 日付フォーマットエラー:', error);
       return businessDate;
     }
   }

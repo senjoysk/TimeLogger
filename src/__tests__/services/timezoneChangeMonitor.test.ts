@@ -18,17 +18,26 @@ import { DynamicReportScheduler } from '../../services/dynamicReportScheduler';
 jest.mock('../../services/dynamicReportScheduler');
 const MockDynamicReportScheduler = DynamicReportScheduler as jest.MockedClass<typeof DynamicReportScheduler>;
 
+// logger のモック
+jest.mock('../../utils/logger', () => ({
+  logger: {
+    info: jest.fn(),
+    error: jest.fn(),
+    warn: jest.fn(),
+    debug: jest.fn(),
+    success: jest.fn()
+  }
+}));
+
 describe('TimezoneChangeMonitor', () => {
   let monitor: TimezoneChangeMonitor;
   let mockScheduler: jest.Mocked<DynamicReportScheduler>;
   let mockRepository: any;
-  let consoleErrorSpy: jest.SpyInstance;
-  let consoleWarnSpy: jest.SpyInstance;
-
   beforeEach(() => {
-    // console spyをセットアップ
-    consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
-    consoleWarnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    // loggerモックをリセット
+    const { logger } = require('../../utils/logger');
+    jest.clearAllMocks();
+    // consoleWarnSpyは必要ない（loggerを使用）
     
     // スケジューラーのモック
     mockScheduler = new MockDynamicReportScheduler() as jest.Mocked<DynamicReportScheduler>;
@@ -56,8 +65,7 @@ describe('TimezoneChangeMonitor', () => {
     await new Promise(resolve => setTimeout(resolve, 50));
     
     // console spyをリストア
-    consoleErrorSpy.mockRestore();
-    consoleWarnSpy.mockRestore();
+    // spyのクリーンアップは不要（loggerモックを使用）
     
     // モックをクリア
     jest.clearAllMocks();
@@ -160,8 +168,10 @@ describe('TimezoneChangeMonitor', () => {
       expect(mockScheduler.onTimezoneChanged).not.toHaveBeenCalled();
 
       // エラーログが出力されることを確認
-      expect(consoleErrorSpy).toHaveBeenCalledWith(
-        expect.stringContaining('❌ Polling for timezone changes failed:'),
+      const { logger } = require('../../utils/logger');
+      expect(logger.error).toHaveBeenCalledWith(
+        'TIMEZONE_MONITOR',
+        '❌ Polling for timezone changes failed:',
         expect.any(Error)
       );
     });
@@ -220,8 +230,10 @@ describe('TimezoneChangeMonitor', () => {
       expect(mockRepository.markNotificationAsProcessed).not.toHaveBeenCalled();
 
       // エラーログが出力されることを確認
-      expect(consoleErrorSpy).toHaveBeenCalledWith(
-        expect.stringContaining('❌ Failed to process notification notif1:'),
+      const { logger } = require('../../utils/logger');
+      expect(logger.error).toHaveBeenCalledWith(
+        'TIMEZONE_MONITOR',
+        '❌ Failed to process notification notif1:',
         expect.any(Error)
       );
     });
@@ -447,8 +459,10 @@ describe('TimezoneChangeMonitor', () => {
       expect(mockRepository.getUserTimezoneChanges.mock.calls.length).toBeGreaterThanOrEqual(3);
 
       // エラーログが出力されることを確認（最初の2回の失敗時）
-      expect(consoleErrorSpy).toHaveBeenCalledWith(
-        expect.stringContaining('❌ Polling for timezone changes failed:'),
+      const { logger } = require('../../utils/logger');
+      expect(logger.error).toHaveBeenCalledWith(
+        'TIMEZONE_MONITOR',
+        '❌ Polling for timezone changes failed:',
         expect.any(Error)
       );
     });
@@ -476,8 +490,10 @@ describe('TimezoneChangeMonitor', () => {
       await new Promise(resolve => setTimeout(resolve, 100));
       
       // エラーログが出力されることを確認
-      expect(consoleErrorSpy).toHaveBeenCalledWith(
-        expect.stringContaining('❌ getUserTimezoneChanges is not a function')
+      const { logger } = require('../../utils/logger');
+      expect(logger.error).toHaveBeenCalledWith(
+        'TIMEZONE_MONITOR',
+        '❌ getUserTimezoneChanges is not a function'
       );
       
       // スケジューラーは呼ばれない
@@ -507,8 +523,10 @@ describe('TimezoneChangeMonitor', () => {
       await new Promise(resolve => setTimeout(resolve, 100));
       
       // エラーログが出力されることを確認
-      expect(consoleErrorSpy).toHaveBeenCalledWith(
-        expect.stringContaining('❌ getUnprocessedNotifications is not a function')
+      const { logger } = require('../../utils/logger');
+      expect(logger.error).toHaveBeenCalledWith(
+        'TIMEZONE_MONITOR',
+        '❌ getUnprocessedNotifications is not a function'
       );
       
       // スケジューラーは呼ばれない
@@ -540,11 +558,14 @@ describe('TimezoneChangeMonitor', () => {
       await new Promise(resolve => setTimeout(resolve, 100));
       
       // 警告ログが出力されることを確認（配列以外のデータの場合は警告が出力される）
-      expect(consoleWarnSpy).toHaveBeenCalledWith(
-        expect.stringContaining('⚠️ getUserTimezoneChanges returned invalid data, skipping')
+      const { logger } = require('../../utils/logger');
+      expect(logger.warn).toHaveBeenCalledWith(
+        'TIMEZONE_MONITOR',
+        '⚠️ getUserTimezoneChanges returned invalid data, skipping'
       );
-      expect(consoleWarnSpy).toHaveBeenCalledWith(
-        expect.stringContaining('⚠️ getUnprocessedNotifications returned invalid data, skipping')
+      expect(logger.warn).toHaveBeenCalledWith(
+        'TIMEZONE_MONITOR',
+        '⚠️ getUnprocessedNotifications returned invalid data, skipping'
       );
     });
   });

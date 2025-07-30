@@ -4,6 +4,7 @@
  */
 
 import { ClassificationResult } from '../../types/todo';
+import { logger } from '../../utils/logger';
 
 /**
  * Gemini APIレスポンス処理サービスインターフェース
@@ -56,8 +57,8 @@ export class GeminiResponseProcessor implements IGeminiResponseProcessor {
       };
 
     } catch (error) {
-      console.error('レスポンス処理エラー:', error);
-      console.log('元のレスポンス:', response);
+      logger.error('GEMINI_RESPONSE', 'レスポンス処理エラー', error);
+      logger.debug('GEMINI_RESPONSE', '元のレスポンス', { response });
       
       // エラー時はデフォルト値を返す
       return {

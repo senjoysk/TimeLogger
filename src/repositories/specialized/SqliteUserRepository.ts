@@ -12,6 +12,7 @@ import {
   UserRegistrationRow,
   UserStatsAggregateRow
 } from '../../types/database';
+import { logger } from '../../utils/logger';
 
 /**
  * SQLiteパラメータ型定義
@@ -47,7 +48,7 @@ export class SqliteUserRepository implements IUserRepository {
       );
       return result.length > 0;
     } catch (error) {
-      console.error('❌ ユーザー存在確認エラー:', error);
+      logger.error('USER_REPO', 'ユーザー存在確認エラー', error, { userId });
       return false;
     }
   }
@@ -66,9 +67,9 @@ export class SqliteUserRepository implements IUserRepository {
         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
       `, [userId, username, defaultTimezone, now, now, 1, now, now]);
       
-      console.log(`✅ 新規ユーザー登録完了: ${userId} (${username})`);
+      logger.info('USER_REPO', '新規ユーザー登録完了', { userId, username });
     } catch (error) {
-      console.error('❌ ユーザー登録エラー:', error);
+      logger.error('USER_REPO', 'ユーザー登録エラー', error, { userId, username });
       throw new TodoError('ユーザー登録に失敗しました', 'USER_REGISTRATION_ERROR', { userId, username, error });
     }
   }

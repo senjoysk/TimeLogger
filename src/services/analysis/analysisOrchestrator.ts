@@ -18,6 +18,7 @@ import { AnalysisResultConverter } from './analysisResultConverter';
 import { GoogleGenerativeAI, GenerativeModel } from '@google/generative-ai';
 import { config } from '../../config';
 import { ApiCostMonitor } from '../apiCostMonitor';
+import { logger } from '../../utils/logger';
 
 /**
  * 分析オーケストレーターインターフェース
@@ -84,13 +85,13 @@ export class AnalysisOrchestrator implements IAnalysisOrchestrator {
    */
   async analyzeDaily(request: AnalysisRequest): Promise<DailyAnalysisResult> {
     try {
-      console.log(`🧠 統合分析開始: [${request.businessDate}] ${request.userId}`);
+      logger.info('ANALYSIS_ORCHESTRATOR', `🧠 統合分析開始: [${request.businessDate}] ${request.userId}`);
 
       // キャッシュチェック（forceRefreshが指定されていない場合）
       if (!request.forceRefresh) {
         const cached = await this.getCachedAnalysis(request.userId, request.businessDate);
         if (cached) {
-          console.log(`⚡ キャッシュから分析結果を返却: [${request.businessDate}]`);
+          logger.info('ANALYSIS_ORCHESTRATOR', `⚡ キャッシュから分析結果を返却: [${request.businessDate}]`);
           return cached;
         }
       }
@@ -99,7 +100,7 @@ export class AnalysisOrchestrator implements IAnalysisOrchestrator {
       const logs = await this.repository.getLogsByDate(request.userId, request.businessDate);
       
       if (logs.length === 0) {
-        console.log(`📝 ログが見つかりません: [${request.businessDate}]`);
+        logger.info('ANALYSIS_ORCHESTRATOR', `📝 ログが見つかりません: [${request.businessDate}]`);
         return this.resultConverter.createEmptyAnalysis(request.businessDate);
       }
 
@@ -109,11 +110,11 @@ export class AnalysisOrchestrator implements IAnalysisOrchestrator {
       // 分析結果をキャッシュに保存
       await this.saveCacheResult(request, analysisResult, logs.length);
 
-      console.log(`✅ 統合分析完了: [${request.businessDate}] ${analysisResult.categories.length}カテゴリ, ${analysisResult.timeline.length}タイムライン`);
+      logger.info('ANALYSIS_ORCHESTRATOR', `✅ 統合分析完了: [${request.businessDate}] ${analysisResult.categories.length}カテゴリ, ${analysisResult.timeline.length}タイムライン`);
       
       return analysisResult;
     } catch (error) {
-      console.error('❌ 統合分析エラー:', error);
+      logger.error('ANALYSIS_ORCHESTRATOR', '❌ 統合分析エラー:', error as Error);
       throw error instanceof ActivityLogError ? error :
         new ActivityLogError('統合分析の実行に失敗しました', 'UNIFIED_ANALYSIS_ERROR', { error, request });
     }
@@ -138,7 +139,7 @@ export class AnalysisOrchestrator implements IAnalysisOrchestrator {
       const cache = await this.repository.getAnalysisCache(userId, businessDate);
       return cache?.analysisResult || null;
     } catch (error) {
-      console.error('❌ キャッシュチェックエラー:', error);
+      logger.error('ANALYSIS_ORCHESTRATOR', '❌ キャッシュチェックエラー:', error as Error);
       return null; // エラー時はキャッシュを使用しない
     }
   }
@@ -156,11 +157,11 @@ export class AnalysisOrchestrator implements IAnalysisOrchestrator {
 
     if (tokenCount <= maxTokens) {
       // 一括分析
-      console.log(`📊 一括分析実行: ${logs.length}件のログ, 推定${tokenCount}トークン`);
+      logger.info('ANALYSIS_ORCHESTRATOR', `📊 一括分析実行: ${logs.length}件のログ, 推定${tokenCount}トークン`);
       return await this.executeBulkAnalysis(logs, request.timezone, request.businessDate);
     } else {
       // 分割分析
-      console.log(`📊 分割分析実行: ${logs.length}件のログ, 推定${tokenCount}トークン`);
+      logger.info('ANALYSIS_ORCHESTRATOR', `📊 分割分析実行: ${logs.length}件のログ, 推定${tokenCount}トークン`);
       return await this.chunkManager.analyzeInChunks(logs, request.timezone, request.businessDate);
     }
   }
@@ -177,8 +178,8 @@ export class AnalysisOrchestrator implements IAnalysisOrchestrator {
       const prompt = this.promptBuilder.buildUnifiedPrompt(logs, timezone, businessDate);
       
       // デバッグ情報: プロンプトサイズと内容
-      console.log(`📝 プロンプトサイズ: ${prompt.length}文字, 推定トークン: ${Math.ceil(prompt.length / 4)}`);
-      console.log(`📝 送信プロンプト詳細:\n${prompt}`);
+      logger.debug('ANALYSIS_ORCHESTRATOR', `📝 プロンプトサイズ: ${prompt.length}文字, 推定トークン: ${Math.ceil(prompt.length / 4)}`);
+      logger.debug('ANALYSIS_ORCHESTRATOR', `📝 送信プロンプト詳細:\n${prompt}`);
       
       // Gemini API 呼び出し
       const result = await this.model.generateContent(prompt);
@@ -193,7 +194,7 @@ export class AnalysisOrchestrator implements IAnalysisOrchestrator {
       const responseText = response.text();
       
       // デバッグ情報: レスポンステキストの詳細
-      console.log(`📝 Geminiレスポンス詳細: 文字数=${responseText.length}, 最後の100文字="${responseText.slice(-100)}"`);
+      logger.debug('ANALYSIS_ORCHESTRATOR', `📝 Geminiレスポンス詳細: 文字数=${responseText.length}, 最後の100文字="${responseText.slice(-100)}"`);
       
       // レスポンスをパース
       const geminiResponse = this.responseProcessor.parseGeminiResponse(responseText);
@@ -201,7 +202,7 @@ export class AnalysisOrchestrator implements IAnalysisOrchestrator {
       // DailyAnalysisResult形式に変換
       return this.resultConverter.convertToDailyAnalysisResult(geminiResponse, businessDate, logs.length);
     } catch (error) {
-      console.error('❌ 一括分析エラー:', error);
+      logger.error('ANALYSIS_ORCHESTRATOR', '❌ 一括分析エラー:', error as Error);
       throw new ActivityLogError('一括分析の実行に失敗しました', 'BULK_ANALYSIS_ERROR', { error });
     }
   }
@@ -222,7 +223,7 @@ export class AnalysisOrchestrator implements IAnalysisOrchestrator {
         logCount
       });
     } catch (error) {
-      console.warn('⚠️ キャッシュ保存失敗:', error);
+      logger.warn('ANALYSIS_ORCHESTRATOR', '⚠️ キャッシュ保存失敗:', { error });
       // キャッシュ保存の失敗は分析結果に影響しないため、警告のみ
     }
   }

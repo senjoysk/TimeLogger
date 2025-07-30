@@ -3,6 +3,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { MigrationManager } from './migrationManager';
 import { ActivityLogError } from '../types/activityLog';
+import { logger } from '../utils/logger';
 
 /**
  * データベース初期化結果
@@ -67,18 +68,18 @@ export class DatabaseInitializer {
     // 存在するファイルを探す
     for (const filePath of possiblePaths) {
       if (fs.existsSync(filePath)) {
-        console.log(`✅ スキーマファイル発見: ${filePath}`);
+        logger.info('DB_INIT', `✅ スキーマファイル発見: ${filePath}`);
         return filePath;
       }
     }
     
     // 見つからない場合はエラー詳細を出力
-    console.error('❌ スキーマファイルが見つかりません。探索したパス:');
+    logger.error('DB_INIT', '❌ スキーマファイルが見つかりません。探索したパス:');
     possiblePaths.forEach(p => {
-      console.error(`  - ${p}: ${fs.existsSync(p) ? '✅' : '❌'}`);
+      logger.error('DB_INIT', `  - ${p}: ${fs.existsSync(p) ? '✅' : '❌'}`);
     });
-    console.error(`  現在のディレクトリ: ${process.cwd()}`);
-    console.error(`  __dirname: ${__dirname}`);
+    logger.error('DB_INIT', `  現在のディレクトリ: ${process.cwd()}`);
+    logger.error('DB_INIT', `  __dirname: ${__dirname}`);
     
     // デフォルトパス（エラー用）
     return possiblePaths[0];
@@ -97,7 +98,7 @@ export class DatabaseInitializer {
       
       return tables.length === 0;
     } catch (error) {
-      console.error('❌ DB空判定エラー:', error);
+      logger.error('DB_INIT', '❌ DB空判定エラー:', error);
       throw new ActivityLogError('データベースの状態確認に失敗しました', 'DB_CHECK_ERROR', { error });
     }
   }
@@ -108,23 +109,23 @@ export class DatabaseInitializer {
    */
   async initialize(): Promise<InitializationResult> {
     try {
-      console.log('🔍 データベース状態を確認中...');
-      console.log('📁 現在のディレクトリ:', process.cwd());
-      console.log('📁 __dirname:', __dirname);
-      console.log('📁 使用するスキーマパス:', this.schemaPath);
+      logger.info('DB_INIT', '🔍 データベース状態を確認中...');
+      logger.info('DB_INIT', '📁 現在のディレクトリ', { cwd: process.cwd() });
+      logger.info('DB_INIT', '📁 __dirname', { dirname: __dirname });
+      logger.info('DB_INIT', '📁 使用するスキーマパス', { schemaPath: this.schemaPath });
       
       const isEmpty = await this.isDatabaseEmpty();
-      console.log('📊 データベース空判定:', isEmpty ? '空' : '既存');
+      logger.info('DB_INIT', '📊 データベース空判定', { isEmpty: isEmpty ? '空' : '既存' });
       
       if (isEmpty) {
-        console.log('📝 新規データベースを検出 - newSchema.sqlから初期化します');
+        logger.info('DB_INIT', '📝 新規データベースを検出 - newSchema.sqlから初期化します');
         return await this.initializeFromSchema();
       } else {
-        console.log('📂 既存データベースを検出 - マイグレーションを実行します');
+        logger.info('DB_INIT', '📂 既存データベースを検出 - マイグレーションを実行します');
         return await this.runMigrations();
       }
     } catch (error) {
-      console.error('❌ データベース初期化エラー:', error);
+      logger.error('DB_INIT', '❌ データベース初期化エラー:', error);
       throw error;
     }
   }
@@ -135,8 +136,8 @@ export class DatabaseInitializer {
   private async initializeFromSchema(): Promise<InitializationResult> {
     try {
       if (!fs.existsSync(this.schemaPath)) {
-        console.error('❌ スキーマファイルが見つかりません:', this.schemaPath);
-        console.error('📁 探索したパス:');
+        logger.error('DB_INIT', '❌ スキーマファイルが見つかりません:', this.schemaPath);
+        logger.error('DB_INIT', '📁 探索したパス:');
         const allPaths = [
           path.join(__dirname, 'newSchema.sql'),
           path.join(__dirname, '../database/newSchema.sql'), 
@@ -148,7 +149,7 @@ export class DatabaseInitializer {
           path.resolve(process.cwd(), 'src/database/newSchema.sql')
         ];
         allPaths.forEach(p => {
-          console.error(`  ${p}: ${fs.existsSync(p) ? '✅' : '❌'}`);
+          logger.error('DB_INIT', `  ${p}: ${fs.existsSync(p) ? '✅' : '❌'}`);
         });
         
         throw new ActivityLogError(
@@ -163,12 +164,12 @@ export class DatabaseInitializer {
         );
       }
       
-      console.log(`📁 スキーマファイル: ${this.schemaPath}`);
+      logger.info('DB_INIT', `📁 スキーマファイル: ${this.schemaPath}`);
       
       const schema = fs.readFileSync(this.schemaPath, 'utf8');
       const statements = this.splitSqlStatements(schema);
       
-      console.log(`📊 実行するSQL文: ${statements.length}個`);
+      logger.info('DB_INIT', `📊 実行するSQL文: ${statements.length}個`);
       
       // テーブル作成を確実に実行するため、各文を個別にトランザクション外で実行
       await this.executeQuery('PRAGMA journal_mode=WAL');  // Write-Ahead Logging mode
@@ -180,28 +181,28 @@ export class DatabaseInitializer {
         if (!statement) continue;
         
         try {
-          console.log(`🔸 実行中: ${statement.substring(0, 100)}...`);
+          logger.info('DB_INIT', `🔸 実行中: ${statement.substring(0, 100)}...`);
           await this.executeQuery(statement);
           
           if (statement.toUpperCase().includes('CREATE TABLE')) {
             tablesCreated++;
           }
           
-          console.log(`✅ SQL ${i + 1}/${statements.length} 実行完了`);
+          logger.info('DB_INIT', `✅ SQL ${i + 1}/${statements.length} 実行完了`);
         } catch (error: unknown) {
           // 既存オブジェクトエラーは無視（idempotent）
           const err = error as Error;
           if (err.message?.includes('already exists')) {
-            console.log(`⏩ SQL ${i + 1} スキップ（既存）`);
+            logger.info('DB_INIT', `⏩ SQL ${i + 1} スキップ（既存）`);
             continue;
           }
-          console.error(`❌ SQL実行エラー (文 ${i + 1}):`, err);
-          console.error(`❌ 失敗したSQL:`, statement);
+          logger.error('DB_INIT', `❌ SQL実行エラー (文 ${i + 1}):`, err);
+          logger.error('DB_INIT', `❌ 失敗したSQL:`, statement);
           throw error;
         }
       }
       
-      console.log('✅ newSchema.sqlからの初期化が完了しました');
+      logger.info('DB_INIT', '✅ newSchema.sqlからの初期化が完了しました');
       
       return {
         isNewDatabase: true,
@@ -227,7 +228,7 @@ export class DatabaseInitializer {
       
       // マイグレーション状態を確認
       const status = await this.migrationManager.getMigrationStatus();
-      console.log(`📊 マイグレーション状態: ${status.pending}個の未実行マイグレーション`);
+      logger.info('DB_INIT', `📊 マイグレーション状態: ${status.pending}個の未実行マイグレーション`);
       
       // マイグレーションを実行
       await this.migrationManager.runMigrations();

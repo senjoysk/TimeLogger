@@ -4,6 +4,7 @@
 
 import { Request, Response, NextFunction } from 'express';
 import { AdminError, AdminSecurityError, AdminValidationError, AdminDatabaseError } from '../types/admin';
+import { logger } from '../../utils/logger';
 
 export function errorHandler(
   error: Error | AdminError,
@@ -11,7 +12,7 @@ export function errorHandler(
   res: Response,
   next: NextFunction
 ): void {
-  console.error('Admin Web App Error:', error);
+  logger.error('WEB_ADMIN', 'Admin Web App Error:', error as Error);
 
   // AdminErrorインターface実装チェック
   if (isAdminError(error)) {

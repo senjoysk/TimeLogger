@@ -14,6 +14,7 @@ import {
   createClassificationButtons,
   generateSessionId
 } from '../components/classificationResultEmbed';
+import { logger } from '../utils/logger';
 
 /**
  * メッセージ分類処理のセッション情報
@@ -97,7 +98,7 @@ export class MessageClassificationHandler implements IMessageClassificationHandl
    */
   async handleMessageClassification(message: Message, userId: string, timezone: string): Promise<void> {
     try {
-      console.log(`🤖 メッセージ分類開始: ${userId} "${message.content}"`);
+      logger.debug('MESSAGE_CLASS', `🤖 メッセージ分類開始: ${userId} "${message.content}"`);
 
       // AI分析を実行
       const result = await this.classificationService.classifyMessage(message.content);
@@ -113,7 +114,7 @@ export class MessageClassificationHandler implements IMessageClassificationHandl
       };
       
       this.activeSessions.set(sessionId, session);
-      console.log(`📝 セッション作成: sessionId=${sessionId}, userId=${userId}`);
+      logger.debug('MESSAGE_CLASS', `📝 セッション作成: sessionId=${sessionId}, userId=${userId}`);
 
       // 判定結果を表示
       const embed = createClassificationResultEmbed({
@@ -133,10 +134,10 @@ export class MessageClassificationHandler implements IMessageClassificationHandl
       // 分類履歴を記録
       await this.recordClassificationHistory(userId, message.content, result);
 
-      console.log(`🤖 メッセージ分類完了: ${userId} -> ${result.classification} (信頼度: ${result.confidence})`);
+      logger.debug('MESSAGE_CLASS', `🤖 メッセージ分類完了: ${userId} -> ${result.classification} (信頼度: ${result.confidence})`);
       
     } catch (error) {
-      console.error('❌ メッセージ分類エラー:', error);
+      logger.error('MESSAGE_CLASS', '❌ メッセージ分類エラー:', error);
       await message.reply('❌ メッセージの分析中にエラーが発生しました。');
     }
   }
@@ -152,26 +153,26 @@ export class MessageClassificationHandler implements IMessageClassificationHandl
     userId: string, 
     timezone: string
   ): Promise<void> {
-    console.log(`🔍 セッション確認: sessionId=${sessionId}, userId=${userId}`);
+    logger.debug('MESSAGE_CLASS', `🔍 セッション確認: sessionId=${sessionId}, userId=${userId}`);
     
     const session = this.activeSessions.get(sessionId);
     
     if (!session) {
-      console.error(`❌ セッションが見つからない: sessionId=${sessionId}`);
-      console.log(`🔍 現在のアクティブセッション: ${Array.from(this.activeSessions.keys()).join(', ')}`);
+      logger.error('MESSAGE_CLASS', `❌ セッションが見つからない: sessionId=${sessionId}`);
+      logger.debug('MESSAGE_CLASS', `🔍 現在のアクティブセッション: ${Array.from(this.activeSessions.keys()).join(', ')}`);
       await interaction.reply({ content: '❌ セッションが見つからないか、権限がありません。', ephemeral: true });
       return;
     }
     
     if (session.userId !== userId) {
-      console.error(`❌ ユーザーIDが不一致: session.userId=${session.userId}, userId=${userId}`);
+      logger.error('MESSAGE_CLASS', `❌ ユーザーIDが不一致: session.userId=${session.userId}, userId=${userId}`);
       await interaction.reply({ content: '❌ セッションが見つからないか、権限がありません。', ephemeral: true });
       return;
     }
     
-    console.log(`✅ セッション確認成功: sessionId=${sessionId}, userId=${userId}`);
+    logger.debug('MESSAGE_CLASS', `✅ セッション確認成功: sessionId=${sessionId}, userId=${userId}`);
     const sessionAge = Date.now() - session.timestamp.getTime();
-    console.log(`🕐 セッション経過時間: ${Math.round(sessionAge / 1000)}秒`);
+    logger.debug('MESSAGE_CLASS', `🕐 セッション経過時間: ${Math.round(sessionAge / 1000)}秒`);
 
     // 分類を決定
     let finalClassification: MessageClassification;
@@ -290,7 +291,7 @@ export class MessageClassificationHandler implements IMessageClassificationHandl
       components: []
     });
 
-    console.log(`✅ TODO作成: ${userId} "${todo.content}"`);
+    logger.debug('MESSAGE_CLASS', `✅ TODO作成: ${userId} "${todo.content}"`);
   }
 
   /**
@@ -304,9 +305,9 @@ export class MessageClassificationHandler implements IMessageClassificationHandl
     try {
       // 分類履歴をデータベースに記録
       // 将来の学習機能で使用
-      console.log(`📊 分類履歴記録: ${userId} "${message}" -> ${result.classification} (${result.confidence})`);
+      logger.debug('MESSAGE_CLASS', `📊 分類履歴記録: ${userId} "${message}" -> ${result.classification} (${result.confidence})`);
     } catch (error) {
-      console.error('❌ 分類履歴記録エラー:', error);
+      logger.error('MESSAGE_CLASS', '❌ 分類履歴記録エラー:', error);
       // エラーでも処理を継続
     }
   }
@@ -338,7 +339,7 @@ export class MessageClassificationHandler implements IMessageClassificationHandl
     }
     
     if (cleanedCount > 0) {
-      console.log(`🧹 期限切れセッションクリーンアップ: ${cleanedCount}件`);
+      logger.debug('MESSAGE_CLASS', `🧹 期限切れセッションクリーンアップ: ${cleanedCount}件`);
     }
   }
 }

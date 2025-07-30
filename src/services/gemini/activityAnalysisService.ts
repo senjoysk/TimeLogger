@@ -8,6 +8,7 @@ import { ApiCostMonitor } from '../apiCostMonitor';
 import { ActivityAnalysisResult, ReminderContext } from '../../types/activityAnalysis';
 import { ActivityAnalysisAIResponse } from '../../types/aiResponse';
 import { AppError, ErrorType } from '../../utils/errorHandler';
+import { logger } from '../../utils/logger';
 
 /**
  * 活動分析サービスインターフェース
@@ -70,19 +71,19 @@ export class ActivityAnalysisService implements IActivityAnalysisService {
       ? 'リマインダーReply活動分析' 
       : '通常活動分析';
       
-    console.log(`📤 [Gemini API] ${logTitle}プロンプト:`);
-    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-    console.log(prompt);
-    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    logger.debug('ACTIVITY_ANALYSIS', `📤 [Gemini API] ${logTitle}プロンプト:`);
+    logger.debug('ACTIVITY_ANALYSIS', '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    logger.debug('ACTIVITY_ANALYSIS', prompt);
+    logger.debug('ACTIVITY_ANALYSIS', '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
     
     try {
       const result = await this.geminiClient.generateContent(prompt);
       const responseText = result.response.text();
       
-      console.log(`📥 [Gemini API] ${logTitle}レスポンス:`);
-      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-      console.log(responseText);
-      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      logger.debug('ACTIVITY_ANALYSIS', `📥 [Gemini API] ${logTitle}レスポンス:`);
+      logger.debug('ACTIVITY_ANALYSIS', '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      logger.debug('ACTIVITY_ANALYSIS', responseText);
+      logger.debug('ACTIVITY_ANALYSIS', '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
       
       // トークン使用量の記録
       if (result.response.usageMetadata) {
@@ -92,7 +93,7 @@ export class ActivityAnalysisService implements IActivityAnalysisService {
       
       return this.parseActivityAnalysisResponse(responseText);
     } catch (error) {
-      console.error('❌ 活動分析エラー:', error);
+      logger.error('ACTIVITY_ANALYSIS', '❌ 活動分析エラー', error);
       throw new AppError(
         '活動分析に失敗しました',
         ErrorType.API,
@@ -288,8 +289,8 @@ JSON形式のみで回答してください。説明文は不要です。`.trim(
       };
 
     } catch (error) {
-      console.error('活動分析レスポンスのパースエラー:', error);
-      console.log('元のレスポンス:', response);
+      logger.error('ACTIVITY_ANALYSIS', '活動分析レスポンスのパースエラー', error);
+      logger.debug('ACTIVITY_ANALYSIS', '元のレスポンス', { response });
       
       // パースエラー時はデフォルト値を返す
       return {

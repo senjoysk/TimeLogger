@@ -55,6 +55,70 @@ Discord を使って自然言語で活動記録とTODO管理を行い、Gemini A
 - **TDD開発**: テスト駆動開発によるバグ防止
 - **統合テスト**: 実際のシナリオに基づくE2Eテスト
 
+## 開発環境要件
+
+### 必須ツール
+- **Node.js**: v20.0.0以上（.nvmrcファイルで指定）
+- **npm**: v9.0.0以上
+- **SQLite3**: データベース用（npm installで自動インストール）
+
+### 推奨ツール
+- **nvm**: Node.jsバージョン管理
+- **Git**: v2.20以上（worktree機能を使用する場合）
+
+### 開発用ツール（プロジェクトに含まれる）
+以下のツールはプロジェクト内のスクリプトとして提供されており、個別インストール不要です：
+
+#### コード品質チェックツール
+- **console使用チェック**: `./scripts/code-review/console-usage-check.sh`
+  - 標準のgrep/findコマンドを使用（外部ツール不要）
+  - console.log/error/warn/infoの使用を検出
+- **SRP違反チェック**: `./scripts/code-review/srp-violation-check.sh`
+- **ファイルサイズチェック**: `./scripts/code-review/file-size-check.sh`
+- **依存性注入チェック**: `./scripts/code-review/dependency-injection-check.sh`
+
+#### 自動化ツール
+- **Husky**: Gitフック管理（npm install時に自動設定）
+- **pre-commitフック**: コード品質の自動チェック
+
+### 開発環境のセットアップ手順
+
+```bash
+# 1. リポジトリをクローン
+git clone https://github.com/your-repo/discord-timelogger.git
+cd discord-timelogger
+
+# 2. Node.js環境の準備（nvmを使用する場合）
+nvm install
+nvm use
+
+# 3. 依存関係のインストール（Huskyも自動設定される）
+npm install
+
+# 4. 環境変数の設定
+cp .env.example .env
+# .envファイルを編集して必要な値を設定
+
+# 5. 開発環境の動作確認
+npm run dev
+```
+
+### コード品質チェックの実行
+
+```bash
+# console使用のチェック（Logger使用を推奨）
+./scripts/code-review/console-usage-check.sh
+
+# TypeScriptビルドチェック
+npm run build
+
+# テスト実行
+npm test
+
+# 全品質チェック（pre-commitフックで自動実行）
+npm run quality:check
+```
+
 ## セットアップ
 
 ### 1. Node.js仮想環境の作成

@@ -8,6 +8,7 @@ import { Database } from 'sqlite3';
 import { PartialCompositeRepository } from '../repositories/PartialCompositeRepository';
 import { IUnifiedRepository } from '../repositories/interfaces';
 import { ActivityLogError } from '../types/activityLog';
+import { logger } from '../utils/logger';
 
 /**
  * 移行設定インターフェース
@@ -352,22 +353,22 @@ export class SystemMigrator {
    * 移行サマリーを表示
    */
   private printMigrationSummary(): void {
-    console.log('\n📊 移行結果サマリー');
-    console.log('='.repeat(50));
-    console.log(`⏱️  実行時間: ${this.stats.durationSeconds}秒`);
-    console.log(`📝 旧レコード数: ${this.stats.oldRecordsCount}件`);
-    console.log(`✅ 移行成功: ${this.stats.migratedCount}件`);
-    console.log(`⏭️  スキップ: ${this.stats.skippedCount}件`);
-    console.log(`❌ エラー: ${this.stats.errorCount}件`);
-    console.log(`⚠️  警告: ${this.stats.warningCount}件`);
+    logger.info('MIGRATOR', '\n📊 移行結果サマリー');
+    logger.info('MIGRATOR', '='.repeat(50));
+    logger.info('MIGRATOR', `⏱️  実行時間: ${this.stats.durationSeconds}秒`);
+    logger.info('MIGRATOR', `📝 旧レコード数: ${this.stats.oldRecordsCount}件`);
+    logger.info('MIGRATOR', `✅ 移行成功: ${this.stats.migratedCount}件`);
+    logger.info('MIGRATOR', `⏭️  スキップ: ${this.stats.skippedCount}件`);
+    logger.info('MIGRATOR', `❌ エラー: ${this.stats.errorCount}件`);
+    logger.info('MIGRATOR', `⚠️  警告: ${this.stats.warningCount}件`);
     
     if (this.stats.migratedCount > 0) {
       const successRate = Math.round((this.stats.migratedCount / this.stats.oldRecordsCount) * 100);
-      console.log(`📈 成功率: ${successRate}%`);
+      logger.info('MIGRATOR', `📈 成功率: ${successRate}%`);
     }
 
     if (this.config.dryRun) {
-      console.log('\n⚠️ これはドライランです。実際の変更は行われていません。');
+      logger.warn('MIGRATOR', '\n⚠️ これはドライランです。実際の変更は行われていません。');
     }
   }
 
@@ -413,7 +414,7 @@ export class SystemMigrator {
         await this.newRepository.close();
       }
     } catch (error) {
-      console.error('❌ クリーンアップエラー:', error);
+      logger.error('MIGRATOR', '❌ クリーンアップエラー:', error as Error);
     }
   }
 
@@ -425,7 +426,7 @@ export class SystemMigrator {
     const logMessage = `[${timestamp}] ${message}`;
     
     if (this.config.verbose) {
-      console.log(logMessage);
+      logger.info('MIGRATOR', message);
     }
     
     this.stats.details.push(logMessage);

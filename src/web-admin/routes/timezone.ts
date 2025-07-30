@@ -3,6 +3,7 @@
  */
 
 import { Router, Request, Response } from 'express';
+import { logger } from '../../utils/logger';
 
 export function createTimezoneRouter(): Router {
   const router = Router();
@@ -41,7 +42,7 @@ export function createTimezoneRouter(): Router {
         path: '/admin'
       });
 
-      console.log(`✅ タイムゾーン設定完了: ${timezone}`);
+      logger.info('WEB_ADMIN', `✅ タイムゾーン設定完了: ${timezone}`);
       
       res.json({
         success: true,
@@ -50,7 +51,7 @@ export function createTimezoneRouter(): Router {
       });
 
     } catch (error) {
-      console.error('タイムゾーン更新エラー:', error);
+      logger.error('WEB_ADMIN', 'タイムゾーン更新エラー:', error);
       res.status(500).json({
         success: false,
         error: 'タイムゾーンの更新に失敗しました'
@@ -73,7 +74,7 @@ export function createTimezoneRouter(): Router {
         supportedTimezones: supportedTimezones
       });
     } catch (error) {
-      console.error('タイムゾーン取得エラー:', error);
+      logger.error('WEB_ADMIN', 'タイムゾーン取得エラー:', error);
       res.json({
         success: true,
         timezone: 'Asia/Tokyo',

@@ -6,6 +6,7 @@
 import { IActivityLogRepository } from '../repositories/activityLogRepository';
 import { IActivityLogMatchingService } from './activityLogMatchingService';
 import { ActivityLog, ActivityLogError } from '../types/activityLog';
+import { logger } from '../utils/logger';
 
 /**
  * 活動ログマッチング管理サービス
@@ -36,11 +37,11 @@ export class ActivityLogMatchingCoordinatorService {
       // 入力時刻順でソート
       unmatchedLogs.sort((a, b) => new Date(a.inputTimestamp).getTime() - new Date(b.inputTimestamp).getTime());
       
-      console.log(`🔍 マッチング待ちログを取得: ${unmatchedLogs.length}件`);
+      logger.info('MATCHING_COORDINATOR', `🔍 マッチング待ちログを取得: ${unmatchedLogs.length}件`);
       
       return unmatchedLogs;
     } catch (error) {
-      console.error('❗ マッチング待ちログ取得エラー:', error);
+      logger.error('MATCHING_COORDINATOR', '❗ マッチング待ちログ取得エラー', error);
       throw error instanceof ActivityLogError ? error :
         new ActivityLogError('マッチング待ちログの取得に失敗しました', 'GET_UNMATCHED_LOGS_ERROR', { error });
     }
@@ -102,14 +103,14 @@ export class ActivityLogMatchingCoordinatorService {
         this.repository.getLogById(endLogId)
       ]);
       
-      console.log(`🔗 手動マッチング完了: ${startLogId} ↔️ ${endLogId}`);
+      logger.info('MATCHING_COORDINATOR', `🔗 手動マッチング完了: ${startLogId} ↔️ ${endLogId}`);
       
       return {
         startLog: updatedStartLog!,
         endLog: updatedEndLog!
       };
     } catch (error) {
-      console.error('❗ 手動マッチングエラー:', error);
+      logger.error('MATCHING_COORDINATOR', '❗ 手動マッチングエラー', error);
       throw error instanceof ActivityLogError ? error :
         new ActivityLogError('手動マッチングに失敗しました', 'MANUAL_MATCH_ERROR', { error, startLogId, endLogId });
     }
@@ -142,7 +143,7 @@ export class ActivityLogMatchingCoordinatorService {
                 similarityScore: candidates[0].score
               })
             ]);
-            console.log(`✨ 自動マッチング成功: ${log.id} ↔️ ${candidates[0].logId} (スコア: ${candidates[0].score.toFixed(2)})`);
+            logger.info('MATCHING_COORDINATOR', `✨ 自動マッチング成功: ${log.id} ↔️ ${candidates[0].logId} (スコア: ${candidates[0].score.toFixed(2)})`);
           }
         }
       } else if (log.logType === 'end_only') {
@@ -166,14 +167,14 @@ export class ActivityLogMatchingCoordinatorService {
                   similarityScore: candidates[0].score
                 })
               ]);
-              console.log(`✨ 自動マッチング成功: ${startLog.id} ↔️ ${log.id} (スコア: ${candidates[0].score.toFixed(2)})`);
+              logger.info('MATCHING_COORDINATOR', `✨ 自動マッチング成功: ${startLog.id} ↔️ ${log.id} (スコア: ${candidates[0].score.toFixed(2)})`);
               break; // 最初のマッチで停止
             }
           }
         }
       }
     } catch (error) {
-      console.error('⚠️ 自動マッチングエラー (継続):', error);
+      logger.error('MATCHING_COORDINATOR', '⚠️ 自動マッチングエラー (継続)', error);
       // 自動マッチングの失敗は致命的ではないのでエラーを継続
     }
   }

@@ -10,6 +10,7 @@ import { ApiCostRow, ApiStatsRow } from '../../types/database';
 import { v4 as uuidv4 } from 'uuid';
 import { toZonedTime, format } from 'date-fns-tz';
 import { ITimezoneService } from '../../services/interfaces/ITimezoneService';
+import { logger } from '../../utils/logger';
 
 /**
  * SQLite実装によるAPIコスト監視Repository
@@ -66,10 +67,16 @@ export class SqliteApiCostRepository implements IApiCostRepository {
       ]);
 
       if (process.env.NODE_ENV === 'test') {
-        console.log(`📊 API呼び出しを記録: ${operation} (入力: ${inputTokens}, 出力: ${outputTokens}, コスト: $${totalCost.toFixed(4)}), timestamp: ${now}`);
+        logger.debug('API_COST_REPO', 'API呼び出しを記録', {
+          operation,
+          inputTokens,
+          outputTokens,
+          cost: totalCost.toFixed(4),
+          timestamp: now
+        });
       }
     } catch (error) {
-      console.error('❌ API呼び出し記録エラー:', error);
+      logger.error('API_COST_REPO', 'API呼び出し記録エラー', error);
       // エラー時も処理を継続（コスト記録失敗で本来の機能を止めない）
     }
   }
@@ -90,9 +97,9 @@ export class SqliteApiCostRepository implements IApiCostRepository {
       // デバッグ用: 全レコードを取得
       if (process.env.NODE_ENV === 'test') {
         const allRecords = await this.dbConnection.all<ApiCostRow>('SELECT * FROM api_costs ORDER BY timestamp DESC');
-        console.log(`🔍 getTodayStats - 全レコード数: ${allRecords.length}`);
+        logger.debug('API_COST_REPO', 'getTodayStats - 全レコード数', { recordCount: allRecords.length });
         if (allRecords.length > 0) {
-          console.log(`🔍 最新レコード: ${JSON.stringify(allRecords[0])}`);
+          logger.debug('API_COST_REPO', '最新レコード', { latestRecord: allRecords[0] });
         }
       }
 
@@ -111,7 +118,7 @@ export class SqliteApiCostRepository implements IApiCostRepository {
       
       // デバッグ情報（テスト時のみ）
       if (process.env.NODE_ENV === 'test') {
-        console.log(`🔍 getTodayStats デバッグ: rows=${rows.length}`);
+        logger.debug('API_COST_REPO', 'getTodayStats デバッグ', { rowCount: rows.length });
       }
 
       let totalCalls = 0;
@@ -142,7 +149,7 @@ export class SqliteApiCostRepository implements IApiCostRepository {
         operationBreakdown
       };
     } catch (error) {
-      console.error('❌ 今日の統計取得エラー:', error);
+      logger.error('API_COST_REPO', '今日の統計取得エラー', error);
       // エラー時はデフォルト値を返す
       return {
         totalCalls: 0,
@@ -180,7 +187,7 @@ export class SqliteApiCostRepository implements IApiCostRepository {
       
       return null;
     } catch (error) {
-      console.error('❌ コスト警告チェックエラー:', error);
+      logger.error('API_COST_REPO', 'コスト警告チェックエラー', error);
       return null;
     }
   }
@@ -225,7 +232,7 @@ export class SqliteApiCostRepository implements IApiCostRepository {
       
       return report;
     } catch (error) {
-      console.error('❌ 日次レポート生成エラー:', error);
+      logger.error('API_COST_REPO', '日次レポート生成エラー', error);
       return '❌ レポートの生成中にエラーが発生しました。';
     }
   }
@@ -265,7 +272,7 @@ export class SqliteApiCostRepository implements IApiCostRepository {
       
       await this.dbConnection.run(createIndexSql);
     } catch (error) {
-      console.error('❌ API費用テーブル確認エラー:', error);
+      logger.error('API_COST_REPO', 'API費用テーブル確認エラー', error);
       throw error;
     }
   }

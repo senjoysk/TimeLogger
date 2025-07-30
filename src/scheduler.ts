@@ -16,6 +16,7 @@ import {
 } from './factories';
 import { ConfigService } from './services/configService';
 import { IActivityPromptRepository } from './repositories/interfaces';
+import { logger } from './utils/logger';
 // ActivityPromptRepository は PartialCompositeRepository に統合済み
 
 /**
@@ -86,15 +87,15 @@ export class Scheduler {
    * 全てのスケジュールを停止
    */
   public stop(): void {
-    console.log('🛑 スケジューラーを停止します...');
+    logger.info('SCHEDULER', 'スケジューラーを停止します...');
     
     for (const [name, job] of this.jobs) {
       job.stop();
-      console.log(`  ✅ ${name} を停止しました`);
+      logger.info('SCHEDULER', `${name} を停止しました`);
     }
     
     this.jobs.clear();
-    console.log('✅ 全てのスケジュールが停止されました');
+    logger.success('SCHEDULER', '全てのスケジュールが停止されました');
   }
 
   /**
@@ -232,20 +233,25 @@ export class Scheduler {
       ? '有効（毎分チェック・毎分実行）' 
       : '有効（毎分チェック、0分・30分に実行）';
     
-    console.log('\n📅 スケジュール情報:');
-    console.log(`  🔔 活動促し機能: ${scheduleInfo}`);
-    console.log(`  📊 サマリー時間: 毎日 ${config.app.summaryTime.hour}:00`);
-    console.log(`  🌍 対応ユーザー数: ${this.userTimezones.size}`);
+    logger.info('SCHEDULER', 'スケジュール情報', {
+      活動促し機能: scheduleInfo,
+      サマリー時間: `毎日 ${config.app.summaryTime.hour}:00`,
+      対応ユーザー数: this.userTimezones.size
+    });
     
     // 各ユーザーのタイムゾーン情報を表示
     for (const [userId, timezone] of this.userTimezones) {
       const now = new Date();
       const localTime = toZonedTime(now, timezone);
-      console.log(`  👤 ${userId}: ${timezone} (現在時刻: ${localTime.toLocaleString()})`);
+      logger.debug('SCHEDULER', `ユーザータイムゾーン`, {
+        userId,
+        timezone,
+        現在時刻: localTime.toLocaleString()
+      });
     }
     
     if (this.userTimezones.size === 0) {
-      console.log('  👤 登録済みユーザーはいません。サマリー送信時に動的に取得します。');
+      logger.info('SCHEDULER', '登録済みユーザーはいません。サマリー送信時に動的に取得します。');
     }
   }
 
@@ -260,14 +266,14 @@ export class Scheduler {
         const users = await repository.getAllUsers();
         for (const user of users) {
           this.userTimezones.set(user.userId, user.timezone);
-          console.log(`  → ユーザー ${user.userId} のタイムゾーン: ${user.timezone}`);
+          logger.debug('SCHEDULER', `ユーザー ${user.userId} のタイムゾーン: ${user.timezone}`);
         }
       }
       
       // ユーザーがいない場合は空でもOK（サマリー送信時に動的に取得）
-      console.log(`  → 読み込み完了: ${this.userTimezones.size}人のユーザー`);
+      logger.info('SCHEDULER', `読み込み完了: ${this.userTimezones.size}人のユーザー`);
     } catch (error) {
-      console.error('❌ タイムゾーン情報の読み込みエラー:', error);
+      logger.error('SCHEDULER', 'タイムゾーン情報の読み込みエラー', error);
       // エラー時は空のマップで続行
       this.userTimezones.clear();
     }

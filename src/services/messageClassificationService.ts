@@ -5,6 +5,7 @@
 
 import { MessageClassification, ClassificationResult } from '../types/todo';
 import { IGeminiService } from './interfaces/IGeminiService';
+import { logger } from '../utils/logger';
 
 export interface IMessageClassificationService {
   /**
@@ -105,10 +106,10 @@ export class MessageClassificationService implements IMessageClassificationServi
       if (this.geminiService && this.geminiService.classifyMessageWithAI) {
         try {
           const aiResult = await this.geminiService.classifyMessageWithAI(message);
-          console.log('🤖 Gemini AI分類結果:', aiResult);
+          logger.info('MESSAGE_CLASSIFIER', '🤖 Gemini AI分類結果:', { aiResult });
           return aiResult;
         } catch (error) {
-          console.warn('Gemini AI分類エラー、フォールバックを使用:', error);
+          logger.warn('MESSAGE_CLASSIFIER', 'Gemini AI分類エラー、フォールバックを使用:', { error });
         }
       }
       
@@ -116,7 +117,7 @@ export class MessageClassificationService implements IMessageClassificationServi
       return this.mockAiClassification(message);
       
     } catch (error) {
-      console.error('メッセージ分類エラー:', error);
+      logger.error('MESSAGE_CLASSIFIER', 'メッセージ分類エラー:', error as Error);
       return {
         classification: 'UNCERTAIN',
         confidence: 0,
@@ -250,7 +251,7 @@ export class MessageClassificationService implements IMessageClassificationServi
     actualClass: MessageClassification
   ): Promise<void> {
     // TODO: 実際の学習機能実装
-    console.log(`分類精度改善: "${message}" -> ${actualClass}`);
+    logger.info('MESSAGE_CLASSIFIER', `分類精度改善: "${message}" -> ${actualClass}`);
   }
 
   /**

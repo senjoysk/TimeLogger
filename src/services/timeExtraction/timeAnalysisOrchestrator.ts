@@ -15,6 +15,7 @@ import {
 import { IGeminiService } from '../interfaces/IGeminiService';
 import { ITimezoneService } from '../interfaces/ITimezoneService';
 import { ITimePatternProcessor } from './timePatternProcessor';
+import { logger } from '../../utils/logger';
 
 /**
  * 時刻分析オーケストレーターインターフェース
@@ -73,13 +74,13 @@ export class TimeAnalysisOrchestrator implements ITimeAnalysisOrchestrator {
     const prompt = this.buildGeminiPrompt(input, timezone, inputTimestamp, basicAnalysis, context);
     
     try {
-      console.log('🤖 Gemini解析開始...');
+      logger.info('TIME_ANALYSIS_ORCHESTRATOR', '🤖 Gemini解析開始...');
       const result = await this.geminiService.classifyMessageWithAI(input);
       
       // レスポンスを期待する形式に変換
       return this.parseGeminiResponse(result as any, basicAnalysis);
     } catch (error) {
-      console.error('Gemini解析エラー:', error);
+      logger.error('TIME_ANALYSIS_ORCHESTRATOR', 'Gemini解析エラー:', error as Error);
       // フォールバック: 基本解析結果を使用
       return this.createFallbackGeminiResponse(basicAnalysis);
     }

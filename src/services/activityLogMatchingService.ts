@@ -13,6 +13,7 @@ import {
   ActivityLogError
 } from '../types/activityLog';
 import { IGeminiService } from './interfaces/IGeminiService';
+import { logger } from '../utils/logger';
 
 export interface IActivityLogMatchingService {
   analyzeLogType(request: LogTypeAnalysisRequest): Promise<LogTypeAnalysisResponse>;
@@ -337,7 +338,7 @@ export class ActivityLogMatchingService implements IActivityLogMatchingService {
 
     } catch (error) {
       // Gemini連携が失敗した場合は基本マッチングにフォールバック
-      console.warn('⚠️ Gemini連携マッチングが失敗しました。基本マッチングにフォールバック:', error);
+      logger.warn('MATCHING_SERVICE', '⚠️ Gemini連携マッチングが失敗しました。基本マッチングにフォールバック', { error });
       return await this.findMatchingCandidates(startLog, endCandidates);
     }
   }
@@ -351,7 +352,7 @@ export class ActivityLogMatchingService implements IActivityLogMatchingService {
     try {
       if (!this.geminiService) {
         // Geminiサービスが利用できない場合は基本分析にフォールバック
-        console.warn('⚠️ GeminiServiceが利用できません。基本分析にフォールバック');
+        logger.warn('MATCHING_SERVICE', '⚠️ GeminiServiceが利用できません。基本分析にフォールバック');
         return await this.analyzeLogType(request);
       }
 
@@ -389,7 +390,7 @@ export class ActivityLogMatchingService implements IActivityLogMatchingService {
       };
 
     } catch (error) {
-      console.error('❌ Geminiログタイプ分析エラー:', error);
+      logger.error('MATCHING_SERVICE', '❌ Geminiログタイプ分析エラー', error);
       // エラー時は基本分析にフォールバック
       return await this.analyzeLogType(request);
     }
@@ -418,7 +419,7 @@ export class ActivityLogMatchingService implements IActivityLogMatchingService {
       return (basicScore * this.strategy.keywordWeight) + (semanticScore * this.strategy.semanticWeight);
 
     } catch (error) {
-      console.warn('⚠️ 意味的類似性計算が失敗しました。基本スコアを使用:', error);
+      logger.warn('MATCHING_SERVICE', '⚠️ 意味的類似性計算が失敗しました。基本スコアを使用', { error });
       return this.calculateContentScore(startLog, endLog);
     }
   }
@@ -456,7 +457,7 @@ export class ActivityLogMatchingService implements IActivityLogMatchingService {
       return Math.max(0.0, Math.min(1.0, response.similarity)); // 0.0-1.0の範囲に制限
 
     } catch (error) {
-      console.warn('⚠️ Gemini意味的類似性計算エラー:', error);
+      logger.warn('MATCHING_SERVICE', '⚠️ Gemini意味的類似性計算エラー', { error });
       return 0.5; // エラー時はニュートラルなスコア
     }
   }

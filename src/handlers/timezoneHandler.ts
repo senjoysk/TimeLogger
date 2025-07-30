@@ -8,6 +8,7 @@ import { IActivityLogRepository } from '../repositories/activityLogRepository';
 import { ActivityLogError } from '../types/activityLog';
 import { ITimezoneService } from '../services/interfaces/ITimezoneService';
 import { ITimeProvider } from '../interfaces/dependencies';
+import { logger } from '../utils/logger';
 import { TimeProviderService } from '../services/timeProviderService';
 
 /**
@@ -80,7 +81,7 @@ export class TimezoneHandler implements ITimezoneHandler {
    */
   async handle(message: Message, userId: string, args: string[]): Promise<void> {
     try {
-      console.log(`🌍 タイムゾーンコマンド処理開始: ${userId} ${args.join(' ')}`);
+      logger.debug('HANDLER', `🌍 タイムゾーンコマンド処理開始: ${userId} ${args.join(' ')}`);
 
       // コマンドを解析
       const parsedCommand = this.parseTimezoneCommand(args);
@@ -112,7 +113,7 @@ export class TimezoneHandler implements ITimezoneHandler {
           await this.showCurrentTimezone(message, userId);
       }
     } catch (error) {
-      console.error('❌ タイムゾーンコマンド処理エラー:', error);
+      logger.error('HANDLER', '❌ タイムゾーンコマンド処理エラー:', error);
       
       const errorMessage = error instanceof ActivityLogError 
         ? `❌ ${error.message}`
@@ -159,9 +160,9 @@ export class TimezoneHandler implements ITimezoneHandler {
       
       await message.reply(response);
       
-      console.log(`🌍 タイムゾーン情報表示完了: ${userId}`);
+      logger.debug('HANDLER', `🌍 タイムゾーン情報表示完了: ${userId}`);
     } catch (error) {
-      console.error('❌ タイムゾーン表示エラー:', error);
+      logger.error('HANDLER', '❌ タイムゾーン表示エラー:', error);
       throw new ActivityLogError('タイムゾーン情報の表示に失敗しました', 'SHOW_TIMEZONE_ERROR', { error });
     }
   }
@@ -171,7 +172,7 @@ export class TimezoneHandler implements ITimezoneHandler {
    */
   private async searchTimezone(message: Message, query: string): Promise<void> {
     try {
-      console.log(`🔍 タイムゾーン検索: "${query}"`);
+      logger.debug('HANDLER', `🔍 タイムゾーン検索: "${query}"`);
       
       const results = this.searchTimezones(query);
       
@@ -193,9 +194,9 @@ export class TimezoneHandler implements ITimezoneHandler {
       
       await message.reply(response);
       
-      console.log(`🔍 タイムゾーン検索完了: ${query} - ${results.length}件ヒット`);
+      logger.debug('HANDLER', `🔍 タイムゾーン検索完了: ${query} - ${results.length}件ヒット`);
     } catch (error) {
-      console.error('❌ タイムゾーン検索エラー:', error);
+      logger.error('HANDLER', '❌ タイムゾーン検索エラー:', error);
       throw new ActivityLogError('タイムゾーンの検索に失敗しました', 'SEARCH_TIMEZONE_ERROR', { error });
     }
   }
@@ -205,7 +206,7 @@ export class TimezoneHandler implements ITimezoneHandler {
    */
   private async setTimezone(message: Message, userId: string, timezone: string): Promise<void> {
     try {
-      console.log(`⚙️ タイムゾーン設定: ${userId} -> ${timezone}`);
+      logger.debug('HANDLER', `⚙️ タイムゾーン設定: ${userId} -> ${timezone}`);
       
       // タイムゾーンの妥当性を検証
       if (!this.isValidTimezone(timezone)) {
@@ -225,9 +226,9 @@ export class TimezoneHandler implements ITimezoneHandler {
       if (this.onTimezoneChanged) {
         try {
           await this.onTimezoneChanged(userId, oldTimezone, timezone);
-          console.log(`📅 動的スケジューラーに通知: ${userId} ${oldTimezone} -> ${timezone}`);
+          logger.debug('HANDLER', `📅 動的スケジューラーに通知: ${userId} ${oldTimezone} -> ${timezone}`);
         } catch (error) {
-          console.warn(`⚠️ 動的スケジューラーへの通知に失敗: ${error}`);
+          logger.warn('HANDLER', `⚠️ 動的スケジューラーへの通知に失敗: ${error}`);
         }
       }
       
@@ -252,9 +253,9 @@ export class TimezoneHandler implements ITimezoneHandler {
                          `• 今後の記録も新しいタイムゾーンで処理されます\n\n` +
                          `🔄 設定変更は即座に反映され、Botの再起動は不要です。`);
       
-      console.log(`⚙️ タイムゾーン設定完了: ${userId} -> ${timezone}`);
+      logger.debug('HANDLER', `⚙️ タイムゾーン設定完了: ${userId} -> ${timezone}`);
     } catch (error) {
-      console.error('❌ タイムゾーン設定エラー:', error);
+      logger.error('HANDLER', '❌ タイムゾーン設定エラー:', error);
       throw new ActivityLogError('タイムゾーンの設定に失敗しました', 'SET_TIMEZONE_ERROR', { error });
     }
   }

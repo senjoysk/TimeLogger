@@ -7,6 +7,7 @@ import { IGeminiApiClient } from './geminiApiClient';
 import { ApiCostMonitor } from '../apiCostMonitor';
 import { ClassificationResult } from '../../types/todo';
 import { AppError, ErrorType } from '../../utils/errorHandler';
+import { logger } from '../../utils/logger';
 
 /**
  * リマインダーコンテキストサービスインターフェース
@@ -78,20 +79,20 @@ export class ReminderContextService implements IReminderContextService {
     const prompt = this.buildReminderContextPrompt(messageContent, timeRange, reminderTime, reminderContent);
     
     // プロンプトのログ出力
-    console.log('📤 [Gemini API] リマインダーReply分析プロンプト:');
-    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-    console.log(prompt);
-    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    logger.debug('REMINDER_CONTEXT', '📤 [Gemini API] リマインダーReply分析プロンプト:');
+    logger.debug('REMINDER_CONTEXT', '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    logger.debug('REMINDER_CONTEXT', prompt);
+    logger.debug('REMINDER_CONTEXT', '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
     
     try {
       const result = await this.geminiClient.generateContent(prompt);
       const responseText = result.response.text();
       
       // レスポンスのログ出力
-      console.log('📥 [Gemini API] リマインダーReply分析レスポンス:');
-      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-      console.log(responseText);
-      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      logger.debug('REMINDER_CONTEXT', '📥 [Gemini API] リマインダーReply分析レスポンス:');
+      logger.debug('REMINDER_CONTEXT', '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      logger.debug('REMINDER_CONTEXT', responseText);
+      logger.debug('REMINDER_CONTEXT', '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
       
       // トークン使用量の記録
       const inputTokens = this.geminiClient.estimateTokens(prompt);
@@ -107,7 +108,7 @@ export class ReminderContextService implements IReminderContextService {
         analysis: `${analysis.analysis} (時間範囲: ${this.formatTimeRange(timeRange)})`
       };
     } catch (error) {
-      console.error('❌ リマインダーコンテキスト分析エラー:', error);
+      logger.error('REMINDER_CONTEXT', '❌ リマインダーコンテキスト分析エラー:', error as Error);
       throw new AppError(
         'リマインダーコンテキスト分析に失敗しました',
         ErrorType.API,
@@ -127,20 +128,20 @@ export class ReminderContextService implements IReminderContextService {
     const prompt = this.buildNearbyReminderContextPrompt(messageContent, reminderTime, timeDiff);
     
     // プロンプトのログ出力
-    console.log('📤 [Gemini API] リマインダー直後メッセージ分析プロンプト:');
-    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-    console.log(prompt);
-    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    logger.debug('REMINDER_CONTEXT', '📤 [Gemini API] リマインダー直後メッセージ分析プロンプト:');
+    logger.debug('REMINDER_CONTEXT', '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    logger.debug('REMINDER_CONTEXT', prompt);
+    logger.debug('REMINDER_CONTEXT', '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
     
     try {
       const result = await this.geminiClient.generateContent(prompt);
       const responseText = result.response.text();
       
       // レスポンスのログ出力
-      console.log('📥 [Gemini API] リマインダー直後メッセージ分析レスポンス:');
-      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-      console.log(responseText);
-      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      logger.debug('REMINDER_CONTEXT', '📥 [Gemini API] リマインダー直後メッセージ分析レスポンス:');
+      logger.debug('REMINDER_CONTEXT', '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      logger.debug('REMINDER_CONTEXT', responseText);
+      logger.debug('REMINDER_CONTEXT', '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
       
       // トークン使用量の記録
       const inputTokens = this.geminiClient.estimateTokens(prompt);
@@ -156,7 +157,7 @@ export class ReminderContextService implements IReminderContextService {
         analysis: `${analysis.analysis} (リマインダー${timeDiff}分後の投稿)`
       };
     } catch (error) {
-      console.error('❌ リマインダー近接分析エラー:', error);
+      logger.error('REMINDER_CONTEXT', '❌ リマインダー近接分析エラー:', error as Error);
       throw new AppError(
         'リマインダー近接分析に失敗しました',
         ErrorType.API,
@@ -273,8 +274,8 @@ JSON形式のみで回答してください。
       };
 
     } catch (error) {
-      console.error('分類レスポンスのパースエラー:', error);
-      console.log('元のレスポンス:', response);
+      logger.error('REMINDER_CONTEXT', '分類レスポンスのパースエラー:', error as Error);
+      logger.debug('REMINDER_CONTEXT', '元のレスポンス:', { response });
       
       // パースエラー時はデフォルト値を返す
       return {

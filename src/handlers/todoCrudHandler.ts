@@ -7,6 +7,7 @@
 import { Message, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } from 'discord.js';
 import { ITodoRepository } from '../repositories/interfaces';
 import { CreateTodoRequest, Todo, TodoCommandType } from '../types/todo';
+import { logger } from '../utils/logger';
 import { createTodoListEmbed, createPaginatedEmbed, createTodoActionButtons } from '../components/classificationResultEmbed';
 import { ActivityLogError } from '../types/activityLog';
 
@@ -48,7 +49,7 @@ export class TodoCrudHandler implements ITodoCrudHandler {
    */
   async handleCommand(message: Message, userId: string, args: string[], timezone: string): Promise<void> {
     try {
-      console.log(`📋 TODO CRUDコマンド処理開始: ${userId} ${args.join(' ')}`);
+      logger.debug('HANDLER', `📋 TODO CRUDコマンド処理開始: ${userId} ${args.join(' ')}`);
 
       const parsedCommand = this.parseCommand(args);
       
@@ -90,7 +91,7 @@ export class TodoCrudHandler implements ITodoCrudHandler {
           await this.showHelp(message);
       }
     } catch (error) {
-      console.error('❌ TODO CRUDコマンド処理エラー:', error);
+      logger.error('HANDLER', '❌ TODO CRUDコマンド処理エラー:', error);
       
       const errorMessage = error instanceof ActivityLogError 
         ? `❌ ${error.message}`
@@ -171,7 +172,7 @@ export class TodoCrudHandler implements ITodoCrudHandler {
     const todo = await this.todoRepository.createTodo(request);
     
     await message.reply(`✅ TODO「${todo.content}」を追加しました！`);
-    console.log(`➕ TODO追加: ${userId} "${todo.content}"`);
+    logger.debug('HANDLER', `➕ TODO追加: ${userId} "${todo.content}"`);
   }
 
   /**
@@ -193,7 +194,7 @@ export class TodoCrudHandler implements ITodoCrudHandler {
     await this.todoRepository.updateTodoStatus(todo.id, 'completed');
     
     await message.reply(`🎉 TODO「${todo.content}」を完了しました！`);
-    console.log(`✅ TODO完了: ${userId} "${todo.content}"`);
+    logger.debug('HANDLER', `✅ TODO完了: ${userId} "${todo.content}"`);
   }
 
   /**
@@ -216,7 +217,7 @@ export class TodoCrudHandler implements ITodoCrudHandler {
     await this.todoRepository.updateTodo(todo.id, { content: newContent });
     
     await message.reply(`✏️ TODO「${oldContent}」を「${newContent}」に編集しました！`);
-    console.log(`✏️ TODO編集: ${userId} "${todo.content}" -> "${newContent}"`);
+    logger.debug('HANDLER', `✏️ TODO編集: ${userId} "${todo.content}" -> "${newContent}"`);
   }
 
   /**
@@ -238,7 +239,7 @@ export class TodoCrudHandler implements ITodoCrudHandler {
     await this.todoRepository.deleteTodo(todo.id);
     
     await message.reply(`🗑️ TODO「${todo.content}」を削除しました。`);
-    console.log(`🗑️ TODO削除: ${userId} "${todo.content}"`);
+    logger.debug('HANDLER', `🗑️ TODO削除: ${userId} "${todo.content}"`);
   }
 
   /**

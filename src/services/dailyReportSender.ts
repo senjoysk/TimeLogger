@@ -7,6 +7,7 @@
 import { ActivityLoggingIntegration } from '../integration/activityLoggingIntegration';
 import { TaskLoggerBot } from '../bot';
 import { ActivityLogError } from '../types/activityLog';
+import { logger } from '../utils/logger';
 
 export class DailyReportSender {
   constructor(
@@ -19,7 +20,7 @@ export class DailyReportSender {
    */
   async sendDailyReport(userId: string, timezone: string): Promise<void> {
     try {
-      console.log(`📊 Generating daily report for user ${userId} (${timezone})`);
+      logger.info('DAILY_REPORT_SENDER', `日次レポート生成中: ユーザー ${userId} (${timezone})`);
       
       // ActivityLoggingIntegrationで日次サマリーを生成
       const summaryText = await this.integration.generateDailySummaryText(userId, timezone);
@@ -27,9 +28,9 @@ export class DailyReportSender {
       // Discord DMで送信
       await this.bot.sendDirectMessage(userId, summaryText);
       
-      console.log(`✅ Daily report sent to user ${userId} (${timezone})`);
+      logger.success('DAILY_REPORT_SENDER', `日次レポート送信完了: ユーザー ${userId} (${timezone})`);
     } catch (error) {
-      console.error(`❌ Failed to send daily report to user ${userId}:`, error);
+      logger.error('DAILY_REPORT_SENDER', `日次レポート送信失敗: ユーザー ${userId}`, error as Error);
       throw new ActivityLogError(
         '日次レポートの送信に失敗しました',
         'DAILY_REPORT_SEND_ERROR',

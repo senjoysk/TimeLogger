@@ -15,6 +15,7 @@ import {
   StatusTransition
 } from '../types/integratedSummary';
 import { IUnifiedAnalysisService } from './unifiedAnalysisService';
+import { logger } from '../utils/logger';
 
 /**
  * 統合サマリーサービスインターフェース
@@ -55,7 +56,7 @@ export class IntegratedSummaryService implements IIntegratedSummaryService {
     timezone: string
   ): Promise<IntegratedSummaryResult> {
     try {
-      console.log(`📊 統合サマリー生成開始: ${userId} ${businessDate}`);
+      logger.info('INTEGRATED_SUMMARY_SERVICE', `統合サマリー生成開始: ${userId} ${businessDate}`);
 
       // 📊 STEP 1: 全体最適化 - 必要なデータを一括取得（DB アクセス最小化）
       const [activities, todos] = await Promise.all([
@@ -63,7 +64,7 @@ export class IntegratedSummaryService implements IIntegratedSummaryService {
         this.repository.getTodosByUserId(userId)
       ]);
 
-      console.log(`🚀 データ一括取得完了: 活動ログ${activities.length}件、TODO${todos.length}件`);
+      logger.debug('INTEGRATED_SUMMARY_SERVICE', `データ一括取得完了: 活動ログ${activities.length}件、TODO${todos.length}件`);
 
       // 📊 STEP 2: 基本的なサマリーを生成
       const [
@@ -81,11 +82,11 @@ export class IntegratedSummaryService implements IIntegratedSummaryService {
         generatedAt: new Date().toISOString()
       };
 
-      console.log(`✅ 統合サマリー生成完了: ${userId} ${businessDate}`);
+      logger.success('INTEGRATED_SUMMARY_SERVICE', `統合サマリー生成完了: ${userId} ${businessDate}`);
       return result;
 
     } catch (error) {
-      console.error('❌ 統合サマリー生成エラー:', error);
+      logger.error('INTEGRATED_SUMMARY_SERVICE', '統合サマリー生成エラー', error as Error);
       throw error;
     }
   }

@@ -4,6 +4,7 @@ import { EnhancedScheduler } from './enhancedScheduler';
 import { DynamicReportScheduler } from './services/dynamicReportScheduler';
 import { TimezoneChangeMonitor } from './services/timezoneChangeMonitor';
 import { IntegratedServer } from './server';
+import { logger } from './utils/logger';
 
 /**
  * アプリケーションのメインエントリーポイント
@@ -30,35 +31,33 @@ class Application {
    */
   public async start(): Promise<void> {
     try {
-      console.log('🚀 Discord Task Logger を起動しています...\n');
+      logger.info('APP', 'Discord Task Logger を起動しています...');
       
       // 設定の検証
       validateConfig();
-      console.log('');
       
       // Discord Bot の起動
       await this.bot.start();
-      console.log('');
       
       // システム初期化の完了を待つ
-      console.log('⏳ システム初期化の完了を待機中...');
+      logger.info('APP', 'システム初期化の完了を待機中...');
       await this.bot.waitForSystemInitialization();
       
       // 統合HTTPサーバーの起動（Admin Web App + Health Check）
       if (process.env.ADMIN_USERNAME && process.env.ADMIN_PASSWORD) {
-        console.log('🌐 統合HTTPサーバーを起動中...');
+        logger.info('APP', '統合HTTPサーバーを起動中...');
         const databasePath = process.env.DATABASE_PATH || './data/app.db';
         this.integratedServer = new IntegratedServer(databasePath, this.bot as unknown as import('./interfaces/dependencies').IDiscordBot);
         await this.integratedServer.start();
       } else {
-        console.log('ℹ️ ADMIN_USERNAME/ADMIN_PASSWORD未設定のため、Web管理アプリは起動しません');
+        logger.info('APP', 'ADMIN_USERNAME/ADMIN_PASSWORD未設定のため、Web管理アプリは起動しません');
       }
       
       // スケジューラーの初期化（活動記録システム初期化完了後）
-      console.log('📅 スケジューラーを初期化中...');
+      logger.info('APP', 'スケジューラーを初期化中...');
       const repository = this.bot.getRepository();
       if (!repository) {
-        console.error('❌ リポジトリが取得できないため、スケジューラーの初期化をスキップします');
+        logger.error('APP', 'リポジトリが取得できないため、スケジューラーの初期化をスキップします');
         return;
       }
       // スケジューラーと動的コンポーネントを初期化
@@ -72,7 +71,7 @@ class Application {
       
       // 18:30レポート送信機能を設定
       this.scheduler.setReportSender(async (userId: string, timezone: string) => {
-        console.log(`📊 ${timezone}の18:30になりました - ユーザー ${userId} に日次レポートを送信中...`);
+        logger.info('SCHEDULER', `${timezone}の18:30になりました - ユーザー ${userId} に日次レポートを送信中...`);
         await this.bot.sendDailySummaryForUser(userId);
       });
       
@@ -83,24 +82,24 @@ class Application {
       
       // スケジューラーの開始
       await this.scheduler.start();
-      console.log('');
       
       
-      console.log('🎉 Discord Task Logger が正常に起動しました！');
+      logger.success('APP', 'Discord Task Logger が正常に起動しました！');
       
       // 動的スケジューラーの状態を表示
       const status = this.scheduler.getComprehensiveStatus();
-      console.log('📈 スケジューラー状態:');
-      console.log(`  - 静的スケジュール: ${status.staticSchedules.length}個`);
-      console.log(`  - 動的スケジュール: ${status.dynamicSchedules.activeJobCount}個のcronジョブ`);
-      console.log(`  - タイムゾーン監視: ${status.timezoneMonitoring.isRunning ? '有効' : '無効'}`);
-      console.log('📝 タスクの記録を開始します...\n');
+      logger.info('APP', 'スケジューラー状態', {
+        静的スケジュール: status.staticSchedules.length,
+        動的スケジュール: status.dynamicSchedules.activeJobCount,
+        タイムゾーン監視: status.timezoneMonitoring.isRunning ? '有効' : '無効'
+      });
+      logger.info('APP', 'タスクの記録を開始します...');
       
       // 終了処理の設定
       this.setupGracefulShutdown();
       
     } catch (error) {
-      console.error('❌ アプリケーションの起動に失敗しました:', error);
+      logger.error('APP', 'アプリケーションの起動に失敗しました', error);
       process.exit(1);
     }
   }
@@ -110,26 +109,26 @@ class Application {
    */
   public async stop(): Promise<void> {
     try {
-      console.log('\n🛑 Discord Task Logger を停止しています...');
+      logger.info('APP', 'Discord Task Logger を停止しています...');
       
       // スケジューラーの停止
       this.scheduler.stop();
       
       // 動的スケジューラーの統計を表示
       const metrics = this.scheduler.getPerformanceMetrics();
-      console.log(`📊 送信統計: ${metrics.totalReportsSent}件のレポートを送信`);
-      if (Object.keys(metrics.timezoneDistribution).length > 0) {
-        console.log('🌍 タイムゾーン分布:', metrics.timezoneDistribution);
-      }
+      logger.info('APP', '送信統計', {
+        totalReportsSent: metrics.totalReportsSent,
+        timezoneDistribution: Object.keys(metrics.timezoneDistribution).length > 0 ? metrics.timezoneDistribution : undefined
+      });
       
       
       // Discord Bot の停止
       await this.bot.stop();
       
-      console.log('✅ Discord Task Logger が正常に停止しました');
+      logger.success('APP', 'Discord Task Logger が正常に停止しました');
       
     } catch (error) {
-      console.error('❌ アプリケーションの停止中にエラーが発生しました:', error);
+      logger.error('APP', 'アプリケーションの停止中にエラーが発生しました', error);
     }
   }
 
@@ -143,7 +142,7 @@ class Application {
     
     signals.forEach(signal => {
       process.on(signal, async () => {
-        console.log(`\n📡 ${signal} シグナルを受信しました`);
+        logger.info('APP', `${signal} シグナルを受信しました`);
         await this.stop();
         process.exit(0);
       });
@@ -151,12 +150,11 @@ class Application {
 
     // 未捕捉エラーの処理
     process.on('unhandledRejection', (reason, promise) => {
-      console.error('❌ 未処理のPromise拒否:', reason);
-      console.error('Promise:', promise);
+      logger.error('APP', '未処理のPromise拒否', reason, { promise: String(promise) });
     });
 
     process.on('uncaughtException', (error) => {
-      console.error('❌ 未捕捉の例外:', error);
+      logger.error('APP', '未捕捉の例外', error);
       this.stop().finally(() => {
         process.exit(1);
       });
@@ -168,6 +166,6 @@ class Application {
 // アプリケーションの実行
 const app = new Application();
 app.start().catch((error) => {
-  console.error('❌ アプリケーション起動エラー:', error);
+  logger.error('APP', 'アプリケーション起動エラー', error);
   process.exit(1);
 });

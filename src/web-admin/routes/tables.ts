@@ -3,6 +3,7 @@
  */
 
 import { Router } from 'express';
+import { logger } from '../../utils/logger';
 import { AdminService } from '../services/adminService';
 import { IAdminService } from '../interfaces/adminInterfaces';
 import { SecurityService, ISecurityService } from '../services/securityService';
@@ -25,7 +26,7 @@ export function createTableRoutes(adminService: IAdminService, securityService: 
         adminTimezone: res.locals.adminTimezone
       });
     } catch (error) {
-      console.error('Table list error:', error);
+      logger.error('WEB_ADMIN', 'Table list error:', error);
       res.status(500).render('error', {
         title: 'Error',
         message: 'テーブル一覧の読み込みに失敗しました',
@@ -92,7 +93,7 @@ export function createTableRoutes(adminService: IAdminService, securityService: 
         }
       });
     } catch (error) {
-      console.error('Table detail error:', error);
+      logger.error('WEB_ADMIN', 'Table detail error:', error);
       res.status(500).render('error', {
         title: 'Error',
         message: 'テーブル詳細の読み込みに失敗しました',

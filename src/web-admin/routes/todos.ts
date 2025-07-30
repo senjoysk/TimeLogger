@@ -3,6 +3,7 @@
  * Phase 2: TODO CRUD機能のUI実装
  */
 
+import { logger } from '../../utils/logger';
 import { Router } from 'express';
 import { TodoManagementService, BulkCreateTodoRequest } from '../services/todoManagementService';
 import { SecurityService, ISecurityService } from '../services/securityService';
@@ -54,14 +55,14 @@ router.get('/', async (req, res, next) => {
           const userTodos = await todoService.getTodosByUser(user.userId, {}, { page, limit });
           todos.push(...userTodos);
         } catch (error) {
-          console.error(`[ERROR] Failed to get todos for user ${user.userId}:`, error);
+          logger.error('WEB_ADMIN', `[ERROR] Failed to get todos for user ${user.userId}:`, error);
         }
       }
     } else if (userId !== 'all') {
       try {
         todos = await todoService.getTodosByUser(userId, {}, { page, limit });
       } catch (error) {
-        console.error(`[ERROR] Failed to get todos for user ${userId}:`, error);
+        logger.error('WEB_ADMIN', `[ERROR] Failed to get todos for user ${userId}:`, error);
       }
     }
     
@@ -71,7 +72,7 @@ router.get('/', async (req, res, next) => {
     try {
       overdueTodos = await todoService.getOverdueTodos();
     } catch (error) {
-      console.error(`[ERROR] Failed to get overdue todos:`, error);
+      logger.error('WEB_ADMIN', `[ERROR] Failed to get overdue todos:`, error);
     }
 
     res.render('todo-dashboard', {
@@ -275,7 +276,7 @@ router.post('/bulk/status', async (req, res, next) => {
 
     res.json({ success: true, updatedCount });
   } catch (error) {
-    console.error('一括ステータス更新エラー:', error);
+    logger.error('WEB_ADMIN', '一括ステータス更新エラー:', error);
     res.status(500).json({ error: error instanceof Error ? error.message : '一括ステータス更新に失敗しました' });
   }
 });
@@ -306,7 +307,7 @@ router.post('/bulk/delete', async (req, res, next) => {
 
     res.json({ success: true, deletedCount });
   } catch (error) {
-    console.error('一括削除エラー:', error);
+    logger.error('WEB_ADMIN', '一括削除エラー:', error);
     res.status(500).json({ error: error instanceof Error ? error.message : '一括削除に失敗しました' });
   }
 });

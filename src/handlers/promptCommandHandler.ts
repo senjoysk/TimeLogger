@@ -10,6 +10,7 @@ import {
   ActivityPromptError,
   ACTIVITY_PROMPT_VALIDATION
 } from '../types/activityPrompt';
+import { logger } from '../utils/logger';
 
 /**
  * 活動促し通知コマンドハンドラーインターフェース
@@ -32,7 +33,7 @@ export class PromptCommandHandler implements IPromptCommandHandler {
    */
   async handleCommand(message: Message, args: string[], userId: string, timezone: string): Promise<void> {
     try {
-      console.log(`📢 活動促しコマンド処理開始: ${userId} ${args.join(' ')}`);
+      logger.debug('HANDLER', `📢 活動促しコマンド処理開始: ${userId} ${args.join(' ')}`);
 
       if (args.length === 0) {
         await this.showHelp(message);
@@ -72,7 +73,7 @@ export class PromptCommandHandler implements IPromptCommandHandler {
       }
 
     } catch (error) {
-      console.error('❌ 活動促しコマンド処理エラー:', error);
+      logger.error('HANDLER', '❌ 活動促しコマンド処理エラー:', error);
       
       if (error instanceof ActivityPromptError) {
         await message.reply(`❌ ${error.message}`);
@@ -106,7 +107,7 @@ export class PromptCommandHandler implements IPromptCommandHandler {
       await message.reply('✅ 活動促し通知を有効にしました！');
     }
 
-    console.log(`✅ 活動促し有効化完了: ${userId}`);
+    logger.debug('HANDLER', `✅ 活動促し有効化完了: ${userId}`);
   }
 
   /**
@@ -123,7 +124,7 @@ export class PromptCommandHandler implements IPromptCommandHandler {
     await this.repository.disablePrompt(userId);
     await message.reply('❌ 活動促し通知を無効にしました。');
     
-    console.log(`❌ 活動促し無効化完了: ${userId}`);
+    logger.debug('HANDLER', `❌ 活動促し無効化完了: ${userId}`);
   }
 
   /**
@@ -184,7 +185,7 @@ export class PromptCommandHandler implements IPromptCommandHandler {
       `📅 新しい時間: ${this.formatTime(startTime.hour, startTime.minute)} - ${this.formatTime(endTime.hour, endTime.minute)}`
     );
 
-    console.log(`⏰ 通知時間設定完了: ${userId} ${this.formatTime(startTime.hour, startTime.minute)}-${this.formatTime(endTime.hour, endTime.minute)}`);
+    logger.debug('HANDLER', `⏰ 通知時間設定完了: ${userId} ${this.formatTime(startTime.hour, startTime.minute)}-${this.formatTime(endTime.hour, endTime.minute)}`);
   }
 
   /**

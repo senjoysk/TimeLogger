@@ -1066,3 +1066,37 @@ logger.success('SYNC', '同期完了', { records: 100 });
 - [ ] エラーコンテキスト情報を適切に含める
 - [ ] 適切なエラータイプを選択
 - [ ] ユーザー向けメッセージとログメッセージを区別
+
+## 🚨 ログ使用規約（Issue #57対応）
+
+### console.log/console.error の使用禁止
+
+すべてのログ出力は統一されたLoggerサービスを使用してください。
+
+```typescript
+// ❌ 悪い例: console直接使用
+console.log('メッセージ');
+console.error('エラー');
+
+// ✅ 良い例: Loggerサービス使用
+import { logger } from '../utils/logger';
+logger.info('COMPONENT', 'メッセージ');
+logger.error('COMPONENT', 'エラー', error);
+```
+
+### ログ使用の基本ルール
+
+1. **必ず**Loggerサービスをインポートして使用
+2. **絶対に**console.log/error/warn/infoを直接使わない
+3. **常に**適切なログレベル（debug/info/warn/error/success）を選択
+4. **必ず**コンポーネント名（operation）を指定
+5. **推奨**構造化されたデータを第3引数に渡す
+
+詳細は `/docs/logging-guideline.md` を参照してください。
+
+### Pre-commitフックでの自動チェック
+
+コミット時に自動的にconsole使用が検出され、エラーとなります：
+```bash
+./scripts/code-review/console-usage-check.sh
+```

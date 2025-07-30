@@ -14,6 +14,7 @@ import {
   WarningLevel,
   ActivityLogError
 } from '../../types/activityLog';
+import { logger } from '../../utils/logger';
 
 /**
  * レスポンスプロセッサーインターフェース
@@ -43,7 +44,7 @@ export class GeminiResponseProcessor implements IGeminiResponseProcessor {
       
       // 不完全なJSONの修復を試行
       if (!jsonText.trim().endsWith('}')) {
-        console.log('🔧 不完全なJSONの修復を試行...');
+        logger.debug('GEMINI_RESPONSE', '🔧 不完全なJSONの修復を試行...');
         jsonText = this.repairIncompleteJson(jsonText);
       }
       
@@ -51,7 +52,7 @@ export class GeminiResponseProcessor implements IGeminiResponseProcessor {
       
       return this.validateAndNormalizeResponse(parsed);
     } catch (error) {
-      console.error('❌ Geminiレスポンスパースエラー:', error);
+      logger.error('GEMINI_RESPONSE', '❌ Geminiレスポンスパースエラー:', error as Error);
       throw new ActivityLogError('分析結果の解析に失敗しました', 'PARSE_RESPONSE_ERROR', { error, responseText });
     }
   }
@@ -100,11 +101,11 @@ export class GeminiResponseProcessor implements IGeminiResponseProcessor {
       repaired += ']'.repeat(openBrackets);
       repaired += '}'.repeat(openBraces);
       
-      console.log(`🔧 JSON修復完了: ${repaired.length}文字`);
+      logger.debug('GEMINI_RESPONSE', `🔧 JSON修復完了: ${repaired.length}文字`);
       return repaired;
       
     } catch (error) {
-      console.error('❌ JSON修復失敗:', error);
+      logger.error('GEMINI_RESPONSE', '❌ JSON修復失敗:', error as Error);
       // 修復できない場合は最小限の有効なJSONを返す
       return this.getMinimumValidJson();
     }
@@ -257,7 +258,7 @@ export class GeminiResponseProcessor implements IGeminiResponseProcessor {
       new Date(str).toISOString();
       return str;
     } catch (error) {
-      console.warn(`⚠️ 無効な日時文字列: ${str}`);
+      logger.warn('GEMINI_RESPONSE', `⚠️ 無効な日時文字列: ${str}`);
       return '';
     }
   }

@@ -2,6 +2,7 @@ import { config } from '../config';
 import { IApiCostRepository } from '../repositories/interfaces';
 import { getCurrentBusinessDate } from '../utils/timeUtils';
 import { CostAlert } from '../types/costAlert';
+import { logger } from '../utils/logger';
 
 /**
  * Gemini API使用量とコスト監視サービス
@@ -29,11 +30,11 @@ export class ApiCostMonitor {
     await this.repository.recordApiCall(operation, inputTokens, outputTokens);
 
     const cost = this.calculateCost(inputTokens, outputTokens);
-    console.log(`💰 [API COST] ${operation}: ${inputTokens}入力+${outputTokens}出力トークン, $${cost.toFixed(6)}`);
+    logger.info('API_COST_MONITOR', `${operation}: ${inputTokens}入力+${outputTokens}出力トークン, $${cost.toFixed(6)}`);
     
     // 累積情報も出力
     const todayStats = await this.getTodayStats();
-    console.log(`📊 [TODAY TOTAL] ${todayStats.totalCalls}回呼び出し, 推定$${todayStats.estimatedCost.toFixed(4)}`);
+    logger.info('API_COST_MONITOR', `本日合計: ${todayStats.totalCalls}回呼び出し, 推定$${todayStats.estimatedCost.toFixed(4)}`);
   }
 
   /**

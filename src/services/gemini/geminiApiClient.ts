@@ -5,6 +5,7 @@
 
 import { GoogleGenerativeAI, GenerativeModel, GenerateContentResult } from '@google/generative-ai';
 import { config } from '../../config';
+import { logger } from '../../utils/logger';
 
 /**
  * Gemini API クライアントインターフェース
@@ -46,7 +47,7 @@ export class GeminiApiClient implements IGeminiApiClient {
       },
     });
 
-    console.log('✅ GeminiApiClient が初期化されました');
+    logger.info('GEMINI_API', '✅ GeminiApiClient が初期化されました');
   }
 
   /**

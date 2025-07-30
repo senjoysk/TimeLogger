@@ -16,6 +16,7 @@ import { createTimezoneMiddleware } from './middleware/timezoneMiddleware';
 import { createRoutes } from './routes';
 import { errorHandler } from './middleware/errorHandler';
 import { IDiscordBot } from '../interfaces/dependencies';
+import { logger } from '../utils/logger';
 
 export class AdminServer {
   private app: express.Application;
@@ -32,7 +33,7 @@ export class AdminServer {
     
     // サービスの初期化
     this.sqliteRepo = new PartialCompositeRepository(databasePath);
-    console.log(`[AdminServer] Repository created for: ${databasePath}`);
+    logger.info('WEB_ADMIN', `[AdminServer] Repository created for: ${databasePath}`);
     const adminRepo = new AdminRepository(this.sqliteRepo);
     this.adminService = new AdminService(adminRepo);
     this.securityService = new SecurityService();
@@ -53,9 +54,9 @@ export class AdminServer {
       } else {
         await this.sqliteRepo.initializeDatabase();
       }
-      console.log('✅ AdminServer: データベース初期化完了');
+      logger.info('WEB_ADMIN', '✅ AdminServer: データベース初期化完了');
     } catch (error) {
-      console.error('❌ AdminServer: データベース初期化エラー:', error);
+      logger.error('WEB_ADMIN', '❌ AdminServer: データベース初期化エラー:', error as Error);
       throw error;
     }
   }
@@ -67,7 +68,7 @@ export class AdminServer {
         try {
           return this.securityService.validateAuth(username, password);
         } catch (error) {
-          console.error('Authentication configuration error:', error);
+          logger.error('WEB_ADMIN', 'Authentication configuration error:', error as Error);
           return false;
         }
       },

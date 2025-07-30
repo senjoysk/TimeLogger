@@ -2,6 +2,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { Database } from 'sqlite3';
 import { ActivityLogError } from '../types/activityLog';
+import { logger } from '../utils/logger';
 import { DATABASE_PATHS } from './simplePathConfig';
 
 /**
@@ -28,10 +29,10 @@ export class BackupManager {
     try {
       if (!fs.existsSync(this.backupDir)) {
         fs.mkdirSync(this.backupDir, { recursive: true });
-        console.log(`📁 バックアップディレクトリを作成しました: ${this.backupDir}`);
+        logger.info('BACKUP', `📁 バックアップディレクトリを作成しました: ${this.backupDir}`);
       }
     } catch (error) {
-      console.warn(`⚠️ バックアップディレクトリの作成に失敗しました: ${this.backupDir}`, error);
+      logger.warn('BACKUP', 'バックアップディレクトリの作成に失敗しました', { backupDir: this.backupDir, error });
       // テスト環境などでディレクトリ作成権限がない場合はスキップ
     }
   }
@@ -48,19 +49,19 @@ export class BackupManager {
       const backupFileName = `timelogger_backup_${timestamp}_${reason}.db`;
       const backupPath = path.join(this.backupDir, backupFileName);
 
-      console.log(`💾 データベースバックアップを作成中... (${reason})`);
+      logger.info('BACKUP', `💾 データベースバックアップを作成中... (${reason})`);
       
       // SQLiteのBACKUP APIを使用（推奨方式）
       await this.executeBackupCommand(backupPath);
       
-      console.log(`✅ バックアップ作成完了: ${backupPath}`);
+      logger.info('BACKUP', `✅ バックアップ作成完了: ${backupPath}`);
       
       // 古いバックアップファイルのクリーンアップ
       await this.cleanupOldBackups();
       
       return backupPath;
     } catch (error) {
-      console.error('❌ バックアップ作成エラー:', error);
+      logger.error('BACKUP', '❌ バックアップ作成エラー:', error);
       throw new ActivityLogError('データベースバックアップの作成に失敗しました', 'BACKUP_ERROR', { error, reason });
     }
   }
@@ -111,12 +112,12 @@ export class BackupManager {
       const dbPath = this.getDatabasePath();
       if (dbPath && fs.existsSync(dbPath)) {
         fs.copyFileSync(dbPath, backupPath);
-        console.log(`📋 ファイルコピーでバックアップを作成しました: ${backupPath}`);
+        logger.info('BACKUP', `📋 ファイルコピーでバックアップを作成しました: ${backupPath}`);
       } else {
         throw new Error('データベースファイルが見つかりません');
       }
     } catch (error) {
-      console.error('❌ ファイルコピーバックアップエラー:', error);
+      logger.error('BACKUP', '❌ ファイルコピーバックアップエラー:', error);
       throw error;
     }
   }
@@ -128,7 +129,7 @@ export class BackupManager {
     try {
       return this.dbPath;
     } catch (error) {
-      console.warn('⚠️ データベースパスの取得に失敗しました');
+      logger.warn('BACKUP', '⚠️ データベースパスの取得に失敗しました');
       return null;
     }
   }
@@ -152,13 +153,13 @@ export class BackupManager {
         
         for (const file of filesToDelete) {
           fs.unlinkSync(file.path);
-          console.log(`🗑️ 古いバックアップファイルを削除: ${file.name}`);
+          logger.info('BACKUP', `🗑️ 古いバックアップファイルを削除: ${file.name}`);
         }
         
-        console.log(`✅ バックアップクリーンアップ完了 (${filesToDelete.length}件削除)`);
+        logger.info('BACKUP', `✅ バックアップクリーンアップ完了 (${filesToDelete.length}件削除)`);
       }
     } catch (error) {
-      console.error('⚠️ バックアップクリーンアップエラー:', error);
+      logger.error('BACKUP', '⚠️ バックアップクリーンアップエラー:', error);
       // クリーンアップエラーは致命的でないため、例外を投げない
     }
   }
@@ -184,7 +185,7 @@ export class BackupManager {
 
       return backupFiles;
     } catch (error) {
-      console.error('❌ バックアップ一覧取得エラー:', error);
+      logger.error('BACKUP', '❌ バックアップ一覧取得エラー:', error);
       return [];
     }
   }
@@ -198,7 +199,7 @@ export class BackupManager {
         throw new Error(`バックアップファイルが見つかりません: ${backupPath}`);
       }
 
-      console.log(`🔄 バックアップから復元中: ${backupPath}`);
+      logger.info('BACKUP', `🔄 バックアップから復元中: ${backupPath}`);
       
       // 現在のデータベースの緊急バックアップを作成
       await this.createBackup('pre_restore');
@@ -210,7 +211,7 @@ export class BackupManager {
       const currentDbPath = this.getDatabasePath();
       if (currentDbPath) {
         fs.copyFileSync(backupPath, currentDbPath);
-        console.log(`✅ データベース復元完了: ${currentDbPath}`);
+        logger.info('BACKUP', `✅ データベース復元完了: ${currentDbPath}`);
       } else {
         throw new Error('現在のデータベースパスが特定できません');
       }
@@ -218,9 +219,9 @@ export class BackupManager {
       // データベース接続を再開
       await this.reopenDatabase();
       
-      console.log('✅ バックアップからの復元が完了しました');
+      logger.info('BACKUP', '✅ バックアップからの復元が完了しました');
     } catch (error) {
-      console.error('❌ バックアップ復元エラー:', error);
+      logger.error('BACKUP', '❌ バックアップ復元エラー:', error);
       throw new ActivityLogError('バックアップからの復元に失敗しました', 'RESTORE_ERROR', { error, backupPath });
     }
   }
@@ -245,7 +246,7 @@ export class BackupManager {
    */
   private async reopenDatabase(): Promise<void> {
     // 注意: 実際の実装では、Repository側でデータベース接続を再作成する必要がある
-    console.log('⚠️ データベース接続の再開は、Repository側で実装する必要があります');
+    logger.info('BACKUP', '⚠️ データベース接続の再開は、Repository側で実装する必要があります');
   }
 
   /**
@@ -260,7 +261,7 @@ export class BackupManager {
       // バックアップファイルの基本チェック
       const stats = fs.statSync(backupPath);
       if (stats.size === 0) {
-        console.error('❌ バックアップファイルが空です');
+        logger.error('BACKUP', '❌ バックアップファイルが空です');
         return false;
       }
 
@@ -271,16 +272,16 @@ export class BackupManager {
         testDb.get('SELECT COUNT(*) as count FROM sqlite_master', (err, row) => {
           testDb.close();
           if (err) {
-            console.error('❌ バックアップファイルの整合性チェックエラー:', err);
+            logger.error('BACKUP', '❌ バックアップファイルの整合性チェックエラー:', err);
             resolve(false);
           } else {
-            console.log('✅ バックアップファイルの整合性チェック完了');
+            logger.info('BACKUP', '✅ バックアップファイルの整合性チェック完了');
             resolve(true);
           }
         });
       });
     } catch (error) {
-      console.error('❌ バックアップ検証エラー:', error);
+      logger.error('BACKUP', '❌ バックアップ検証エラー:', error);
       return false;
     }
   }

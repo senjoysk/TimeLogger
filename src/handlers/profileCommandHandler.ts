@@ -2,6 +2,7 @@ import { Message } from 'discord.js';
 import { IUserRepository } from '../repositories/interfaces';
 import { UserProfile, ProfileDisplayOptions, DEFAULT_PROFILE_OPTIONS, UserActivityStats } from '../types/userProfile';
 import { withErrorHandling, AppError, ErrorType } from '../utils/errorHandler';
+import { logger } from '../utils/logger';
 
 /**
  * プロファイル表示コマンドハンドラー
@@ -18,7 +19,7 @@ export class ProfileCommandHandler {
    */
   async handle(message: Message, userId: string, args: string[], timezone: string): Promise<void> {
     await withErrorHandling(async () => {
-      console.log(`📊 プロファイル表示要求: ${userId}, オプション: [${args.join(', ')}]`);
+      logger.debug('HANDLER', `📊 プロファイル表示要求: ${userId}, オプション: [${args.join(', ')}]`);
       
       // オプション解析
       const options = this.parseOptions(args);
@@ -55,7 +56,7 @@ export class ProfileCommandHandler {
       const profileText = this.formatProfile(profile, options);
       await message.reply(profileText);
       
-      console.log(`✅ プロファイル表示完了: ${userId}`);
+      logger.debug('HANDLER', `✅ プロファイル表示完了: ${userId}`);
       
     }, ErrorType.DISCORD, { userId });
   }
@@ -105,7 +106,7 @@ export class ProfileCommandHandler {
       
       return sections.join('\n');
     } catch (error) {
-      console.error('❌ プロファイル情報フォーマットエラー:', error);
+      logger.error('HANDLER', '❌ プロファイル情報フォーマットエラー:', error);
       return '❌ プロファイル情報の表示中にエラーが発生しました。';
     }
   }
@@ -138,7 +139,7 @@ export class ProfileCommandHandler {
     try {
       const date = new Date(dateString);
       if (isNaN(date.getTime())) {
-        console.warn('⚠️ 無効な日付文字列:', dateString);
+        logger.warn('HANDLER', '⚠️ 無効な日付文字列', { dateString });
         return '不明';
       }
       return date.toLocaleString('ja-JP', {
@@ -149,7 +150,7 @@ export class ProfileCommandHandler {
         minute: '2-digit'
       });
     } catch (error) {
-      console.error('❌ 日付フォーマットエラー:', error);
+      logger.error('HANDLER', '❌ 日付フォーマットエラー:', error);
       return '不明';
     }
   }

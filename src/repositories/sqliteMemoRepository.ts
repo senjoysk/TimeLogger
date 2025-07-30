@@ -7,6 +7,7 @@ import { IMemoRepository } from './interfaces';
 import { Memo, CreateMemoRequest, UpdateMemoRequest, MemoError } from '../types/memo';
 import { v4 as uuidv4 } from 'uuid';
 import { promisify } from 'util';
+import { logger } from '../utils/logger';
 
 /**
  * SQLiteメモリポジトリの実装
@@ -37,7 +38,7 @@ export class SqliteMemoRepository implements IMemoRepository {
 
     this.db.run(createTableQuery, (err) => {
       if (err) {
-        console.error('❌ メモテーブル作成エラー:', err);
+        logger.error('MEMO_REPO', 'メモテーブル作成エラー', err);
         // 非同期コールバック内でのthrowは避けて、エラーログのみ記録
         return;
       }
@@ -45,7 +46,7 @@ export class SqliteMemoRepository implements IMemoRepository {
       // テーブル作成成功後にインデックスを作成
       this.db.run(`CREATE INDEX IF NOT EXISTS idx_memos_user_id ON memos(user_id)`, (err) => {
         if (err) {
-          console.error('❌ メモインデックス作成エラー:', err);
+          logger.error('MEMO_REPO', 'メモインデックス作成エラー', err);
         }
       });
     });

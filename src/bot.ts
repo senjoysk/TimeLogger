@@ -280,7 +280,7 @@ export class TaskLoggerBot {
     const currentCount = this.errorCounters.get(errorType) || 0;
     const newCount = currentCount + 1;
     this.errorCounters.set(errorType, newCount);
-    console.log(`⚠️ エラーカウント増加: ${errorType} = ${newCount}回`);
+    logger.warn('BOT', `エラーカウント増加: ${errorType} = ${newCount}回`);
     return newCount;
   }
   
@@ -290,7 +290,7 @@ export class TaskLoggerBot {
   private resetErrorCount(errorType: string): void {
     if (this.errorCounters.has(errorType)) {
       this.errorCounters.set(errorType, 0);
-      console.log(`✅ エラーカウントリセット: ${errorType}`);
+      logger.info('BOT', `エラーカウントリセット: ${errorType}`);
     }
   }
   
@@ -300,7 +300,7 @@ export class TaskLoggerBot {
   private async sendAdminNotification(title: string, message: string): Promise<void> {
     try {
       if (!config.monitoring.adminNotification.enabled || !config.monitoring.adminNotification.userId) {
-        console.log('⚠️ 管理者通知が無効または管理者IDが未設定です');
+        logger.warn('BOT', '管理者通知が無効または管理者IDが未設定です');
         return;
       }
       
@@ -308,7 +308,7 @@ export class TaskLoggerBot {
       const fullMessage = `${title}\n\n${message}\n\n---\n*TimeLogger Bot システム監視*`;
       
       await this.sendDirectMessage(adminUserId, fullMessage);
-      console.log(`📢 管理者通知送信完了: ${adminUserId}`);
+      logger.info('BOT', `管理者通知送信完了: ${adminUserId}`);
     } catch (error) {
       const notifyError = new SystemError('管理者通知送信エラー', {
         operation: 'sendAdminNotification',
@@ -325,12 +325,12 @@ export class TaskLoggerBot {
    * 自動復旧試行
    */
   private async attemptAutoRecovery(healthStatus: HealthStatus): Promise<void> {
-    console.log('🔄 自動復旧を試行中...');
+    logger.info('BOT', '自動復旧を試行中...');
     
     // Discord接続の再試行
     if (!healthStatus.checks.discordReady) {
       try {
-        console.log('🔄 Discord再接続を試行中...');
+        logger.info('BOT', 'Discord再接続を試行中...');
         if (this.client.readyAt === null) {
           await this.client.login(config.discord.token);
         }
@@ -348,7 +348,7 @@ export class TaskLoggerBot {
     // 活動記録システムの再初期化
     if (!healthStatus.checks.activityLoggingInitialized) {
       try {
-        console.log('🔄 活動記録システム再初期化を試行中...');
+        logger.info('BOT', '活動記録システム再初期化を試行中...');
         await this.initializeActivityLogging();
       } catch (error) {
         const initError = new SystemError('活動記録システム再初期化失敗', {
@@ -361,7 +361,7 @@ export class TaskLoggerBot {
       }
     }
     
-    console.log('✅ 自動復旧試行完了');
+    logger.success('BOT', '自動復旧試行完了');
   }
 
   /**
@@ -369,7 +369,7 @@ export class TaskLoggerBot {
    */
   private async initializeActivityLogging(): Promise<void> {
     try {
-      console.log('🚀 活動記録システム統合開始...');
+      logger.info('BOT', '活動記録システム統合開始...');
       
       // 統合設定を作成（既存DBファイルを使用）
       const integrationConfig = createDefaultConfig(
@@ -391,12 +391,14 @@ export class TaskLoggerBot {
       // 活動促しコマンドハンドラーを初期化
       await this.initializePromptCommandHandler();
       
-      console.log('✅ 活動記録システム統合完了！');
-      console.log('💡 機能が利用可能:');
-      console.log('   - 自然言語でログ記録');
-      console.log('   - !edit でログ編集');
-      console.log('   - !summary でAI分析表示');
-      console.log('   - !logs でログ検索・表示');
+      logger.success('BOT', '活動記録システム統合完了！', {
+        利用可能機能: [
+          '自然言語でログ記録',
+          '!edit でログ編集',
+          '!summary でAI分析表示',
+          '!logs でログ検索・表示'
+        ]
+      });
       
       
     } catch (error) {
@@ -417,14 +419,14 @@ export class TaskLoggerBot {
    */
   public async start(): Promise<void> {
     try {
-      console.log('🤖 Discord Bot を起動中...');
+      logger.info('BOT', 'Discord Bot を起動中...');
       
       // 活動記録システムで独自のデータベース初期化を行う
       
       await this.client.login(config.discord.token);
       this.status.isRunning = true;
       
-      console.log('✅ Discord Bot が正常に起動しました');
+      logger.success('BOT', 'Discord Bot が正常に起動しました');
     } catch (error) {
       const startError = new SystemError('Discord Bot の起動に失敗しました', {
         operation: 'start',
@@ -440,7 +442,7 @@ export class TaskLoggerBot {
    * Bot を停止
    */
   public async stop(): Promise<void> {
-    console.log('🛑 Discord Bot を停止中...');
+    logger.info('BOT', 'Discord Bot を停止中...');
     
     this.status.isRunning = false;
     this.client.destroy();
@@ -449,7 +451,7 @@ export class TaskLoggerBot {
     if (this.activityLoggingIntegration) {
       try {
         await this.activityLoggingIntegration.shutdown();
-        console.log('✅ 活動記録システムのシャットダウン完了');
+        logger.success('BOT', '活動記録システムのシャットダウン完了');
       } catch (error) {
         const shutdownError = new SystemError('活動記録システムシャットダウンエラー', {
           operation: 'shutdown',
@@ -464,7 +466,7 @@ export class TaskLoggerBot {
     
     // 活動記録システムのシャットダウンのみ実行
     
-    console.log('✅ Discord Bot が停止しました');
+    logger.success('BOT', 'Discord Bot が停止しました');
   }
 
   /**
@@ -473,10 +475,11 @@ export class TaskLoggerBot {
   private setupEventHandlers(): void {
     // Bot が準備完了したときの処理
     this.client.once('ready', async () => {
-      console.log(`✅ ${this.client.user?.tag} としてログインしました`);
-      console.log(`🔧 [DEBUG] Bot ID: ${this.client.user?.id}`);
-      console.log(`🔧 [DEBUG] マルチユーザー対応で起動中`);
-      console.log(`🔧 [DEBUG] Intents: Guilds, DirectMessages, MessageContent`);
+      logger.success('BOT', `${this.client.user?.tag} としてログインしました`, {
+        botId: this.client.user?.id,
+        mode: 'マルチユーザー対応',
+        intents: 'Guilds, DirectMessages, MessageContent'
+      });
       
       // 活動記録システムを統合
       await this.initializeActivityLogging();
@@ -502,25 +505,25 @@ export class TaskLoggerBot {
   public async sendDailySummaryForAllUsers(): Promise<void> {
     try {
       if (!this.activityLoggingIntegration) {
-        console.warn('⚠️ 活動記録システムが初期化されていません');
+        logger.warn('BOT', '活動記録システムが初期化されていません');
         return;
       }
 
       // データベースから全ユーザーを取得
       const repository = this.activityLoggingIntegration.getRepository();
       if (!repository || !repository.getAllUsers) {
-        console.warn('⚠️ ユーザー情報を取得できません');
+        logger.warn('BOT', 'ユーザー情報を取得できません');
         return;
       }
 
       const users = await repository.getAllUsers();
-      console.log(`📊 全ユーザーへの日次サマリー送信開始: ${users.length}人`);
+      logger.info('BOT', `全ユーザーへの日次サマリー送信開始: ${users.length}人`);
 
       for (const user of users) {
         await this.sendDailySummaryToUser(user.userId, user.timezone);
       }
 
-      console.log('✅ 全ユーザーへの日次サマリー送信完了');
+      logger.success('BOT', '全ユーザーへの日次サマリー送信完了');
     } catch (error) {
       const summaryError = new SystemError('全ユーザーへの日次サマリー送信エラー', {
         operation: 'sendDailySummaryToAllUsers',
@@ -567,7 +570,7 @@ export class TaskLoggerBot {
 
       const dmChannel = await user.createDM();
       await dmChannel.send(message);
-      console.log(`✅ ${userId} にダイレクトメッセージを送信しました`);
+      logger.info('BOT', `${userId} にダイレクトメッセージを送信しました`);
     } catch (error) {
       const dmError = new DiscordError(`${userId} へのダイレクトメッセージ送信エラー`, {
         operation: 'sendDirectMessage',
@@ -601,11 +604,13 @@ export class TaskLoggerBot {
       
       // サマリー時刻かチェック（18:30）
       if (hours !== 18 || minutes !== 30) {
-        console.log(`⏰ ${userId} (${timezone}): サマリー時刻ではありません (現在: ${hours}:${minutes.toString().padStart(2, '0')})`);
+        logger.debug('BOT', `${userId} (${timezone}): サマリー時刻ではありません`, {
+          currentTime: `${hours}:${minutes.toString().padStart(2, '0')}`
+        });
         return;
       }
       
-      console.log(`⏰ ${userId} (${timezone}): サマリー時刻です - 送信開始`);
+      logger.info('BOT', `${userId} (${timezone}): サマリー時刻です - 送信開始`);
 
       const dmChannel = await user.createDM();
       
@@ -619,7 +624,7 @@ export class TaskLoggerBot {
       try {
         const summaryText = await this.activityLoggingIntegration.generateDailySummaryText(userId, timezone);
         await dmChannel.send(summaryText);
-        console.log(`✅ ${userId} に日次サマリーを送信しました`);
+        logger.success('BOT', `${userId} に日次サマリーを送信しました`);
       } catch (summaryError) {
         const genError = new SystemError(`${userId} のサマリー生成エラー`, {
           operation: 'generateDailySummaryText',
@@ -654,7 +659,7 @@ export class TaskLoggerBot {
    * 日次サマリーを自動送信（レガシーメソッド）
    */
   public async sendDailySummary(): Promise<void> {
-    console.log('⚠️ sendDailySummary は非推奨です。sendDailySummaryForAllUsers を使用してください。');
+    logger.warn('BOT', 'sendDailySummary は非推奨です。sendDailySummaryForAllUsers を使用してください。');
     await this.sendDailySummaryForAllUsers();
   }
 
@@ -726,7 +731,7 @@ export class TaskLoggerBot {
         throw notFoundError;
       }
 
-      console.log(`⏰ ${userId} (${timezone}): テストモード - 時刻チェックをスキップして送信開始`);
+      logger.info('BOT', `${userId} (${timezone}): テストモード - 時刻チェックをスキップして送信開始`);
 
       const dmChannel = await user.createDM();
       
@@ -740,7 +745,7 @@ export class TaskLoggerBot {
       try {
         const summaryText = await this.activityLoggingIntegration.generateDailySummaryText(userId, timezone);
         await dmChannel.send(summaryText + '\n\n（テストモードで送信）');
-        console.log(`✅ ${userId} に日次サマリーを送信しました（テストモード）`);
+        logger.success('BOT', `${userId} に日次サマリーを送信しました（テストモード）`);
       } catch (summaryError) {
         logger.error('SUMMARY', `${userId} のサマリー生成エラー`, summaryError, { userId });
         
@@ -796,25 +801,25 @@ export class TaskLoggerBot {
   public async sendApiCostReportForAllUsers(): Promise<void> {
     try {
       if (!this.activityLoggingIntegration) {
-        console.warn('⚠️ 活動記録システムが初期化されていません');
+        logger.warn('BOT', '活動記録システムが初期化されていません');
         return;
       }
 
       // データベースから全ユーザーを取得
       const repository = this.activityLoggingIntegration.getRepository();
       if (!repository || !repository.getAllUsers) {
-        console.warn('⚠️ ユーザー情報を取得できません');
+        logger.warn('BOT', 'ユーザー情報を取得できません');
         return;
       }
 
       const users = await repository.getAllUsers();
-      console.log(`💰 全ユーザーへのAPIコストレポート送信開始: ${users.length}人`);
+      logger.info('BOT', `全ユーザーへのAPIコストレポート送信開始: ${users.length}人`);
 
       for (const user of users) {
         await this.sendApiCostReportToUser(user.userId, user.timezone);
       }
 
-      console.log('✅ 全ユーザーへのAPIコストレポート送信完了');
+      logger.success('BOT', '全ユーザーへのAPIコストレポート送信完了');
     } catch (error) {
       logger.error('API_COST', '全ユーザーへのAPIコストレポート送信エラー', error);
       throw new SystemError(`APIコストレポート送信に失敗しました: ${error instanceof Error ? error.message : String(error)}`, { originalError: error });
@@ -842,23 +847,25 @@ export class TaskLoggerBot {
       
       // コストレポート時刻かチェック（18:05）
       if (hours !== 18 || minutes !== 5) { // config.app.summaryTime.hour
-        console.log(`⏰ ${userId} (${timezone}): コストレポート時刻ではありません (現在: ${hours}:${minutes.toString().padStart(2, '0')})`);
+        logger.debug('BOT', `${userId} (${timezone}): コストレポート時刻ではありません`, {
+          currentTime: `${hours}:${minutes.toString().padStart(2, '0')}`
+        });
         return;
       }
       
-      console.log(`⏰ ${userId} (${timezone}): コストレポート時刻です - 送信開始`);
+      logger.info('BOT', `${userId} (${timezone}): コストレポート時刻です - 送信開始`);
 
       const dmChannel = await user.createDM();
       
       if (!this.activityLoggingIntegration) {
-        console.warn('⚠️ 活動記録システムが初期化されていません - コストレポートをスキップ');
+        logger.warn('BOT', '活動記録システムが初期化されていません - コストレポートをスキップ');
         return;
       }
       
       // 活動記録システム経由でコストレポートを取得
       const report = await this.activityLoggingIntegration.getCostReport(userId, timezone);
       await dmChannel.send(report);
-      console.log(`✅ ${userId} にAPIコストレポートを送信しました`);
+      logger.success('BOT', `${userId} にAPIコストレポートを送信しました`);
     } catch (error) {
       logger.error('API_COST', `${userId} へのAPIコストレポート送信エラー`, error, { userId, timezone });
       throw new DiscordError(`APIコストレポート送信に失敗しました: ${error instanceof Error ? error.message : String(error)}`, { userId, timezone, originalError: error });
@@ -869,7 +876,7 @@ export class TaskLoggerBot {
    * APIコストレポートを送信（レガシーメソッド）
    */
   public async sendApiCostReport(): Promise<void> {
-    console.log('⚠️ sendApiCostReport は非推奨です。sendApiCostReportForAllUsers を使用してください。');
+    logger.warn('BOT', 'sendApiCostReport は非推奨です。sendApiCostReportForAllUsers を使用してください。');
     await this.sendApiCostReportForAllUsers();
   }
 
@@ -879,19 +886,19 @@ export class TaskLoggerBot {
   public async sendCostAlert(message: string): Promise<void> {
     try {
       if (!this.activityLoggingIntegration) {
-        console.warn('⚠️ 活動記録システムが初期化されていません');
+        logger.warn('BOT', '活動記録システムが初期化されていません');
         return;
       }
 
       // データベースから全ユーザーを取得
       const repository = this.activityLoggingIntegration.getRepository();
       if (!repository || !repository.getAllUsers) {
-        console.warn('⚠️ ユーザー情報を取得できません');
+        logger.warn('BOT', 'ユーザー情報を取得できません');
         return;
       }
 
       const users = await repository.getAllUsers();
-      console.log(`🚨 全ユーザーへのコスト警告送信開始: ${users.length}人`);
+      logger.info('BOT', `全ユーザーへのコスト警告送信開始: ${users.length}人`);
 
       for (const user of users) {
         try {
@@ -900,14 +907,14 @@ export class TaskLoggerBot {
           
           const dmChannel = await discordUser.createDM();
           await dmChannel.send(`🚨 **コスト警告** 🚨\n${message}`);
-          console.log(`✅ ${user.userId} にコスト警告を送信しました`);
+          logger.success('BOT', `${user.userId} にコスト警告を送信しました`);
         } catch (error) {
           logger.error('COST_ALERT', `${user.userId} へのコスト警告送信エラー`, error, { userId: user.userId });
           // 個別のエラーは続行する
         }
       }
 
-      console.log('✅ 全ユーザーへのコスト警告送信完了');
+      logger.success('BOT', '全ユーザーへのコスト警告送信完了');
     } catch (error) {
       logger.error('COST_ALERT', '全ユーザーへのコスト警告送信エラー', error);
       throw new SystemError(`コスト警告送信に失敗しました: ${error instanceof Error ? error.message : String(error)}`, { originalError: error });
@@ -951,7 +958,7 @@ export class TaskLoggerBot {
     if (this.activityLoggingIntegration) {
       this.activityLoggingIntegration.setTimezoneChangeCallback(callback);
     } else {
-      console.warn('⚠️ ActivityLoggingIntegrationが初期化されていません');
+      logger.warn('BOT', 'ActivityLoggingIntegrationが初期化されていません');
     }
   }
 
@@ -998,7 +1005,7 @@ export class TaskLoggerBot {
       // PromptCommandHandlerを初期化（PartialCompositeRepositoryを直接使用）
       this.promptCommandHandler = new PromptCommandHandler(repository);
       
-      console.log('✅ 活動促しコマンドハンドラーを初期化しました');
+      logger.success('BOT', '活動促しコマンドハンドラーを初期化しました');
     } catch (error) {
       logger.error('INITIALIZATION', '活動促しコマンドハンドラーの初期化に失敗', error);
       throw new SystemError(`活動促しコマンドハンドラーの初期化に失敗しました: ${error instanceof Error ? error.message : String(error)}`, { originalError: error });

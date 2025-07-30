@@ -6,6 +6,7 @@
  */
 
 import { Router, Request, Response } from 'express';
+import { logger } from '../../utils/logger';
 import { TimeSimulationService } from '../services/timeSimulationService';
 import { MockTimeProvider } from '../../factories';
 import { TimeSetRequest } from '../types/testing';
@@ -33,7 +34,7 @@ export function createTimeSimulationRouter(bot: IDiscordBot | null = null): Rout
         activityPromptRepository = repository as unknown as IActivityPromptRepository; // PartialCompositeRepository implements both interfaces
       }
     } catch (error) {
-      console.warn('ActivityPromptRepository初期化に失敗:', error);
+      logger.warn('WEB_ADMIN', 'ActivityPromptRepository初期化に失敗:', { error });
     }
   }
 

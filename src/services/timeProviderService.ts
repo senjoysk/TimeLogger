@@ -5,6 +5,7 @@
 
 import { ITimeProvider } from '../interfaces/dependencies';
 import { RealTimeProvider, MockTimeProvider } from '../factories';
+import { logger } from '../utils/logger';
 
 export interface ITimeProviderService {
   getTimeProvider(): ITimeProvider;
@@ -57,7 +58,7 @@ export class TimeProviderService implements ITimeProviderService {
     if (!this.isSimulationMode) {
       this.timeProvider = new MockTimeProvider(initialDate);
       this.isSimulationMode = true;
-      console.log('⏰ TimeProviderService: シミュレーションモード有効化');
+      logger.info('TIME_PROVIDER_SERVICE', 'シミュレーションモード有効化');
     }
   }
 
@@ -68,7 +69,7 @@ export class TimeProviderService implements ITimeProviderService {
     if (this.isSimulationMode) {
       this.timeProvider = new RealTimeProvider();
       this.isSimulationMode = false;
-      console.log('⏰ TimeProviderService: 実時刻モードに復帰');
+      logger.info('TIME_PROVIDER_SERVICE', '実時刻モードに復帰');
     }
   }
 
@@ -86,9 +87,9 @@ export class TimeProviderService implements ITimeProviderService {
   setSimulatedTime(date: Date): void {
     if (this.timeProvider instanceof MockTimeProvider) {
       this.timeProvider.setMockDate(date);
-      console.log(`⏰ TimeProviderService: シミュレーション時刻を設定: ${date.toISOString()}`);
+      logger.info('TIME_PROVIDER_SERVICE', `シミュレーション時刻を設定: ${date.toISOString()}`);
     } else {
-      console.warn('⚠️ TimeProviderService: シミュレーションモードではないため、時刻設定はスキップされました');
+      logger.warn('TIME_PROVIDER_SERVICE', 'シミュレーションモードではないため、時刻設定はスキップされました');
     }
   }
 
@@ -106,7 +107,7 @@ export class TimeProviderService implements ITimeProviderService {
     if (this.timeProvider instanceof MockTimeProvider) {
       this.timeProvider.startTimeProgression();
     } else {
-      console.warn('⚠️ TimeProviderService: 実時刻モードでは時間進行機能は使用できません');
+      logger.warn('TIME_PROVIDER_SERVICE', '実時刻モードでは時間進行機能は使用できません');
     }
   }
 
@@ -117,7 +118,7 @@ export class TimeProviderService implements ITimeProviderService {
     if (this.timeProvider instanceof MockTimeProvider) {
       this.timeProvider.stopTimeProgression();
     } else {
-      console.warn('⚠️ TimeProviderService: 実時刻モードでは時間進行機能は使用できません');
+      logger.warn('TIME_PROVIDER_SERVICE', '実時刻モードでは時間進行機能は使用できません');
     }
   }
 

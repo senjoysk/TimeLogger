@@ -12,6 +12,7 @@ import {
   RealTimeAnalysisErrorCode
 } from '../types/realTimeAnalysis';
 import { IGeminiService } from './interfaces/IGeminiService';
+import { logger } from '../utils/logger';
 
 /**
  * 活動内容分析クラス
@@ -27,7 +28,7 @@ export class ActivityContentAnalyzer {
     timeAnalysis: TimeAnalysisResult
   ): Promise<ActivityDetail[]> {
     try {
-      console.log(`📊 活動内容分析開始: "${input.substring(0, 50)}..."`);
+      logger.info('ACTIVITY_ANALYZER', `📊 活動内容分析開始: "${input.substring(0, 50)}..."`);
 
       // 1. 基本的な活動分解
       const basicBreakdown = this.performBasicBreakdown(input);
@@ -41,11 +42,11 @@ export class ActivityContentAnalyzer {
       // 4. 優先度の決定
       const finalActivities = this.determinePriorities(adjustedActivities);
 
-      console.log(`✅ 活動内容分析完了: ${finalActivities.length}個の活動を検出`);
+      logger.info('ACTIVITY_ANALYZER', `✅ 活動内容分析完了: ${finalActivities.length}個の活動を検出`);
       return finalActivities;
 
     } catch (error) {
-      console.error('❌ 活動内容分析エラー:', error);
+      logger.error('ACTIVITY_ANALYZER', '❌ 活動内容分析エラー:', error as Error);
       throw new RealTimeAnalysisError(
         '活動内容の分析に失敗しました',
         RealTimeAnalysisErrorCode.AI_ANALYSIS_FAILED,
@@ -141,7 +142,7 @@ export class ActivityContentAnalyzer {
     const prompt = this.buildDetailedAnalysisPrompt(input, timeAnalysis, basicBreakdown);
 
     try {
-      console.log('🤖 Gemini活動分析開始...');
+      logger.info('ACTIVITY_ANALYZER', '🤖 Gemini活動分析開始...');
       
       // GeminiServiceを使用してAI分析を実行
       const result = await this.geminiService.classifyMessageWithAI(input);
@@ -150,7 +151,7 @@ export class ActivityContentAnalyzer {
       return this.parseGeminiActivityResponse(result as unknown as Record<string, unknown>, timeAnalysis, basicBreakdown);
 
     } catch (error) {
-      console.error('Gemini活動分析エラー:', error);
+      logger.error('ACTIVITY_ANALYZER', 'Gemini活動分析エラー:', error as Error);
       // フォールバック処理
       return this.createFallbackActivityResponse(input, timeAnalysis, basicBreakdown);
     }
@@ -340,7 +341,7 @@ JSON形式のみで回答してください。説明文は不要です。
     const totalPercentage = activities.reduce((sum, activity) => sum + activity.timePercentage, 0);
     
     if (Math.abs(totalPercentage - 100) > 1) {
-      console.log(`⚠️ 時間配分調整: ${totalPercentage}% -> 100%`);
+      logger.warn('ACTIVITY_ANALYZER', `⚠️ 時間配分調整: ${totalPercentage}% -> 100%`);
       activities = this.normalizePercentages(activities);
     }
 

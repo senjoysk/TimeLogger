@@ -12,6 +12,7 @@
 
 import { DynamicReportScheduler } from './dynamicReportScheduler';
 import { TimezoneChange, TimezoneNotification } from '../repositories/interfaces';
+import { logger } from '../utils/logger';
 
 interface UserSettings {
   user_id: string;
@@ -110,7 +111,7 @@ export class TimezoneChangeMonitor {
       await this.pollForChanges();
     }, this.pollingInterval);
 
-    console.log(`✅ Timezone polling monitor started (interval: ${this.pollingInterval}ms)`);
+    logger.info('TIMEZONE_MONITOR', `✅ Timezone polling monitor started (interval: ${this.pollingInterval}ms)`);
   }
 
   /**
@@ -140,7 +141,7 @@ export class TimezoneChangeMonitor {
       }
     }, this.pollingInterval);
 
-    console.log(`✅ Timezone notification processor started`);
+    logger.info('TIMEZONE_MONITOR', `✅ Timezone notification processor started`);
   }
 
   /**
@@ -154,7 +155,7 @@ export class TimezoneChangeMonitor {
 
       // getUserTimezoneChanges メソッドの存在確認
       if (typeof this.repository.getUserTimezoneChanges !== 'function') {
-        console.error('❌ getUserTimezoneChanges is not a function');
+        logger.error('TIMEZONE_MONITOR', '❌ getUserTimezoneChanges is not a function');
         this.stats.totalErrors++;
         return;
       }
@@ -163,7 +164,7 @@ export class TimezoneChangeMonitor {
       
       // changesがnull、undefined、または配列でない場合の処理
       if (!changes || !Array.isArray(changes)) {
-        console.warn('⚠️ getUserTimezoneChanges returned invalid data, skipping');
+        logger.warn('TIMEZONE_MONITOR', '⚠️ getUserTimezoneChanges returned invalid data, skipping');
         this.lastCheckTime = new Date();
         return;
       }
@@ -179,14 +180,14 @@ export class TimezoneChangeMonitor {
           this.stats.totalProcessedNotifications++;
           this.stats.lastActivity = new Date();
         } catch (error) {
-          console.error(`❌ Failed to process timezone change for user ${change.user_id}:`, error);
+          logger.error('TIMEZONE_MONITOR', `❌ Failed to process timezone change for user ${change.user_id}:`, error as Error);
           this.stats.totalErrors++;
         }
       }
 
       this.lastCheckTime = new Date();
     } catch (error) {
-      console.error('❌ Polling for timezone changes failed:', error);
+      logger.error('TIMEZONE_MONITOR', '❌ Polling for timezone changes failed:', error as Error);
       this.stats.totalErrors++;
     }
   }
@@ -203,7 +204,7 @@ export class TimezoneChangeMonitor {
 
       // getUnprocessedNotifications メソッドの存在確認
       if (typeof this.repository.getUnprocessedNotifications !== 'function') {
-        console.error('❌ getUnprocessedNotifications is not a function');
+        logger.error('TIMEZONE_MONITOR', '❌ getUnprocessedNotifications is not a function');
         this.stats.totalErrors++;
         return;
       }
@@ -212,7 +213,7 @@ export class TimezoneChangeMonitor {
 
       // notificationsがnull、undefined、または配列でない場合の処理
       if (!notifications || !Array.isArray(notifications)) {
-        console.warn('⚠️ getUnprocessedNotifications returned invalid data, skipping');
+        logger.warn('TIMEZONE_MONITOR', '⚠️ getUnprocessedNotifications returned invalid data, skipping');
         return;
       }
 
@@ -232,13 +233,13 @@ export class TimezoneChangeMonitor {
           this.stats.totalProcessedNotifications++;
           this.stats.lastActivity = new Date();
         } catch (error) {
-          console.error(`❌ Failed to process notification ${notification.id}:`, error);
+          logger.error('TIMEZONE_MONITOR', `❌ Failed to process notification ${notification.id}:`, error as Error);
           this.stats.totalErrors++;
           // エラー時は処理済みマークしない（再試行可能）
         }
       }
     } catch (error) {
-      console.error('❌ Processing notifications failed:', error);
+      logger.error('TIMEZONE_MONITOR', '❌ Processing notifications failed:', error as Error);
       this.stats.totalErrors++;
     }
   }
@@ -257,7 +258,7 @@ export class TimezoneChangeMonitor {
 
       // 同じタイムゾーンの場合はスキップ
       if (oldTimezone === newTimezone) {
-        console.log(`ℹ️ User ${userId} already has timezone ${newTimezone}, skipping`);
+        logger.info('TIMEZONE_MONITOR', `ℹ️ User ${userId} already has timezone ${newTimezone}, skipping`);
         return;
       }
 
@@ -270,9 +271,9 @@ export class TimezoneChangeMonitor {
       this.stats.totalProcessedNotifications++;
       this.stats.lastActivity = new Date();
 
-      console.log(`✅ Timezone updated for user ${userId}: ${oldTimezone} → ${newTimezone}`);
+      logger.info('TIMEZONE_MONITOR', `✅ Timezone updated for user ${userId}: ${oldTimezone} → ${newTimezone}`);
     } catch (error) {
-      console.error(`❌ Failed to update timezone for user ${userId}:`, error);
+      logger.error('TIMEZONE_MONITOR', `❌ Failed to update timezone for user ${userId}:`, error as Error);
       this.stats.totalErrors++;
       throw error;
     }
@@ -287,7 +288,7 @@ export class TimezoneChangeMonitor {
       this.pollingTimer = undefined;
     }
     this.isPollingRunning = false;
-    console.log('🛑 Timezone polling monitor stopped');
+    logger.info('TIMEZONE_MONITOR', '🛑 Timezone polling monitor stopped');
   }
 
   /**
@@ -299,7 +300,7 @@ export class TimezoneChangeMonitor {
       this.processorTimer = undefined;
     }
     this.isProcessorRunning = false;
-    console.log('🛑 Timezone notification processor stopped');
+    logger.info('TIMEZONE_MONITOR', '🛑 Timezone notification processor stopped');
   }
 
   /**

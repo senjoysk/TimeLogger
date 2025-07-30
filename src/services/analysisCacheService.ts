@@ -10,6 +10,7 @@ import {
   CreateAnalysisCacheRequest,
   ActivityLogError
 } from '../types/activityLog';
+import { logger } from '../utils/logger';
 
 /**
  * キャッシュ戦略の設定
@@ -118,7 +119,7 @@ export class AnalysisCacheService implements IAnalysisCacheService {
       ...strategy
     };
 
-    console.log('🗄️ キャッシュサービス初期化:', this.strategy);
+    logger.debug('CACHE', '🗄️ キャッシュサービス初期化', { strategy: this.strategy });
   }
 
   /**
@@ -130,7 +131,7 @@ export class AnalysisCacheService implements IAnalysisCacheService {
       
       if (!cache) {
         this.missCount++;
-        console.log(`💨 キャッシュミス: [${businessDate}] ${userId}`);
+        logger.debug('CACHE', `💨 キャッシュミス: [${businessDate}] ${userId}`);
         return null;
       }
 
@@ -139,7 +140,7 @@ export class AnalysisCacheService implements IAnalysisCacheService {
       
       if (cacheAge > this.strategy.maxAgeMinutes) {
         this.missCount++;
-        console.log(`⏰ キャッシュ期限切れ: [${businessDate}] ${cacheAge}分経過`);
+        logger.debug('CACHE', `⏰ キャッシュ期限切れ: [${businessDate}] ${cacheAge}分経過`);
         await this.invalidateCache(userId, businessDate);
         return null;
       }
@@ -150,7 +151,7 @@ export class AnalysisCacheService implements IAnalysisCacheService {
         
         if (cache.logCount !== currentLogCount) {
           this.missCount++;
-          console.log(`🔄 ログ数変更によりキャッシュ無効: [${businessDate}] ${cache.logCount} -> ${currentLogCount}`);
+          logger.debug('CACHE', `🔄 ログ数変更によりキャッシュ無効: [${businessDate}] ${cache.logCount} -> ${currentLogCount}`);
           await this.invalidateCache(userId, businessDate);
           return null;
         }
@@ -159,7 +160,7 @@ export class AnalysisCacheService implements IAnalysisCacheService {
         const latestLogUpdate = await this.getLatestLogUpdateTime(userId, businessDate);
         if (latestLogUpdate && latestLogUpdate > cache.generatedAt) {
           this.missCount++;
-          console.log(`📝 ログ内容変更によりキャッシュ無効: [${businessDate}] キャッシュ:${cache.generatedAt} < 最新:${latestLogUpdate}`);
+          logger.debug('CACHE', `📝 ログ内容変更によりキャッシュ無効: [${businessDate}] キャッシュ:${cache.generatedAt} < 最新:${latestLogUpdate}`);
           await this.invalidateCache(userId, businessDate);
           return null;
         }
@@ -169,17 +170,17 @@ export class AnalysisCacheService implements IAnalysisCacheService {
       const forceRefreshMinutes = this.strategy.forceRefreshHours * 60;
       if (cacheAge > forceRefreshMinutes) {
         this.missCount++;
-        console.log(`🔄 強制リフレッシュ時間到達: [${businessDate}] ${cacheAge}分経過`);
+        logger.debug('CACHE', `🔄 強制リフレッシュ時間到達: [${businessDate}] ${cacheAge}分経過`);
         await this.invalidateCache(userId, businessDate);
         return null;
       }
 
       this.hitCount++;
-      console.log(`⚡ キャッシュヒット: [${businessDate}] ${cacheAge}分前生成`);
+      logger.debug('CACHE', `⚡ キャッシュヒット: [${businessDate}] ${cacheAge}分前生成`);
       
       return cache.analysisResult;
     } catch (error) {
-      console.error('❌ キャッシュ取得エラー:', error);
+      logger.error('CACHE', '❌ キャッシュ取得エラー:', error);
       this.missCount++;
       return null; // エラー時はキャッシュを使用しない
     }
@@ -199,11 +200,11 @@ export class AnalysisCacheService implements IAnalysisCacheService {
 
       const savedCache = await this.repository.saveAnalysisCache(request);
       
-      console.log(`💾 キャッシュ保存: [${businessDate}] ${logCount}ログ, ${analysisResult.categories.length}カテゴリ`);
+      logger.debug('CACHE', `💾 キャッシュ保存: [${businessDate}] ${logCount}ログ, ${analysisResult.categories.length}カテゴリ`);
       
       return savedCache;
     } catch (error) {
-      console.error('❌ キャッシュ保存エラー:', error);
+      logger.error('CACHE', '❌ キャッシュ保存エラー:', error);
       throw error instanceof ActivityLogError ? error :
         new ActivityLogError('キャッシュの保存に失敗しました', 'CACHE_SAVE_ERROR', { error });
     }
@@ -217,12 +218,12 @@ export class AnalysisCacheService implements IAnalysisCacheService {
       const result = await this.repository.deleteAnalysisCache(userId, businessDate);
       
       if (result) {
-        console.log(`🗑️ キャッシュ無効化: [${businessDate}] ${userId}`);
+        logger.debug('CACHE', `🗑️ キャッシュ無効化: [${businessDate}] ${userId}`);
       }
       
       return result;
     } catch (error) {
-      console.error('❌ キャッシュ無効化エラー:', error);
+      logger.error('CACHE', '❌ キャッシュ無効化エラー:', error);
       return false;
     }
   }
@@ -240,11 +241,11 @@ export class AnalysisCacheService implements IAnalysisCacheService {
           invalidatedCount++;
         }
       } catch (error) {
-        console.error(`❌ キャッシュ無効化エラー [${businessDate}]:`, error);
+        logger.error('CACHE', `❌ キャッシュ無効化エラー [${businessDate}]:`, error);
       }
     }
 
-    console.log(`🗑️ 複数キャッシュ無効化: ${invalidatedCount}/${businessDates.length}件`);
+    logger.debug('CACHE', `🗑️ 複数キャッシュ無効化: ${invalidatedCount}/${businessDates.length}件`);
     
     return invalidatedCount;
   }
@@ -288,7 +289,7 @@ export class AnalysisCacheService implements IAnalysisCacheService {
 
       return true; // キャッシュは有効
     } catch (error) {
-      console.error('❌ キャッシュ有効性チェックエラー:', error);
+      logger.error('CACHE', '❌ キャッシュ有効性チェックエラー:', error);
       return false;
     }
   }
@@ -301,11 +302,11 @@ export class AnalysisCacheService implements IAnalysisCacheService {
       const days = olderThanDays || this.strategy.autoCleanupDays;
       const deletedCount = await this.repository.cleanupOldCaches(days);
       
-      console.log(`🧹 キャッシュクリーンアップ: ${deletedCount}件削除 (${days}日以上前)`);
+      logger.debug('CACHE', `🧹 キャッシュクリーンアップ: ${deletedCount}件削除 (${days}日以上前)`);
       
       return deletedCount;
     } catch (error) {
-      console.error('❌ キャッシュクリーンアップエラー:', error);
+      logger.error('CACHE', '❌ キャッシュクリーンアップエラー:', error);
       throw error instanceof ActivityLogError ? error :
         new ActivityLogError('キャッシュクリーンアップに失敗しました', 'CACHE_CLEANUP_ERROR', { error });
     }
@@ -329,7 +330,7 @@ export class AnalysisCacheService implements IAnalysisCacheService {
         staleCaches: 0  // 実装する場合は古いキャッシュ数を計算
       };
     } catch (error) {
-      console.error('❌ キャッシュ統計取得エラー:', error);
+      logger.error('CACHE', '❌ キャッシュ統計取得エラー:', error);
       throw error instanceof ActivityLogError ? error :
         new ActivityLogError('キャッシュ統計の取得に失敗しました', 'CACHE_STATS_ERROR', { error });
     }
@@ -358,7 +359,7 @@ export class AnalysisCacheService implements IAnalysisCacheService {
   resetStats(): void {
     this.hitCount = 0;
     this.missCount = 0;
-    console.log('📊 キャッシュ統計をリセットしました');
+    logger.debug('CACHE', '📊 キャッシュ統計をリセットしました');
   }
 
   /**
@@ -366,7 +367,7 @@ export class AnalysisCacheService implements IAnalysisCacheService {
    */
   updateStrategy(newStrategy: Partial<CacheStrategy>): void {
     this.strategy = { ...this.strategy, ...newStrategy };
-    console.log('⚙️ キャッシュ戦略を更新:', this.strategy);
+    logger.debug('CACHE', '⚙️ キャッシュ戦略を更新', { strategy: this.strategy });
   }
 
   /**
@@ -413,7 +414,7 @@ export class AnalysisCacheService implements IAnalysisCacheService {
 
       return latestUpdate;
     } catch (error) {
-      console.error('❌ 最新ログ更新時刻取得エラー:', error);
+      logger.error('CACHE', '❌ 最新ログ更新時刻取得エラー:', error);
       return null; // エラー時はキャッシュを維持
     }
   }
@@ -426,7 +427,7 @@ export class AnalysisCacheService implements IAnalysisCacheService {
     hitRate: number;
   }> {
     try {
-      console.log('🔧 キャッシュメンテナンス開始');
+      logger.debug('CACHE', '🔧 キャッシュメンテナンス開始');
 
       // 古いキャッシュをクリーンアップ
       const cleanedCaches = await this.cleanup();
@@ -434,14 +435,14 @@ export class AnalysisCacheService implements IAnalysisCacheService {
       // 統計情報を記録
       const hitRate = this.getHitRate();
 
-      console.log(`✅ キャッシュメンテナンス完了: ${cleanedCaches}件削除, ヒット率${Math.round(hitRate * 100)}%`);
+      logger.debug('CACHE', `✅ キャッシュメンテナンス完了: ${cleanedCaches}件削除, ヒット率${Math.round(hitRate * 100)}%`);
 
       return {
         cleanedCaches,
         hitRate
       };
     } catch (error) {
-      console.error('❌ キャッシュメンテナンスエラー:', error);
+      logger.error('CACHE', '❌ キャッシュメンテナンスエラー:', error);
       throw error instanceof ActivityLogError ? error :
         new ActivityLogError('キャッシュメンテナンスに失敗しました', 'CACHE_MAINTENANCE_ERROR', { error });
     }

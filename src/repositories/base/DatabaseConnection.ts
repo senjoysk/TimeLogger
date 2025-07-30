@@ -8,6 +8,7 @@ import { MigrationManager } from '../../database/migrationManager';
 import { DatabaseInitializer } from '../../database/databaseInitializer';
 import * as fs from 'fs';
 import * as path from 'path';
+import { logger } from '../../utils/logger';
 
 /**
  * SQLiteパラメータ型定義
@@ -65,7 +66,7 @@ export class DatabaseConnection {
     await this.migrationManager.runMigrations();
 
     this.connected = true;
-    console.log('✅ データベース接続が初期化されました');
+    logger.info('DATABASE', 'データベース接続が初期化されました', { databasePath: this.databasePath });
   }
 
   /**
@@ -178,7 +179,7 @@ export class DatabaseConnection {
             this.connected = false;
             this.migrationManager = null;
             DatabaseConnection.instances.delete(this.databasePath);
-            console.log('✅ データベース接続が閉鎖されました');
+            logger.info('DATABASE', 'データベース接続が閉鎖されました');
             resolve();
           }
         });

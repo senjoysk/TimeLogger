@@ -18,6 +18,7 @@ import { ApiCostMonitor } from '../apiCostMonitor';
 import { IGeminiPromptBuilder } from './geminiPromptBuilder';
 import { IGeminiResponseProcessor } from './geminiResponseProcessor';
 import { AnalysisResultConverter } from './analysisResultConverter';
+import { logger } from '../../utils/logger';
 
 /**
  * チャンクマネージャーインターフェース
@@ -57,12 +58,12 @@ export class AnalysisChunkManager implements IAnalysisChunkManager {
       // 時間帯別にログを分割
       const chunks = this.splitLogsByTimeRange(logs, timezone);
       
-      console.log(`🔄 分割分析: ${chunks.length}チャンクに分割`);
+      logger.info('CHUNK_ANALYSIS', `🔄 分割分析: ${chunks.length}チャンクに分割`);
       
       // 各チャンクをバッチ並行分析（40-60%性能向上、API制限考慮）
       const chunkResults = await this.processBatchAnalysis(chunks, timezone, businessDate);
       
-      console.log(`✅ チャンクバッチ並行分析完了: ${chunkResults.length}チャンク処理済み`);
+      logger.info('CHUNK_ANALYSIS', `✅ チャンクバッチ並行分析完了: ${chunkResults.length}チャンク処理済み`);
 
       // チャンク結果を統合
       const mergedResult = this.mergeChunkResults(chunkResults);
@@ -70,7 +71,7 @@ export class AnalysisChunkManager implements IAnalysisChunkManager {
       // DailyAnalysisResult形式に変換
       return this.resultConverter.convertToDailyAnalysisResult(mergedResult, businessDate, logs.length);
     } catch (error) {
-      console.error('❌ 分割分析エラー:', error);
+      logger.error('CHUNK_ANALYSIS', '❌ 分割分析エラー:', error as Error);
       throw new ActivityLogError('分割分析の実行に失敗しました', 'CHUNK_ANALYSIS_ERROR', { error });
     }
   }
@@ -123,12 +124,12 @@ export class AnalysisChunkManager implements IAnalysisChunkManager {
     const chunkResults: GeminiAnalysisResponse[] = [];
     const BATCH_SIZE = 3; // API制限を考慮したバッチサイズ
     
-    console.log(`🚀 チャンクバッチ並行分析開始: ${chunks.length}チャンク、バッチサイズ${BATCH_SIZE}`);
+    logger.info('CHUNK_ANALYSIS', `🚀 チャンクバッチ並行分析開始: ${chunks.length}チャンク、バッチサイズ${BATCH_SIZE}`);
     
     for (let i = 0; i < chunks.length; i += BATCH_SIZE) {
       const batch = chunks.slice(i, i + BATCH_SIZE);
       
-      console.log(`📊 バッチ${Math.floor(i / BATCH_SIZE) + 1}/${Math.ceil(chunks.length / BATCH_SIZE)}処理中: チャンク${i + 1}-${Math.min(i + batch.length, chunks.length)}`);
+      logger.info('CHUNK_ANALYSIS', `📊 バッチ${Math.floor(i / BATCH_SIZE) + 1}/${Math.ceil(chunks.length / BATCH_SIZE)}処理中: チャンク${i + 1}-${Math.min(i + batch.length, chunks.length)}`);
       
       const batchPromises = batch.map(async (chunk, batchIndex) => {
         const globalIndex = i + batchIndex;
@@ -138,7 +139,7 @@ export class AnalysisChunkManager implements IAnalysisChunkManager {
       const batchResults = await Promise.all(batchPromises);
       chunkResults.push(...batchResults);
       
-      console.log(`✅ バッチ${Math.floor(i / BATCH_SIZE) + 1}完了: ${batchResults.length}チャンク処理済み`);
+      logger.info('CHUNK_ANALYSIS', `✅ バッチ${Math.floor(i / BATCH_SIZE) + 1}完了: ${batchResults.length}チャンク処理済み`);
     }
     
     return chunkResults;
@@ -154,7 +155,7 @@ export class AnalysisChunkManager implements IAnalysisChunkManager {
     globalIndex: number,
     totalChunks: number
   ): Promise<GeminiAnalysisResponse> {
-    console.log(`📊 チャンク${globalIndex + 1}/${totalChunks}を分析: ${chunk.logs.length}件`);
+    logger.info('CHUNK_ANALYSIS', `📊 チャンク${globalIndex + 1}/${totalChunks}を分析: ${chunk.logs.length}件`);
     
     const prompt = this.promptBuilder.buildChunkPrompt(chunk.logs, timezone, chunk.timeRange, businessDate);
     
@@ -165,17 +166,17 @@ export class AnalysisChunkManager implements IAnalysisChunkManager {
     if (response.usageMetadata) {
       const { promptTokenCount, candidatesTokenCount } = response.usageMetadata;
       this.costMonitor.recordApiCall('generateDailySummary', promptTokenCount, candidatesTokenCount)
-        .catch(error => console.warn('⚠️ トークン使用量記録失敗:', error));
+        .catch(error => logger.warn('CHUNK_ANALYSIS', '⚠️ トークン使用量記録失敗:', { error }));
     }
 
     const responseText = response.text();
     
     // デバッグ情報: チャンクレスポンステキストの詳細
-    console.log(`📝 チャンク${globalIndex + 1}レスポンス詳細: 文字数=${responseText.length}, 最後の50文字="${responseText.slice(-50)}"`);
+    logger.debug('CHUNK_ANALYSIS', `📝 チャンク${globalIndex + 1}レスポンス詳細: 文字数=${responseText.length}, 最後の50文字="${responseText.slice(-50)}"`);
     
     // 不完全なJSONの検出
     if (!responseText.trim().endsWith('}')) {
-      console.warn(`⚠️ チャンク${globalIndex + 1}のレスポンスが不完全です`);
+      logger.warn('CHUNK_ANALYSIS', `⚠️ チャンク${globalIndex + 1}のレスポンスが不完全です`);
     }
     
     return this.responseProcessor.parseGeminiResponse(responseText);

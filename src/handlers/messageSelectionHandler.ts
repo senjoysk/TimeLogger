@@ -9,6 +9,7 @@ import { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ButtonInter
 import { IGeminiService } from '../services/interfaces/IGeminiService';
 import { IActivityLogService } from '../services/activityLogService';
 import { IMemoRepository, ITodoRepository } from '../repositories/interfaces';
+import { logger } from '../utils/logger';
 
 export class MessageSelectionHandler {
   private storedMessages: Map<string, string> = new Map();
@@ -80,7 +81,7 @@ export class MessageSelectionHandler {
     try {
       // 🟢 Green Phase: 実際の処理統合（エラーハンドリング強化）
       const messageContent = this.storedMessages.get(userId);
-      console.log(`🔘 MessageSelection処理開始: ${userId}, customId: ${interaction.customId}, messageContent: "${messageContent}"`);
+      logger.debug('MESSAGE_SELECT', `🔘 MessageSelection処理開始: ${userId}, customId: ${interaction.customId}, messageContent: "${messageContent}"`);
       
       if (interaction.customId === 'select_TODO') {
         try {
@@ -101,29 +102,29 @@ export class MessageSelectionHandler {
               dueDate: undefined,
               timezone
             };
-            console.log(`📋 TODO作成開始:`, todoRequest);
+            logger.debug('MESSAGE_SELECT', `📋 TODO作成開始:`, todoRequest);
             await this.todoRepository.createTodo(todoRequest);
-            console.log(`✅ TODO作成完了`);
+            logger.debug('MESSAGE_SELECT', `✅ TODO作成完了`);
             
             // 処理完了後に結果を編集
             await interaction.editReply({
               content: '📋 TODOとして登録しました！'
             });
           } else {
-            console.log(`⚠️ TODO作成スキップ: todoRepository=${!!this.todoRepository}, messageContent="${messageContent}"`);
+            logger.debug('MESSAGE_SELECT', `⚠️ TODO作成スキップ: todoRepository=${!!this.todoRepository}, messageContent="${messageContent}"`);
             await interaction.editReply({
               content: '📋 TODOとして登録しました！'
             });
           }
         } catch (error) {
-          console.error('❌ TODO作成エラー:', error);
+          logger.error('MESSAGE_SELECT', '❌ TODO作成エラー:', error);
           const errorMessage = error instanceof Error ? error.message : String(error);
           try {
             await interaction.editReply({
               content: `❌ TODO作成中にエラーが発生しました: ${errorMessage}`
             });
           } catch (editError) {
-            console.error('❌ エラー編集失敗:', editError);
+            logger.error('MESSAGE_SELECT', '❌ エラー編集失敗:', editError);
           }
         }
       } else if (interaction.customId === 'select_ACTIVITY_LOG') {
@@ -137,19 +138,19 @@ export class MessageSelectionHandler {
           
           if (this.activityLogService && this.geminiService && messageContent) {
             // AI分析を実行（通常メッセージ）
-            console.log(`🤖 [通常活動ログ] AI分析開始: userId=${userId}, content="${messageContent}"`);
+            logger.debug('MESSAGE_SELECT', `🤖 [通常活動ログ] AI分析開始: userId=${userId}, content="${messageContent}"`);
             const activityAnalysis = await this.geminiService.analyzeActivityContent(
               messageContent,
               new Date(),
               timezone
               // reminderContextは渡さない（通常メッセージなので）
             );
-            console.log(`✅ [通常活動ログ] AI分析完了:`, activityAnalysis);
+            logger.debug('MESSAGE_SELECT', '✅ [通常活動ログ] AI分析完了', { activityAnalysis });
             
             // 実際の活動ログ記録処理（AI分析結果を含む）
-            console.log(`📝 活動ログ記録開始: userId=${userId}, content="${messageContent}", timezone=${timezone}`);
+            logger.debug('MESSAGE_SELECT', `📝 活動ログ記録開始: userId=${userId}, content="${messageContent}", timezone=${timezone}`);
             await this.activityLogService.recordActivity(userId, messageContent, timezone, undefined, activityAnalysis);
-            console.log(`✅ 活動ログ記録完了`);
+            logger.debug('MESSAGE_SELECT', `✅ 活動ログ記録完了`);
             
             // 処理完了後に結果を編集（AI分析結果も表示）
             await interaction.editReply({
@@ -166,20 +167,20 @@ export class MessageSelectionHandler {
 🏷️ タグ: ${activityAnalysis.activityCategory.tags.join(', ')}`
             });
           } else {
-            console.log(`⚠️ 活動ログ記録スキップ: activityLogService=${!!this.activityLogService}, geminiService=${!!this.geminiService}, messageContent="${messageContent}"`);
+            logger.debug('MESSAGE_SELECT', `⚠️ 活動ログ記録スキップ: activityLogService=${!!this.activityLogService}, geminiService=${!!this.geminiService}, messageContent="${messageContent}"`);
             await interaction.editReply({
               content: '📝 活動ログとして記録しました！'
             });
           }
         } catch (error) {
-          console.error('❌ 活動ログ記録エラー:', error);
+          logger.error('MESSAGE_SELECT', '❌ 活動ログ記録エラー:', error);
           const errorMessage = error instanceof Error ? error.message : String(error);
           try {
             await interaction.editReply({
               content: `❌ 活動ログ記録中にエラーが発生しました: ${errorMessage}`
             });
           } catch (editError) {
-            console.error('❌ エラー編集失敗:', editError);
+            logger.error('MESSAGE_SELECT', '❌ エラー編集失敗:', editError);
           }
         }
       } else if (interaction.customId === 'select_MEMO') {
@@ -198,29 +199,29 @@ export class MessageSelectionHandler {
               content: messageContent,
               tags: []
             };
-            console.log(`📄 メモ保存開始:`, memoRequest);
+            logger.debug('MESSAGE_SELECT', `📄 メモ保存開始:`, memoRequest);
             await this.memoRepository.createMemo(memoRequest);
-            console.log(`✅ メモ保存完了`);
+            logger.debug('MESSAGE_SELECT', `✅ メモ保存完了`);
             
             // 処理完了後に結果を編集
             await interaction.editReply({
               content: '📄 メモとして保存しました！'
             });
           } else {
-            console.log(`⚠️ メモ保存スキップ: memoRepository=${!!this.memoRepository}, messageContent="${messageContent}"`);
+            logger.debug('MESSAGE_SELECT', `⚠️ メモ保存スキップ: memoRepository=${!!this.memoRepository}, messageContent="${messageContent}"`);
             await interaction.editReply({
               content: '📄 メモとして保存しました！'
             });
           }
         } catch (error) {
-          console.error('❌ メモ保存エラー:', error);
+          logger.error('MESSAGE_SELECT', '❌ メモ保存エラー:', error);
           const errorMessage = error instanceof Error ? error.message : String(error);
           try {
             await interaction.editReply({
               content: `❌ メモ保存中にエラーが発生しました: ${errorMessage}`
             });
           } catch (editError) {
-            console.error('❌ エラー編集失敗:', editError);
+            logger.error('MESSAGE_SELECT', '❌ エラー編集失敗:', editError);
           }
         }
       } else if (interaction.customId === 'select_CANCEL') {
@@ -233,10 +234,10 @@ export class MessageSelectionHandler {
       
       // 処理完了後、保存されたメッセージを削除
       this.storedMessages.delete(userId);
-      console.log(`✅ MessageSelection処理完了: ${userId}`);
+      logger.debug('MESSAGE_SELECT', `✅ MessageSelection処理完了: ${userId}`);
       
     } catch (error) {
-      console.error('❌ MessageSelection全体エラー:', error);
+      logger.error('MESSAGE_SELECT', '❌ MessageSelection全体エラー:', error);
       try {
         if (!interaction.replied && !interaction.deferred) {
           const errorMessage = error instanceof Error ? error.message : String(error);
@@ -247,7 +248,7 @@ export class MessageSelectionHandler {
           });
         }
       } catch (replyError) {
-        console.error('❌ エラー応答失敗:', replyError);
+        logger.error('MESSAGE_SELECT', '❌ エラー応答失敗:', replyError);
       }
     }
   }
@@ -264,7 +265,7 @@ export class MessageSelectionHandler {
       await this.showSelectionUI(message, userId, message.content);
       return true; // 処理成功
     } catch (error) {
-      console.error('MessageSelectionHandler処理エラー:', error);
+      logger.error('MESSAGE_SELECT', 'MessageSelectionHandler処理エラー:', error);
       return false; // 処理失敗
     }
   }

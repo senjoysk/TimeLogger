@@ -6,6 +6,7 @@
 import { IActivityLogRepository } from '../repositories/activityLogRepository';
 import { DailyAnalysisResult, TimelineEntry } from '../types/activityLog';
 import { toZonedTime, format } from 'date-fns-tz';
+import { logger } from '../utils/logger';
 
 /**
  * 検出されたギャップ情報
@@ -69,7 +70,7 @@ export class GapDetectionService implements IGapDetectionService {
    */
   async detectGapsFromAnalysis(analysisResult: DailyAnalysisResult, timezone: string): Promise<TimeGap[]> {
     try {
-      console.log(`📊 分析結果からギャップ検出: ${analysisResult.timeline.length}個のタイムライン`);
+      logger.debug('GAP_DETECTION_SERVICE', `分析結果からギャップ検出: ${analysisResult.timeline.length}個のタイムライン`);
       
       if (!analysisResult.timeline || analysisResult.timeline.length === 0) {
         // タイムラインがない場合は全時間帯がギャップ
@@ -104,11 +105,11 @@ export class GapDetectionService implements IGapDetectionService {
         gaps.push(lastGap);
       }
       
-      console.log(`📊 分析結果ベースギャップ検出完了: ${gaps.length}件`);
+      logger.info('GAP_DETECTION_SERVICE', `分析結果ベースギャップ検出完了: ${gaps.length}件`);
       return gaps;
       
     } catch (error) {
-      console.error('❌ 分析結果ベースギャップ検出エラー:', error);
+      logger.error('GAP_DETECTION_SERVICE', '分析結果ベースギャップ検出エラー', error as Error);
       throw error;
     }
   }

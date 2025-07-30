@@ -10,6 +10,7 @@ import {
   DeleteLogRequest,
   ActivityLogError
 } from '../types/activityLog';
+import { logger } from '../utils/logger';
 
 /**
  * 編集コマンドの種類
@@ -60,7 +61,7 @@ export class EditCommandHandler implements IEditCommandHandler {
    */
   async handle(message: Message, userId: string, args: string[], timezone: string): Promise<void> {
     try {
-      console.log(`✏️ 編集コマンド処理開始: ${userId} ${args.join(' ')}`);
+      logger.debug('HANDLER', `✏️ 編集コマンド処理開始: ${userId} ${args.join(' ')}`);
 
       // コマンドを解析
       const parsedCommand = this.parseEditCommand(args);
@@ -92,7 +93,7 @@ export class EditCommandHandler implements IEditCommandHandler {
           await this.showHelp(message);
       }
     } catch (error) {
-      console.error('❌ 編集コマンド処理エラー:', error);
+      logger.error('HANDLER', '❌ 編集コマンド処理エラー:', error);
       
       const errorMessage = error instanceof ActivityLogError 
         ? `❌ ${error.message}`
@@ -118,9 +119,9 @@ export class EditCommandHandler implements IEditCommandHandler {
       
       await message.reply(formattedList);
       
-      console.log(`📋 編集リスト表示: ${userId} - ${logs.length}件`);
+      logger.debug('HANDLER', `📋 編集リスト表示: ${userId} - ${logs.length}件`);
     } catch (error) {
-      console.error('❌ 編集リスト表示エラー:', error);
+      logger.error('HANDLER', '❌ 編集リスト表示エラー:', error);
       throw new ActivityLogError('ログ一覧の表示に失敗しました', 'SHOW_EDIT_LIST_ERROR', { error });
     }
   }
@@ -167,9 +168,9 @@ ${updatedLog.content}
 
       await message.reply(successMessage);
       
-      console.log(`✏️ ログ編集完了: ${userId} ${targetLog.id}`);
+      logger.debug('HANDLER', `✏️ ログ編集完了: ${userId} ${targetLog.id}`);
     } catch (error) {
-      console.error('❌ ログ編集エラー:', error);
+      logger.error('HANDLER', '❌ ログ編集エラー:', error);
       throw error instanceof ActivityLogError ? error :
         new ActivityLogError('ログの編集に失敗しました', 'EDIT_LOG_ERROR', { error });
     }
@@ -214,9 +215,9 @@ ${deletedContent}
 
       await message.reply(successMessage);
       
-      console.log(`🗑️ ログ削除完了: ${userId} ${targetLog.id}`);
+      logger.debug('HANDLER', `🗑️ ログ削除完了: ${userId} ${targetLog.id}`);
     } catch (error) {
-      console.error('❌ ログ削除エラー:', error);
+      logger.error('HANDLER', '❌ ログ削除エラー:', error);
       throw error instanceof ActivityLogError ? error :
         new ActivityLogError('ログの削除に失敗しました', 'DELETE_LOG_ERROR', { error });
     }
@@ -336,7 +337,7 @@ ${deletedContent}
       const logs = await this.activityLogService.getLogsForEdit(userId, timezone);
       return logs.length;
     } catch (error) {
-      console.error('❌ ログ数取得エラー:', error);
+      logger.error('HANDLER', '❌ ログ数取得エラー:', error);
       return 0;
     }
   }
@@ -351,7 +352,7 @@ ${deletedContent}
       const logs = await this.activityLogService.getLatestLogs(userId, 100);
       return logs.some(log => log.id === logId && log.userId === userId);
     } catch (error) {
-      console.error('❌ 編集権限チェックエラー:', error);
+      logger.error('HANDLER', '❌ 編集権限チェックエラー:', error);
       return false;
     }
   }
@@ -361,6 +362,6 @@ ${deletedContent}
    */
   private async recordEditHistory(userId: string, logId: string, oldContent: string, newContent: string): Promise<void> {
     // 将来的に編集履歴をトラッキングする場合の実装場所
-    console.log(`📝 編集履歴: ${userId} ${logId} "${oldContent}" -> "${newContent}"`);
+    logger.debug('HANDLER', `📝 編集履歴: ${userId} ${logId} "${oldContent}" -> "${newContent}"`);
   }
 }

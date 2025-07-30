@@ -26,6 +26,7 @@ import {
 } from './activityLoggingIntegration';
 import { config } from '../config';
 import { DATABASE_PATHS } from '../database/simplePathConfig';
+import { logger } from '../utils/logger';
 
 /**
  * 既存BotClientに活動記録システムを統合する便利関数
@@ -35,7 +36,7 @@ export async function integrateActivityLogging(
   customConfig?: Partial<ActivityLoggingConfig>
 ): Promise<ActivityLoggingIntegration> {
   try {
-    console.log('🚀 活動記録システム統合を開始...');
+    logger.info('INTEGRATION', '🚀 活動記録システム統合を開始...');
 
     // デフォルト設定を生成（統一DBパスを使用）
     const defaultConfig = createDefaultConfig(
@@ -65,18 +66,18 @@ export async function integrateActivityLogging(
     // Discord Botに統合
     integration.integrateWithBot(discordClient);
 
-    console.log('✅ 活動記録システム統合完了！');
+    logger.info('INTEGRATION', '✅ 活動記録システム統合完了！');
     
     // ヘルスチェックを実行
     const healthCheck = await integration.healthCheck();
     if (!healthCheck.healthy) {
-      console.warn('⚠️ システムヘルスチェックで問題が検出されました:', healthCheck.details);
+      logger.warn('INTEGRATION', '⚠️ システムヘルスチェックで問題が検出されました', { details: healthCheck.details });
     }
 
     return integration;
 
   } catch (error) {
-    console.error('❌ 活動記録システム統合エラー:', error);
+    logger.error('INTEGRATION', '❌ 活動記録システム統合エラー:', error as Error);
     throw error;
   }
 }
@@ -143,11 +144,11 @@ export async function getSystemOverview(integration: ActivityLoggingIntegration)
  */
 export async function emergencyShutdown(integration: ActivityLoggingIntegration): Promise<void> {
   try {
-    console.log('🚨 緊急シャットダウンを実行中...');
+    logger.info('INTEGRATION', '🚨 緊急シャットダウンを実行中...');
     await integration.shutdown();
-    console.log('✅ 緊急シャットダウン完了');
+    logger.info('INTEGRATION', '✅ 緊急シャットダウン完了');
   } catch (error) {
-    console.error('❌ 緊急シャットダウンエラー:', error);
+    logger.error('INTEGRATION', '❌ 緊急シャットダウンエラー:', error as Error);
     throw error;
   }
 }
@@ -160,11 +161,12 @@ export async function emergencyShutdown(integration: ActivityLoggingIntegration)
  * ```typescript
  * import { Client } from 'discord.js';
  * import { integrateNewSystem } from './integration';
+ * import { logger } from '../utils/logger';
  * 
  * const client = new Client({ ... });
  * 
  * client.once('ready', async () => {
- *   console.log('Bot is ready!');
+ *   logger.info('BOT', 'Bot is ready!');
  *   
  *   // 新システムを統合
  *   try {
@@ -173,9 +175,9 @@ export async function emergencyShutdown(integration: ActivityLoggingIntegration)
  *       enableAutoAnalysis: true
  *     });
  *     
- *     console.log('New system integrated successfully!');
+ *     logger.info('INTEGRATION', 'New system integrated successfully!');
  *   } catch (error) {
- *     console.error('Failed to integrate new system:', error);
+ *     logger.error('INTEGRATION', 'Failed to integrate new system:', error);
  *   }
  * });
  * 

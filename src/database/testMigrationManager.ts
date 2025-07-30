@@ -6,6 +6,7 @@
 import { Database } from 'sqlite3';
 import { MigrationManager } from './migrationManager';
 import { DatabaseInitializer } from './databaseInitializer';
+import { logger } from '../utils/logger';
 
 /**
  * テスト専用マイグレーション管理クラス
@@ -43,7 +44,7 @@ export class TestMigrationManager {
   async runMigrationsUntil(targetVersion: string): Promise<void> {
     await this.databaseInitializer.initialize();
     // TODO: MigrationManagerに段階実行機能を追加
-    console.warn(`段階的マイグレーション実行は未実装です。代わりに全マイグレーションを実行します。`);
+    logger.warn('TEST_MIGRATION', '段階的マイグレーション実行は未実装です。代わりに全マイグレーションを実行します。');
     await this.migrationManager.runMigrations();
   }
 

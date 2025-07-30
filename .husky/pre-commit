@@ -64,6 +64,21 @@ fi
 
 echo "✅ エラー処理規約チェック通過"
 
+# 🆕 Console使用チェック
+echo "🔍 Pre-commit check: Console使用チェック..."
+./scripts/code-review/console-usage-check.sh
+
+if [ $? -ne 0 ]; then
+    echo ""
+    echo "🚨 コミットが阻止されました！"
+    echo "🛠️ console.log/console.error の直接使用が検出されました。"
+    echo "📋 logger サービスを使用してください。"
+    echo ""
+    exit 1
+fi
+
+echo "✅ Console使用チェック通過"
+
 # データベースパス妥当性チェック
 echo "🔍 Pre-commit check: データベースパス妥当性確認..."
 npm run check:database-paths

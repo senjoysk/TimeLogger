@@ -10,6 +10,7 @@ import {
   ActivityLog,
   ActivityLogError
 } from '../types/activityLog';
+import { logger } from '../utils/logger';
 
 /**
  * ログコマンドの種類
@@ -60,7 +61,7 @@ export class LogsCommandHandler implements ILogsCommandHandler {
    */
   async handle(message: Message, userId: string, args: string[], timezone: string): Promise<void> {
     try {
-      console.log(`📋 ログコマンド処理開始: ${userId} ${args.join(' ')}`);
+      logger.debug('HANDLER', `📋 ログコマンド処理開始: ${userId} ${args.join(' ')}`);
 
       // コマンドを解析
       const parsedCommand = this.parseLogsCommand(args);
@@ -100,7 +101,7 @@ export class LogsCommandHandler implements ILogsCommandHandler {
           await this.showTodayLogs(message, userId, timezone);
       }
     } catch (error) {
-      console.error('❌ ログコマンド処理エラー:', error);
+      logger.error('HANDLER', '❌ ログコマンド処理エラー:', error);
       
       const errorMessage = error instanceof ActivityLogError 
         ? `❌ ${error.message}`
@@ -125,9 +126,9 @@ export class LogsCommandHandler implements ILogsCommandHandler {
       const formattedLogs = this.formatLogsDisplay(logs, timezone, '今日');
       await message.reply(formattedLogs);
       
-      console.log(`📋 今日のログ表示: ${userId} - ${logs.length}件`);
+      logger.debug('HANDLER', `📋 今日のログ表示: ${userId} - ${logs.length}件`);
     } catch (error) {
-      console.error('❌ 今日のログ表示エラー:', error);
+      logger.error('HANDLER', '❌ 今日のログ表示エラー:', error);
       throw new ActivityLogError('今日のログの表示に失敗しました', 'SHOW_TODAY_LOGS_ERROR', { error });
     }
   }
@@ -149,9 +150,9 @@ export class LogsCommandHandler implements ILogsCommandHandler {
       const formattedLogs = this.formatLogsDisplay(logs, timezone, dateLabel);
       await message.reply(formattedLogs);
       
-      console.log(`📋 指定日ログ表示: ${userId} ${targetDate} - ${logs.length}件`);
+      logger.debug('HANDLER', `📋 指定日ログ表示: ${userId} ${targetDate} - ${logs.length}件`);
     } catch (error) {
-      console.error('❌ 指定日ログ表示エラー:', error);
+      logger.error('HANDLER', '❌ 指定日ログ表示エラー:', error);
       throw new ActivityLogError('指定日のログの表示に失敗しました', 'SHOW_DATE_LOGS_ERROR', { error });
     }
   }
@@ -171,9 +172,9 @@ export class LogsCommandHandler implements ILogsCommandHandler {
       const formattedResults = this.activityLogService.formatSearchResults(logs, query, timezone);
       await message.reply(formattedResults);
       
-      console.log(`🔍 ログ検索: ${userId} "${query}" - ${logs.length}件ヒット`);
+      logger.debug('HANDLER', `🔍 ログ検索: ${userId} "${query}" - ${logs.length}件ヒット`);
     } catch (error) {
-      console.error('❌ ログ検索エラー:', error);
+      logger.error('HANDLER', '❌ ログ検索エラー:', error);
       throw new ActivityLogError('ログの検索に失敗しました', 'SEARCH_LOGS_ERROR', { error });
     }
   }
@@ -193,9 +194,9 @@ export class LogsCommandHandler implements ILogsCommandHandler {
       const formattedLogs = this.formatLogsDisplay(logs, timezone, `最新${logs.length}件`);
       await message.reply(formattedLogs);
       
-      console.log(`📌 最新ログ表示: ${userId} - ${logs.length}件`);
+      logger.debug('HANDLER', `📌 最新ログ表示: ${userId} - ${logs.length}件`);
     } catch (error) {
-      console.error('❌ 最新ログ表示エラー:', error);
+      logger.error('HANDLER', '❌ 最新ログ表示エラー:', error);
       throw new ActivityLogError('最新ログの表示に失敗しました', 'SHOW_LATEST_LOGS_ERROR', { error });
     }
   }
@@ -224,9 +225,9 @@ ${this.getUsageInsight(stats)}
 
       await message.reply(statsMessage);
       
-      console.log(`📊 統計情報表示: ${userId}`);
+      logger.debug('HANDLER', `📊 統計情報表示: ${userId}`);
     } catch (error) {
-      console.error('❌ 統計情報表示エラー:', error);
+      logger.error('HANDLER', '❌ 統計情報表示エラー:', error);
       throw new ActivityLogError('統計情報の表示に失敗しました', 'SHOW_STATISTICS_ERROR', { error });
     }
   }
@@ -311,7 +312,7 @@ ${this.getUsageInsight(stats)}
         return format(localDate, 'M月d日(E)', { timeZone: timezone });
       }
     } catch (error) {
-      console.error('❌ 日付ラベルフォーマットエラー:', error);
+      logger.error('HANDLER', '❌ 日付ラベルフォーマットエラー:', error);
       return dateStr;
     }
   }

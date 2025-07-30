@@ -1,5 +1,6 @@
 import dotenv from 'dotenv';
 import { DATABASE_PATHS } from './database/simplePathConfig';
+import { logger } from './utils/logger';
 
 // 環境判定と環境別設定ファイルの読み込み
 const NODE_ENV = process.env.NODE_ENV || 'development';
@@ -15,7 +16,7 @@ if (isDevelopment) {
   dotenv.config(); // デフォルト（.env）
 }
 
-console.log(`🚀 環境: ${NODE_ENV}`);
+logger.info('CONFIG', `環境: ${NODE_ENV}`);
 
 /**
  * アプリケーション設定
@@ -95,12 +96,13 @@ export const config = {
  */
 export function validateConfig(): void {
   // デバッグ: 環境変数の状態を出力
-  console.log('🔍 環境変数のチェック:');
-  console.log(`   - 環境: ${config.environment.nodeEnv}`);
-  console.log(`   - データベースパス: ${config.database.path}`);
-  console.log(`   - DISCORD_TOKEN: ${process.env.DISCORD_TOKEN ? '設定済み' : '未設定'}`);
-  console.log(`   - 実際のトークン長: ${config.discord.token.length}文字`);
-  console.log(`   - トークンプレビュー: ${config.discord.token.substring(0, 10)}...`);
+  logger.debug('CONFIG', '環境変数のチェック:', {
+    環境: config.environment.nodeEnv,
+    データベースパス: config.database.path,
+    DISCORD_TOKEN: process.env.DISCORD_TOKEN ? '設定済み' : '未設定',
+    実際のトークン長: config.discord.token.length,
+    トークンプレビュー: config.discord.token.substring(0, 10) + '...'
+  });
 
   const requiredFields = [
     { key: 'DISCORD_TOKEN', value: config.discord.token },
@@ -111,7 +113,7 @@ export function validateConfig(): void {
   
   // 管理者通知が有効な場合のみ必須チェック
   if (config.monitoring.adminNotification.enabled && !config.monitoring.adminNotification.userId) {
-    console.error('❌ 管理者通知が有効ですが、ADMIN_USER_IDが設定されていません');
+    logger.error('CONFIG', '管理者通知が有効ですが、ADMIN_USER_IDが設定されていません');
     process.exit(1);
   }
 
@@ -120,11 +122,12 @@ export function validateConfig(): void {
     .map(field => field.key);
 
   if (missingFields.length > 0) {
-    console.error('❌ 必須の環境変数が設定されていません:');
-    missingFields.forEach(field => console.error(`   - ${field}`));
-    console.error(`\n.env.${config.environment.nodeEnv}を参考に環境変数を設定してください。`);
+    logger.error('CONFIG', '必須の環境変数が設定されていません', undefined, {
+      missingFields,
+      environment: config.environment.nodeEnv
+    });
     process.exit(1);
   }
 
-  console.log('✅ 設定の検証が完了しました');
+  logger.success('CONFIG', '設定の検証が完了しました');
 }

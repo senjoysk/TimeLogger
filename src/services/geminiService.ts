@@ -4,6 +4,7 @@ import { ClassificationResult } from '../types/todo';
 import { ActivityAnalysisResult, ReminderContext } from '../types/activityAnalysis';
 import { PreviousActivities } from '../types/database';
 import { CostAlert } from '../types/costAlert';
+import { logger } from '../utils/logger';
 
 // 専用サービスのインポート
 import { GeminiApiClient, IGeminiApiClient } from './gemini/geminiApiClient';
@@ -38,7 +39,7 @@ export class GeminiService {
     this.activityAnalysis = new ActivityAnalysisService(this.apiClient, this.costMonitor);
     this.costService = new GeminiCostService(this.costMonitor);
     
-    console.log('✅ GeminiService（リファクタリング版）が初期化されました');
+    logger.success('GEMINI', 'GeminiService（リファクタリング版）が初期化されました');
   }
 
   /**

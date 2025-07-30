@@ -16,6 +16,7 @@ import { DynamicReportScheduler } from './services/dynamicReportScheduler';
 import { TimezoneChangeMonitor } from './services/timezoneChangeMonitor';
 import { TaskLoggerBot } from './bot';
 import { IUnifiedRepository } from './repositories/interfaces';
+import { logger } from './utils/logger';
 
 interface ComponentHealth {
   dynamicScheduler: 'healthy' | 'failed' | 'not_configured';
@@ -142,9 +143,9 @@ export class EnhancedScheduler extends Scheduler {
       if (this.dynamicScheduler) {
         try {
           await this.dynamicScheduler.initialize();
-          console.log('✅ DynamicReportScheduler初期化完了');
+          logger.info('SCHEDULER', '✅ DynamicReportScheduler初期化完了');
         } catch (error) {
-          console.error('❌ DynamicReportScheduler初期化エラー:', error);
+          logger.error('SCHEDULER', '❌ DynamicReportScheduler初期化エラー:', error as Error);
         }
       }
 

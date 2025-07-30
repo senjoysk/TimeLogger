@@ -4,6 +4,7 @@ import { Database } from 'sqlite3';
 import { ActivityLogError } from '../types/activityLog';
 import { BackupManager } from './backupManager';
 import { DATABASE_PATHS } from './simplePathConfig';
+import { logger } from '../utils/logger';
 
 /**
  * データベースマイグレーション管理システム
@@ -41,7 +42,7 @@ export class MigrationManager {
    */
   async initialize(): Promise<void> {
     try {
-      console.log('🔄 マイグレーションシステムを初期化中...');
+      logger.info('MIGRATION', '🔄 マイグレーションシステムを初期化中...');
       
       // マイグレーション管理テーブルの作成
       const systemSql = fs.readFileSync(
@@ -50,9 +51,9 @@ export class MigrationManager {
       );
       
       await this.executeQuery(systemSql);
-      console.log('✅ マイグレーションシステムの初期化が完了しました');
+      logger.info('MIGRATION', '✅ マイグレーションシステムの初期化が完了しました');
     } catch (error) {
-      console.error('❌ マイグレーションシステム初期化エラー:', error);
+      logger.error('MIGRATION', '❌ マイグレーションシステム初期化エラー:', error);
       throw new ActivityLogError('マイグレーションシステムの初期化に失敗しました', 'MIGRATION_INIT_ERROR', { error });
     }
   }
@@ -67,7 +68,7 @@ export class MigrationManager {
         .filter(file => file.endsWith('.sql') && file !== 'migration_system.sql')
         .sort();
     } catch (error) {
-      console.error('❌ マイグレーションファイル読み込みエラー:', error);
+      logger.error('MIGRATION', '❌ マイグレーションファイル読み込みエラー:', error);
       return [];
     }
   }
@@ -80,7 +81,7 @@ export class MigrationManager {
       const result = await this.queryDatabase('SELECT version FROM schema_migrations WHERE success = 1');
       return new Set(result.map(row => row.version as string));
     } catch (error) {
-      console.log('⚠️ マイグレーション履歴テーブルが存在しません（初回実行）');
+      logger.info('MIGRATION', '⚠️ マイグレーション履歴テーブルが存在しません（初回実行）');
       return new Set();
     }
   }
@@ -93,7 +94,7 @@ export class MigrationManager {
       const result = await this.queryDatabase(`PRAGMA table_info(${tableName})`);
       return result.some((row: Record<string, unknown>) => (row.name as string) === columnName);
     } catch (error) {
-      console.log(`⚠️ テーブル ${tableName} が存在しません`);
+      logger.info('MIGRATION', `⚠️ テーブル ${tableName} が存在しません`);
       return false;
     }
   }
@@ -118,43 +119,43 @@ export class MigrationManager {
    */
   async runMigrations(): Promise<void> {
     try {
-      console.log('🚀 マイグレーションを開始します...');
-      console.log('🔍 マイグレーションパス:', this.migrationsPath);
+      logger.info('MIGRATION', '🚀 マイグレーションを開始します...');
+      logger.info('MIGRATION', '🔍 マイグレーションパス', { path: this.migrationsPath });
       
       const availableMigrations = this.getAvailableMigrations();
-      console.log('📋 利用可能なマイグレーション:', availableMigrations);
+      logger.info('MIGRATION', '📋 利用可能なマイグレーション', { migrations: availableMigrations });
       
       const executedMigrations = await this.getExecutedMigrations();
-      console.log('📋 実行済みマイグレーション:', Array.from(executedMigrations));
+      logger.info('MIGRATION', '📋 実行済みマイグレーション', { migrations: Array.from(executedMigrations) });
       
       const pendingMigrations = availableMigrations.filter(
         migration => !executedMigrations.has(this.extractVersion(migration))
       );
-      console.log('📋 保留中のマイグレーション:', pendingMigrations);
+      logger.info('MIGRATION', '📋 保留中のマイグレーション', { migrations: pendingMigrations });
 
       if (pendingMigrations.length === 0) {
-        console.log('✅ 実行すべきマイグレーションはありません');
+        logger.info('MIGRATION', '✅ 実行すべきマイグレーションはありません');
         return;
       }
 
-      console.log(`📋 実行予定のマイグレーション: ${pendingMigrations.length}件`);
+      logger.info('MIGRATION', `📋 実行予定のマイグレーション: ${pendingMigrations.length}件`);
       
       // マイグレーション実行前にバックアップを作成（一時的に無効化）
       const ENABLE_BACKUP = process.env.ENABLE_BACKUP === 'true';
       if (ENABLE_BACKUP) {
-        console.log('💾 マイグレーション前バックアップを作成中...');
+        logger.info('MIGRATION', '💾 マイグレーション前バックアップを作成中...');
         await this.backupManager.createBackup('pre_migration');
       } else {
-        console.log('⚠️ バックアップ機能は無効化されています (ENABLE_BACKUP=false)');
+        logger.info('MIGRATION', '⚠️ バックアップ機能は無効化されています (ENABLE_BACKUP=false)');
       }
       
       for (const migrationFile of pendingMigrations) {
         await this.executeMigration(migrationFile);
       }
       
-      console.log('✅ 全マイグレーションが完了しました');
+      logger.info('MIGRATION', '✅ 全マイグレーションが完了しました');
     } catch (error: unknown) {
-      console.error('❌ マイグレーション実行エラー:', {
+      logger.error('MIGRATION', '❌ マイグレーション実行エラー:', {
         message: (error as Error).message,
         stack: (error as Error).stack,
         path: this.migrationsPath
@@ -171,7 +172,7 @@ export class MigrationManager {
     const startTime = Date.now();
     
     try {
-      console.log(`🔧 マイグレーション ${version} を実行中...`);
+      logger.info('MIGRATION', `🔧 マイグレーション ${version} を実行中...`);
       
       const migrationPath = path.join(this.migrationsPath, migrationFile);
       const migrationSql = fs.readFileSync(migrationPath, 'utf8');
@@ -184,17 +185,17 @@ export class MigrationManager {
       // マイグレーション成功を記録
       await this.recordMigration(version, `Migration ${version} executed`, executionTime, true);
       
-      console.log(`✅ マイグレーション ${version} が完了しました (${executionTime}ms)`);
+      logger.info('MIGRATION', `✅ マイグレーション ${version} が完了しました (${executionTime}ms)`);
     } catch (error) {
       const executionTime = Date.now() - startTime;
       
-      console.error(`❌ マイグレーション ${version} が失敗しました:`, error);
+      logger.error('MIGRATION', `❌ マイグレーション ${version} が失敗しました:`, error);
       
       // マイグレーション失敗を記録
       try {
         await this.recordMigration(version, `Migration ${version} failed`, executionTime, false, String(error));
       } catch (recordError) {
-        console.error('⚠️ マイグレーション失敗記録エラー:', recordError);
+        logger.error('MIGRATION', '⚠️ マイグレーション失敗記録エラー:', recordError);
       }
       
       throw error;
@@ -220,7 +221,7 @@ export class MigrationManager {
       
       await this.executeQuery(sql, [version, description, executionTime, success ? 1 : 0, errorMessage || '']);
     } catch (error) {
-      console.error('⚠️ マイグレーション履歴記録エラー:', error);
+      logger.error('MIGRATION', '⚠️ マイグレーション履歴記録エラー:', error);
       // マイグレーション履歴記録の失敗は致命的エラーとしない
     }
   }
@@ -259,12 +260,12 @@ export class MigrationManager {
       for (let i = 0; i < statements.length; i++) {
         const statement = statements[i];
         try {
-          console.log(`📝 SQL文 ${i + 1}/${statements.length} を実行中: ${statement.substring(0, 50)}...`);
+          logger.info('MIGRATION', `📝 SQL文 ${i + 1}/${statements.length} を実行中: ${statement.substring(0, 50)}...`);
           await this.executeQuery(statement);
-          console.log(`✅ SQL文 ${i + 1} 実行完了`);
+          logger.info('MIGRATION', `✅ SQL文 ${i + 1} 実行完了`);
         } catch (error) {
-          console.error(`❌ SQL文 ${i + 1} 実行エラー:`, error);
-          console.error(`❌ 失敗したSQL: ${statement}`);
+          logger.error('MIGRATION', `❌ SQL文 ${i + 1} 実行エラー:`, error);
+          logger.error('MIGRATION', `❌ 失敗したSQL: ${statement}`);
           throw new ActivityLogError(
             `マイグレーション SQL文 ${i + 1} の実行に失敗しました`,
             'SQL_EXECUTION_ERROR',
@@ -291,7 +292,7 @@ export class MigrationManager {
    */
   public async executeMultipleStatementsWithTransaction(sql: string): Promise<void> {
     try {
-      console.log('🔄 トランザクションを開始します...');
+      logger.info('MIGRATION', '🔄 トランザクションを開始します...');
       await this.beginTransaction();
 
       try {
@@ -300,16 +301,16 @@ export class MigrationManager {
         for (let i = 0; i < statements.length; i++) {
           const statement = statements[i];
           try {
-            console.log(`📝 [TX] SQL文 ${i + 1}/${statements.length} を実行中: ${statement.substring(0, 50)}...`);
+            logger.info('MIGRATION', `📝 [TX] SQL文 ${i + 1}/${statements.length} を実行中: ${statement.substring(0, 50)}...`);
             
             // ALTER TABLE ADD COLUMNの場合、カラム重複エラーを許容
             if (this.isAddColumnStatement(statement)) {
               try {
                 await this.executeQuery(statement);
-                console.log(`✅ [TX] SQL文 ${i + 1} 実行完了（カラム追加）`);
+                logger.info('MIGRATION', `✅ [TX] SQL文 ${i + 1} 実行完了（カラム追加）`);
               } catch (error) {
                 if (this.isColumnAlreadyExistsError(error)) {
-                  console.log(`⚠️ [TX] SQL文 ${i + 1} スキップ（カラム既存）: ${this.extractColumnName(statement)}`);
+                  logger.info('MIGRATION', `⚠️ [TX] SQL文 ${i + 1} スキップ（カラム既存）: ${this.extractColumnName(statement)}`);
                   // カラムが既に存在する場合はスキップ（エラーではない）
                 } else {
                   throw error;
@@ -317,11 +318,11 @@ export class MigrationManager {
               }
             } else {
               await this.executeQuery(statement);
-              console.log(`✅ [TX] SQL文 ${i + 1} 実行完了`);
+              logger.info('MIGRATION', `✅ [TX] SQL文 ${i + 1} 実行完了`);
             }
           } catch (error) {
-            console.error(`❌ [TX] SQL文 ${i + 1} 実行エラー:`, error);
-            console.error(`❌ [TX] 失敗したSQL: ${statement}`);
+            logger.error('MIGRATION', `❌ [TX] SQL文 ${i + 1} 実行エラー:`, error);
+            logger.error('MIGRATION', `❌ [TX] 失敗したSQL: ${statement}`);
             throw new ActivityLogError(
               `トランザクション内 SQL文 ${i + 1} の実行に失敗しました`,
               'TRANSACTION_SQL_ERROR',
@@ -335,12 +336,12 @@ export class MigrationManager {
           }
         }
 
-        console.log('✅ トランザクションをコミットします...');
+        logger.info('MIGRATION', '✅ トランザクションをコミットします...');
         await this.commitTransaction();
-        console.log('✅ トランザクションが正常に完了しました');
+        logger.info('MIGRATION', '✅ トランザクションが正常に完了しました');
 
       } catch (error) {
-        console.error('❌ トランザクション実行エラー - ロールバックします:', error);
+        logger.error('MIGRATION', '❌ トランザクション実行エラー - ロールバックします:', error);
         await this.rollbackTransaction();
         throw error;
       }
@@ -389,7 +390,7 @@ export class MigrationManager {
     return new Promise((resolve, reject) => {
       this.db.run('ROLLBACK', (err) => {
         if (err) {
-          console.error('⚠️ トランザクションロールバックエラー:', err);
+          logger.error('MIGRATION', '⚠️ トランザクションロールバックエラー:', err);
           // ロールバック失敗はログに記録するが、元のエラーを隠さない
           resolve();
         } else {
@@ -447,7 +448,7 @@ export class MigrationManager {
     // 3. トリガーやBEGIN...ENDブロックを考慮した分割
     const statements = this.parseComplexSqlStatements(cleanedSql);
 
-    console.log(`📊 SQL文を解析: ${statements.length}文に分割`);
+    logger.info('MIGRATION', `📊 SQL文を解析: ${statements.length}文に分割`);
     
     return statements;
   }
@@ -539,7 +540,7 @@ export class MigrationManager {
         pendingMigrations: pending
       };
     } catch (error) {
-      console.error('❌ マイグレーション状態確認エラー:', error);
+      logger.error('MIGRATION', '❌ マイグレーション状態確認エラー:', error);
       return {
         available: 0,
         executed: 0,

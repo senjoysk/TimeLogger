@@ -5,6 +5,7 @@
 
 import { PartialCompositeRepository } from '../repositories/PartialCompositeRepository';
 import { getTestDbPath, cleanupTestDatabase, prepareTestDatabase } from '../utils/testDatabasePath';
+import { logger } from '../utils/logger';
 
 /**
  * 標準化されたテストデータベースセットアップ
@@ -40,7 +41,7 @@ export class TestDatabaseInitializer {
         await this.repository.close();
       } catch (error) {
         // Already closed database errors are expected in some test scenarios
-        console.warn('Database cleanup warning:', error);
+        logger.warn('TEST_DB', 'Database cleanup warning', { error });
       }
       this.repository = null;
     }

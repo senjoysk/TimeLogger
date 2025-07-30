@@ -3,6 +3,7 @@
  */
 
 import { Request, Response, NextFunction } from 'express';
+import { logger } from '../../utils/logger';
 
 // Expressのリクエストオブジェクトを拡張
 declare global {
@@ -23,7 +24,7 @@ export function createTimezoneMiddleware() {
       // Cookieからタイムゾーンを取得（デフォルト: Asia/Tokyo）
       const adminTimezone = req.cookies.adminTimezone || 'Asia/Tokyo';
       
-      console.log(`[TimezoneMiddleware] Cookie timezone: ${adminTimezone}`);
+      logger.debug('WEB_ADMIN', `[TimezoneMiddleware] Cookie timezone: ${adminTimezone}`);
       
       // リクエストとレスポンスローカル変数に設定
       req.adminTimezone = adminTimezone;
@@ -32,7 +33,7 @@ export function createTimezoneMiddleware() {
       
       next();
     } catch (error) {
-      console.error('タイムゾーンミドルウェアエラー:', error);
+      logger.error('WEB_ADMIN', 'タイムゾーンミドルウェアエラー:', error as Error);
       
       // エラー時のフォールバック
       const fallbackTimezone = 'Asia/Tokyo';

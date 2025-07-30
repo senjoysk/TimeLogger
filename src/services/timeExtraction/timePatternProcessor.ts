@@ -12,6 +12,7 @@ import {
   TimePatternMatch
 } from '../../types/realTimeAnalysis';
 import { TimePatternMatcher, TIME_EXPRESSION_NORMALIZER } from '../../utils/timePatterns';
+import { logger } from '../../utils/logger';
 
 /**
  * 時刻パターン処理サービスインターフェース
@@ -193,7 +194,7 @@ export class TimePatternProcessor implements ITimePatternProcessor {
       const parsed = match.parsed || match.parsedInfo;
       
       if (!parsed || parsed.startHour === undefined) {
-        console.warn('明示的時刻範囲の解析に失敗:', match);
+        logger.warn('TIME_PATTERN_PROCESSOR', '明示的時刻範囲の解析に失敗:', { match });
         return { confidence: 0.3 };
       }
 
@@ -228,7 +229,7 @@ export class TimePatternProcessor implements ITimePatternProcessor {
         timezone
       };
     } catch (error) {
-      console.error('明示的時刻範囲の解析エラー:', error);
+      logger.error('TIME_PATTERN_PROCESSOR', '明示的時刻範囲の解析エラー:', error as Error);
       return { confidence: 0.3 };
     }
   }
@@ -274,7 +275,7 @@ export class TimePatternProcessor implements ITimePatternProcessor {
         timezone
       };
     } catch (error) {
-      console.error('単一時刻の解析エラー:', error);
+      logger.error('TIME_PATTERN_PROCESSOR', '単一時刻の解析エラー:', error as Error);
       return { confidence: 0.3 };
     }
   }
@@ -313,7 +314,7 @@ export class TimePatternProcessor implements ITimePatternProcessor {
         timezone
       };
     } catch (error) {
-      console.error('継続時間パターンの解析エラー:', error);
+      logger.error('TIME_PATTERN_PROCESSOR', '継続時間パターンの解析エラー:', error as Error);
       return { confidence: 0.3 };
     }
   }
@@ -352,7 +353,7 @@ export class TimePatternProcessor implements ITimePatternProcessor {
         timezone
       };
     } catch (error) {
-      console.error('相対時刻パターンの解析エラー:', error);
+      logger.error('TIME_PATTERN_PROCESSOR', '相対時刻パターンの解析エラー:', error as Error);
       return { confidence: 0.3 };
     }
   }

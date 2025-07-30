@@ -10,6 +10,17 @@ jest.mock('@google/generative-ai', () => ({
   }))
 }));
 
+// logger のモック
+jest.mock('../../utils/logger', () => ({
+  logger: {
+    info: jest.fn(),
+    error: jest.fn(),
+    warn: jest.fn(),
+    debug: jest.fn(),
+    success: jest.fn()
+  }
+}));
+
 // GeminiServiceでのリマインダーコンテキスト付きAI分析テスト（実装済み）
 describe('GeminiService ReminderContext機能（実装済み）', () => {
   let geminiService: GeminiService;
@@ -29,15 +40,16 @@ describe('GeminiService ReminderContext機能（実装済み）', () => {
       generateDailyReport: jest.fn().mockResolvedValue('Daily report')
     } as any;
     
-    // console.logをスパイして、ログ出力を確認できるようにする
-    jest.spyOn(console, 'log').mockImplementation(() => {});
+    // loggerのモックをリセット
+    const { logger } = require('../../utils/logger');
+    jest.clearAllMocks();
     jest.spyOn(console, 'error').mockImplementation(() => {});
     
     geminiService = new GeminiService(mockApiCostRepository);
   });
 
   afterEach(() => {
-    // console.logのモックをリストア
+    // モックをリストア
     jest.restoreAllMocks();
   });
 
@@ -85,8 +97,9 @@ describe('GeminiService ReminderContext機能（実装済み）', () => {
       expect(result.contextType).toBe('REMINDER_REPLY');
       
       // ログ出力が呼ばれたことを確認
-      expect(console.log).toHaveBeenCalledWith('📤 [Gemini API] リマインダーReply分析プロンプト:');
-      expect(console.log).toHaveBeenCalledWith('📥 [Gemini API] リマインダーReply分析レスポンス:');
+      const { logger } = require('../../utils/logger');
+      expect(logger.debug).toHaveBeenCalledWith('REMINDER_CONTEXT', '📤 [Gemini API] リマインダーReply分析プロンプト:');
+      expect(logger.debug).toHaveBeenCalledWith('REMINDER_CONTEXT', '📥 [Gemini API] リマインダーReply分析レスポンス:');
     });
 
     test('リマインダー直後メッセージを文脈考慮で分析する', async () => {
@@ -131,8 +144,9 @@ describe('GeminiService ReminderContext機能（実装済み）', () => {
       expect(result.contextType).toBe('POST_REMINDER');
       
       // ログ出力が呼ばれたことを確認
-      expect(console.log).toHaveBeenCalledWith('📤 [Gemini API] リマインダー直後メッセージ分析プロンプト:');
-      expect(console.log).toHaveBeenCalledWith('📥 [Gemini API] リマインダー直後メッセージ分析レスポンス:');
+      const { logger } = require('../../utils/logger');
+      expect(logger.debug).toHaveBeenCalledWith('REMINDER_CONTEXT', '📤 [Gemini API] リマインダー直後メッセージ分析プロンプト:');
+      expect(logger.debug).toHaveBeenCalledWith('REMINDER_CONTEXT', '📥 [Gemini API] リマインダー直後メッセージ分析レスポンス:');
     });
   });
 

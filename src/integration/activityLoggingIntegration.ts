@@ -39,6 +39,7 @@ import { ITimeProvider, IDiscordBot } from '../interfaces/dependencies';
 import { TimeProviderService } from '../services/timeProviderService';
 import { ReminderReplyService, IReminderReplyService } from '../services/reminderReplyService';
 import { HealthStatus } from '../types/health';
+import { logger } from '../utils/logger';
 
 /**
  * 活動記録システム統合設定インターフェース
@@ -122,18 +123,18 @@ export class ActivityLoggingIntegration {
    */
   async initialize(): Promise<void> {
     if (this.isInitialized) {
-      console.log('ℹ️ 活動記録システムは既に初期化済みです');
+      logger.info('ACTIVITY_LOG', 'ℹ️ 活動記録システムは既に初期化済みです');
       return;
     }
     
     try {
-      console.log('🚀 活動記録システムの初期化を開始...');
+      logger.info('ACTIVITY_LOG', '🚀 活動記録システムの初期化を開始...');
 
       // 1. データベース接続とRepository初期化
       if (this.config.repository) {
         // 外部から注入されたリポジトリを使用（テスト用）
         this.repository = this.config.repository;
-        console.log('✅ 外部リポジトリを使用（テスト用）');
+        logger.info('ACTIVITY_LOG', '✅ 外部リポジトリを使用（テスト用）');
       } else {
         // 通常の場合は新しいリポジトリを作成
         this.repository = new PartialCompositeRepository(this.config.databasePath);
@@ -144,18 +145,18 @@ export class ActivityLoggingIntegration {
         // ConfigServiceとTimezoneServiceの初期化（リポジトリを注入）
         this.configService = new ConfigService();
         this.timezoneService = new TimezoneService(this.repository);
-        console.log('✅ データベース接続・初期化完了');
+        logger.info('ACTIVITY_LOG', '✅ データベース接続・初期化完了');
       }
 
       // メモリポジトリの初期化
       this.memoRepository = new SqliteMemoRepository(this.config.databasePath);
-      console.log('✅ メモリポジトリ初期化完了');
+      logger.info('ACTIVITY_LOG', '✅ メモリポジトリ初期化完了');
 
       // 外部リポジトリの場合のConfigServiceとTimezoneService初期化
       if (this.config.repository) {
         this.configService = new ConfigService();
         this.timezoneService = new TimezoneService(this.repository);
-        console.log('✅ ConfigService・TimezoneService初期化完了（外部リポジトリ用）');
+        logger.info('ACTIVITY_LOG', '✅ ConfigService・TimezoneService初期化完了（外部リポジトリ用）');
       }
 
       // 2. サービス層の初期化
@@ -164,17 +165,17 @@ export class ActivityLoggingIntegration {
       if (this.config.geminiService) {
         // 外部から注入されたGeminiServiceを使用（テスト用）
         this.geminiService = this.config.geminiService;
-        console.log('✅ 外部GeminiServiceを使用（テスト用）');
+        logger.info('ACTIVITY_LOG', '✅ 外部GeminiServiceを使用（テスト用）');
       } else {
         // 通常の場合は新しいGeminiServiceを作成
         const { GeminiService } = await import('../services/geminiService');
         this.geminiService = new GeminiService(this.repository);
-        console.log('✅ 新規GeminiServiceを作成');
+        logger.info('ACTIVITY_LOG', '✅ 新規GeminiServiceを作成');
       }
       
       // ActivityLogServiceにGeminiServiceを注入（リアルタイム分析のため）
       this.activityLogService = new ActivityLogService(this.repository, this.geminiService);
-      console.log('✅ GeminiService初期化完了（CompositeRepository使用）');
+      logger.info('ACTIVITY_LOG', '✅ GeminiService初期化完了（CompositeRepository使用）');
       
       
       this.gapDetectionService = new GapDetectionService(this.repository);
@@ -184,18 +185,18 @@ export class ActivityLoggingIntegration {
       if (this.config.messageClassificationService) {
         // 外部から注入されたメッセージ分類サービスを使用（テスト用）
         this.messageClassificationService = this.config.messageClassificationService;
-        console.log('✅ 外部MessageClassificationServiceを使用（テスト用）');
+        logger.info('ACTIVITY_LOG', '✅ 外部MessageClassificationServiceを使用（テスト用）');
       } else {
         // 通常の場合は新しいMessageClassificationServiceを作成
         const { MessageClassificationService } = await import('../services/messageClassificationService');
         this.messageClassificationService = new MessageClassificationService(this.geminiService);
-        console.log('✅ 新規MessageClassificationServiceを作成');
+        logger.info('ACTIVITY_LOG', '✅ 新規MessageClassificationServiceを作成');
       }
       
       // DynamicReportSchedulerの初期化
       this.dynamicReportScheduler = new DynamicReportScheduler(this.repository);
       
-      console.log('✅ サービス層初期化完了（TODO統合機能含む）');
+      logger.info('ACTIVITY_LOG', '✅ サービス層初期化完了（TODO統合機能含む）');
 
       // 3. ハンドラー層の初期化
       this.editHandler = new EditCommandHandler(this.activityLogService);
@@ -242,19 +243,19 @@ export class ActivityLoggingIntegration {
       this.timezoneHandler.setTimezoneChangeCallback(async (userId: string, oldTimezone: string | null, newTimezone: string) => {
         try {
           await this.dynamicReportScheduler.onTimezoneChanged(userId, oldTimezone, newTimezone);
-          console.log(`📅 DynamicReportSchedulerに通知: ${userId} ${oldTimezone} -> ${newTimezone}`);
+          logger.info('ACTIVITY_LOG', `📅 DynamicReportSchedulerに通知: ${userId} ${oldTimezone} -> ${newTimezone}`);
         } catch (error) {
-          console.warn(`⚠️ DynamicReportSchedulerへの通知に失敗: ${error}`);
+          logger.warn('ACTIVITY_LOG', 'DynamicReportSchedulerへの通知に失敗', { error });
         }
       });
       
-      console.log('✅ ハンドラー層初期化完了（TODO機能統合済み）');
+      logger.info('ACTIVITY_LOG', '✅ ハンドラー層初期化完了（TODO機能統合済み）');
 
       this.isInitialized = true;
-      console.log('🎉 活動記録システム初期化完了！');
+      logger.info('ACTIVITY_LOG', '🎉 活動記録システム初期化完了！');
 
     } catch (error) {
-      console.error('❌ 活動記録システム初期化エラー:', error);
+      logger.error('ACTIVITY_LOG', '❌ 活動記録システム初期化エラー:', error);
       throw new ActivityLogError(
         '活動記録システムの初期化に失敗しました', 
         'INTEGRATION_INIT_ERROR', 
@@ -275,7 +276,7 @@ export class ActivityLoggingIntegration {
       );
     }
 
-    console.log('🔗 Discord Botへの統合を開始...');
+    logger.info('ACTIVITY_LOG', '🔗 Discord Botへの統合を開始...');
 
     // Botインスタンスを保存
     this.botInstance = bot;
@@ -284,7 +285,7 @@ export class ActivityLoggingIntegration {
     if (bot) {
       this.dailyReportSender = new DailyReportSender(this, bot as unknown as TaskLoggerBot);
       this.dynamicReportScheduler.setReportSender(this.dailyReportSender);
-      console.log('✅ DailyReportSender初期化完了');
+      logger.info('ACTIVITY_LOG', '✅ DailyReportSender初期化完了');
     }
 
     // 既存のmessageCreateリスナーを一時的に無効化
@@ -301,7 +302,7 @@ export class ActivityLoggingIntegration {
           try {
             await (listener as Function)(message);
           } catch (error) {
-            console.error('❌ レガシーハンドラーエラー:', error);
+            logger.error('ACTIVITY_LOG', '❌ レガシーハンドラーエラー:', error);
           }
         }
       }
@@ -314,7 +315,7 @@ export class ActivityLoggingIntegration {
       }
     });
 
-    console.log('✅ Discord Bot統合完了（活動記録システム + TODO機能統合）');
+    logger.info('ACTIVITY_LOG', '✅ Discord Bot統合完了（活動記録システム + TODO機能統合）');
   }
 
   /**
@@ -323,7 +324,7 @@ export class ActivityLoggingIntegration {
    */
   async handleMessage(message: Message): Promise<boolean> {
     try {
-      console.log('🔍 [活動記録] メッセージ受信:', {
+      logger.info('ACTIVITY_LOG', '🔍 [活動記録] メッセージ受信:', {
         authorId: message.author?.id,
         authorTag: message.author?.tag,
         isBot: message.author?.bot,
@@ -334,13 +335,13 @@ export class ActivityLoggingIntegration {
 
       // Bot自身のメッセージは無視
       if (message.author.bot) {
-        console.log('  ↳ [活動記録] Botメッセージのため無視');
+        logger.info('ACTIVITY_LOG', '  ↳ [活動記録] Botメッセージのため無視');
         return false;
       }
 
       // DMのみを処理（ギルドチャンネルは無視）
       if (message.guild) {
-        console.log('  ↳ [活動記録] ギルドメッセージのため無視（DMのみ処理）');
+        logger.info('ACTIVITY_LOG', '  ↳ [活動記録] ギルドメッセージのため無視（DMのみ処理）');
         return false;
       }
 
@@ -356,32 +357,32 @@ export class ActivityLoggingIntegration {
         const welcomeMessage = this.getWelcomeMessage();
         try {
           await message.reply(welcomeMessage);
-          console.log(`🎉 ウェルカムメッセージ送信完了: ${userId}`);
+          logger.info('ACTIVITY_LOG', `🎉 ウェルカムメッセージ送信完了: ${userId}`);
           // ウェルカムメッセージ送信後、通常の処理も継続
         } catch (error) {
-          console.error('❌ ウェルカムメッセージ送信エラー:', error);
+          logger.error('ACTIVITY_LOG', '❌ ウェルカムメッセージ送信エラー:', error);
         }
       }
       
-      console.log(`✅ [活動記録] 処理対象ユーザー: ${userId}`);
-      console.log(`✅ [活動記録] 処理対象メッセージ: "${content}"`)
+      logger.info('ACTIVITY_LOG', `✅ [活動記録] 処理対象ユーザー: ${userId}`);
+      logger.info('ACTIVITY_LOG', `✅ [活動記録] 処理対象メッセージ: "${content}"`)
 
       // コマンド処理
       if (content.startsWith('!')) {
-        console.log(`🔧 [活動記録] コマンド検出: "${content}"`);
+        logger.info('ACTIVITY_LOG', `🔧 [活動記録] コマンド検出: "${content}"`);
         await this.handleCommand(message, userId, content, timezone);
         return true;
       }
 
       // リマインダーReply検出処理
-      console.log(`🔍 [リマインダーReply] 検出処理開始: ${userId}`);
+      logger.info('ACTIVITY_LOG', `🔍 [リマインダーReply] 検出処理開始: ${userId}`);
       const reminderReplyResult = await this.reminderReplyService.isReminderReply(message);
       
       if (reminderReplyResult.isReminderReply && reminderReplyResult.timeRange) {
-        console.log(`✅ [リマインダーReply] Reply検出成功:`, reminderReplyResult.timeRange);
+        logger.info('ACTIVITY_LOG', '✅ [リマインダーReply] Reply検出成功', { timeRange: reminderReplyResult.timeRange });
         
         // GeminiServiceでAI分析を実行（新しいanalyzeActivityContentメソッドを使用）
-        console.log(`🤖 [リマインダーReply] Gemini分析開始...`);
+        logger.info('ACTIVITY_LOG', `🤖 [リマインダーReply] Gemini分析開始...`);
         const analysis = await this.geminiService.analyzeActivityContent(
           content,
           message.createdAt,
@@ -393,7 +394,7 @@ export class ActivityLoggingIntegration {
             reminderContent: reminderReplyResult.reminderContent
           }
         );
-        console.log(`✅ [リマインダーReply] Gemini分析完了:`, analysis);
+        logger.info('ACTIVITY_LOG', '✅ [リマインダーReply] Gemini分析完了', { analysis });
         
         // 分析結果を含めてリマインダーReplyとして活動ログに記録
         const activityLog = {
@@ -418,7 +419,7 @@ export class ActivityLoggingIntegration {
         };
         
         await this.repository.saveLog(activityLog);
-        console.log(`✅ [リマインダーReply] 活動ログ記録完了: ${userId}`);
+        logger.info('ACTIVITY_LOG', `✅ [リマインダーReply] 活動ログ記録完了: ${userId}`);
         
         // ユーザーに確認メッセージを送信（AI分析結果も含む）
         const timeRange = reminderReplyResult.timeRange;
@@ -436,19 +437,19 @@ export class ActivityLoggingIntegration {
 
       // 通常のメッセージはAI分類を優先し、分類結果に基づいて適切に記録
       if (content.length > 0 && content.length <= 2000) {
-        console.log(`🤖 メッセージ分類処理開始: ${userId}`);
+        logger.info('ACTIVITY_LOG', `🤖 メッセージ分類処理開始: ${userId}`);
         
         // 🟢 Green Phase: AI分類をMessageSelectionHandlerに置き換え
         await this.messageSelectionHandler.processNonCommandMessage(message, userId, timezone);
         
-        console.log(`✅ メッセージ分類処理完了: ${userId}`);
+        logger.info('ACTIVITY_LOG', `✅ メッセージ分類処理完了: ${userId}`);
         return true;
       }
 
       return false; // 処理対象外
 
     } catch (error) {
-      console.error('❌ メッセージ処理エラー:', error);
+      logger.error('ACTIVITY_LOG', '❌ メッセージ処理エラー:', error);
       
       // エラーを適切にユーザーに通知
       const errorMessage = error instanceof ActivityLogError 
@@ -458,7 +459,7 @@ export class ActivityLoggingIntegration {
       try {
         await message.reply(errorMessage);
       } catch (replyError) {
-        console.error('❌ エラー返信失敗:', replyError);
+        logger.error('ACTIVITY_LOG', '❌ エラー返信失敗:', replyError);
       }
       
       return false; // エラーのため未処理扱い
@@ -473,7 +474,7 @@ export class ActivityLoggingIntegration {
     const command = parts[0].toLowerCase();
     const args = parts.slice(1);
 
-    console.log(`🎮 コマンド処理: ${command} (${userId}), args: [${args.join(', ')}]`);
+    logger.info('ACTIVITY_LOG', `🎮 コマンド処理: ${command} (${userId}), args: [${args.join(', ')}]`);
 
     switch (command) {
       case 'edit':
@@ -513,39 +514,39 @@ export class ActivityLoggingIntegration {
 
       case 'gap':
       case 'ギャップ':
-        console.log(`🔧 gapコマンド実行: ユーザー=${userId}, タイムゾーン=${timezone}, ハンドラー存在=${!!this.gapHandler}`);
+        logger.info('ACTIVITY_LOG', `🔧 gapコマンド実行: ユーザー=${userId}, タイムゾーン=${timezone}, ハンドラー存在=${!!this.gapHandler}`);
         await this.gapHandler.handle(message, userId, args, timezone);
         break;
 
       case 'unmatched':
       case 'マッチング':
       case 'match':
-        console.log(`🔗 unmatchedコマンド実行: ユーザー=${userId}, タイムゾーン=${timezone}, ハンドラー存在=${!!this.unmatchedHandler}`);
+        logger.info('ACTIVITY_LOG', `🔗 unmatchedコマンド実行: ユーザー=${userId}, タイムゾーン=${timezone}, ハンドラー存在=${!!this.unmatchedHandler}`);
         await this.unmatchedHandler.handle(message, userId, args, timezone);
         break;
 
       case 'todo':
       case 'タスク':
-        console.log(`📋 todoコマンド実行: ユーザー=${userId}, タイムゾーン=${timezone}`);
+        logger.info('ACTIVITY_LOG', `📋 todoコマンド実行: ユーザー=${userId}, タイムゾーン=${timezone}`);
         await this.todoCrudHandler.handleCommand(message, userId, args, timezone);
         break;
 
       case 'profile':
       case 'プロファイル':
-        console.log(`📊 profileコマンド実行: ユーザー=${userId}, タイムゾーン=${timezone}`);
+        logger.info('ACTIVITY_LOG', `📊 profileコマンド実行: ユーザー=${userId}, タイムゾーン=${timezone}`);
         await this.profileHandler.handle(message, userId, args, timezone);
         break;
 
       case 'memo':
       case 'メモ':
-        console.log(`📝 memoコマンド実行: ユーザー=${userId}, タイムゾーン=${timezone}`);
+        logger.info('ACTIVITY_LOG', `📝 memoコマンド実行: ユーザー=${userId}, タイムゾーン=${timezone}`);
         await this.memoHandler.handleCommand(message, args);
         break;
 
       case 'prompt':
       case 'プロンプト':
       case '通知':
-        console.log(`📢 promptコマンド実行: ユーザー=${userId}, タイムゾーン=${timezone}`);
+        logger.info('ACTIVITY_LOG', `📢 promptコマンド実行: ユーザー=${userId}, タイムゾーン=${timezone}`);
         if (this.botInstance?.handlePromptCommand) {
           await this.botInstance.handlePromptCommand(message, args, userId, timezone);
         }
@@ -553,7 +554,7 @@ export class ActivityLoggingIntegration {
 
       default:
         // 他のコマンドは既存システムに委譲または無視
-        console.log(`📝 未対応コマンド: ${command}`);
+        logger.info('ACTIVITY_LOG', `📝 未対応コマンド: ${command}`);
         break;
     }
   }
@@ -567,7 +568,7 @@ export class ActivityLoggingIntegration {
       const userId = interaction.user.id;
       const timezone = await this.getUserTimezone(userId);
       
-      console.log(`🔘 ボタンインタラクション処理: ${userId} - ${interaction.customId}`);
+      logger.info('ACTIVITY_LOG', `🔘 ボタンインタラクション処理: ${userId} - ${interaction.customId}`);
       
       // 🟢 Green Phase: MessageSelectionのボタンかTODOボタンかを判定
       if (interaction.customId.startsWith('select_')) {
@@ -577,11 +578,11 @@ export class ActivityLoggingIntegration {
         // TodoInteractionHandlerに委譲
         await this.handleTodoButtonInteraction(interaction, userId, timezone);
       } else {
-        console.log('⚠️ 未知のボタンインタラクション:', interaction.customId);
+        logger.info('ACTIVITY_LOG', '⚠️ 未知のボタンインタラクション', { customId: interaction.customId });
       }
       
     } catch (error) {
-      console.error('❌ ボタンインタラクション処理エラー:', error);
+      logger.error('ACTIVITY_LOG', '❌ ボタンインタラクション処理エラー:', error);
       
       if (!interaction.replied) {
         try {
@@ -590,7 +591,7 @@ export class ActivityLoggingIntegration {
             ephemeral: true 
           });
         } catch (replyError) {
-          console.error('❌ エラー返信失敗:', replyError);
+          logger.error('ACTIVITY_LOG', '❌ エラー返信失敗:', replyError);
         }
       }
     }
@@ -600,7 +601,7 @@ export class ActivityLoggingIntegration {
    * TODOボタンインタラクションを処理
    */
   private async handleTodoButtonInteraction(interaction: ButtonInteraction, userId: string, timezone: string): Promise<void> {
-    console.log(`🔘 TODOボタンインタラクション: ${userId} ${interaction.customId}`);
+    logger.info('ACTIVITY_LOG', `🔘 TODOボタンインタラクション: ${userId} ${interaction.customId}`);
 
     // カスタムIDを解析
     const idParts = interaction.customId.split('_');
@@ -629,13 +630,13 @@ export class ActivityLoggingIntegration {
    */
   private async recordActivity(message: Message, userId: string, content: string, timezone: string): Promise<void> {
     try {
-      console.log(`📝 活動記録: ${userId} - ${content.substring(0, 50)}...`);
+      logger.info('ACTIVITY_LOG', `📝 活動記録: ${userId} - ${content.substring(0, 50)}...`);
 
       // 活動を記録
       const log = await this.activityLogService.recordActivity(userId, content, timezone);
 
       // キャッシュ無効化はシンプルサマリーでは不要
-      console.log(`📋 ログ記録完了: ${userId} ${log.businessDate}`);
+      logger.info('ACTIVITY_LOG', `📋 ログ記録完了: ${userId} ${log.businessDate}`);
 
       // 記録完了の確認（デバッグモードのみ）
       if (this.config.debugMode) {
@@ -645,12 +646,12 @@ export class ActivityLoggingIntegration {
       // 自動分析が有効な場合、バックグラウンドで分析をトリガー
       if (this.config.enableAutoAnalysis) {
         this.triggerAutoAnalysis(userId, log.businessDate, timezone).catch(error => {
-          console.warn('⚠️ 自動分析エラー:', error);
+          logger.warn('ACTIVITY_LOG', '自動分析エラー', { error });
         });
       }
 
     } catch (error) {
-      console.error('❌ 活動記録エラー:', error);
+      logger.error('ACTIVITY_LOG', '❌ 活動記録エラー:', error);
       throw error;
     }
   }
@@ -676,9 +677,9 @@ export class ActivityLoggingIntegration {
         const logs = await this.activityLogService.getLogsForDate(userId, businessDate, timezone);
         
         // シンプルサマリーでは自動分析は不要
-        console.log(`📋 活動ログ登録完了: ${userId} (${logs.length}件目)`);
+        logger.info('ACTIVITY_LOG', `📋 活動ログ登録完了: ${userId} (${logs.length}件目)`);
       } catch (error) {
-        console.warn('⚠️ 自動分析トリガー失敗:', error);
+        logger.warn('ACTIVITY_LOG', '自動分析トリガー失敗', { error });
       } finally {
         // 完了したタスクを管理セットから除去
         this.pendingAnalysisTasks.delete(immediateHandle);
@@ -752,7 +753,7 @@ export class ActivityLoggingIntegration {
 
       await message.reply(statusMessage);
     } catch (error) {
-      console.error('❌ ステータス表示エラー:', error);
+      logger.error('ACTIVITY_LOG', '❌ ステータス表示エラー:', error);
       await message.reply('❌ ステータス情報の取得に失敗しました。');
     }
   }
@@ -765,7 +766,7 @@ export class ActivityLoggingIntegration {
       // GeminiService経由でコストレポートを取得
       return await this.geminiService.getDailyCostReport(userId, timezone);
     } catch (error) {
-      console.error('❌ コストレポート取得エラー:', error);
+      logger.error('ACTIVITY_LOG', '❌ コストレポート取得エラー:', error);
       return '❌ コストレポートの取得に失敗しました。';
     }
   }
@@ -790,9 +791,9 @@ export class ActivityLoggingIntegration {
   setTimezoneChangeCallback(callback: (userId: string, oldTimezone: string | null, newTimezone: string) => Promise<void>): void {
     if (this.timezoneHandler) {
       this.timezoneHandler.setTimezoneChangeCallback(callback);
-      console.log('📅 TimezoneHandlerにコールバックを設定しました');
+      logger.info('ACTIVITY_LOG', '📅 TimezoneHandlerにコールバックを設定しました');
     } else {
-      console.warn('⚠️ TimezoneHandlerが初期化されていません');
+      logger.warn('ACTIVITY_LOG', 'TimezoneHandlerが初期化されていません');
     }
   }
 
@@ -828,7 +829,7 @@ export class ActivityLoggingIntegration {
       
       return summaryText || '🌅 今日一日お疲れさまでした！\n\nサマリーの詳細は `!summary` コマンドで確認できます。';
     } catch (error) {
-      console.error('❌ 日次サマリーテキスト生成エラー:', error);
+      logger.error('ACTIVITY_LOG', '❌ 日次サマリーテキスト生成エラー:', error);
       return '🌅 今日一日お疲れさまでした！\n\nサマリーの詳細は `!summary` コマンドで確認できます。';
     }
   }
@@ -838,7 +839,7 @@ export class ActivityLoggingIntegration {
    */
   async shutdown(): Promise<void> {
     try {
-      console.log('🔄 活動記録システムのシャットダウンを開始...');
+      logger.info('ACTIVITY_LOG', '🔄 活動記録システムのシャットダウンを開始...');
 
       // シャットダウンフラグを設定
       this.isShuttingDown = true;
@@ -848,23 +849,23 @@ export class ActivityLoggingIntegration {
         clearImmediate(handle);
       }
       this.pendingAnalysisTasks.clear();
-      console.log('✅ 非同期分析タスクをクリーンアップしました');
+      logger.info('ACTIVITY_LOG', '✅ 非同期分析タスクをクリーンアップしました');
 
       // TODOハンドラーのクリーンアップ（分割版）
       if (this.messageClassificationHandler && typeof this.messageClassificationHandler.destroy === 'function') {
         this.messageClassificationHandler.destroy();
-        console.log('✅ メッセージ分類ハンドラーをクリーンアップしました');
+        logger.info('ACTIVITY_LOG', '✅ メッセージ分類ハンドラーをクリーンアップしました');
       }
 
       if (this.repository) {
         await this.repository.close();
-        console.log('✅ データベース接続を閉じました');
+        logger.info('ACTIVITY_LOG', '✅ データベース接続を閉じました');
       }
 
       this.isInitialized = false;
-      console.log('✅ 活動記録システムのシャットダウン完了');
+      logger.info('ACTIVITY_LOG', '✅ 活動記録システムのシャットダウン完了');
     } catch (error) {
-      console.error('❌ シャットダウンエラー:', error);
+      logger.error('ACTIVITY_LOG', '❌ シャットダウンエラー:', error);
       throw error;
     }
   }
@@ -913,7 +914,7 @@ export class ActivityLoggingIntegration {
         timestamp: new Date()
       };
     } catch (error) {
-      console.error('❌ ヘルスチェックエラー:', error);
+      logger.error('ACTIVITY_LOG', '❌ ヘルスチェックエラー:', error);
       return { 
         healthy: false, 
         checks: {
@@ -970,7 +971,7 @@ export class ActivityLoggingIntegration {
         }
       };
     } catch (error) {
-      console.error('❌ システム統計取得エラー:', error);
+      logger.error('ACTIVITY_LOG', '❌ システム統計取得エラー:', error);
       throw new ActivityLogError('システム統計の取得に失敗しました', 'GET_SYSTEM_STATS_ERROR', { error });
     }
   }
@@ -983,30 +984,30 @@ export class ActivityLoggingIntegration {
    */
   private async handleCostCommand(message: Message, userId: string, timezone: string): Promise<void> {
     try {
-      console.log(`💰 コスト情報要求: ${userId}, timezone: ${timezone}`);
+      logger.info('ACTIVITY_LOG', `💰 コスト情報要求: ${userId}, timezone: ${timezone}`);
       
       // GeminiServiceが利用可能かチェック
       if (!this.geminiService) {
-        console.error('❌ GeminiServiceが初期化されていません');
+        logger.error('ACTIVITY_LOG', '❌ GeminiServiceが初期化されていません');
         await message.reply('❌ コスト情報の取得機能が利用できません。');
         return;
       }
 
-      console.log('🔍 GeminiService利用可能、コストレポート生成中...');
+      logger.info('ACTIVITY_LOG', '🔍 GeminiService利用可能、コストレポート生成中...');
 
       // API使用コストレポートを生成
       const costReport = await this.geminiService.getDailyCostReport(userId, timezone);
       
-      console.log(`📊 コストレポート生成完了: ${costReport.substring(0, 100)}...`);
+      logger.info('ACTIVITY_LOG', `📊 コストレポート生成完了: ${costReport.substring(0, 100)}...`);
 
       // Discordに送信
       await message.reply(costReport);
       
-      console.log(`✅ コストレポート送信完了: ${userId}`);
+      logger.info('ACTIVITY_LOG', `✅ コストレポート送信完了: ${userId}`);
       
     } catch (error) {
-      console.error('❌ コストコマンドエラー:', error);
-      console.error('❌ エラー詳細:', {
+      logger.error('ACTIVITY_LOG', '❌ コストコマンドエラー:', error);
+      logger.error('ACTIVITY_LOG', '❌ エラー詳細:', {
         name: (error as Error).name,
         message: (error as Error).message,
         stack: (error as Error).stack?.split('\n').slice(0, 3)
@@ -1034,7 +1035,7 @@ export class ActivityLoggingIntegration {
       // フォールバック: デフォルト値を使用
       return this.config.defaultTimezone;
     } catch (error) {
-      console.error('❌ タイムゾーン取得エラー:', error);
+      logger.error('ACTIVITY_LOG', '❌ タイムゾーン取得エラー:', error);
       return this.config.defaultTimezone;
     }
   }
@@ -1050,7 +1051,7 @@ export class ActivityLoggingIntegration {
       
       if (!userExists) {
         await this.repository.registerUser(userId, username);
-        console.log(`🎉 新規ユーザー自動登録: ${userId} (${username})`);
+        logger.info('ACTIVITY_LOG', `🎉 新規ユーザー自動登録: ${userId} (${username})`);
         return true; // 新規ユーザー
       } else {
         // 最終利用日時を更新
@@ -1058,7 +1059,7 @@ export class ActivityLoggingIntegration {
         return false; // 既存ユーザー
       }
     } catch (error) {
-      console.error('❌ ユーザー登録確認エラー:', error);
+      logger.error('ACTIVITY_LOG', '❌ ユーザー登録確認エラー:', error);
       // 登録エラーは処理を止めない（ログ記録は継続）
       return false;
     }
@@ -1131,7 +1132,7 @@ export class ActivityLoggingIntegration {
         timezone
       }));
     } catch (error) {
-      console.error('❌ 全ユーザータイムゾーン取得エラー:', error);
+      logger.error('ACTIVITY_LOG', '❌ 全ユーザータイムゾーン取得エラー:', error);
       throw new ActivityLogError('全ユーザータイムゾーンの取得に失敗しました', 'GET_ALL_USER_TIMEZONES_ERROR', { error });
     }
   }
@@ -1141,25 +1142,25 @@ export class ActivityLoggingIntegration {
    */
   async destroy(): Promise<void> {
     try {
-      console.log('🧹 活動記録システムのクリーンアップ開始...');
+      logger.info('ACTIVITY_LOG', '🧹 活動記録システムのクリーンアップ開始...');
 
       // TODO機能ハンドラーのクリーンアップ（分割版）
       if (this.messageClassificationHandler && typeof this.messageClassificationHandler.destroy === 'function') {
         this.messageClassificationHandler.destroy();
-        console.log('✅ メッセージ分類ハンドラークリーンアップ完了');
+        logger.info('ACTIVITY_LOG', '✅ メッセージ分類ハンドラークリーンアップ完了');
       }
 
       // データベースリポジトリのクリーンアップ
       if (this.repository) {
         await this.repository.close();
-        console.log('✅ データベース接続クリーンアップ完了');
+        logger.info('ACTIVITY_LOG', '✅ データベース接続クリーンアップ完了');
       }
 
       this.isInitialized = false;
-      console.log('🎉 活動記録システムクリーンアップ完了');
+      logger.info('ACTIVITY_LOG', '🎉 活動記録システムクリーンアップ完了');
 
     } catch (error) {
-      console.error('❌ システムクリーンアップエラー:', error);
+      logger.error('ACTIVITY_LOG', '❌ システムクリーンアップエラー:', error);
       throw new ActivityLogError(
         'システムクリーンアップに失敗しました', 
         'SYSTEM_CLEANUP_ERROR', 

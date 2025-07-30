@@ -15,6 +15,7 @@ import { TodoTask, TodoStatus, TodoPriority, Todo } from '../../types/todo';
 import { v4 as uuidv4 } from 'uuid';
 import { ITimezoneService } from '../../services/interfaces/ITimezoneService';
 import { CreateTodoRequest } from '../services/todoManagementService';
+import { logger } from '../../utils/logger';
 
 export class AdminRepository implements IAdminRepository {
   private sqliteRepo: IUnifiedRepository;
@@ -530,7 +531,7 @@ export class AdminRepository implements IAdminRepository {
     
     // エラーがあった場合のログ出力（デバッグ用）
     if (errors.length > 0 && process.env.NODE_ENV !== 'production') {
-      console.warn(`[Bulk Create] ${errors.length} TODOs failed to create:`, errors);
+      logger.warn('WEB_ADMIN', `[Bulk Create] ${errors.length} TODOs failed to create:`, { errors });
     }
     
     return createdTodos;

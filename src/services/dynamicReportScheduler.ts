@@ -11,6 +11,7 @@
 
 import * as cron from 'node-cron';
 import { UserTimezone } from '../repositories/interfaces';
+import { logger } from '../utils/logger';
 // import { toZonedTime } from 'date-fns-tz'; // 将来の拡張用
 
 interface UtcTime {
@@ -68,7 +69,7 @@ export class DynamicReportScheduler {
    */
   async initialize(): Promise<void> {
     if (!this.repository) {
-      console.warn('Repository not set, skipping initialization');
+      logger.warn('SCHEDULER', 'Repository not set, skipping initialization');
       return;
     }
 
@@ -77,7 +78,7 @@ export class DynamicReportScheduler {
       
       // userTimezonesがnull、undefined、または配列でない場合の処理
       if (!userTimezones || !Array.isArray(userTimezones)) {
-        console.warn('⚠️ userTimezones is not iterable or is null/undefined, skipping initialization');
+        logger.warn('SCHEDULER', '⚠️ userTimezones is not iterable or is null/undefined, skipping initialization');
         return;
       }
       
@@ -85,9 +86,9 @@ export class DynamicReportScheduler {
         await this.onTimezoneChanged(userId, null, timezone);
       }
       
-      console.log(`✅ DynamicReportScheduler initialized with ${userTimezones.length} users`);
+      logger.info('SCHEDULER', `✅ DynamicReportScheduler initialized with ${userTimezones.length} users`);
     } catch (error) {
-      console.error('❌ Failed to initialize DynamicReportScheduler:', error);
+      logger.error('SCHEDULER', '❌ Failed to initialize DynamicReportScheduler:', error as Error);
     }
   }
 
@@ -107,7 +108,7 @@ export class DynamicReportScheduler {
       };
       
       if (!(newTimezone in offsetMap)) {
-        console.warn(`⚠️ Invalid timezone: ${newTimezone}, skipping`);
+        logger.warn('SCHEDULER', `⚠️ Invalid timezone: ${newTimezone}, skipping`);
         return;
       }
 
@@ -119,9 +120,9 @@ export class DynamicReportScheduler {
       // 2. 新しいタイムゾーンにユーザーを追加
       await this.addUserToTimezone(userId, newTimezone);
 
-      console.log(`🔄 User ${userId}: ${oldTimezone || 'null'} → ${newTimezone}`);
+      logger.info('SCHEDULER', `🔄 User ${userId}: ${oldTimezone || 'null'} → ${newTimezone}`);
     } catch (error) {
-      console.error(`❌ Failed to handle timezone change for user ${userId}:`, error);
+      logger.error('SCHEDULER', `❌ Failed to handle timezone change for user ${userId}:`, error as Error);
     }
   }
 
@@ -151,7 +152,7 @@ export class DynamicReportScheduler {
         await this.setupCronForUtcTime(utcTime, utcKey);
       }
     } catch (error) {
-      console.error(`❌ Failed to add user ${userId} to timezone ${timezone}:`, error);
+      logger.error('SCHEDULER', `❌ Failed to add user ${userId} to timezone ${timezone}:`, error as Error);
     }
   }
 
@@ -186,7 +187,7 @@ export class DynamicReportScheduler {
         }
       }
     } catch (error) {
-      console.error(`❌ Failed to remove user ${userId} from timezone ${timezone}:`, error);
+      logger.error('SCHEDULER', `❌ Failed to remove user ${userId} from timezone ${timezone}:`, error as Error);
     }
   }
 
@@ -204,9 +205,9 @@ export class DynamicReportScheduler {
       });
 
       this.activeJobs.set(utcKey, job);
-      console.log(`✅ Created cron job: ${pattern} for UTC ${utcKey}`);
+      logger.info('SCHEDULER', `✅ Created cron job: ${pattern} for UTC ${utcKey}`);
     } catch (error) {
-      console.error(`❌ Failed to create cron job for UTC ${utcKey}:`, error);
+      logger.error('SCHEDULER', `❌ Failed to create cron job for UTC ${utcKey}:`, error as Error);
       throw error; // テストでエラーハンドリングを確認するため
     }
   }
@@ -220,10 +221,10 @@ export class DynamicReportScheduler {
       if (job) {
         job.stop();
         this.activeJobs.delete(utcKey);
-        console.log(`🗑️ Removed cron job: ${utcKey}`);
+        logger.info('SCHEDULER', `🗑️ Removed cron job: ${utcKey}`);
       }
     } catch (error) {
-      console.error(`❌ Failed to remove cron job for UTC ${utcKey}:`, error);
+      logger.error('SCHEDULER', `❌ Failed to remove cron job for UTC ${utcKey}:`, error as Error);
     }
   }
 
@@ -233,7 +234,7 @@ export class DynamicReportScheduler {
   private async handleReportTime(utcTime: UtcTime): Promise<void> {
     try {
       const utcKey = `${utcTime.hour}:${utcTime.minute}`;
-      console.log(`📊 Report time reached: UTC ${utcKey}`);
+      logger.info('SCHEDULER', `📊 Report time reached: UTC ${utcKey}`);
       
       // このUTC時刻に該当するタイムゾーンのユーザーに送信
       const timezones = this.utcTimeToTimezones.get(utcKey);
@@ -241,27 +242,27 @@ export class DynamicReportScheduler {
         for (const timezone of timezones) {
           const users = this.timezoneUserMap.get(timezone);
           if (users) {
-            console.log(`📨 Sending reports for ${timezone} (${users.size} users)`);
+            logger.info('SCHEDULER', `📨 Sending reports for ${timezone} (${users.size} users)`);
             
             // 実際の送信処理
             if (this.reportSender) {
               for (const userId of users) {
                 try {
                   await this.reportSender.sendDailyReport(userId, timezone);
-                  console.log(`✅ Daily report sent to user ${userId} (${timezone})`);
+                  logger.info('SCHEDULER', `✅ Daily report sent to user ${userId} (${timezone})`);
                 } catch (error) {
-                  console.error(`❌ Failed to send daily report to user ${userId}:`, error);
+                  logger.error('SCHEDULER', `❌ Failed to send daily report to user ${userId}:`, error as Error);
                   // 個別のエラーでも他のユーザーへの送信は継続
                 }
               }
             } else {
-              console.warn(`⚠️ No report sender configured for ${timezone}`);
+              logger.warn('SCHEDULER', `⚠️ No report sender configured for ${timezone}`);
             }
           }
         }
       }
     } catch (error) {
-      console.error(`❌ Failed to handle report time for UTC ${utcTime.hour}:${utcTime.minute}:`, error);
+      logger.error('SCHEDULER', `❌ Failed to handle report time for UTC ${utcTime.hour}:${utcTime.minute}:`, error as Error);
     }
   }
 
@@ -321,7 +322,7 @@ export class DynamicReportScheduler {
         minute: Math.floor(utcMinute)
       };
     } catch (error) {
-      console.error(`❌ Failed to calculate UTC time for timezone ${timezone}:`, error);
+      logger.error('SCHEDULER', `❌ Failed to calculate UTC time for timezone ${timezone}:`, error as Error);
       throw error;
     }
   }

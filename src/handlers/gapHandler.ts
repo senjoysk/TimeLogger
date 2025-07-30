@@ -18,6 +18,7 @@ import {
 } from 'discord.js';
 import { IGapDetectionService, TimeGap } from '../services/gapDetectionService';
 import { IActivityLogService } from '../services/activityLogService';
+import { logger } from '../utils/logger';
 
 /**
  * ギャップハンドラーインターフェース
@@ -61,7 +62,7 @@ export class GapHandler implements IGapHandler {
       return;
 
     } catch (error) {
-      console.error('❌ ギャップ検出エラー:', error);
+      logger.error('HANDLER', '❌ ギャップ検出エラー:', error);
       const errorMessage = `❌ ギャップの検出中にエラーが発生しました\n\nエラー詳細: ${error instanceof Error ? error.message : String(error)}`;
       await message.reply(errorMessage);
     }
@@ -174,7 +175,9 @@ export class GapHandler implements IGapHandler {
         return newRow;
       });
 
-      message.edit({ components: disabledComponents }).catch(console.error);
+      message.edit({ components: disabledComponents }).catch((error) => {
+        logger.error('GAP_HANDLER', 'ボタン無効化エラー', error as Error);
+      });
     });
   }
 

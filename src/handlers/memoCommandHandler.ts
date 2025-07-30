@@ -7,6 +7,7 @@ import { Message, EmbedBuilder } from 'discord.js';
 import { IMemoRepository } from '../repositories/interfaces';
 import { ICommandHandler } from './interfaces';
 import { Memo, CreateMemoRequest, UpdateMemoRequest, MemoError } from '../types/memo';
+import { logger } from '../utils/logger';
 import { withErrorHandling } from '../utils/errorHandler';
 import { ITimezoneService } from '../services/interfaces/ITimezoneService';
 
@@ -46,7 +47,7 @@ export class MemoCommandHandler implements ICommandHandler {
         ? await this.timezoneService.getUserTimezone(userId)
         : this.getDefaultTimezone();
       
-      console.log(`📝 メモコマンド処理開始: ${userId} ${args.join(' ')}`);
+      logger.debug('HANDLER', `📝 メモコマンド処理開始: ${userId} ${args.join(' ')}`);
 
       const parsedCommand = this.parseCommand(args);
       
@@ -80,7 +81,7 @@ export class MemoCommandHandler implements ICommandHandler {
           await this.showHelp(message);
       }
     } catch (error) {
-      console.error('❌ メモコマンド処理エラー:', error);
+      logger.error('HANDLER', '❌ メモコマンド処理エラー:', error);
       await message.reply('❌ メモコマンドの処理中にエラーが発生しました。');
     }
   }
@@ -113,7 +114,7 @@ export class MemoCommandHandler implements ICommandHandler {
     const memo = await this.memoRepository.createMemo(request);
     
     await message.reply(`✅ メモ「${memo.content}」を追加しました！`);
-    console.log(`➕ メモ追加: ${userId} "${memo.content}"`);
+    logger.debug('HANDLER', `➕ メモ追加: ${userId} "${memo.content}"`);
   }
 
   /**
@@ -135,7 +136,7 @@ export class MemoCommandHandler implements ICommandHandler {
     await this.memoRepository.deleteMemo(memo.id);
     
     await message.reply(`🗑️ メモ「${memo.content}」を削除しました。`);
-    console.log(`🗑️ メモ削除: ${userId} "${memo.content}"`);
+    logger.debug('HANDLER', `🗑️ メモ削除: ${userId} "${memo.content}"`);
   }
 
   /**

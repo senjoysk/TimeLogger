@@ -10,6 +10,7 @@ import {
   ActivityLog,
   ActivityLogError
 } from '../types/activityLog';
+import { logger } from '../utils/logger';
 
 /**
  * Unmatchedコマンドの種類
@@ -59,7 +60,7 @@ export class UnmatchedCommandHandler implements IUnmatchedCommandHandler {
    */
   async handle(message: Message, userId: string, args: string[], timezone: string): Promise<void> {
     try {
-      console.log(`🔗 マッチングコマンド処理開始: ${userId} ${args.join(' ')}`);
+      logger.debug('HANDLER', `🔗 マッチングコマンド処理開始: ${userId} ${args.join(' ')}`);
 
       // コマンドを解析
       const parsedCommand = this.parseUnmatchedCommand(args);
@@ -87,7 +88,7 @@ export class UnmatchedCommandHandler implements IUnmatchedCommandHandler {
           await this.showUnmatchedLogs(message, userId, timezone);
       }
     } catch (error) {
-      console.error('❌ マッチングコマンド処理エラー:', error);
+      logger.error('HANDLER', '❌ マッチングコマンド処理エラー:', error);
       
       const errorMessage = error instanceof ActivityLogError 
         ? `❌ ${error.message}`
@@ -112,9 +113,9 @@ export class UnmatchedCommandHandler implements IUnmatchedCommandHandler {
       const formattedLogs = this.formatUnmatchedLogsDisplay(unmatchedLogs, timezone);
       await message.reply(formattedLogs);
       
-      console.log(`🔍 マッチング待ちログ表示: ${userId} - ${unmatchedLogs.length}件`);
+      logger.debug('HANDLER', `🔍 マッチング待ちログ表示: ${userId} - ${unmatchedLogs.length}件`);
     } catch (error) {
-      console.error('❌ マッチング待ちログ表示エラー:', error);
+      logger.error('HANDLER', '❌ マッチング待ちログ表示エラー:', error);
       throw new ActivityLogError('マッチング待ちログの表示に失敗しました', 'SHOW_UNMATCHED_LOGS_ERROR', { error });
     }
   }
@@ -140,9 +141,9 @@ export class UnmatchedCommandHandler implements IUnmatchedCommandHandler {
 
       await message.reply(successMessage);
       
-      console.log(`🔗 手動マッチング成功: ${userId} ${startLogId} ↔️ ${endLogId}`);
+      logger.debug('HANDLER', `🔗 手動マッチング成功: ${userId} ${startLogId} ↔️ ${endLogId}`);
     } catch (error) {
-      console.error('❌ 手動マッチングエラー:', error);
+      logger.error('HANDLER', '❌ 手動マッチングエラー:', error);
       
       if (error instanceof ActivityLogError) {
         let userFriendlyMessage = '';
@@ -242,7 +243,7 @@ export class UnmatchedCommandHandler implements IUnmatchedCommandHandler {
       
       return `[${timeStr}]`;
     } catch (error) {
-      console.error('❌ 時刻フォーマットエラー:', error);
+      logger.error('HANDLER', '❌ 時刻フォーマットエラー:', error);
       return '[--:--]';
     }
   }

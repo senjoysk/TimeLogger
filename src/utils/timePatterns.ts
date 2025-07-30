@@ -4,6 +4,7 @@
  */
 
 import { TimeComponentType, TimePatternMatch } from '../types/realTimeAnalysis';
+import { logger } from './logger';
 
 /**
  * 時刻パターン定義
@@ -291,7 +292,7 @@ export class TimePatternMatcher {
             }
           });
         } catch (error) {
-          console.warn(`パターン ${pattern.name} のパース失敗:`, error);
+          logger.warn('TIME_PATTERNS', `パターン ${pattern.name} のパース失敗`, { error });
         }
       }
     }
@@ -434,19 +435,20 @@ export const TIME_EXPRESSION_NORMALIZER = {
  * デバッグ用: パターンマッチング結果の表示
  */
 export function debugTimePatterns(input: string): void {
-  console.log('=== 時刻パターンマッチング結果 ===');
-  console.log('入力:', input);
+  logger.debug('TIME_PATTERNS', '=== 時刻パターンマッチング結果 ===');
+  logger.debug('TIME_PATTERNS', '入力', { input });
   
   const matcher = new TimePatternMatcher();
   const matches = matcher.matchPatterns(input);
   
-  console.log('マッチ数:', matches.length);
+  logger.debug('TIME_PATTERNS', 'マッチ数', { count: matches.length });
   
   matches.forEach((match, index) => {
-    console.log(`\n[${index + 1}] ${match.patternName}`);
-    console.log('  マッチ:', match.match);
-    console.log('  信頼度:', match.confidence.toFixed(2));
-    console.log('  位置:', `${match.position.start}-${match.position.end}`);
-    console.log('  グループ:', match.groups);
+    logger.debug('TIME_PATTERNS', `[${index + 1}] ${match.patternName}`, {
+      match: match.match,
+      confidence: match.confidence.toFixed(2),
+      position: `${match.position.start}-${match.position.end}`,
+      groups: match.groups
+    });
   });
 }

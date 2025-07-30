@@ -42,6 +42,29 @@ export interface ILogger {
  * 本番環境では外部ログサービスに置き換え可能
  */
 export class ConsoleLogger implements ILogger {
+  private isTestEnvironment = process.env.NODE_ENV === 'test';
+  private suppressLogs = process.env.SUPPRESS_LOGS === 'true';
+  private logLevel: LogLevel = this.getConfiguredLogLevel();
+
+  private getConfiguredLogLevel(): LogLevel {
+    const level = process.env.LOG_LEVEL?.toUpperCase();
+    return Object.values(LogLevel).includes(level as LogLevel) 
+      ? (level as LogLevel) 
+      : LogLevel.INFO;
+  }
+
+  private shouldLog(level: LogLevel): boolean {
+    if (this.suppressLogs) return false;
+    
+    const levels = [LogLevel.DEBUG, LogLevel.INFO, LogLevel.WARN, LogLevel.ERROR];
+    const currentLevelIndex = levels.indexOf(this.logLevel);
+    const messageLevelIndex = levels.indexOf(level);
+    
+    // SUCCESSは常に表示
+    if (level === LogLevel.SUCCESS) return true;
+    
+    return messageLevelIndex >= currentLevelIndex;
+  }
   private formatLog(context: LogContext): string {
     const icon = this.getIcon(context.level);
     const levelStr = `[${context.level}]`;
@@ -98,21 +121,29 @@ export class ConsoleLogger implements ILogger {
   }
 
   debug(operation: string, message: string, data?: Record<string, unknown>): void {
+    if (!this.shouldLog(LogLevel.DEBUG)) return;
+    
     const context = this.createContext(LogLevel.DEBUG, operation, message, data);
     console.log(this.formatLog(context), data || '');
   }
 
   info(operation: string, message: string, data?: Record<string, unknown>): void {
+    if (!this.shouldLog(LogLevel.INFO)) return;
+    
     const context = this.createContext(LogLevel.INFO, operation, message, data);
     console.log(this.formatLog(context), data || '');
   }
 
   warn(operation: string, message: string, data?: Record<string, unknown>): void {
+    if (!this.shouldLog(LogLevel.WARN)) return;
+    
     const context = this.createContext(LogLevel.WARN, operation, message, data);
     console.warn(this.formatLog(context), data || '');
   }
 
   error(operation: string, message: string, error?: unknown, data?: Record<string, unknown>): void {
+    if (!this.shouldLog(LogLevel.ERROR)) return;
+    
     const context = this.createContext(LogLevel.ERROR, operation, message, data, error);
     // console.errorは使用せず、統一されたログ出力を使用
     console.log(this.formatLog(context), {
@@ -122,6 +153,8 @@ export class ConsoleLogger implements ILogger {
   }
 
   success(operation: string, message: string, data?: Record<string, unknown>): void {
+    if (!this.shouldLog(LogLevel.SUCCESS)) return;
+    
     const context = this.createContext(LogLevel.SUCCESS, operation, message, data);
     console.log(this.formatLog(context), data || '');
   }
@@ -129,3 +162,4 @@ export class ConsoleLogger implements ILogger {
 
 // シングルトンインスタンス
 export const logger: ILogger = new ConsoleLogger();
+

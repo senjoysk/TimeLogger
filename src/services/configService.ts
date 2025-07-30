@@ -4,6 +4,7 @@
  */
 
 import { IConfigService } from '../interfaces/dependencies';
+import { logger } from '../utils/logger';
 
 /**
  * デフォルト設定値
@@ -130,20 +131,20 @@ export class ConfigService implements IConfigService {
       // ポート番号の妥当性確認
       const port = this.getServerPort();
       if (port < 1 || port > 65535) {
-        console.error(`無効なポート番号: ${port}`);
+        logger.error('CONFIG_SERVICE', `無効なポート番号: ${port}`);
         return false;
       }
       
       // データベースパスの確認
       const dbPath = this.getDatabasePath();
       if (!dbPath || dbPath.trim() === '') {
-        console.error('データベースパスが設定されていません');
+        logger.error('CONFIG_SERVICE', 'データベースパスが設定されていません');
         return false;
       }
       
       return true;
     } catch (error) {
-      console.error('設定検証エラー:', error);
+      logger.error('CONFIG_SERVICE', '設定検証エラー', error as Error);
       return false;
     }
   }

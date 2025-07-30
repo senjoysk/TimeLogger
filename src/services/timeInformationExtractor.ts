@@ -17,6 +17,7 @@ import { IGeminiService } from './interfaces/IGeminiService';
 import { ITimezoneService } from './interfaces/ITimezoneService';
 import { TimePatternProcessor, ITimePatternProcessor } from './timeExtraction/timePatternProcessor';
 import { TimeAnalysisOrchestrator, ITimeAnalysisOrchestrator } from './timeExtraction/timeAnalysisOrchestrator';
+import { logger } from '../utils/logger';
 
 /**
  * 時刻情報抽出クラス（ファサード）
@@ -105,7 +106,7 @@ export class TimeInformationExtractor {
       return finalAnalysis;
 
     } catch (error) {
-      console.error('❌ 時刻抽出エラー:', error);
+      logger.error('TIME_EXTRACTOR', '❌ 時刻抽出エラー:', error as Error);
       throw new RealTimeAnalysisError(
         '時刻情報の抽出に失敗しました',
         RealTimeAnalysisErrorCode.TIME_EXTRACTION_FAILED,

@@ -21,6 +21,7 @@ import { ActivityContentAnalyzer } from './activityContentAnalyzer';
 import { TimeConsistencyValidator } from './timeConsistencyValidator';
 import { IGeminiService } from './interfaces/IGeminiService';
 import { ITimezoneService } from './interfaces/ITimezoneService';
+import { logger } from '../utils/logger';
 
 /**
  * リアルタイム活動分析統合クラス
@@ -68,37 +69,37 @@ export class RealTimeActivityAnalyzer {
     
     try {
       
-      console.log('🚀 リアルタイム活動分析開始');
-      console.log(`📝 入力: "${input.substring(0, 100)}${input.length > 100 ? '...' : ''}"`)
-      console.log(`🌍 タイムゾーン: ${timezone}, 入力時刻: ${normalizedTimestamp.toISOString()}`);
+      logger.info('REAL_TIME_ANALYZER', '🚀 リアルタイム活動分析開始');
+      logger.info('REAL_TIME_ANALYZER', `📝 入力: "${input.substring(0, 100)}${input.length > 100 ? '...' : ''}"`);
+      logger.info('REAL_TIME_ANALYZER', `🌍 タイムゾーン: ${timezone}, 入力時刻: ${normalizedTimestamp.toISOString()}`);
       
       // Phase 1: 時刻情報の詳細抽出
-      console.log('⏰ Phase 1: 時刻情報抽出開始...');
+      logger.info('REAL_TIME_ANALYZER', '⏰ Phase 1: 時刻情報抽出開始...');
       const timeAnalysis = await this.timeExtractor.extractTimeInformation(
         input,
         timezone || this.getDefaultTimezone(),
         normalizedTimestamp,
         context
       );
-      console.log(`✅ Phase 1完了: ${timeAnalysis.startTime} - ${timeAnalysis.endTime} (${timeAnalysis.totalMinutes}分, 信頼度: ${timeAnalysis.confidence})`);
+      logger.info('REAL_TIME_ANALYZER', `✅ Phase 1完了: ${timeAnalysis.startTime} - ${timeAnalysis.endTime} (${timeAnalysis.totalMinutes}分, 信頼度: ${timeAnalysis.confidence})`);
       
       // Phase 2: 活動内容の詳細分析
-      console.log('📊 Phase 2: 活動内容分析開始...');
+      logger.info('REAL_TIME_ANALYZER', '📊 Phase 2: 活動内容分析開始...');
       const activities = await this.activityAnalyzer.analyzeActivityContent(input, timeAnalysis);
-      console.log(`✅ Phase 2完了: ${activities.length}個の活動を検出`);
+      logger.info('REAL_TIME_ANALYZER', `✅ Phase 2完了: ${activities.length}個の活動を検出`);
       
       // Phase 3: 整合性検証と品質チェック
-      console.log('🔍 Phase 3: 整合性検証開始...');
+      logger.info('REAL_TIME_ANALYZER', '🔍 Phase 3: 整合性検証開始...');
       const validationResult = await this.consistencyValidator.validateConsistency(
         timeAnalysis,
         activities,
         context,
         input
       );
-      console.log(`✅ Phase 3完了: ${validationResult.warnings.length}件の警告, 総合信頼度: ${validationResult.overallConfidence}`);
+      logger.info('REAL_TIME_ANALYZER', `✅ Phase 3完了: ${validationResult.warnings.length}件の警告, 総合信頼度: ${validationResult.overallConfidence}`);
       
       // Phase 4: 最終結果の構築
-      console.log('🏗️ Phase 4: 最終結果構築...');
+      logger.info('REAL_TIME_ANALYZER', '🏗️ Phase 4: 最終結果構築...');
       const finalResult = this.buildFinalAnalysisResult(
         timeAnalysis,
         activities,
@@ -110,13 +111,13 @@ export class RealTimeActivityAnalyzer {
       );
       
       const totalProcessingTime = Date.now() - analysisStartTime;
-      console.log(`🎉 リアルタイム活動分析完了 (${totalProcessingTime}ms)`);
-      console.log(`📈 最終信頼度: ${finalResult.confidence}, 警告: ${finalResult.warnings.length}件`);
+      logger.info('REAL_TIME_ANALYZER', `🎉 リアルタイム活動分析完了 (${totalProcessingTime}ms)`);
+      logger.info('REAL_TIME_ANALYZER', `📈 最終信頼度: ${finalResult.confidence}, 警告: ${finalResult.warnings.length}件`);
       
       return finalResult;
       
     } catch (error) {
-      console.error('❌ リアルタイム活動分析エラー:', error);
+      logger.error('REAL_TIME_ANALYZER', '❌ リアルタイム活動分析エラー:', error as Error);
       
       // エラー時のフォールバック分析
       return this.createFallbackAnalysis(
@@ -247,7 +248,7 @@ export class RealTimeActivityAnalyzer {
     error: Error | unknown,
     analysisStartTime: number
   ): DetailedActivityAnalysis {
-    console.log('🔄 フォールバック分析を実行中...');
+    logger.info('REAL_TIME_ANALYZER', '🔄 フォールバック分析を実行中...');
     
     const processingTime = Date.now() - analysisStartTime;
     
@@ -343,7 +344,7 @@ export class RealTimeActivityAnalyzer {
         { recentLogs: [] }
       );
     } catch (error) {
-      console.error('簡易時刻抽出エラー:', error);
+      logger.error('REAL_TIME_ANALYZER', '簡易時刻抽出エラー:', error as Error);
       throw new RealTimeAnalysisError(
         '時刻抽出に失敗しました',
         RealTimeAnalysisErrorCode.TIME_EXTRACTION_FAILED,
@@ -380,7 +381,7 @@ export class RealTimeActivityAnalyzer {
       
       return true;
     } catch (error) {
-      console.error('分析結果妥当性チェックエラー:', error);
+      logger.error('REAL_TIME_ANALYZER', '分析結果妥当性チェックエラー:', error as Error);
       return false;
     }
   }
