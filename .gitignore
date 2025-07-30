@@ -37,6 +37,9 @@ test-failures-quick.txt
 test-summary.txt
 test-success.txt
 
+# TODO・FIXMEコメント管理レポート（自動生成）
+todo-comments-report.txt
+
 # ログファイル
 logs/
 *.log
