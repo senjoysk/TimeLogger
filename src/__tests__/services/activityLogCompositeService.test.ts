@@ -8,7 +8,6 @@ import { ActivityLogCrudService } from '../../services/activityLogCrudService';
 import { ActivityLogQueryService } from '../../services/activityLogQueryService';
 import { ActivityLogFormattingService } from '../../services/activityLogFormattingService';
 import { BusinessDateCalculatorService } from '../../services/businessDateCalculatorService';
-import { ActivityLogMatchingCoordinatorService } from '../../services/activityLogMatchingCoordinatorService';
 import { IActivityLogRepository } from '../../repositories/activityLogRepository';
 import { ITimezoneService } from '../../services/interfaces/ITimezoneService';
 import { ActivityLog } from '../../types/activityLog';
@@ -21,7 +20,6 @@ describe('ActivityLogCompositeServiceのテスト', () => {
   let mockQueryService: jest.Mocked<ActivityLogQueryService>;
   let mockFormattingService: jest.Mocked<ActivityLogFormattingService>;
   let mockDateCalculatorService: jest.Mocked<BusinessDateCalculatorService>;
-  let mockMatchingCoordinatorService: jest.Mocked<ActivityLogMatchingCoordinatorService>;
 
   beforeEach(() => {
     // リポジトリとタイムゾーンサービスのモック
@@ -65,18 +63,11 @@ describe('ActivityLogCompositeServiceのテスト', () => {
       isToday: jest.fn(),
     } as any;
 
-    mockMatchingCoordinatorService = {
-      getUnmatchedLogs: jest.fn(),
-      manualMatchLogs: jest.fn(),
-      performAutomaticMatching: jest.fn(),
-    } as any;
-
     service = new ActivityLogCompositeService(
       mockCrudService,
       mockQueryService,
       mockFormattingService,
-      mockDateCalculatorService,
-      mockMatchingCoordinatorService
+      mockDateCalculatorService
     );
   });
 
@@ -240,77 +231,6 @@ describe('ActivityLogCompositeServiceのテスト', () => {
     });
   });
 
-  describe('getUnmatchedLogs', () => {
-    test('MatchingCoordinator サービスにマッチング待ちログ取得を委譲する', async () => {
-      const userId = 'user123';
-      const timezone = 'Asia/Tokyo';
-      const expectedLogs: ActivityLog[] = [
-        {
-          id: 'start1',
-          userId,
-          content: '会議を開始',
-          inputTimestamp: '2024-07-29T10:00:00.000Z',
-          businessDate: '2024-07-29',
-          isDeleted: false,
-          createdAt: '2024-07-29T10:00:00.000Z',
-          updatedAt: '2024-07-29T10:00:00.000Z',
-          logType: 'start_only',
-          matchStatus: 'unmatched',
-        },
-      ];
-
-      mockMatchingCoordinatorService.getUnmatchedLogs.mockResolvedValue(expectedLogs);
-
-      const result = await service.getUnmatchedLogs(userId, timezone);
-
-      expect(result).toEqual(expectedLogs);
-      expect(mockMatchingCoordinatorService.getUnmatchedLogs).toHaveBeenCalledWith(userId, timezone);
-    });
-  });
-
-  describe('manualMatchLogs', () => {
-    test('MatchingCoordinator サービスに手動マッチングを委譲する', async () => {
-      const startLogId = 'start1';
-      const endLogId = 'end1';
-      const userId = 'user123';
-
-      const expectedResult = {
-        startLog: {
-          id: startLogId,
-          userId,
-          content: '会議を開始',
-          inputTimestamp: '2024-07-29T10:00:00.000Z',
-          businessDate: '2024-07-29',  
-          isDeleted: false,
-          createdAt: '2024-07-29T10:00:00.000Z',
-          updatedAt: '2024-07-29T10:00:00.000Z',
-          logType: 'start_only' as const,
-          matchStatus: 'matched' as const,
-          matchedLogId: endLogId,
-        },
-        endLog: {
-          id: endLogId,
-          userId,
-          content: '会議が終了',
-          inputTimestamp: '2024-07-29T11:00:00.000Z',
-          businessDate: '2024-07-29',
-          isDeleted: false,
-          createdAt: '2024-07-29T11:00:00.000Z',
-          updatedAt: '2024-07-29T11:00:00.000Z',
-          logType: 'end_only' as const,
-          matchStatus: 'matched' as const,
-          matchedLogId: startLogId,
-        },
-      };
-
-      mockMatchingCoordinatorService.manualMatchLogs.mockResolvedValue(expectedResult);
-
-      const result = await service.manualMatchLogs(startLogId, endLogId, userId);
-
-      expect(result).toEqual(expectedResult);
-      expect(mockMatchingCoordinatorService.manualMatchLogs).toHaveBeenCalledWith(startLogId, endLogId, userId);
-    });
-  });
 
   describe('統合機能テスト', () => {
     test('複数サービスを組み合わせた処理フローが正常に動作する', async () => {

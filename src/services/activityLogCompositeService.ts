@@ -7,7 +7,6 @@ import { ActivityLogCrudService } from './activityLogCrudService';
 import { ActivityLogQueryService } from './activityLogQueryService';
 import { ActivityLogFormattingService } from './activityLogFormattingService';
 import { BusinessDateCalculatorService } from './businessDateCalculatorService';
-import { ActivityLogMatchingCoordinatorService } from './activityLogMatchingCoordinatorService';
 import { 
   ActivityLog, 
   BusinessDateInfo, 
@@ -25,8 +24,7 @@ export class ActivityLogCompositeService {
     private crudService: ActivityLogCrudService,
     private queryService: ActivityLogQueryService,
     private formattingService: ActivityLogFormattingService,
-    private dateCalculatorService: BusinessDateCalculatorService,
-    private matchingCoordinatorService: ActivityLogMatchingCoordinatorService
+    private dateCalculatorService: BusinessDateCalculatorService
   ) {}
 
   /**
@@ -163,33 +161,4 @@ export class ActivityLogCompositeService {
     return this.dateCalculatorService.isToday(targetDate, timezone);
   }
 
-  /**
-   * マッチングされていない開始・終了ログを取得
-   * @param userId ユーザーID
-   * @param timezone タイムゾーン
-   * @returns マッチング待ちログ配列
-   */
-  async getUnmatchedLogs(userId: string, timezone: string): Promise<ActivityLog[]> {
-    return this.matchingCoordinatorService.getUnmatchedLogs(userId, timezone);
-  }
-
-  /**
-   * 手動でログをマッチングする
-   * @param startLogId 開始ログID
-   * @param endLogId 終了ログID
-   * @param userId ユーザーID
-   * @returns マッチング結果
-   */
-  async manualMatchLogs(startLogId: string, endLogId: string, userId: string): Promise<{ startLog: ActivityLog; endLog: ActivityLog }> {
-    return this.matchingCoordinatorService.manualMatchLogs(startLogId, endLogId, userId);
-  }
-
-  /**
-   * 自動マッチング処理を実行
-   * @param log 対象ログ
-   * @param userId ユーザーID
-   */
-  async performAutomaticMatching(log: ActivityLog, userId: string): Promise<void> {
-    return this.matchingCoordinatorService.performAutomaticMatching(log, userId);
-  }
 }

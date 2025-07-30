@@ -25,7 +25,7 @@ export class DatabaseInitializer {
   private schemaPath: string;
   private migrationManager: MigrationManager;
 
-  constructor(db: Database, schemaPath?: string) {
+  constructor(db: Database, schemaPath?: string, migrationManager?: MigrationManager) {
     this.db = db;
     
     // スキーマファイルパスの解決
@@ -36,7 +36,8 @@ export class DatabaseInitializer {
       this.schemaPath = this.findSchemaFile();
     }
     
-    this.migrationManager = new MigrationManager(db, process.env.DATABASE_PATH);
+    // MigrationManagerが渡された場合はそれを使用、そうでなければ新規作成
+    this.migrationManager = migrationManager || new MigrationManager(db, process.env.DATABASE_PATH);
   }
 
   /**

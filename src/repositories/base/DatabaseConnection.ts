@@ -62,9 +62,8 @@ export class DatabaseConnection {
     await this.run('PRAGMA foreign_keys = ON');
 
     // スキーマ初期化とマイグレーション実行
-    const initializer = new DatabaseInitializer(this.db);
+    const initializer = new DatabaseInitializer(this.db, undefined, this.migrationManager);
     await initializer.initialize();
-    await this.migrationManager.runMigrations();
 
     this.connected = true;
     logger.info('DATABASE', 'データベース接続が初期化されました', { databasePath: this.databasePath });

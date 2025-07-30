@@ -97,11 +97,6 @@ class MockActivityLogService implements IActivityLogService {
   formatLogsForEdit() { return ''; }
   async editLog() { return {} as any; }
   async deleteLog() { return {} as any; }
-  async analyzeActivities() { return {} as any; }
-  async getMatchingLogs() { return []; }
-  async matchLogs() {}
-  async getUnmatchedLogs() { return []; }
-  async manualMatchLogs() { return { startLog: {} as any, endLog: {} as any }; }
   calculateBusinessDate() { return { businessDate: '', startTime: '', endTime: '', timezone: '' }; }
 }
 

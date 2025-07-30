@@ -66,8 +66,6 @@ export class ActivityLogCrudService {
       content: content.trim(),
       inputTimestamp,
       businessDate,
-      logType: 'complete',
-      matchStatus: 'matched',
     };
 
     // AI分析結果があれば統合

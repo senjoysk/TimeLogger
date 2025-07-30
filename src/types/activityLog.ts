@@ -3,9 +3,6 @@
  * 自然言語ログ方式に対応
  */
 
-// 開始・終了ログマッチング用の型定義
-export type LogType = 'complete' | 'start_only' | 'end_only';
-export type MatchStatus = 'unmatched' | 'matched' | 'ignored';
 
 // 活動ログの基本型（データベース対応）
 export interface ActivityLog {
@@ -27,12 +24,6 @@ export interface ActivityLog {
   categories?: string;       // カテゴリ（カンマ区切り）
   analysisWarnings?: string; // 警告メッセージ（セミコロン区切り）
 
-  // 開始・終了ログマッチング機能（新機能）
-  logType?: LogType;         // ログの種類（complete/start_only/end_only）
-  matchStatus?: MatchStatus; // マッチング状態（unmatched/matched/ignored）
-  matchedLogId?: string;     // マッチング相手のログID
-  activityKey?: string;      // 活動内容の分類キー（マッチング用）
-  similarityScore?: number;  // マッチング時の類似度スコア
 
   // リマインダーReply機能（新機能）
   isReminderReply?: boolean; // リマインダーへのreplyかどうか
@@ -57,12 +48,6 @@ export interface CreateActivityLogRequest {
   categories?: string;
   analysisWarnings?: string;
 
-  // 開始・終了ログマッチング機能（オプション）
-  logType?: LogType;
-  matchStatus?: MatchStatus;
-  matchedLogId?: string;
-  activityKey?: string;
-  similarityScore?: number;
 
   // リマインダーReply機能（オプション）
   isReminderReply?: boolean;
@@ -304,96 +289,3 @@ export interface SystemStats {
   lastAnalysisTime: string;
 }
 
-// === 開始・終了ログマッチング関連の型定義 ===
-
-// マッチング候補
-export interface MatchingCandidate {
-  logId: string;
-  score: number;
-  reason: string;
-  confidence: number;
-}
-
-// マッチング結果
-export interface MatchingResult {
-  startLog: ActivityLog;
-  endLog: ActivityLog;
-  matchScore: number;
-  confidence: number;
-  durationMinutes: number;
-  warnings?: string[];
-}
-
-// マッチング戦略設定
-export interface MatchingStrategy {
-  // 時間的制約
-  maxDurationHours: number;      // 最大作業時間（24時間）
-  maxGapDays: number;            // 最大日数差（2日）
-  
-  // 類似性判定
-  minSimilarityScore: number;    // 最小類似度スコア（0.6）
-  keywordWeight: number;         // キーワード一致の重み（0.4）
-  semanticWeight: number;        // 意味的類似性の重み（0.6）
-  
-  // マッチング優先度
-  timeProximityWeight: number;   // 時間の近さの重み（0.3）
-  contentSimilarityWeight: number; // 内容類似性の重み（0.7）
-}
-
-// ログタイプ分析リクエスト
-export interface LogTypeAnalysisRequest {
-  content: string;
-  inputTimestamp: string;
-  timezone: string;
-}
-
-// ログタイプ分析レスポンス
-export interface LogTypeAnalysisResponse {
-  logType: LogType;
-  confidence: number;
-  extractedTime?: string;
-  activityKey: string;
-  keywords: string[];
-  reasoning: string;
-}
-
-// マッチング分析リクエスト
-export interface MatchingAnalysisRequest {
-  startLog: ActivityLog;
-  endCandidates: ActivityLog[];
-  timezone: string;
-}
-
-// マッチング分析レスポンス
-export interface MatchingAnalysisResponse {
-  bestMatch?: {
-    logId: string;
-    confidence: number;
-    reasoning: string;
-  };
-  alternatives: {
-    logId: string;
-    confidence: number;
-    reasoning: string;
-  }[];
-  warnings: string[];
-}
-
-// マッチング済み活動エントリ
-export interface MatchedActivityEntry {
-  startTime: string;
-  endTime: string;
-  duration: number;
-  activity: string;
-  confidence: number;
-  matchType: 'auto' | 'manual';
-}
-
-// 未マッチログの警告
-export interface UnmatchedWarning {
-  logId: string;
-  logType: LogType;
-  content: string;
-  timestamp: string;
-  suggestions: string[];
-}

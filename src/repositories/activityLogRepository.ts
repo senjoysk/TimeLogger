@@ -183,35 +183,6 @@ export interface IActivityLogRepository {
    */
   withTransaction<T>(operation: () => Promise<T>): Promise<T>;
 
-  // === 開始・終了ログマッチング機能 ===
-
-  /**
-   * ログのマッチング情報を更新
-   * @param logId ログID
-   * @param matchInfo マッチング情報
-   */
-  updateLogMatching(logId: string, matchInfo: {
-    matchStatus?: string;
-    matchedLogId?: string;
-    similarityScore?: number;
-  }): Promise<void>;
-
-  /**
-   * 未マッチのログを取得（指定されたログタイプ）
-   * @param userId ユーザーID
-   * @param logType ログタイプ
-   * @param businessDate 業務日（オプション）
-   * @returns 未マッチログ配列
-   */
-  getUnmatchedLogs(userId: string, logType: string, businessDate?: string): Promise<ActivityLog[]>;
-
-  /**
-   * マッチング済みログペアを取得
-   * @param userId ユーザーID
-   * @param businessDate 業務日（オプション）
-   * @returns マッチング済みログペア配列
-   */
-  getMatchedLogPairs(userId: string, businessDate?: string): Promise<{ startLog: ActivityLog; endLog: ActivityLog }[]>;
 
   // === ユーザータイムゾーン管理 ===
 

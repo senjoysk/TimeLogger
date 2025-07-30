@@ -20,8 +20,6 @@ import { ActivityLogCrudService } from './activityLogCrudService';
 import { ActivityLogQueryService } from './activityLogQueryService';
 import { ActivityLogFormattingService } from './activityLogFormattingService';
 import { BusinessDateCalculatorService } from './businessDateCalculatorService';
-import { ActivityLogMatchingCoordinatorService } from './activityLogMatchingCoordinatorService';
-import { ActivityLogMatchingService, IActivityLogMatchingService } from './activityLogMatchingService';
 
 /**
  * 活動ログサービスインターフェース（後方互換性維持）
@@ -72,15 +70,6 @@ export interface IActivityLogService {
     averageLogsPerDay: number;
   }>;
 
-  /**
-   * マッチングされていない開始・終了ログを取得
-   */
-  getUnmatchedLogs(userId: string, timezone: string): Promise<ActivityLog[]>;
-
-  /**
-   * 手動でログをマッチングする
-   */
-  manualMatchLogs(startLogId: string, endLogId: string, userId: string): Promise<{ startLog: ActivityLog; endLog: ActivityLog }>;
 
   /**
    * 編集用フォーマット
@@ -116,26 +105,12 @@ export class ActivityLogService implements IActivityLogService {
     const formattingService = new ActivityLogFormattingService();
     const dateCalculatorService = new BusinessDateCalculatorService(repository);
     
-    // マッチングサービスを初期化
-    const defaultStrategy = {
-      maxDurationHours: 24,
-      maxGapDays: 2,
-      minSimilarityScore: 0.6,
-      keywordWeight: 0.4,
-      semanticWeight: 0.6,
-      timeProximityWeight: 0.3,
-      contentSimilarityWeight: 0.7
-    };
-    const matchingService = new ActivityLogMatchingService(defaultStrategy, geminiService);
-    const matchingCoordinatorService = new ActivityLogMatchingCoordinatorService(repository, matchingService);
-
     // コンポジットサービスを初期化
     this.compositeService = new ActivityLogCompositeService(
       crudService,
       queryService,
       formattingService,
-      dateCalculatorService,
-      matchingCoordinatorService
+      dateCalculatorService
     );
   }
 
@@ -210,19 +185,6 @@ export class ActivityLogService implements IActivityLogService {
     return this.compositeService.getStatistics(userId);
   }
 
-  /**
-   * マッチングされていない開始・終了ログを取得
-   */
-  async getUnmatchedLogs(userId: string, timezone: string): Promise<ActivityLog[]> {
-    return this.compositeService.getUnmatchedLogs(userId, timezone);
-  }
-
-  /**
-   * 手動でログをマッチングする
-   */
-  async manualMatchLogs(startLogId: string, endLogId: string, userId: string): Promise<{ startLog: ActivityLog; endLog: ActivityLog }> {
-    return this.compositeService.manualMatchLogs(startLogId, endLogId, userId);
-  }
 
   /**
    * 編集用フォーマット
@@ -259,10 +221,4 @@ export class ActivityLogService implements IActivityLogService {
     return this.compositeService.isToday(targetDate, timezone);
   }
 
-  /**
-   * 自動マッチング処理を実行
-   */
-  async performAutomaticMatching(log: ActivityLog, userId: string): Promise<void> {
-    return this.compositeService.performAutomaticMatching(log, userId);
-  }
 }

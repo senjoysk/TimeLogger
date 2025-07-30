@@ -16,7 +16,6 @@ import { EditCommandHandler } from '../handlers/editCommandHandler';
 import { SummaryHandler } from '../handlers/summaryHandler';
 import { LogsCommandHandler } from '../handlers/logsCommandHandler';
 import { TimezoneHandler } from '../handlers/timezoneHandler';
-import { UnmatchedCommandHandler } from '../handlers/unmatchedCommandHandler';
 import { TodoCrudHandler } from '../handlers/todoCrudHandler';
 import { MessageClassificationHandler } from '../handlers/messageClassificationHandler';
 import { TodoInteractionHandler } from '../handlers/todoInteractionHandler';
@@ -92,7 +91,6 @@ export class ActivityLoggingIntegration {
   private logsHandler!: LogsCommandHandler;
   private timezoneHandler!: TimezoneHandler;
   private gapHandler!: GapHandler;
-  private unmatchedHandler!: UnmatchedCommandHandler;
   private todoCrudHandler!: TodoCrudHandler;
   private messageClassificationHandler!: MessageClassificationHandler;
   private todoInteractionHandler!: TodoInteractionHandler;
@@ -211,7 +209,6 @@ export class ActivityLoggingIntegration {
         this.gapDetectionService,
         this.activityLogService
       );
-      this.unmatchedHandler = new UnmatchedCommandHandler(this.activityLogService);
       
       // TODO機能ハンドラーの初期化（分割版）
       this.todoCrudHandler = new TodoCrudHandler(this.repository);
@@ -520,11 +517,6 @@ export class ActivityLoggingIntegration {
         break;
 
       case 'unmatched':
-      case 'マッチング':
-      case 'match':
-        logger.info('ACTIVITY_LOG', `🔗 unmatchedコマンド実行: ユーザー=${userId}, タイムゾーン=${timezone}, ハンドラー存在=${!!this.unmatchedHandler}`);
-        await this.unmatchedHandler.handle(message, userId, args, timezone);
-        break;
 
       case 'todo':
       case 'タスク':

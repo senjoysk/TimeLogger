@@ -182,21 +182,6 @@ export class PartialCompositeRepository implements IUnifiedRepository {
     return this.activityLogRepo.withTransaction(operation);
   }
 
-  async updateLogMatching(logId: string, matchInfo: {
-    matchStatus?: string;
-    matchedLogId?: string;
-    similarityScore?: number;
-  }): Promise<void> {
-    return this.activityLogRepo.updateLogMatching(logId, matchInfo);
-  }
-
-  async getUnmatchedLogs(userId: string, logType: string, businessDate?: string): Promise<ActivityLog[]> {
-    return this.activityLogRepo.getUnmatchedLogs(userId, logType, businessDate);
-  }
-
-  async getMatchedLogPairs(userId: string, businessDate?: string): Promise<{ startLog: ActivityLog; endLog: ActivityLog }[]> {
-    return this.activityLogRepo.getMatchedLogPairs(userId, businessDate);
-  }
 
   getDatabase() {
     return this.activityLogRepo.getDatabase();

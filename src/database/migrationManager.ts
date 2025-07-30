@@ -37,6 +37,7 @@ export class MigrationManager {
     this.backupManager = new BackupManager(db, undefined, this.dbPath);
   }
 
+
   /**
    * マイグレーションシステムの初期化
    */
@@ -44,13 +45,21 @@ export class MigrationManager {
     try {
       logger.info('MIGRATION', '🔄 マイグレーションシステムを初期化中...');
       
+      // schema_migrationsテーブルが既に存在するか確認
+      const tableExists = await this.tableExists('schema_migrations');
+      if (tableExists) {
+        logger.info('MIGRATION', '✅ マイグレーションシステムは既に初期化されています');
+        return;
+      }
+      
       // マイグレーション管理テーブルの作成
       const systemSql = fs.readFileSync(
         path.join(this.migrationsPath, 'migration_system.sql'), 
         'utf8'
       );
       
-      await this.executeQuery(systemSql);
+      // SQL文を分割して実行（migration_system.sqlには複数の文が含まれる）
+      await this.executeMultipleStatements(systemSql);
       logger.info('MIGRATION', '✅ マイグレーションシステムの初期化が完了しました');
     } catch (error) {
       logger.error('MIGRATION', '❌ マイグレーションシステム初期化エラー:', error);

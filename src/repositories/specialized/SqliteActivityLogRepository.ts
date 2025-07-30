@@ -21,9 +21,7 @@ import {
   AnalysisCache,
   CreateAnalysisCacheRequest,
   BusinessDateInfo,
-  DailyAnalysisResult,
-  LogType,
-  MatchStatus
+  DailyAnalysisResult
 } from '../../types/activityLog';
 import { TimezoneChange, TimezoneNotification, UserTimezone } from '../interfaces';
 import { AppError, ErrorType } from '../../utils/errorHandler';
@@ -63,10 +61,9 @@ export class SqliteActivityLogRepository implements IActivityLogRepository {
         INSERT INTO activity_logs (
           id, user_id, content, business_date, input_timestamp, updated_at,
           start_time, end_time, total_minutes, confidence, analysis_method, 
-          categories, analysis_warnings, log_type, match_status, 
-          matched_log_id, activity_key, similarity_score,
+          categories, analysis_warnings,
           is_reminder_reply, time_range_start, time_range_end, context_type
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `;
 
       const logId = 'log-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
@@ -84,11 +81,6 @@ export class SqliteActivityLogRepository implements IActivityLogRepository {
         request.analysisMethod || null,
         request.categories || null,
         request.analysisWarnings || null,
-        request.logType || null,
-        request.matchStatus || null,
-        request.matchedLogId || null,
-        request.activityKey || null,
-        request.similarityScore || null,
         request.isReminderReply || false,
         request.timeRangeStart || null,
         request.timeRangeEnd || null,
@@ -927,160 +919,6 @@ export class SqliteActivityLogRepository implements IActivityLogRepository {
     });
   }
 
-  /**
-   * ログのマッチング情報を更新
-   */
-  async updateLogMatching(logId: string, matchInfo: {
-    matchStatus?: string;
-    matchedLogId?: string;
-    similarityScore?: number;
-  }): Promise<void> {
-    return new Promise((resolve, reject) => {
-      const db = this.db.getDatabase();
-      
-      const setClause: string[] = [];
-      const values: unknown[] = [];
-
-      if (matchInfo.matchStatus !== undefined) {
-        setClause.push('match_status = ?');
-        values.push(matchInfo.matchStatus);
-      }
-      if (matchInfo.matchedLogId !== undefined) {
-        setClause.push('matched_log_id = ?');
-        values.push(matchInfo.matchedLogId);
-      }
-      if (matchInfo.similarityScore !== undefined) {
-        setClause.push('similarity_score = ?');
-        values.push(matchInfo.similarityScore);
-      }
-
-      setClause.push('updated_at = ?');
-      values.push(new Date().toISOString());
-      values.push(logId);
-
-      const sql = `UPDATE activity_logs SET ${setClause.join(', ')} WHERE id = ?`;
-
-      db.run(sql, values, function(err: Error | null) {
-        if (err) {
-          reject(new AppError(`ログマッチング更新エラー: ${err.message}`, ErrorType.DATABASE, { error: err }));
-          return;
-        }
-
-        resolve();
-      });
-    });
-  }
-
-  /**
-   * 未マッチのログを取得
-   */
-  async getUnmatchedLogs(userId: string, logType: string, businessDate?: string): Promise<ActivityLog[]> {
-    return new Promise((resolve, reject) => {
-      const db = this.db.getDatabase();
-      
-      let sql = `
-        SELECT * FROM activity_logs 
-        WHERE user_id = ? AND log_type = ? AND match_status = 'unmatched' AND is_deleted = FALSE
-      `;
-      const params = [userId, logType];
-
-      if (businessDate) {
-        sql += ' AND business_date = ?';
-        params.push(businessDate);
-      }
-
-      sql += ' ORDER BY input_timestamp ASC';
-
-      db.all(sql, params, (err: Error | null, rows: Record<string, unknown>[]) => {
-        if (err) {
-          reject(new AppError(`未マッチログ取得エラー: ${err.message}`, ErrorType.DATABASE, { error: err }));
-          return;
-        }
-
-        resolve(rows.map(row => this.mapRowToActivityLog(row)));
-      });
-    });
-  }
-
-  /**
-   * マッチング済みログペアを取得
-   */
-  async getMatchedLogPairs(userId: string, businessDate?: string): Promise<{ startLog: ActivityLog; endLog: ActivityLog }[]> {
-    return new Promise((resolve, reject) => {
-      const db = this.db.getDatabase();
-      
-      let sql = `
-        SELECT 
-          start_log.*,
-          end_log.id as end_id, end_log.user_id as end_user_id, end_log.content as end_content,
-          end_log.input_timestamp as end_input_timestamp, end_log.business_date as end_business_date,
-          end_log.is_deleted as end_is_deleted, end_log.created_at as end_created_at, 
-          end_log.updated_at as end_updated_at, end_log.start_time as end_start_time,
-          end_log.end_time as end_end_time, end_log.total_minutes as end_total_minutes,
-          end_log.confidence as end_confidence, end_log.analysis_method as end_analysis_method,
-          end_log.categories as end_categories, end_log.analysis_warnings as end_analysis_warnings,
-          end_log.log_type as end_log_type, end_log.match_status as end_match_status,
-          end_log.matched_log_id as end_matched_log_id, end_log.activity_key as end_activity_key,
-          end_log.similarity_score as end_similarity_score, end_log.is_reminder_reply as end_is_reminder_reply,
-          end_log.time_range_start as end_time_range_start, end_log.time_range_end as end_time_range_end,
-          end_log.context_type as end_context_type
-        FROM activity_logs start_log
-        JOIN activity_logs end_log ON start_log.matched_log_id = end_log.id
-        WHERE start_log.user_id = ? AND start_log.log_type = 'start_only' 
-          AND start_log.match_status = 'matched' AND start_log.is_deleted = FALSE
-          AND end_log.is_deleted = FALSE
-      `;
-      const params = [userId];
-
-      if (businessDate) {
-        sql += ' AND start_log.business_date = ?';
-        params.push(businessDate);
-      }
-
-      sql += ' ORDER BY start_log.input_timestamp ASC';
-
-      db.all(sql, params, (err: Error | null, rows: Record<string, unknown>[]) => {
-        if (err) {
-          reject(new AppError(`マッチングペア取得エラー: ${err.message}`, ErrorType.DATABASE, { error: err }));
-          return;
-        }
-
-        const pairs = rows.map(row => {
-          const startLog = this.mapRowToActivityLog(row);
-          const endLog = this.mapRowToActivityLog({
-            id: row.end_id,
-            user_id: row.end_user_id,
-            content: row.end_content,
-            input_timestamp: row.end_input_timestamp,
-            business_date: row.end_business_date,
-            is_deleted: row.end_is_deleted ? 1 : 0,
-            created_at: row.end_created_at,
-            updated_at: row.end_updated_at,
-            start_time: row.end_start_time,
-            end_time: row.end_end_time,
-            total_minutes: row.end_total_minutes,
-            confidence: row.end_confidence,
-            analysis_method: row.end_analysis_method,
-            categories: row.end_categories,
-            analysis_warnings: row.end_analysis_warnings,
-            log_type: row.end_log_type,
-            match_status: row.end_match_status,
-            matched_log_id: row.end_matched_log_id,
-            activity_key: row.end_activity_key,
-            similarity_score: row.end_similarity_score,
-            is_reminder_reply: row.end_is_reminder_reply,
-            time_range_start: row.end_time_range_start,
-            time_range_end: row.end_time_range_end,
-            context_type: row.end_context_type
-          });
-
-          return { startLog, endLog };
-        });
-
-        resolve(pairs);
-      });
-    });
-  }
 
   /**
    * 全ユーザー情報を取得
@@ -1160,13 +998,6 @@ export class SqliteActivityLogRepository implements IActivityLogRepository {
       analysisMethod: row.analysis_method ? String(row.analysis_method) : undefined,
       categories: row.categories ? String(row.categories) : undefined,
       analysisWarnings: row.analysis_warnings ? String(row.analysis_warnings) : undefined,
-
-      // 開始・終了ログマッチング機能
-      logType: row.log_type ? String(row.log_type) as LogType : undefined,
-      matchStatus: row.match_status ? String(row.match_status) as MatchStatus : undefined,
-      matchedLogId: row.matched_log_id ? String(row.matched_log_id) : undefined,
-      activityKey: row.activity_key ? String(row.activity_key) : undefined,
-      similarityScore: row.similarity_score ? Number(row.similarity_score) : undefined,
 
       // リマインダーReply機能
       isReminderReply: Boolean(row.is_reminder_reply),
