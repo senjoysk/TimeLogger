@@ -108,3 +108,18 @@ if [ $? -ne 0 ]; then
 fi
 
 echo "✅ データベースパス妥当性チェック通過"
+
+# 🆕 エラーハンドリング重複チェック（Issue #62対応）
+echo "🔍 Pre-commit check: エラーハンドリング重複チェック..."
+./scripts/code-review/error-handling-duplication-check.sh
+
+if [ $? -ne 0 ]; then
+    echo ""
+    echo "🚨 コミットが阻止されました！"
+    echo "🛠️ エラーハンドリング重複が検出されました。"
+    echo "📋 統一エラーハンドラー（withErrorHandling系）を使用してください。"
+    echo ""
+    exit 1
+fi
+
+echo "✅ エラーハンドリング重複チェック通過"

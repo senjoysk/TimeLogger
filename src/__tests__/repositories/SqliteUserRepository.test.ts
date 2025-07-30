@@ -7,6 +7,7 @@ import { SqliteUserRepository } from '../../repositories/specialized/SqliteUserR
 import { DatabaseConnection } from '../../repositories/base/DatabaseConnection';
 import { cleanupTestDatabaseFiles } from '../setup';
 import { TodoError } from '../../types/todo';
+import { AppError } from '../../utils/errorHandler';
 import * as path from 'path';
 import * as fs from 'fs';
 
@@ -289,20 +290,20 @@ describe('SqliteUserRepository分離テスト（実装済み）', () => {
   });
 
   describe('エラーハンドリング', () => {
-    test('getUserInfo失敗時にTodoErrorを投げる', async () => {
+    test('getUserInfo失敗時にAppErrorを投げる', async () => {
       // データベース接続を閉鎖してエラーを発生させる
       await dbConnection.close();
 
       // Act & Assert
-      await expect(repository.getUserInfo('test-user')).rejects.toThrow(TodoError);
+      await expect(repository.getUserInfo('test-user')).rejects.toThrow(AppError);
     });
 
-    test('registerUser失敗時にTodoErrorを投げる', async () => {
+    test('registerUser失敗時にAppErrorを投げる', async () => {
       // データベース接続を閉鎖してエラーを発生させる
       await dbConnection.close();
 
       // Act & Assert
-      await expect(repository.registerUser('test-user', 'テスト')).rejects.toThrow(TodoError);
+      await expect(repository.registerUser('test-user', 'テスト')).rejects.toThrow(AppError);
     });
 
     test('getUserStats失敗時にTodoErrorを投げる', async () => {

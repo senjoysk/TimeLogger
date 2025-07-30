@@ -9,7 +9,12 @@ export enum ErrorType {
   API = 'API',
   VALIDATION = 'VALIDATION',
   DISCORD = 'DISCORD',
-  SYSTEM = 'SYSTEM'
+  SYSTEM = 'SYSTEM',
+  TIMEOUT = 'TIMEOUT',
+  AUTHENTICATION = 'AUTHENTICATION',
+  CONFIGURATION = 'CONFIGURATION',
+  NOT_FOUND = 'NOT_FOUND',
+  NOT_IMPLEMENTED = 'NOT_IMPLEMENTED'
 }
 
 // ログデータの型定義
@@ -104,6 +109,36 @@ export class ErrorHandler {
   }
 
   /**
+   * エラーログ記録専用メソッド
+   * catch節でのログ記録を統一
+   */
+  public static logError(
+    operation: string,
+    message: string,
+    error: unknown,
+    context?: Record<string, unknown>
+  ): void {
+    this.logger.error(operation, message, error, context);
+  }
+
+  /**
+   * エラーを適切に変換してスロー
+   * catch節での共通パターン
+   */
+  public static convertAndThrow(
+    error: unknown,
+    errorType: ErrorType,
+    userMessage: string,
+    context: ErrorContext = {}
+  ): never {
+    if (error instanceof AppError) {
+      throw error;
+    }
+    
+    throw new AppError(userMessage, errorType, context, error instanceof Error ? error : undefined);
+  }
+
+  /**
    * AppErrorの処理
    */
   private static handleAppError(error: AppError): string {
@@ -189,4 +224,124 @@ export async function withErrorHandling<T>(
     const message = error instanceof Error ? error.message : 'Unknown error';
     throw new AppError(message, errorType, context, error instanceof Error ? error : undefined);
   }
+}
+
+/**
+ * 同期関数のエラーハンドリングラッパー
+ * @param fn 実行する同期関数
+ * @param errorType エラータイプ
+ * @param context エラーコンテキスト
+ * @returns 実行結果またはAppError
+ */
+export function withSyncErrorHandling<T>(
+  fn: () => T,
+  errorType: ErrorType,
+  context: ErrorContext = {}
+): T {
+  try {
+    return fn();
+  } catch (error) {
+    if (error instanceof AppError) {
+      throw error; // AppErrorはそのまま再スロー
+    }
+    
+    // 予期しないエラーをAppErrorに変換
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    throw new AppError(message, errorType, context, error instanceof Error ? error : undefined);
+  }
+}
+
+/**
+ * データベース操作専用エラーハンドラ
+ * よく使われるデータベース操作のエラーハンドリングを統一
+ */
+export async function withDatabaseErrorHandling<T>(
+  fn: () => Promise<T>,
+  operation: string,
+  context: ErrorContext = {}
+): Promise<T> {
+  return withErrorHandling(
+    fn,
+    ErrorType.DATABASE,
+    { operation, ...context }
+  );
+}
+
+/**
+ * API操作専用エラーハンドラ
+ * Gemini APIなどの外部API呼び出し用
+ */
+export async function withApiErrorHandling<T>(
+  fn: () => Promise<T>,
+  apiName: string,
+  context: ErrorContext = {}
+): Promise<T> {
+  return withErrorHandling(
+    fn,
+    ErrorType.API,
+    { operation: apiName, ...context }
+  );
+}
+
+/**
+ * Discord操作専用エラーハンドラ
+ * Discord API呼び出し用
+ */
+export async function withDiscordErrorHandling<T>(
+  fn: () => Promise<T>,
+  operation: string,
+  context: ErrorContext = {}
+): Promise<T> {
+  return withErrorHandling(
+    fn,
+    ErrorType.DISCORD,
+    { operation, ...context }
+  );
+}
+
+/**
+ * 共通のcatch節処理
+ * logger.error + AppError変換 + throw のパターンを統一
+ */
+export function handleCatchBlock(
+  error: unknown,
+  errorType: ErrorType,
+  loggerOperation: string,
+  userMessage: string,
+  context: ErrorContext = {}
+): never {
+  // ログ出力
+  logger.error(loggerOperation, userMessage, error);
+  
+  // AppErrorの場合はそのまま再スロー
+  if (error instanceof AppError) {
+    throw error;
+  }
+  
+  // 予期しないエラーをAppErrorに変換してスロー
+  const message = error instanceof Error ? error.message : 'Unknown error';
+  throw new AppError(userMessage, errorType, context, error instanceof Error ? error : undefined);
+}
+
+/**
+ * Promise<T>を返すコールバック関数でよく使われるtry-catchパターンの統一
+ * Promise constructorのreject呼び出しパターン用
+ */
+export function createPromiseErrorHandler(
+  errorType: ErrorType,
+  operation: string
+) {
+  return (reject: (reason?: AppError) => void) => {
+    return (error: unknown) => {
+      logger.error(operation.toUpperCase(), `${operation}エラー`, error);
+      
+      if (error instanceof AppError) {
+        reject(error);
+        return;
+      }
+      
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      reject(new AppError(`${operation}に失敗しました: ${errorMessage}`, errorType, { error }));
+    };
+  };
 }

@@ -11,6 +11,7 @@ import {
   ActivityLogError
 } from '../types/activityLog';
 import { logger } from '../utils/logger';
+import { withDatabaseErrorHandling } from '../utils/errorHandler';
 
 /**
  * キャッシュ戦略の設定
@@ -127,62 +128,69 @@ export class AnalysisCacheService implements IAnalysisCacheService {
    */
   async getCache(userId: string, businessDate: string): Promise<DailyAnalysisResult | null> {
     try {
-      const cache = await this.repository.getAnalysisCache(userId, businessDate);
-      
-      if (!cache) {
-        this.missCount++;
-        logger.debug('CACHE', `💨 キャッシュミス: [${businessDate}] ${userId}`);
-        return null;
-      }
+      return await withDatabaseErrorHandling(
+        async () => {
+          const cache = await this.repository.getAnalysisCache(userId, businessDate);
+          
+          if (!cache) {
+            this.missCount++;
+            logger.debug('CACHE', `💨 キャッシュミス: [${businessDate}] ${userId}`);
+            return null;
+          }
 
-      // キャッシュの年齢をチェック
-      const cacheAge = this.getCacheAgeMinutes(cache.generatedAt);
-      
-      if (cacheAge > this.strategy.maxAgeMinutes) {
-        this.missCount++;
-        logger.debug('CACHE', `⏰ キャッシュ期限切れ: [${businessDate}] ${cacheAge}分経過`);
-        await this.invalidateCache(userId, businessDate);
-        return null;
-      }
+          // キャッシュの年齢をチェック
+          const cacheAge = this.getCacheAgeMinutes(cache.generatedAt);
+          
+          if (cacheAge > this.strategy.maxAgeMinutes) {
+            this.missCount++;
+            logger.debug('CACHE', `⏰ キャッシュ期限切れ: [${businessDate}] ${cacheAge}分経過`);
+            await this.invalidateCache(userId, businessDate);
+            return null;
+          }
 
-      // ログ数の変更をチェック
-      if (this.strategy.invalidateOnLogCountChange) {
-        const currentLogCount = await this.repository.getLogCountByDate(userId, businessDate);
-        
-        if (cache.logCount !== currentLogCount) {
-          this.missCount++;
-          logger.debug('CACHE', `🔄 ログ数変更によりキャッシュ無効: [${businessDate}] ${cache.logCount} -> ${currentLogCount}`);
-          await this.invalidateCache(userId, businessDate);
-          return null;
-        }
+          // ログ数の変更をチェック
+          if (this.strategy.invalidateOnLogCountChange) {
+            const currentLogCount = await this.repository.getLogCountByDate(userId, businessDate);
+            
+            if (cache.logCount !== currentLogCount) {
+              this.missCount++;
+              logger.debug('CACHE', `🔄 ログ数変更によりキャッシュ無効: [${businessDate}] ${cache.logCount} -> ${currentLogCount}`);
+              await this.invalidateCache(userId, businessDate);
+              return null;
+            }
 
-        // ログ内容の変更をチェック（最終更新時刻比較）
-        const latestLogUpdate = await this.getLatestLogUpdateTime(userId, businessDate);
-        if (latestLogUpdate && latestLogUpdate > cache.generatedAt) {
-          this.missCount++;
-          logger.debug('CACHE', `📝 ログ内容変更によりキャッシュ無効: [${businessDate}] キャッシュ:${cache.generatedAt} < 最新:${latestLogUpdate}`);
-          await this.invalidateCache(userId, businessDate);
-          return null;
-        }
-      }
+            // ログ内容の変更をチェック（最終更新時刻比較）
+            const latestLogUpdate = await this.getLatestLogUpdateTime(userId, businessDate);
+            if (latestLogUpdate && latestLogUpdate > cache.generatedAt) {
+              this.missCount++;
+              logger.debug('CACHE', `📝 ログ内容変更によりキャッシュ無効: [${businessDate}] キャッシュ:${cache.generatedAt} < 最新:${latestLogUpdate}`);
+              await this.invalidateCache(userId, businessDate);
+              return null;
+            }
+          }
 
-      // 強制リフレッシュの時間をチェック
-      const forceRefreshMinutes = this.strategy.forceRefreshHours * 60;
-      if (cacheAge > forceRefreshMinutes) {
-        this.missCount++;
-        logger.debug('CACHE', `🔄 強制リフレッシュ時間到達: [${businessDate}] ${cacheAge}分経過`);
-        await this.invalidateCache(userId, businessDate);
-        return null;
-      }
+          // 強制リフレッシュの時間をチェック
+          const forceRefreshMinutes = this.strategy.forceRefreshHours * 60;
+          if (cacheAge > forceRefreshMinutes) {
+            this.missCount++;
+            logger.debug('CACHE', `🔄 強制リフレッシュ時間到達: [${businessDate}] ${cacheAge}分経過`);
+            await this.invalidateCache(userId, businessDate);
+            return null;
+          }
 
-      this.hitCount++;
-      logger.debug('CACHE', `⚡ キャッシュヒット: [${businessDate}] ${cacheAge}分前生成`);
-      
-      return cache.analysisResult;
+          this.hitCount++;
+          logger.debug('CACHE', `⚡ キャッシュヒット: [${businessDate}] ${cacheAge}分前生成`);
+          
+          return cache.analysisResult;
+        },
+        'キャッシュ取得',
+        { userId, businessDate }
+      );
     } catch (error) {
+      // キャッシュエラーは非致命的なので、nullを返してキャッシュを使用しない
       logger.error('CACHE', '❌ キャッシュ取得エラー:', error);
       this.missCount++;
-      return null; // エラー時はキャッシュを使用しない
+      return null;
     }
   }
 

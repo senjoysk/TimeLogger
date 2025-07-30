@@ -10,6 +10,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { logger } from '../../utils/logger';
 import { DatabaseError } from '../../errors';
+import { createPromiseErrorHandler, ErrorType } from '../../utils/errorHandler';
 
 /**
  * SQLiteパラメータ型定義
@@ -91,14 +92,16 @@ export class DatabaseConnection {
    */
   public run(sql: string, params?: SqliteParam[]): Promise<{ lastID: number; changes: number }> {
     return new Promise((resolve, reject) => {
+      const handleError = createPromiseErrorHandler(ErrorType.DATABASE, 'SQL実行')(reject);
+      
       if (!this.db) {
-        reject(new DatabaseError('Database not initialized'));
+        handleError(new DatabaseError('Database not initialized'));
         return;
       }
 
       this.db.run(sql, params || [], function(err) {
         if (err) {
-          reject(err);
+          handleError(err);
         } else {
           resolve({
             lastID: this.lastID,
@@ -114,14 +117,16 @@ export class DatabaseConnection {
    */
   public get<T = any>(sql: string, params?: SqliteParam[]): Promise<T | undefined> { // ALLOW_ANY: ジェネリック型のデフォルト値として使用
     return new Promise((resolve, reject) => {
+      const handleError = createPromiseErrorHandler(ErrorType.DATABASE, '単一行取得')(reject);
+      
       if (!this.db) {
-        reject(new DatabaseError('Database not initialized'));
+        handleError(new DatabaseError('Database not initialized'));
         return;
       }
 
       this.db.get(sql, params || [], (err, row) => {
         if (err) {
-          reject(err);
+          handleError(err);
         } else {
           resolve(row as T);
         }
@@ -134,14 +139,16 @@ export class DatabaseConnection {
    */
   public all<T = any>(sql: string, params?: SqliteParam[]): Promise<T[]> { // ALLOW_ANY: ジェネリック型のデフォルト値として使用
     return new Promise((resolve, reject) => {
+      const handleError = createPromiseErrorHandler(ErrorType.DATABASE, '複数行取得')(reject);
+      
       if (!this.db) {
-        reject(new DatabaseError('Database not initialized'));
+        handleError(new DatabaseError('Database not initialized'));
         return;
       }
 
       this.db.all(sql, params || [], (err, rows) => {
         if (err) {
-          reject(err);
+          handleError(err);
         } else {
           resolve(rows as T[]);
         }

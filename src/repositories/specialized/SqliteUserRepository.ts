@@ -13,6 +13,7 @@ import {
   UserStatsAggregateRow
 } from '../../types/database';
 import { logger } from '../../utils/logger';
+import { withDatabaseErrorHandling, ErrorHandler } from '../../utils/errorHandler';
 
 /**
  * SQLiteパラメータ型定義
@@ -42,13 +43,20 @@ export class SqliteUserRepository implements IUserRepository {
    */
   async userExists(userId: string): Promise<boolean> {
     try {
-      const result = await this.dbConnection.all(
-        'SELECT user_id FROM user_settings WHERE user_id = ?',
-        [userId]
+      return await withDatabaseErrorHandling(
+        async () => {
+          const result = await this.dbConnection.all(
+            'SELECT user_id FROM user_settings WHERE user_id = ?',
+            [userId]
+          );
+          return result.length > 0;
+        },
+        'ユーザー存在確認',
+        { userId }
       );
-      return result.length > 0;
     } catch (error) {
-      logger.error('USER_REPO', 'ユーザー存在確認エラー', error, { userId });
+      // ユーザー存在確認でエラーが発生した場合はfalseを返す（存在しないものとして扱う）
+      ErrorHandler.logError('USER_REPO', 'ユーザー存在確認エラー', error, { userId });
       return false;
     }
   }
@@ -57,41 +65,44 @@ export class SqliteUserRepository implements IUserRepository {
    * 新規ユーザーを登録
    */
   async registerUser(userId: string, username: string): Promise<void> {
-    try {
-      const now = new Date().toISOString();
-      const defaultTimezone = 'Asia/Tokyo';
-      
-      // user_settingsに登録
-      await this.dbConnection.run(`
-        INSERT INTO user_settings (user_id, username, timezone, first_seen, last_seen, is_active, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-      `, [userId, username, defaultTimezone, now, now, 1, now, now]);
-      
-      logger.info('USER_REPO', '新規ユーザー登録完了', { userId, username });
-    } catch (error) {
-      logger.error('USER_REPO', 'ユーザー登録エラー', error, { userId, username });
-      throw new TodoError('ユーザー登録に失敗しました', 'USER_REGISTRATION_ERROR', { userId, username, error });
-    }
+    await withDatabaseErrorHandling(
+      async () => {
+        const now = new Date().toISOString();
+        const defaultTimezone = 'Asia/Tokyo';
+        
+        // user_settingsに登録
+        await this.dbConnection.run(`
+          INSERT INTO user_settings (user_id, username, timezone, first_seen, last_seen, is_active, created_at, updated_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        `, [userId, username, defaultTimezone, now, now, 1, now, now]);
+        
+        logger.info('USER_REPO', '新規ユーザー登録完了', { userId, username });
+      },
+      'ユーザー登録',
+      { userId, username }
+    );
   }
 
   /**
    * ユーザー情報を取得
    */
   async getUserInfo(userId: string): Promise<UserInfo | null> {
-    try {
-      const row = await this.dbConnection.get<UserRegistrationRow>(
-        'SELECT * FROM user_settings WHERE user_id = ?',
-        [userId]
-      );
+    return withDatabaseErrorHandling(
+      async () => {
+        const row = await this.dbConnection.get<UserRegistrationRow>(
+          'SELECT * FROM user_settings WHERE user_id = ?',
+          [userId]
+        );
 
-      if (!row) {
-        return null;
-      }
+        if (!row) {
+          return null;
+        }
 
-      return this.mapRowToUserInfo(row);
-    } catch (error) {
-      throw new TodoError('ユーザー情報取得に失敗しました', 'GET_USER_INFO_ERROR', { userId, error });
-    }
+        return this.mapRowToUserInfo(row);
+      },
+      'ユーザー情報取得',
+      { userId }
+    );
   }
 
   /**

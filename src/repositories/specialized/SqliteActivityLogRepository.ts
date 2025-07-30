@@ -24,7 +24,7 @@ import {
   DailyAnalysisResult
 } from '../../types/activityLog';
 import { TimezoneChange, TimezoneNotification, UserTimezone } from '../interfaces';
-import { AppError, ErrorType } from '../../utils/errorHandler';
+import { AppError, ErrorType, createPromiseErrorHandler } from '../../utils/errorHandler';
 
 /**
  * 活動ログ専用SQLiteリポジトリ
@@ -55,6 +55,7 @@ export class SqliteActivityLogRepository implements IActivityLogRepository {
    */
   async saveLog(request: CreateActivityLogRequest): Promise<ActivityLog> {
     return new Promise((resolve, reject) => {
+      const handleError = createPromiseErrorHandler(ErrorType.DATABASE, '活動ログ保存')(reject);
       const db = this.db.getDatabase();
       
       const sql = `
@@ -89,7 +90,7 @@ export class SqliteActivityLogRepository implements IActivityLogRepository {
 
       db.run(sql, values, (err: Error | null) => {
         if (err) {
-          reject(new AppError(`活動ログ保存エラー: ${err.message}`, ErrorType.DATABASE, { error: err }));
+          handleError(err);
           return;
         }
 
@@ -97,7 +98,7 @@ export class SqliteActivityLogRepository implements IActivityLogRepository {
         const selectSql = 'SELECT * FROM activity_logs WHERE id = ?';
         db.get(selectSql, [logId], (selectErr: Error | null, row: Record<string, unknown>) => {
           if (selectErr) {
-            reject(new AppError(`保存後ログ取得エラー: ${selectErr.message}`, ErrorType.DATABASE, { error: selectErr }));
+            handleError(selectErr);
             return;
           }
 
@@ -112,6 +113,7 @@ export class SqliteActivityLogRepository implements IActivityLogRepository {
    */
   async getLogsByDate(userId: string, businessDate: string, includeDeleted = false): Promise<ActivityLog[]> {
     return new Promise((resolve, reject) => {
+      const handleError = createPromiseErrorHandler(ErrorType.DATABASE, '日別ログ取得')(reject);
       const db = this.db.getDatabase();
       
       let sql = `
@@ -127,7 +129,7 @@ export class SqliteActivityLogRepository implements IActivityLogRepository {
 
       db.all(sql, [userId, businessDate], (err: Error | null, rows: Record<string, unknown>[]) => {
         if (err) {
-          reject(new AppError(`日別ログ取得エラー: ${err.message}`, ErrorType.DATABASE, { error: err }));
+          handleError(err);
           return;
         }
 

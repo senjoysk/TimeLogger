@@ -7,7 +7,8 @@ import { IGeminiApiClient } from './geminiApiClient';
 import { ApiCostMonitor } from '../apiCostMonitor';
 import { ActivityAnalysisResult, ReminderContext } from '../../types/activityAnalysis';
 import { ActivityAnalysisAIResponse } from '../../types/aiResponse';
-import { AppError, ErrorType } from '../../utils/errorHandler';
+import { withApiErrorHandling } from '../../utils/errorHandler';
+import { ApiError } from '../../utils/errors';
 import { logger } from '../../utils/logger';
 
 /**
@@ -76,30 +77,27 @@ export class ActivityAnalysisService implements IActivityAnalysisService {
     logger.debug('ACTIVITY_ANALYSIS', prompt);
     logger.debug('ACTIVITY_ANALYSIS', '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
     
-    try {
-      const result = await this.geminiClient.generateContent(prompt);
-      const responseText = result.response.text();
-      
-      logger.debug('ACTIVITY_ANALYSIS', `📥 [Gemini API] ${logTitle}レスポンス:`);
-      logger.debug('ACTIVITY_ANALYSIS', '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-      logger.debug('ACTIVITY_ANALYSIS', responseText);
-      logger.debug('ACTIVITY_ANALYSIS', '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-      
-      // トークン使用量の記録
-      if (result.response.usageMetadata) {
-        const { promptTokenCount, candidatesTokenCount } = result.response.usageMetadata;
-        await this.costMonitor.recordApiCall('analyzeActivity', promptTokenCount, candidatesTokenCount);
-      }
-      
-      return this.parseActivityAnalysisResponse(responseText);
-    } catch (error) {
-      logger.error('ACTIVITY_ANALYSIS', '❌ 活動分析エラー', error);
-      throw new AppError(
-        '活動分析に失敗しました',
-        ErrorType.API,
-        { error, message, reminderContext }
-      );
-    }
+    return withApiErrorHandling(
+      async () => {
+        const result = await this.geminiClient.generateContent(prompt);
+        const responseText = result.response.text();
+        
+        logger.debug('ACTIVITY_ANALYSIS', `📥 [Gemini API] ${logTitle}レスポンス:`);
+        logger.debug('ACTIVITY_ANALYSIS', '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+        logger.debug('ACTIVITY_ANALYSIS', responseText);
+        logger.debug('ACTIVITY_ANALYSIS', '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+        
+        // トークン使用量の記録
+        if (result.response.usageMetadata) {
+          const { promptTokenCount, candidatesTokenCount } = result.response.usageMetadata;
+          await this.costMonitor.recordApiCall('analyzeActivity', promptTokenCount, candidatesTokenCount);
+        }
+        
+        return this.parseActivityAnalysisResponse(responseText);
+      },
+      '活動分析',
+      { message, reminderContext }
+    );
   }
 
   /**
@@ -256,7 +254,7 @@ JSON形式のみで回答してください。説明文は不要です。`.trim(
       // JSONブロックを抽出
       const jsonMatch = response.match(/\{[\s\S]*\}/);
       if (!jsonMatch) {
-        throw new Error('JSONレスポンスが見つかりません');
+        throw new ApiError('JSONレスポンスが見つかりません', { response });
       }
 
       const jsonText = jsonMatch[0];

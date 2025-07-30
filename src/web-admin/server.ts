@@ -15,6 +15,7 @@ import { IUnifiedRepository } from '../repositories/interfaces';
 import { createTimezoneMiddleware } from './middleware/timezoneMiddleware';
 import { createRoutes } from './routes';
 import { errorHandler } from './middleware/errorHandler';
+import { expressErrorHandler, notFoundHandler } from '../utils/expressErrorHandler';
 import { IDiscordBot } from '../interfaces/dependencies';
 import { logger } from '../utils/logger';
 
@@ -124,7 +125,13 @@ export class AdminServer {
     // ルーティング設定
     this.app.use('/', createRoutes(this.adminService, this.securityService, this.databasePath, this.bot));
     
-    // エラーハンドラー（最後に設定）
+    // 404ハンドラー
+    this.app.use(notFoundHandler);
+    
+    // 統一エラーハンドラー（最後に設定）
+    this.app.use(expressErrorHandler);
+    
+    // 既存のエラーハンドラー（後方互換性のため残す）
     this.app.use(errorHandler);
   }
   
