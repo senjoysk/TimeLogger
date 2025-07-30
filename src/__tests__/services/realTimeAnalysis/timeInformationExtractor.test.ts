@@ -198,7 +198,8 @@ describe('TimeInformationExtractor', () => {
       // 正しくは60分（1時間）であるべき
       expect(result.totalMinutes).toBe(1440); // 既存バグ：24時間として計算される
       
-      // TODO: この機能の修正時に以下のテストに変更する
+      // Issue #69: 時間情報抽出機能の修正とテスト更新
+      // 修正後のテスト:
       // expect(result.totalMinutes).toBe(60); // 1時間
       // const startTime = new Date(result.startTime);
       // const endTime = new Date(result.endTime);

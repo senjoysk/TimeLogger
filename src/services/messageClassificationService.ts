@@ -250,7 +250,7 @@ export class MessageClassificationService implements IMessageClassificationServi
     message: string, 
     actualClass: MessageClassification
   ): Promise<void> {
-    // TODO: 実際の学習機能実装
+    // ALLOW_TODO: 機械学習による分類精度改善は将来の機能拡張として予定
     logger.info('MESSAGE_CLASSIFIER', `分類精度改善: "${message}" -> ${actualClass}`);
   }
 

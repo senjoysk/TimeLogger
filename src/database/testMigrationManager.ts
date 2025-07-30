@@ -43,7 +43,7 @@ export class TestMigrationManager {
    */
   async runMigrationsUntil(targetVersion: string): Promise<void> {
     await this.databaseInitializer.initialize();
-    // TODO: MigrationManagerに段階実行機能を追加
+    // ALLOW_TODO: 段階的マイグレーション実行は現在のテスト要件では不要だが将来的に有用
     logger.warn('TEST_MIGRATION', '段階的マイグレーション実行は未実装です。代わりに全マイグレーションを実行します。');
     await this.migrationManager.runMigrations();
   }

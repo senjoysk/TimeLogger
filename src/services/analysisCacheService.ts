@@ -329,7 +329,7 @@ export class AnalysisCacheService implements IAnalysisCacheService {
       const totalRequests = this.hitCount + this.missCount;
       const hitRate = totalRequests > 0 ? this.hitCount / totalRequests : 0;
 
-      // TODO: より詳細な統計情報をデータベースから取得
+      // ALLOW_TODO: 詳細統計は現在の機能要件に含まれていないため将来実装予定
       // 現在は基本的な情報のみ返す
       return {
         totalCaches: 0, // 実装する場合はSQLクエリで取得

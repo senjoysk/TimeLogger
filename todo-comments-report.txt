@@ -1,0 +1,23 @@
+TODO・FIXMEコメント検出レポート
+生成日時: Wed Jul 30 15:56:37 IST 2025
+==========================================
+
+✅ 例外許可: /Users/senjo.yoshiki/Work/senjoysk/TimeLogger/worktrees/fix-refactor5/CLAUDE.md:1418
+   - `/* TODO:`
+
+✅ 例外許可: /Users/senjo.yoshiki/Work/senjoysk/TimeLogger/worktrees/fix-refactor5/src/database/testMigrationManager.ts:46
+       // ALLOW_TODO: 段階的マイグレーション実行は現在のテスト要件では不要だが将来的に有用
+
+✅ 例外許可: /Users/senjo.yoshiki/Work/senjoysk/TimeLogger/worktrees/fix-refactor5/src/services/messageClassificationService.ts:253
+       // ALLOW_TODO: 機械学習による分類精度改善は将来の機能拡張として予定
+
+✅ 例外許可: /Users/senjo.yoshiki/Work/senjoysk/TimeLogger/worktrees/fix-refactor5/src/services/analysisCacheService.ts:332
+         // ALLOW_TODO: 詳細統計は現在の機能要件に含まれていないため将来実装予定
+
+==========================================
+検出サマリー:
+- 総検出数: 20
+- 違反数: 0
+- 例外許可数: 20
+
+対応が必要な項目数: 0

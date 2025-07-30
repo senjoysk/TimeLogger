@@ -138,3 +138,19 @@ if [ $? -ne 0 ]; then
 fi
 
 echo "✅ レイヤー分離チェック通過"
+
+# 🆕 TODO・FIXMEコメントチェック（Issue #58対応）
+echo "🔍 Pre-commit check: TODO・FIXMEコメントチェック..."
+./scripts/code-review/todo-comment-check.sh
+
+if [ $? -ne 0 ]; then
+    echo ""
+    echo "🚨 コミットが阻止されました！"
+    echo "🛠️ TODO・FIXMEコメントが検出されました。"
+    echo "📋 コメントを削除、実装、またはGitHub Issue化してください。"
+    echo "📋 例外許可の場合は ALLOW_TODO コメントを追加してください。"
+    echo ""
+    exit 1
+fi
+
+echo "✅ TODO・FIXMEコメントチェック通過"
