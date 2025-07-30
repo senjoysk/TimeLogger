@@ -78,7 +78,7 @@ export class TimeAnalysisOrchestrator implements ITimeAnalysisOrchestrator {
       const result = await this.geminiService.classifyMessageWithAI(input);
       
       // レスポンスを期待する形式に変換
-      return this.parseGeminiResponse(result as any, basicAnalysis);
+      return this.parseGeminiResponse(result as any, basicAnalysis); // ALLOW_ANY: Geminiレスポンスの動的な型変換のため
     } catch (error) {
       logger.error('TIME_ANALYSIS_ORCHESTRATOR', 'Gemini解析エラー:', error as Error);
       // フォールバック: 基本解析結果を使用
@@ -151,7 +151,7 @@ export class TimeAnalysisOrchestrator implements ITimeAnalysisOrchestrator {
   ): TimeAnalysisResult | GeminiTimeAnalysisResponse {
     // 最近のログとの重複チェック
     if (context.recentLogs && context.recentLogs.length > 0) {
-      const adjusted = this.checkTimeOverlaps(analysis, context.recentLogs as any);
+      const adjusted = this.checkTimeOverlaps(analysis, context.recentLogs as any); // ALLOW_ANY: 型互換性のための一時的なキャスト
       if (adjusted) {
         return adjusted;
       }
@@ -159,7 +159,7 @@ export class TimeAnalysisOrchestrator implements ITimeAnalysisOrchestrator {
 
     // セッション情報による補正
     if (context.currentSession) {
-      return this.adjustWithSessionInfo(analysis, context.currentSession as any);
+      return this.adjustWithSessionInfo(analysis, context.currentSession as any); // ALLOW_ANY: 型互換性のための一時的なキャスト
     }
 
     return analysis;

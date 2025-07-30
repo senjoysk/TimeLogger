@@ -136,6 +136,6 @@ export class TimeProviderService implements ITimeProviderService {
    * テスト用：インスタンスをリセット
    */
   static resetForTesting(): void {
-    TimeProviderService.instance = null as any;
+    TimeProviderService.instance = null as any; // ALLOW_ANY: インスタンスのリセットのため
   }
 }

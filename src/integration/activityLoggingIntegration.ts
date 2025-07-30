@@ -40,6 +40,7 @@ import { TimeProviderService } from '../services/timeProviderService';
 import { ReminderReplyService, IReminderReplyService } from '../services/reminderReplyService';
 import { HealthStatus } from '../types/health';
 import { logger } from '../utils/logger';
+import { SystemError } from '../errors';
 
 /**
  * 活動記録システム統合設定インターフェース
@@ -804,7 +805,7 @@ export class ActivityLoggingIntegration {
   async generateDailySummaryText(userId: string, timezone: string): Promise<string> {
     try {
       if (!this.summaryHandler) {
-        throw new Error('サマリーハンドラーが初期化されていません');
+        throw new SystemError('サマリーハンドラーが初期化されていません');
       }
 
       // モックメッセージオブジェクトを作成
@@ -825,7 +826,7 @@ export class ActivityLoggingIntegration {
       } as Pick<Message, 'reply'>;
       
       // サマリーハンドラーを使って今日のサマリーを生成
-      await this.summaryHandler.handle(mockMessage as any, userId, [], timezone);
+      await this.summaryHandler.handle(mockMessage as Message, userId, [], timezone);
       
       return summaryText || '🌅 今日一日お疲れさまでした！\n\nサマリーの詳細は `!summary` コマンドで確認できます。';
     } catch (error) {

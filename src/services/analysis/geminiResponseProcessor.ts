@@ -114,7 +114,7 @@ export class GeminiResponseProcessor implements IGeminiResponseProcessor {
   /**
    * レスポンスを検証・正規化
    */
-  private validateAndNormalizeResponse(parsed: any): GeminiAnalysisResponse {
+  private validateAndNormalizeResponse(parsed: any): GeminiAnalysisResponse { // ALLOW_ANY: Gemini APIの動的レスポンスを処理するため
     return {
       categories: this.validateCategories(parsed.categories || []),
       timeline: this.validateTimeline(parsed.timeline || []),
@@ -128,7 +128,7 @@ export class GeminiResponseProcessor implements IGeminiResponseProcessor {
   /**
    * カテゴリ配列を検証・正規化
    */
-  private validateCategories(categories: any[]): CategorySummary[] {
+  private validateCategories(categories: any[]): CategorySummary[] { // ALLOW_ANY: 未検証の配列要素を処理するため
     return categories
       .filter(cat => cat && typeof cat === 'object')
       .map(cat => ({
@@ -146,7 +146,7 @@ export class GeminiResponseProcessor implements IGeminiResponseProcessor {
   /**
    * タイムライン配列を検証・正規化
    */
-  private validateTimeline(timeline: any[]): TimelineEntry[] {
+  private validateTimeline(timeline: any[]): TimelineEntry[] { // ALLOW_ANY: 未検証の配列要素を処理するため
     return timeline
       .filter(entry => entry && typeof entry === 'object')
       .map(entry => ({
@@ -166,7 +166,7 @@ export class GeminiResponseProcessor implements IGeminiResponseProcessor {
   /**
    * 時間分布を検証・正規化
    */
-  private validateTimeDistribution(timeDistribution: any): TimeDistribution {
+  private validateTimeDistribution(timeDistribution: any): TimeDistribution { // ALLOW_ANY: 未検証のオブジェクトを処理するため
     const td = timeDistribution || {};
     return {
       totalEstimatedMinutes: Math.max(0, Number(td.totalEstimatedMinutes) || 0),
@@ -180,7 +180,7 @@ export class GeminiResponseProcessor implements IGeminiResponseProcessor {
   /**
    * 洞察を検証・正規化
    */
-  private validateInsights(insights: any): AnalysisInsight {
+  private validateInsights(insights: any): AnalysisInsight { // ALLOW_ANY: 未検証のオブジェクトを処理するため
     const ins = insights || {};
     const workBalance = ins.workBalance || {};
     
@@ -205,7 +205,7 @@ export class GeminiResponseProcessor implements IGeminiResponseProcessor {
   /**
    * 警告配列を検証・正規化
    */
-  private validateWarnings(warnings: any[]): AnalysisWarning[] {
+  private validateWarnings(warnings: any[]): AnalysisWarning[] { // ALLOW_ANY: 未検証の配列要素を処理するため
     return warnings
       .filter(warning => warning && typeof warning === 'object')
       .map(warning => ({
@@ -220,7 +220,7 @@ export class GeminiResponseProcessor implements IGeminiResponseProcessor {
   /**
    * 警告タイプを検証
    */
-  private validateWarningType(type: any): WarningType {
+  private validateWarningType(type: any): WarningType { // ALLOW_ANY: 未検証の値を処理するため
     const validTypes: WarningType[] = [
       'time_overlap',
       'time_gap', 
@@ -235,21 +235,21 @@ export class GeminiResponseProcessor implements IGeminiResponseProcessor {
   /**
    * 警告レベルを検証
    */
-  private validateWarningLevel(level: any): WarningLevel {
+  private validateWarningLevel(level: any): WarningLevel { // ALLOW_ANY: 未検証の値を処理するため
     return Object.values(WarningLevel).includes(level) ? level : WarningLevel.INFO;
   }
 
   /**
    * 信頼度を検証・正規化
    */
-  private validateConfidence(confidence: any): number {
+  private validateConfidence(confidence: any): number { // ALLOW_ANY: 未検証の値を処理するため
     return Math.min(1, Math.max(0, Number(confidence) || 0.7));
   }
 
   /**
    * ISO文字列を検証
    */
-  private validateISOString(dateString: any): string {
+  private validateISOString(dateString: any): string { // ALLOW_ANY: 未検証の値を処理するため
     if (!dateString) return '';
     
     const str = String(dateString);

@@ -453,7 +453,7 @@ export class SqliteActivityLogRepository implements IActivityLogRepository {
           return;
         }
 
-        resolve((this as any).changes > 0);
+        resolve((this as any).changes > 0); // ALLOW_ANY: sqlite3のRunResultのchangesプロパティアクセスのため
       });
     });
   }
@@ -525,7 +525,7 @@ export class SqliteActivityLogRepository implements IActivityLogRepository {
           return;
         }
 
-        resolve((this as any).changes > 0);
+        resolve((this as any).changes > 0); // ALLOW_ANY: sqlite3のRunResultのchangesプロパティアクセスのため
       });
     });
   }
@@ -833,7 +833,7 @@ export class SqliteActivityLogRepository implements IActivityLogRepository {
           return;
         }
 
-        resolve((this as any).changes);
+        resolve((this as any).changes); // ALLOW_ANY: sqlite3のRunResultのchangesプロパティアクセスのため
       });
     });
   }

@@ -16,6 +16,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { ITimezoneService } from '../../services/interfaces/ITimezoneService';
 import { CreateTodoRequest } from '../services/todoManagementService';
 import { logger } from '../../utils/logger';
+import { NotFoundError, DatabaseError } from '../../errors';
 
 export class AdminRepository implements IAdminRepository {
   private sqliteRepo: IUnifiedRepository;
@@ -51,7 +52,7 @@ export class AdminRepository implements IAdminRepository {
   async getTableCount(tableName: string): Promise<number> {
     try {
       // SQLを直接実行してN+1問題を回避
-      const db = (this.sqliteRepo as any).db; // privateなdbインスタンスにアクセス
+      const db = (this.sqliteRepo as any).db; // ALLOW_ANY: 管理画面のパフォーマンス最適化のため直接DBアクセスが必要
       
       switch (tableName) {
         case 'activity_logs':
@@ -127,7 +128,7 @@ export class AdminRepository implements IAdminRepository {
     
     try {
       // SQLを直接実行してN+1問題を回避
-      const db = (this.sqliteRepo as any).db;
+      const db = (this.sqliteRepo as any).db; // ALLOW_ANY: 管理画面のパフォーマンス最適化のため直接DBアクセスが必要
       
       switch (tableName) {
         case 'activity_logs':
@@ -196,7 +197,7 @@ export class AdminRepository implements IAdminRepository {
           allLogs.push(...logs);
         }
         allLogs.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-        return this.paginate(allLogs as any, page, limit);
+        return this.paginate(allLogs as unknown as Record<string, unknown>[], page, limit);
       case 'todo_tasks':
         const allUsers = await this.sqliteRepo.getAllUsers();
         const allTodos = [];
@@ -205,7 +206,7 @@ export class AdminRepository implements IAdminRepository {
           allTodos.push(...todos);
         }
         allTodos.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-        return this.paginate(allTodos as any, page, limit);
+        return this.paginate(allTodos as unknown as Record<string, unknown>[], page, limit);
       case 'user_settings':
         const userList = await this.sqliteRepo.getAllUsers();
         return this.paginate(userList, page, limit);
@@ -232,7 +233,7 @@ export class AdminRepository implements IAdminRepository {
           const endDate = new Date().toISOString().split('T')[0];
           const startDate = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
           const logs = await this.sqliteRepo.getLogsByDateRange(filters.userId, startDate, endDate);
-          return this.paginate(logs as any, page, limit);
+          return this.paginate(logs as unknown as Record<string, unknown>[], page, limit);
         }
         return this.getTableData(tableName, options);
       case 'todo_tasks':
@@ -264,7 +265,7 @@ export class AdminRepository implements IAdminRepository {
         
         // ソートとページネーション
         finalTodos.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-        return this.paginate(finalTodos as any, page, limit);
+        return this.paginate(finalTodos as unknown as Record<string, unknown>[], page, limit);
       default:
         return this.getTableData(tableName, options);
     }
@@ -354,7 +355,7 @@ export class AdminRepository implements IAdminRepository {
     // 既存のTODOを取得
     const existingTodo = await this.getTodoTaskById(todoId);
     if (!existingTodo) {
-      throw new Error('TODO not found');
+      throw new NotFoundError('TODO not found');
     }
 
     // SqliteActivityLogRepositoryを使用してTODOを更新
@@ -374,7 +375,7 @@ export class AdminRepository implements IAdminRepository {
     // 更新後のTODOを取得して返す
     const updatedTodo = await this.getTodoTaskById(todoId);
     if (!updatedTodo) {
-      throw new Error('Failed to retrieve updated TODO');
+      throw new DatabaseError('Failed to retrieve updated TODO');
     }
 
     return updatedTodo;

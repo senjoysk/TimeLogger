@@ -9,6 +9,7 @@ import { DatabaseInitializer } from '../../database/databaseInitializer';
 import * as fs from 'fs';
 import * as path from 'path';
 import { logger } from '../../utils/logger';
+import { DatabaseError } from '../../errors';
 
 /**
  * SQLiteパラメータ型定義
@@ -74,7 +75,7 @@ export class DatabaseConnection {
    */
   public getDatabase(): Database {
     if (!this.db) {
-      throw new Error('Database not initialized. Call initializeDatabase() first.');
+      throw new DatabaseError('Database not initialized. Call initializeDatabase() first.');
     }
     return this.db;
   }
@@ -92,7 +93,7 @@ export class DatabaseConnection {
   public run(sql: string, params?: SqliteParam[]): Promise<{ lastID: number; changes: number }> {
     return new Promise((resolve, reject) => {
       if (!this.db) {
-        reject(new Error('Database not initialized'));
+        reject(new DatabaseError('Database not initialized'));
         return;
       }
 
@@ -112,10 +113,10 @@ export class DatabaseConnection {
   /**
    * 単一行取得（Promise版）
    */
-  public get<T = any>(sql: string, params?: SqliteParam[]): Promise<T | undefined> {
+  public get<T = any>(sql: string, params?: SqliteParam[]): Promise<T | undefined> { // ALLOW_ANY: ジェネリック型のデフォルト値として使用
     return new Promise((resolve, reject) => {
       if (!this.db) {
-        reject(new Error('Database not initialized'));
+        reject(new DatabaseError('Database not initialized'));
         return;
       }
 
@@ -132,10 +133,10 @@ export class DatabaseConnection {
   /**
    * 複数行取得（Promise版）
    */
-  public all<T = any>(sql: string, params?: SqliteParam[]): Promise<T[]> {
+  public all<T = any>(sql: string, params?: SqliteParam[]): Promise<T[]> { // ALLOW_ANY: ジェネリック型のデフォルト値として使用
     return new Promise((resolve, reject) => {
       if (!this.db) {
-        reject(new Error('Database not initialized'));
+        reject(new DatabaseError('Database not initialized'));
         return;
       }
 

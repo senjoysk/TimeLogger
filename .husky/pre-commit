@@ -79,6 +79,21 @@ fi
 
 echo "✅ Console使用チェック通過"
 
+# 🆕 型安全性チェック
+echo "🔍 Pre-commit check: 型安全性チェック..."
+./scripts/code-review/type-safety-check.sh
+
+if [ $? -ne 0 ]; then
+    echo ""
+    echo "🚨 コミットが阻止されました！"
+    echo "🛠️ 型安全性の問題が検出されました。"
+    echo "📋 any型の使用や型注釈不足を修正してください。"
+    echo ""
+    exit 1
+fi
+
+echo "✅ 型安全性チェック通過"
+
 # データベースパス妥当性チェック
 echo "🔍 Pre-commit check: データベースパス妥当性確認..."
 npm run check:database-paths

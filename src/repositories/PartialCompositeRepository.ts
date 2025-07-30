@@ -80,7 +80,7 @@ export class PartialCompositeRepository implements IUnifiedRepository {
    */
   async close(): Promise<void> {
     // DatabaseConnectionは共有インスタンスなので、一度だけ閉じる
-    const db = (this.activityLogRepo as any).db;
+    const db = (this.activityLogRepo as any).db; // ALLOW_ANY: DatabaseConnectionの共有インスタンスを閉じるため
     if (db && typeof db.close === 'function') {
       await db.close();
     }

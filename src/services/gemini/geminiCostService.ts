@@ -5,6 +5,7 @@
 
 import { ApiCostMonitor } from '../apiCostMonitor';
 import { CostAlert } from '../../types/costAlert';
+import { ApiCostStats } from '../interfaces/IGeminiService';
 
 /**
  * Gemini コストサービスインターフェース
@@ -14,7 +15,7 @@ export interface IGeminiCostService {
    * API使用量統計を取得
    * @returns 今日の統計情報
    */
-  getCostStats(): Promise<any>;
+  getCostStats(): Promise<ApiCostStats>;
 
   /**
    * 日次コストレポートを取得

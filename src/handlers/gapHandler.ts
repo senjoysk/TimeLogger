@@ -167,7 +167,7 @@ export class GapHandler implements IGapHandler {
         if ('components' in row && Array.isArray(row.components)) {
           row.components.forEach((component) => {
             if ('type' in component && component.type === 2) { // ButtonComponent
-              const button = ButtonBuilder.from(component as any).setDisabled(true);
+              const button = ButtonBuilder.from(component as any).setDisabled(true); // ALLOW_ANY: Discord.jsのButtonComponentをButtonBuilderに変換するため
               newRow.addComponents(button);
             }
           });

@@ -12,18 +12,18 @@ import { logger } from './utils/logger';
  */
 class Application {
   private bot: TaskLoggerBot;
-  private scheduler: EnhancedScheduler;
-  private dynamicScheduler: DynamicReportScheduler;
-  private timezoneMonitor: TimezoneChangeMonitor;
+  private scheduler: EnhancedScheduler | null = null;
+  private dynamicScheduler: DynamicReportScheduler | null = null;
+  private timezoneMonitor: TimezoneChangeMonitor | null = null;
   private integratedServer: IntegratedServer | null = null;
 
   constructor() {
     this.bot = new TaskLoggerBot();
     // スケジューラーの初期化はBotの初期化後に行う
-    this.scheduler = null as any;
+    this.scheduler = null;
     // DynamicReportSchedulerとTimezoneChangeMonitorはリポジトリ取得後に初期化
-    this.dynamicScheduler = null as any;
-    this.timezoneMonitor = null as any;
+    this.dynamicScheduler = null;
+    this.timezoneMonitor = null;
   }
 
   /**
@@ -66,22 +66,30 @@ class Application {
       this.scheduler = new EnhancedScheduler(this.bot, repository);
       
       // EnhancedSchedulerに動的コンポーネントを統合
-      this.scheduler.setDynamicScheduler(this.dynamicScheduler);
-      this.scheduler.setTimezoneMonitor(this.timezoneMonitor);
+      if (this.scheduler) {
+        this.scheduler.setDynamicScheduler(this.dynamicScheduler);
+        this.scheduler.setTimezoneMonitor(this.timezoneMonitor);
+      }
       
       // 18:30レポート送信機能を設定
-      this.scheduler.setReportSender(async (userId: string, timezone: string) => {
+      if (this.scheduler) {
+        this.scheduler.setReportSender(async (userId: string, timezone: string) => {
         logger.info('SCHEDULER', `${timezone}の18:30になりました - ユーザー ${userId} に日次レポートを送信中...`);
         await this.bot.sendDailySummaryForUser(userId);
-      });
+        });
+      }
       
       // TimezoneHandlerのコールバック設定（!timezone set 時のEnhancedScheduler連携）
       this.bot.setTimezoneChangeCallback(async (userId: string, oldTimezone: string | null, newTimezone: string) => {
-        await this.scheduler.onUserTimezoneChanged(userId, oldTimezone, newTimezone);
+        if (this.scheduler) {
+          await this.scheduler.onUserTimezoneChanged(userId, oldTimezone, newTimezone);
+        }
       });
       
       // スケジューラーの開始
-      await this.scheduler.start();
+      if (this.scheduler) {
+        await this.scheduler.start();
+      }
       
       
       logger.success('APP', 'Discord Task Logger が正常に起動しました！');
@@ -112,14 +120,18 @@ class Application {
       logger.info('APP', 'Discord Task Logger を停止しています...');
       
       // スケジューラーの停止
-      this.scheduler.stop();
+      if (this.scheduler) {
+        this.scheduler.stop();
+      }
       
       // 動的スケジューラーの統計を表示
-      const metrics = this.scheduler.getPerformanceMetrics();
-      logger.info('APP', '送信統計', {
-        totalReportsSent: metrics.totalReportsSent,
-        timezoneDistribution: Object.keys(metrics.timezoneDistribution).length > 0 ? metrics.timezoneDistribution : undefined
-      });
+      const metrics = this.scheduler?.getPerformanceMetrics();
+      if (metrics) {
+        logger.info('APP', '送信統計', {
+          totalReportsSent: metrics.totalReportsSent,
+          timezoneDistribution: Object.keys(metrics.timezoneDistribution).length > 0 ? metrics.timezoneDistribution : undefined
+        });
+      }
       
       
       // Discord Bot の停止

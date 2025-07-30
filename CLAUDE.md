@@ -1100,3 +1100,75 @@ logger.error('COMPONENT', 'エラー', error);
 ```bash
 ./scripts/code-review/console-usage-check.sh
 ```
+
+## 🚨 型安全性規約（Issue #60対応）
+
+### any型使用の完全禁止
+
+TypeScriptコードベースでは、any型の使用を原則として禁止します。
+
+```typescript
+// ❌ 悪い例: any型の使用
+const data: any = fetchData();
+function process(input: any): any { ... }
+
+// ✅ 良い例: 具体的な型定義
+interface UserData {
+  id: string;
+  name: string;
+}
+const data: UserData = fetchData();
+function process(input: UserData): ProcessResult { ... }
+```
+
+### any型使用の例外ルール
+
+やむを得ずany型を使用する場合は、必ず`// ALLOW_ANY`コメントを付与し、理由を明記してください。
+
+```typescript
+// ALLOW_ANY: sqlite3のRunResultのchangesプロパティアクセスのため
+resolve((this as any).changes > 0);
+
+// ALLOW_ANY: Discord.jsのButtonComponentをButtonBuilderに変換するため
+const button = ButtonBuilder.from(component as any).setDisabled(true);
+```
+
+### 関数の型注釈必須
+
+すべての関数には戻り値の型を明示的に指定してください。
+
+```typescript
+// ❌ 悪い例: 戻り値型なし
+function calculate(a: number, b: number) {
+  return a + b;
+}
+
+// ✅ 良い例: 戻り値型あり
+function calculate(a: number, b: number): number {
+  return a + b;
+}
+
+// ✅ 良い例: async関数
+async function fetchData(id: string): Promise<UserData> {
+  // ...
+}
+```
+
+### 型安全性チェックの自動化
+
+Pre-commitフックで型安全性がチェックされます：
+```bash
+./scripts/code-review/type-safety-check.sh
+```
+
+このスクリプトは以下を検出します：
+- any型の使用（ALLOW_ANYコメントなし）
+- 暗黙的なany型
+- 型注釈のない関数パラメータ
+- 戻り値型のない関数
+
+### 開発時の推奨事項
+
+1. **VSCode設定**: `"typescript.tsserver.experimental.enableProjectDiagnostics": true`
+2. **定期的な型チェック**: `npx tsc --noEmit`
+3. **strictモード維持**: tsconfig.jsonの`"strict": true`を変更しない

@@ -4,7 +4,8 @@ import { config } from './config';
 import { IUnifiedRepository } from './repositories/interfaces';
 import { toZonedTime } from 'date-fns-tz';
 import { 
-  ISchedulerService, 
+  ISchedulerService,
+  IScheduledTask,
   ILogger,
   ITimeProvider,
   IConfigService 
@@ -17,6 +18,7 @@ import {
 import { ConfigService } from './services/configService';
 import { IActivityPromptRepository } from './repositories/interfaces';
 import { logger } from './utils/logger';
+import { SystemError } from './errors';
 // ActivityPromptRepository は PartialCompositeRepository に統合済み
 
 /**
@@ -38,7 +40,7 @@ export interface SchedulerDependencies {
 export class Scheduler {
   private bot: TaskLoggerBot;
   private repository: IUnifiedRepository;
-  private jobs: Map<string, any> = new Map(); // cron.ScheduledTaskからanyに変更（DI対応）
+  private jobs: Map<string, IScheduledTask> = new Map(); // ALLOW_ANY: DI対応でIScheduledTaskインターフェースを使用
   private userTimezones: Map<string, string> = new Map();
   
   // DI依存関係
@@ -315,7 +317,7 @@ export class Scheduler {
           await this.bot.sendDailySummaryForAllUsers();
           break;
         default:
-          throw new Error(`未知のスケジュール名: ${scheduleName}`);
+          throw new SystemError(`未知のスケジュール名: ${scheduleName}`);
       }
       
       this.logger.info(`✅ ${scheduleName} の手動実行が完了しました`);

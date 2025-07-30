@@ -192,7 +192,7 @@ export interface TestingEnvironmentSettings {
 /**
  * API共通レスポンス型
  */
-export interface ApiResponse<T = any> {
+export interface ApiResponse<T = any> { // ALLOW_ANY: ジェネリック型のデフォルト値として使用
   /** 成功フラグ */
   success: boolean;
   /** レスポンスデータ */

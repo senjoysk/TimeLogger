@@ -22,6 +22,7 @@ import { TimeConsistencyValidator } from './timeConsistencyValidator';
 import { IGeminiService } from './interfaces/IGeminiService';
 import { ITimezoneService } from './interfaces/ITimezoneService';
 import { logger } from '../utils/logger';
+import { ValidationError } from '../errors';
 
 /**
  * リアルタイム活動分析統合クラス
@@ -64,7 +65,7 @@ export class RealTimeActivityAnalyzer {
       : new Date(inputTimestamp);
     
     if (isNaN(normalizedTimestamp.getTime())) {
-      throw new Error(`無効なinputTimestamp: ${inputTimestamp}`);
+      throw new ValidationError(`無効なinputTimestamp: ${inputTimestamp}`);
     }
     
     try {
@@ -175,7 +176,7 @@ export class RealTimeActivityAnalyzer {
         type: warning.type,
         level: warning.level,
         message: warning.message,
-        details: warning.details ? warning.details as any : {}
+        details: warning.details ? warning.details as any : {} // ALLOW_ANY: 警告詳細の動的なプロパティのため
       })),
       metadata,
       summary: this.generateAnalysisSummary(timeAnalysis, activities, validationResult),

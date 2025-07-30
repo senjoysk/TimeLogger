@@ -125,7 +125,7 @@ export class SqliteApiCostRepository implements IApiCostRepository {
       let totalInputTokens = 0;
       let totalOutputTokens = 0;
       let estimatedCost = 0;
-      const operationBreakdown: Record<string, any> = {};
+      const operationBreakdown: Record<string, { calls: number; inputTokens: number; outputTokens: number; cost: number }> = {};
 
       rows.forEach(row => {
         totalCalls += row.calls;
