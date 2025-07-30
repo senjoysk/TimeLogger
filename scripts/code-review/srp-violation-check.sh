@@ -9,6 +9,7 @@ echo "🔍 SRP違反チェックを開始します..."
 
 # 設定: 閾値定義
 MAX_LINES=500              # ファイル最大行数
+MAX_LINES_TEST=800         # テストファイル最大行数
 MAX_METHODS=20             # クラス最大メソッド数
 MAX_INTERFACES=3           # 最大実装インターフェース数
 MAX_IMPORTS=30             # 最大import数（複雑度の指標）
@@ -32,14 +33,30 @@ check_srp_exception() {
     return 1  # 例外なし
 }
 
+# ヘルパー関数: テストファイル判定
+is_test_file() {
+    local file="$1"
+    # __tests__ディレクトリ内、または .test.ts/.test.js/.spec.ts/.spec.js で終わるファイル
+    if [[ "$file" == *"__tests__"* ]] || [[ "$file" == *.test.ts ]] || [[ "$file" == *.test.js ]] || [[ "$file" == *.spec.ts ]] || [[ "$file" == *.spec.js ]]; then
+        return 0  # テストファイル
+    fi
+    return 1  # 本番コード
+}
+
 # ヘルパー関数: 行数チェック
 check_file_lines() {
     local file="$1"
     local lines=$(wc -l < "$file")
+    local max_lines=$MAX_LINES
     
-    if [ "$lines" -gt "$MAX_LINES" ]; then
+    # テストファイルの場合は制限を緩和
+    if is_test_file "$file"; then
+        max_lines=$MAX_LINES_TEST
+    fi
+    
+    if [ "$lines" -gt "$max_lines" ]; then
         if ! check_srp_exception "$file"; then
-            echo -e "${RED}❌ ファイル行数超過:${NC} $file ($lines 行 > $MAX_LINES 行)"
+            echo -e "${RED}❌ ファイル行数超過:${NC} $file ($lines 行 > $max_lines 行)"
             echo -e "   ${YELLOW}対策:${NC} ファイルを責務ごとに分割してください"
             return 1
         else
