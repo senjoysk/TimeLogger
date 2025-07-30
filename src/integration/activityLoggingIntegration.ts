@@ -235,7 +235,9 @@ export class ActivityLoggingIntegration {
       this.messageSelectionHandler.setGeminiService(this.geminiService);
       
       // リマインダーReplyサービスの初期化
-      this.reminderReplyService = new ReminderReplyService();
+      const { DiscordMessageClient } = await import('../interfaces/discordClient');
+      const discordClient = new DiscordMessageClient();
+      this.reminderReplyService = new ReminderReplyService(discordClient);
       
       // TimezoneHandlerにDynamicReportSchedulerのコールバックを設定
       this.timezoneHandler.setTimezoneChangeCallback(async (userId: string, oldTimezone: string | null, newTimezone: string) => {

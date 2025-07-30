@@ -25,6 +25,9 @@ describe('TODO一括操作の統合テスト', () => {
   const authHeader = `Basic ${Buffer.from(`${testUsername}:${testPassword}`).toString('base64')}`;
 
   beforeAll(async () => {
+    // テスト環境の設定（本番環境チェックを回避）
+    process.env.NODE_ENV = 'test';
+    
     // テスト用の一時データベースファイル作成
     testDbPath = path.join(__dirname, `test-bulk-${Date.now()}.db`);
     

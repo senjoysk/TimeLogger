@@ -1,14 +1,33 @@
 import { ReminderReplyService } from '../../services/reminderReplyService';
+import { IDiscordMessageClient } from '../../interfaces/discordClient';
 import { Message } from 'discord.js';
 
-// 🔴 Red Phase: リマインダーReply機能のテスト - 実装前なので失敗する
-describe('🟢 Green Phase: ReminderReplyService', () => {
+// MockDiscordMessageClient for testing
+class MockDiscordMessageClient implements IDiscordMessageClient {
+  private mockMessages: Map<string, Message | null> = new Map();
+
+  setMockMessage(messageId: string, message: Message | null): void {
+    this.mockMessages.set(messageId, message);
+  }
+
+  async fetchReferencedMessage(message: Message, messageId: string): Promise<Message | null> {
+    return this.mockMessages.get(messageId) || null;
+  }
+
+  async fetchRecentMessages(message: Message, limit?: number): Promise<Message[]> {
+    return []; // テストでは空配列を返す
+  }
+}
+
+describe('ReminderReplyService', () => {
   let reminderReplyService: ReminderReplyService;
+  let mockDiscordClient: MockDiscordMessageClient;
   let mockMessage: any;
   let mockReferencedMessage: any;
 
   beforeEach(() => {
-    reminderReplyService = new ReminderReplyService();
+    mockDiscordClient = new MockDiscordMessageClient();
+    reminderReplyService = new ReminderReplyService(mockDiscordClient);
     
     // モックメッセージの設定
     mockReferencedMessage = {
@@ -31,13 +50,11 @@ describe('🟢 Green Phase: ReminderReplyService', () => {
       createdAt: new Date('2024-01-15T11:32:00Z'),
       reference: {
         messageId: 'reminder-message-id'
-      },
-      channel: {
-        messages: {
-          fetch: jest.fn().mockResolvedValue(mockReferencedMessage)
-        }
       }
     };
+
+    // MockDiscordMessageClientにメッセージを設定
+    mockDiscordClient.setMockMessage('reminder-message-id', mockReferencedMessage as Message);
   });
 
   describe('isReminderReply', () => {

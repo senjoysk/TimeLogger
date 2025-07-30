@@ -123,3 +123,18 @@ if [ $? -ne 0 ]; then
 fi
 
 echo "✅ エラーハンドリング重複チェック通過"
+
+# 🆕 レイヤー分離チェック（Issue #61対応）
+echo "🔍 Pre-commit check: レイヤー分離チェック..."
+./scripts/code-review/layer-separation-check.sh
+
+if [ $? -ne 0 ]; then
+    echo ""
+    echo "🚨 コミットが阻止されました！"
+    echo "🛠️ レイヤー分離違反が検出されました。"
+    echo "📋 サービス層でのDB/API直接使用を修正してください。"
+    echo ""
+    exit 1
+fi
+
+echo "✅ レイヤー分離チェック通過"

@@ -1172,3 +1172,173 @@ Pre-commitフックで型安全性がチェックされます：
 1. **VSCode設定**: `"typescript.tsserver.experimental.enableProjectDiagnostics": true`
 2. **定期的な型チェック**: `npx tsc --noEmit`
 3. **strictモード維持**: tsconfig.jsonの`"strict": true`を変更しない
+
+## 🏗️ レイヤ分離規約（Issue #61対応）
+
+### ビジネスロジックとインフラロジックの完全分離
+
+Issue #61対応として、アーキテクチャの明確な分離を実現するため、以下のレイヤ分離ルールを**厳格に遵守**してください。
+
+### レイヤ分離の基本原則
+
+#### 1. **サービス層（ビジネスロジック層）の責任**
+```typescript
+// ✅ 良い例: リポジトリ経由のデータアクセス
+export class ActivityAnalysisService {
+  constructor(
+    private repository: IActivityLogRepository,
+    private apiClient: IGeminiApiClient
+  ) {}
+  
+  async analyzeActivity(userId: string): Promise<AnalysisResult> {
+    // ビジネスロジックに集中
+    const logs = await this.repository.getLogsByDate(userId, date);
+    const result = await this.apiClient.analyzeContent(logs);
+    return this.processAnalysisResult(result);
+  }
+}
+```
+
+#### 2. **禁止事項: サービス層での直接アクセス**
+```typescript
+// ❌ 悪い例: サービス層でのDB直接操作
+export class BadService {
+  async getData(): Promise<Data[]> {
+    // 禁止: SQLite3直接使用
+    const db = new sqlite3.Database('./data.db');
+    return new Promise((resolve) => {
+      db.all('SELECT * FROM table', resolve);
+    });
+  }
+  
+  async fetchApiData(): Promise<ApiData> {
+    // 禁止: HTTP直接呼び出し
+    const response = await fetch('https://api.example.com/data');
+    return response.json();
+  }
+  
+  async getDiscordMessage(messageId: string): Promise<Message> {
+    // 禁止: Discord API直接操作
+    return await message.channel.messages.fetch(messageId);
+  }
+}
+```
+
+### 適切なレイヤ分離の実装
+
+#### 1. **データベースアクセス**: リポジトリパターン
+```typescript
+// ✅ インターフェース定義（ドメイン層）
+export interface IActivityLogRepository {
+  getLogsByDate(userId: string, date: string): Promise<ActivityLog[]>;
+  saveLog(log: ActivityLog): Promise<void>;
+}
+
+// ✅ サービス層実装
+export class ActivityLogService {
+  constructor(private repository: IActivityLogRepository) {}
+  
+  async processActivity(userId: string, date: string): Promise<void> {
+    const logs = await this.repository.getLogsByDate(userId, date);
+    // ビジネスロジック処理...
+  }
+}
+```
+
+#### 2. **外部API呼び出し**: クライアントパターン
+```typescript
+// ✅ インターフェース定義（ドメイン層）
+export interface IGeminiApiClient {
+  analyzeContent(content: string): Promise<AnalysisResult>;
+}
+
+// ✅ サービス層実装
+export class AnalysisService {
+  constructor(private apiClient: IGeminiApiClient) {}
+  
+  async performAnalysis(content: string): Promise<ProcessedResult> {
+    const result = await this.apiClient.analyzeContent(content);
+    return this.processResult(result);
+  }
+}
+```
+
+#### 3. **Discord API操作**: クライアントラッパー
+```typescript
+// ✅ インターフェース定義（ドメイン層）
+export interface IDiscordMessageClient {
+  fetchReferencedMessage(message: Message, messageId: string): Promise<Message | null>;
+}
+
+// ✅ サービス層実装
+export class ReminderReplyService {
+  constructor(private discordClient: IDiscordMessageClient) {}
+  
+  async isReminderReply(message: Message): Promise<ReminderReplyResult> {
+    const referenced = await this.discordClient.fetchReferencedMessage(
+      message, 
+      message.reference?.messageId
+    );
+    // ビジネスロジック処理...
+  }
+}
+```
+
+### 例外許可の仕組み
+
+やむを得ず直接アクセスが必要な場合は、**例外コメント**を記述してください：
+
+```typescript
+// ✅ 例外許可の例
+export class ConfigService {
+  loadConfig(): void {
+    // ALLOW_LAYER_VIOLATION: 環境変数読み込みのための直接アクセス
+    this.config.set('discordToken', process.env.DISCORD_BOT_TOKEN);
+  }
+}
+```
+
+**利用可能な例外コメント:**
+- `// ALLOW_LAYER_VIOLATION:` - 一般的なレイヤ分離違反の許可
+- `// ALLOW_DB_ACCESS:` - データベース直接アクセスの許可  
+- `// ALLOW_API_ACCESS:` - API直接呼び出しの許可
+
+### 自動チェック機能
+
+Pre-commitフックで自動的にレイヤ分離違反を検出します：
+
+```bash
+./scripts/code-review/layer-separation-check.sh
+```
+
+**検出対象:**
+- データベース直接操作（sqlite3, Database, db.query等）
+- HTTP/API直接呼び出し（fetch, axios, got等）
+- Discord API直接操作（channel.messages.fetch等）
+- ファイルシステム直接操作（fs.readFile等）
+
+### レイヤ分離チェックリスト
+
+#### 開発時の必須確認
+- [ ] サービス層でDB操作を行う場合、リポジトリインターフェース経由か？
+- [ ] サービス層でAPI呼び出しを行う場合、クライアントインターフェース経由か？
+- [ ] 直接アクセスが必要な場合、適切な例外コメントを追加したか？
+- [ ] インターフェースはドメイン層で定義し、実装はインフラ層に配置したか？
+
+#### コミット前の必須チェック
+```bash
+# レイヤ分離チェック実行
+./scripts/code-review/layer-separation-check.sh
+
+# 期待される結果
+✅ レイヤー分離チェック完了: 問題なし
+```
+
+### 期待する効果
+
+1. **テスト容易性の向上**: インターフェース経由でモック可能
+2. **再利用性の向上**: ビジネスロジックとインフラの独立性
+3. **保守性の向上**: 変更の影響範囲を最小化
+4. **アーキテクチャの明確化**: 責任の所在が明確
+
+**📝 レイヤ分離の徹底により、堅牢で保守しやすいアーキテクチャを実現します。**
