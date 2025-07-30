@@ -240,6 +240,12 @@ export class DatabaseInitializer {
         migrationsApplied: status.pending
       };
     } catch (error) {
+      logger.error('DB_INIT', '❌ マイグレーション実行エラー:', error);
+      logger.error('DB_INIT', '❌ エラー詳細:', {
+        message: (error as Error)?.message,
+        stack: (error as Error)?.stack,
+        name: (error as Error)?.name
+      });
       throw new ActivityLogError(
         'マイグレーション実行に失敗しました',
         'MIGRATION_ERROR',
