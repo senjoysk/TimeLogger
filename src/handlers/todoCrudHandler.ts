@@ -1,6 +1,5 @@
 /**
- * 🟢 Green Phase: TodoCrudHandler 実装
- * TDD開発: TODO管理コマンドの責任分離
+ * TodoCrudHandler - TODO管理コマンドハンドラー
  * 責任: コマンド解析 + CRUD操作 + ヘルプ表示
  * 
  * @SRP-EXCEPTION: TODO管理の統合ハンドラーとして複数の責務を持つ
@@ -117,6 +116,12 @@ export class TodoCrudHandler implements ITodoCrudHandler {
   private async showTodoList(message: Message, userId: string, page: number = 1): Promise<void> {
     // パフォーマンス最適化: メモリ内フィルタリングをDB直接クエリに変更
     const activeTodos = await this.todoRepository.getTodosByStatusOptimized(userId, ['pending', 'in_progress']);
+
+    // 優先度でソート（高優先度→普通→低の順）
+    activeTodos.sort((a, b) => {
+      // 優先度が高い（1）ものを先に、低い（-1）ものを後に
+      return b.priority - a.priority;
+    });
 
     const pageSize = 10;
     const totalPages = Math.ceil(activeTodos.length / pageSize);
@@ -313,6 +318,12 @@ export class TodoCrudHandler implements ITodoCrudHandler {
       await message.reply(`🔍 「${keyword}」に一致するTODOが見つかりませんでした。`);
       return;
     }
+
+    // 優先度でソート（高優先度→普通→低の順）
+    todos.sort((a, b) => {
+      // 優先度が高い（1）ものを先に、低い（-1）ものを後に
+      return b.priority - a.priority;
+    });
 
     const embed = createTodoListEmbed(todos.map(todo => ({
       id: todo.id,

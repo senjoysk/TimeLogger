@@ -1,6 +1,6 @@
 /**
- * 🔴 Red Phase: TodoCrudHandler のテスト - 実装前なので失敗する
- * TDD開発: コマンド解析とCRUD操作の責任分離
+ * TodoCrudHandler のテスト
+ * TODOコマンドの解析とCRUD操作の動作確認
  */
 
 import { Message } from 'discord.js';
@@ -97,7 +97,7 @@ const createMockMessage = (content: string, userId: string = 'test-user'): any =
   reply: jest.fn().mockResolvedValue({})
 });
 
-describe('🔴 Red Phase: TodoCrudHandler分離テスト', () => {
+describe('TodoCrudHandler分離テスト', () => {
   let handler: TodoCrudHandler;
   let mockTodoRepo: MockTodoRepository;
 
@@ -289,6 +289,88 @@ describe('🔴 Red Phase: TodoCrudHandler分離テスト', () => {
   });
 
   describe('優先度対応機能', () => {
+    describe('優先度によるソート', () => {
+      test('TODO一覧が優先度順にソートされる', async () => {
+        // 異なる優先度のTODOを作成
+        await mockTodoRepo.createTodo({
+          userId: 'test-user',
+          content: '低優先度タスク',
+          priority: -1
+        });
+        
+        await mockTodoRepo.createTodo({
+          userId: 'test-user',
+          content: '高優先度タスク',
+          priority: 1
+        });
+        
+        await mockTodoRepo.createTodo({
+          userId: 'test-user',
+          content: '普通優先度タスク',
+          priority: 0
+        });
+
+        const message = createMockMessage('!todo', 'test-user') as Message;
+        
+        await handler.handleCommand(message, 'test-user', [], 'Asia/Tokyo');
+        
+        const replyCall = (message.reply as jest.Mock).mock.calls[0][0];
+        const embedDescription = replyCall.embeds[0].data.description;
+        
+        // リストはEmbedのdescriptionフィールドに格納される
+        expect(embedDescription).toContain('高優先度タスク');
+        expect(embedDescription).toContain('🔴');
+        
+        // その後に普通優先度、低優先度の順で表示される
+        const lines = embedDescription.split('\n');
+        
+        // 1番目は高優先度（priority: 1）
+        expect(lines[0]).toContain('高優先度タスク');
+        // 2番目は普通優先度（priority: 0）
+        expect(lines[1]).toContain('普通優先度タスク');
+        // 3番目は低優先度（priority: -1）
+        expect(lines[2]).toContain('低優先度タスク');
+      });
+
+      test('検索結果も優先度順にソートされる', async () => {
+        // 同じキーワードを含む異なる優先度のTODOを作成
+        await mockTodoRepo.createTodo({
+          userId: 'test-user',
+          content: '資料作成（低優先度）',
+          priority: -1
+        });
+        
+        await mockTodoRepo.createTodo({
+          userId: 'test-user',
+          content: '資料準備（高優先度）',
+          priority: 1
+        });
+        
+        await mockTodoRepo.createTodo({
+          userId: 'test-user',
+          content: '資料確認（普通優先度）',
+          priority: 0
+        });
+
+        const message = createMockMessage('!todo search 資料', 'test-user') as Message;
+        
+        await handler.handleCommand(message, 'test-user', ['search', '資料'], 'Asia/Tokyo');
+        
+        const replyCall = (message.reply as jest.Mock).mock.calls[0][0];
+        const embedDescription = replyCall.embeds[0].data.description;
+        
+        // 検索結果も優先度順にソートされている
+        const lines = embedDescription.split('\n');
+        
+        // 1番目は高優先度
+        expect(lines[0]).toContain('資料準備（高優先度）');
+        // 2番目は普通優先度
+        expect(lines[1]).toContain('資料確認（普通優先度）');
+        // 3番目は低優先度
+        expect(lines[2]).toContain('資料作成（低優先度）');
+      });
+    });
+
     describe('TODO追加時の優先度設定', () => {
       test('優先度を指定してTODOを追加できる', async () => {
         const message = createMockMessage('!todo add 高優先度タスク 1', 'test-user') as Message;
