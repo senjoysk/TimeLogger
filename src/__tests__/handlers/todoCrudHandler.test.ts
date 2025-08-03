@@ -287,4 +287,122 @@ describe('🔴 Red Phase: TodoCrudHandler分離テスト', () => {
       expect(updatedTodo?.status).toBe('completed');
     });
   });
+
+  describe('優先度対応機能', () => {
+    describe('TODO追加時の優先度設定', () => {
+      test('優先度を指定してTODOを追加できる', async () => {
+        const message = createMockMessage('!todo add 高優先度タスク 1', 'test-user') as Message;
+        
+        await handler.handleCommand(message, 'test-user', ['add', '高優先度タスク', '1'], 'Asia/Tokyo');
+        
+        expect(message.reply).toHaveBeenCalledWith(expect.stringContaining('✅ TODO「高優先度タスク」を追加しました！'));
+        
+        const todos = await mockTodoRepo.getTodosByUserId('test-user');
+        const addedTodo = todos.find(t => t.content === '高優先度タスク');
+        expect(addedTodo?.priority).toBe(1);
+      });
+
+      test('優先度を省略した場合はデフォルト値（0）になる', async () => {
+        const message = createMockMessage('!todo add 通常タスク', 'test-user') as Message;
+        
+        await handler.handleCommand(message, 'test-user', ['add', '通常タスク'], 'Asia/Tokyo');
+        
+        const todos = await mockTodoRepo.getTodosByUserId('test-user');
+        const addedTodo = todos.find(t => t.content === '通常タスク');
+        expect(addedTodo?.priority).toBe(0);
+      });
+
+      test('無効な優先度値の場合はエラーメッセージを表示する', async () => {
+        const message = createMockMessage('!todo add タスク 2', 'test-user') as Message;
+        
+        await handler.handleCommand(message, 'test-user', ['add', 'タスク', '2'], 'Asia/Tokyo');
+        
+        expect(message.reply).toHaveBeenCalledWith('❌ 優先度は 1（高）、0（普通）、-1（低）のいずれかを指定してください。');
+      });
+    });
+
+    describe('TODO編集時の優先度変更', () => {
+      let testTodo: Todo;
+
+      beforeEach(async () => {
+        testTodo = await mockTodoRepo.createTodo({
+          userId: 'test-user',
+          content: '編集テスト用TODO',
+          priority: 0
+        });
+      });
+
+      test('内容のみ編集（優先度は変更しない）', async () => {
+        const message = createMockMessage(`!todo edit ${testTodo.id} 新しい内容`, 'test-user') as Message;
+        
+        await handler.handleCommand(message, 'test-user', ['edit', testTodo.id, '新しい内容'], 'Asia/Tokyo');
+        
+        expect(message.reply).toHaveBeenCalledWith('✏️ TODO「編集テスト用TODO」を「新しい内容」に編集しました！');
+        
+        const updated = await mockTodoRepo.getTodoById(testTodo.id);
+        expect(updated?.content).toBe('新しい内容');
+        expect(updated?.priority).toBe(0); // 優先度は変更されない
+      });
+
+      test('内容と優先度を同時に編集', async () => {
+        const message = createMockMessage(`!todo edit ${testTodo.id} 重要なタスク 1`, 'test-user') as Message;
+        
+        await handler.handleCommand(message, 'test-user', ['edit', testTodo.id, '重要なタスク', '1'], 'Asia/Tokyo');
+        
+        expect(message.reply).toHaveBeenCalledWith('✏️ TODO「編集テスト用TODO」を「重要なタスク」に編集しました！（優先度: 高（🔴））');
+        
+        const updated = await mockTodoRepo.getTodoById(testTodo.id);
+        expect(updated?.content).toBe('重要なタスク');
+        expect(updated?.priority).toBe(1);
+      });
+
+      test('編集時の無効な優先度値はエラーになる', async () => {
+        const message = createMockMessage(`!todo edit ${testTodo.id} 新しい内容 5`, 'test-user') as Message;
+        
+        await handler.handleCommand(message, 'test-user', ['edit', testTodo.id, '新しい内容', '5'], 'Asia/Tokyo');
+        
+        expect(message.reply).toHaveBeenCalledWith('❌ 優先度は 1（高）、0（普通）、-1（低）のいずれかを指定してください。');
+      });
+    });
+
+    describe('優先度のみ変更', () => {
+      let testTodo: Todo;
+
+      beforeEach(async () => {
+        testTodo = await mockTodoRepo.createTodo({
+          userId: 'test-user',
+          content: '優先度変更テスト',
+          priority: 0
+        });
+      });
+
+      test('priorityコマンドで優先度のみ変更できる', async () => {
+        const message = createMockMessage(`!todo priority ${testTodo.id} 1`, 'test-user') as Message;
+        
+        await handler.handleCommand(message, 'test-user', ['priority', testTodo.id, '1'], 'Asia/Tokyo');
+        
+        expect(message.reply).toHaveBeenCalledWith('📊 TODO「優先度変更テスト」の優先度を「高（🔴）」に変更しました！');
+        
+        const updated = await mockTodoRepo.getTodoById(testTodo.id);
+        expect(updated?.priority).toBe(1);
+        expect(updated?.content).toBe('優先度変更テスト'); // 内容は変更されない
+      });
+
+      test('無効な優先度値はエラーになる', async () => {
+        const message = createMockMessage(`!todo priority ${testTodo.id} abc`, 'test-user') as Message;
+        
+        await handler.handleCommand(message, 'test-user', ['priority', testTodo.id, 'abc'], 'Asia/Tokyo');
+        
+        expect(message.reply).toHaveBeenCalledWith('❌ 優先度は 1（高）、0（普通）、-1（低）のいずれかを指定してください。');
+      });
+
+      test('存在しないTODOの優先度変更はエラーになる', async () => {
+        const message = createMockMessage('!todo priority invalid-id 1', 'test-user') as Message;
+        
+        await handler.handleCommand(message, 'test-user', ['priority', 'invalid-id', '1'], 'Asia/Tokyo');
+        
+        expect(message.reply).toHaveBeenCalledWith('❌ 指定されたTODOが見つかりません。');
+      });
+    });
+  });
 });

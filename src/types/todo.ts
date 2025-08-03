@@ -5,7 +5,7 @@
 /**
  * TODOコマンドの種類
  */
-export type TodoCommandType = 'list' | 'add' | 'done' | 'edit' | 'delete' | 'search' | 'help';
+export type TodoCommandType = 'list' | 'add' | 'done' | 'edit' | 'delete' | 'search' | 'priority' | 'help';
 
 /**
  * TODOステータス
