@@ -8,6 +8,9 @@ import { logger } from '../utils/logger';
 
 /**
  * データベースマイグレーション管理システム
+ * 
+ * @SRP-EXCEPTION: マイグレーション管理の統合クラスとして必要
+ * @SRP-REASON: マイグレーション実行・履歴管理・検証・ロールバックが密接に関連しているため統合管理が必要
  * プロダクション環境での安全なスキーマ変更を管理
  */
 export class MigrationManager {

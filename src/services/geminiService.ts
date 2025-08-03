@@ -1,6 +1,5 @@
 import { IApiCostRepository } from '../repositories/interfaces';
 import { ApiCostMonitor } from './apiCostMonitor';
-import { ClassificationResult } from '../types/todo';
 import { ActivityAnalysisResult, ReminderContext } from '../types/activityAnalysis';
 import { PreviousActivities } from '../types/database';
 import { CostAlert } from '../types/costAlert';
@@ -8,7 +7,6 @@ import { logger } from '../utils/logger';
 
 // 専用サービスのインポート
 import { GeminiApiClient, IGeminiApiClient } from './gemini/geminiApiClient';
-import { MessageClassificationService, IMessageClassificationService } from './gemini/messageClassificationService';
 import { ReminderContextService, IReminderContextService } from './gemini/reminderContextService';
 import { ActivityAnalysisService, IActivityAnalysisService } from './gemini/activityAnalysisService';
 import { GeminiCostService, IGeminiCostService } from './gemini/geminiCostService';
@@ -22,7 +20,6 @@ import { GeminiCostService, IGeminiCostService } from './gemini/geminiCostServic
  */
 export class GeminiService {
   private apiClient: IGeminiApiClient;
-  private messageClassification: IMessageClassificationService;
   private reminderContext: IReminderContextService;
   private activityAnalysis: IActivityAnalysisService;
   private costService: IGeminiCostService;
@@ -34,7 +31,6 @@ export class GeminiService {
     this.apiClient = new GeminiApiClient();
     
     // 専用サービスの初期化
-    this.messageClassification = new MessageClassificationService(this.apiClient, this.costMonitor);
     this.reminderContext = new ReminderContextService(this.apiClient, this.costMonitor);
     this.activityAnalysis = new ActivityAnalysisService(this.apiClient, this.costMonitor);
     this.costService = new GeminiCostService(this.costMonitor);
@@ -63,39 +59,6 @@ export class GeminiService {
     return await this.costService.checkCostAlerts(userId, timezone);
   }
 
-  /**
-   * メッセージをAIで分類
-   */
-  public async classifyMessageWithAI(message: string): Promise<ClassificationResult> {
-    return await this.messageClassification.classifyMessageWithAI(message);
-  }
-
-  /**
-   * リマインダーReplyメッセージを時間範囲付きで分析
-   */
-  public async classifyMessageWithReminderContext(
-    messageContent: string,
-    timeRange: { start: Date; end: Date },
-    reminderTime?: Date,
-    reminderContent?: string
-  ): Promise<ClassificationResult & { contextType: 'REMINDER_REPLY' }> {
-    return await this.reminderContext.classifyMessageWithReminderContext(
-      messageContent, timeRange, reminderTime, reminderContent
-    );
-  }
-
-  /**
-   * リマインダー直後メッセージを文脈考慮で分析
-   */
-  public async classifyMessageWithNearbyReminderContext(
-    messageContent: string,
-    reminderTime: Date,
-    timeDiff: number
-  ): Promise<ClassificationResult & { contextType: 'POST_REMINDER' }> {
-    return await this.reminderContext.classifyMessageWithNearbyReminderContext(
-      messageContent, reminderTime, timeDiff
-    );
-  }
 
   /**
    * リマインダーコンテキストプロンプトを構築

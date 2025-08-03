@@ -17,12 +17,10 @@ import { SummaryHandler } from '../handlers/summaryHandler';
 import { LogsCommandHandler } from '../handlers/logsCommandHandler';
 import { TimezoneHandler } from '../handlers/timezoneHandler';
 import { TodoCrudHandler } from '../handlers/todoCrudHandler';
-import { MessageClassificationHandler } from '../handlers/messageClassificationHandler';
 import { TodoInteractionHandler } from '../handlers/todoInteractionHandler';
 import { ProfileCommandHandler } from '../handlers/profileCommandHandler';
 import { MemoCommandHandler } from '../handlers/memoCommandHandler';
 import { IGeminiService } from '../services/interfaces/IGeminiService';
-import { IMessageClassificationService } from '../services/messageClassificationService';
 import { GapDetectionService, IGapDetectionService } from '../services/gapDetectionService';
 import { DynamicReportScheduler } from '../services/dynamicReportScheduler';
 import { DailyReportSender } from '../services/dailyReportSender';
@@ -65,8 +63,6 @@ export interface ActivityLoggingConfig {
   timeProvider?: ITimeProvider;
   /** 外部Geminiサービスの注入（テスト用） */
   geminiService?: IGeminiService;
-  /** 外部メッセージ分類サービスの注入（テスト用） */
-  messageClassificationService?: IMessageClassificationService;
 }
 
 /**
@@ -78,7 +74,6 @@ export class ActivityLoggingIntegration {
   private memoRepository!: IMemoRepository;
   private activityLogService!: IActivityLogService;
   private geminiService!: IGeminiService;
-  private messageClassificationService!: IMessageClassificationService;
   private gapDetectionService!: IGapDetectionService;
   private dynamicReportScheduler!: DynamicReportScheduler;
   private dailyReportSender!: DailyReportSender;
@@ -92,7 +87,6 @@ export class ActivityLoggingIntegration {
   private timezoneHandler!: TimezoneHandler;
   private gapHandler!: GapHandler;
   private todoCrudHandler!: TodoCrudHandler;
-  private messageClassificationHandler!: MessageClassificationHandler;
   private todoInteractionHandler!: TodoInteractionHandler;
   private profileHandler!: ProfileCommandHandler;
   private memoHandler!: MemoCommandHandler;
@@ -178,17 +172,6 @@ export class ActivityLoggingIntegration {
       this.gapDetectionService = new GapDetectionService(this.repository);
       
       
-      // TODO機能サービスの初期化
-      if (this.config.messageClassificationService) {
-        // 外部から注入されたメッセージ分類サービスを使用（テスト用）
-        this.messageClassificationService = this.config.messageClassificationService;
-        logger.info('ACTIVITY_LOG', '✅ 外部MessageClassificationServiceを使用（テスト用）');
-      } else {
-        // 通常の場合は新しいMessageClassificationServiceを作成
-        const { MessageClassificationService } = await import('../services/messageClassificationService');
-        this.messageClassificationService = new MessageClassificationService(this.geminiService);
-        logger.info('ACTIVITY_LOG', '✅ 新規MessageClassificationServiceを作成');
-      }
       
       // DynamicReportSchedulerの初期化
       this.dynamicReportScheduler = new DynamicReportScheduler(this.repository);
@@ -210,12 +193,6 @@ export class ActivityLoggingIntegration {
       
       // TODO機能ハンドラーの初期化（分割版）
       this.todoCrudHandler = new TodoCrudHandler(this.repository);
-      this.messageClassificationHandler = new MessageClassificationHandler(
-        this.repository, // ITodoRepository
-        this.repository, // IMessageClassificationRepository  
-        this.geminiService,
-        this.messageClassificationService
-      );
       this.todoInteractionHandler = new TodoInteractionHandler(this.repository);
       
       // プロファイル機能ハンドラーの初期化
@@ -847,11 +824,6 @@ export class ActivityLoggingIntegration {
       this.pendingAnalysisTasks.clear();
       logger.info('ACTIVITY_LOG', '✅ 非同期分析タスクをクリーンアップしました');
 
-      // TODOハンドラーのクリーンアップ（分割版）
-      if (this.messageClassificationHandler && typeof this.messageClassificationHandler.destroy === 'function') {
-        this.messageClassificationHandler.destroy();
-        logger.info('ACTIVITY_LOG', '✅ メッセージ分類ハンドラーをクリーンアップしました');
-      }
 
       if (this.repository) {
         await this.repository.close();
@@ -1140,11 +1112,6 @@ export class ActivityLoggingIntegration {
     try {
       logger.info('ACTIVITY_LOG', '🧹 活動記録システムのクリーンアップ開始...');
 
-      // TODO機能ハンドラーのクリーンアップ（分割版）
-      if (this.messageClassificationHandler && typeof this.messageClassificationHandler.destroy === 'function') {
-        this.messageClassificationHandler.destroy();
-        logger.info('ACTIVITY_LOG', '✅ メッセージ分類ハンドラークリーンアップ完了');
-      }
 
       // データベースリポジトリのクリーンアップ
       if (this.repository) {

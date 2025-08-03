@@ -3,7 +3,6 @@
  * Google Gemini APIを使用した分析・分類機能を抽象化
  */
 
-import { ClassificationResult } from '../../types/todo';
 import { ActivityAnalysisResult, ReminderContext } from '../../types/activityAnalysis';
 import { PreviousActivities } from '../../types/database';
 import { CostAlert } from '../../types/costAlert';
@@ -46,40 +45,6 @@ export interface IGeminiService {
    */
   checkCostAlerts(userId: string, timezone: string): Promise<CostAlert | null>;
 
-  /**
-   * メッセージをAIで分類
-   * @param message 分類するメッセージ
-   * @returns 分類結果
-   */
-  classifyMessageWithAI(message: string): Promise<ClassificationResult>;
-
-  /**
-   * リマインダーコンテキスト付きでメッセージを分類
-   * @param messageContent 分類するメッセージ
-   * @param timeRange 時間範囲
-   * @param reminderTime リマインダー送信時刻（オプション）
-   * @param reminderContent リマインダーメッセージ内容（オプション）
-   * @returns 分類結果
-   */
-  classifyMessageWithReminderContext(
-    messageContent: string,
-    timeRange: { start: Date; end: Date },
-    reminderTime?: Date,
-    reminderContent?: string
-  ): Promise<ClassificationResult & { contextType: 'REMINDER_REPLY' }>;
-
-  /**
-   * 近くのリマインダーコンテキスト付きでメッセージを分類
-   * @param messageContent 分類するメッセージ
-   * @param reminderTime リマインダー送信時刻
-   * @param timeDiff 時間差（分）
-   * @returns 分類結果
-   */
-  classifyMessageWithNearbyReminderContext(
-    messageContent: string,
-    reminderTime: Date,
-    timeDiff: number
-  ): Promise<ClassificationResult & { contextType: 'POST_REMINDER' }>;
 
   /**
    * リマインダーコンテキストプロンプトを構築

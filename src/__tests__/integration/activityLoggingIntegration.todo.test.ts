@@ -5,16 +5,12 @@
 
 import { ActivityLoggingIntegration, ActivityLoggingConfig } from '../../integration/activityLoggingIntegration';
 import { TodoCrudHandler } from '../../handlers/todoCrudHandler';
-import { MessageClassificationHandler } from '../../handlers/messageClassificationHandler';
-import { MessageClassificationService } from '../../services/messageClassificationService';
 
 // モックDependencies
 jest.mock('../../repositories/PartialCompositeRepository');
 jest.mock('../../services/activityLogService');
 jest.mock('../../services/geminiService');
-jest.mock('../../services/messageClassificationService');
 jest.mock('../../handlers/todoCrudHandler');
-jest.mock('../../handlers/messageClassificationHandler');
 jest.mock('../../handlers/todoInteractionHandler');
 
 // Discord.jsのモック
@@ -80,14 +76,10 @@ describe('ActivityLoggingIntegration TODO機能統合', () => {
       // 初期化が完了していることを確認
       expect(integration).toBeDefined();
       
-      // 内部サービスの初期化を確認（モック経由）
-      expect(MessageClassificationService).toHaveBeenCalled();
       // 分割後のハンドラーを確認
       const { TodoCrudHandler } = require('../../handlers/todoCrudHandler');
-      const { MessageClassificationHandler } = require('../../handlers/messageClassificationHandler');
       const { TodoInteractionHandler } = require('../../handlers/todoInteractionHandler');
       expect(TodoCrudHandler).toHaveBeenCalled();
-      expect(MessageClassificationHandler).toHaveBeenCalled();
       expect(TodoInteractionHandler).toHaveBeenCalled();
     });
 
@@ -96,17 +88,10 @@ describe('ActivityLoggingIntegration TODO機能統合', () => {
       
       // 分割後のハンドラーが適切なリポジトリインスタンスを受け取ることを確認
       const { TodoCrudHandler } = require('../../handlers/todoCrudHandler');
-      const { MessageClassificationHandler } = require('../../handlers/messageClassificationHandler');
       const { TodoInteractionHandler } = require('../../handlers/todoInteractionHandler');
       
       expect(TodoCrudHandler).toHaveBeenCalledWith(
         expect.any(Object) // repository (ITodoRepository)
-      );
-      expect(MessageClassificationHandler).toHaveBeenCalledWith(
-        expect.any(Object), // repository (ITodoRepository)
-        expect.any(Object), // repository (IMessageClassificationRepository)
-        expect.any(Object), // geminiService
-        expect.any(Object)  // messageClassificationService
       );
       expect(TodoInteractionHandler).toHaveBeenCalledWith(
         expect.any(Object) // repository (ITodoRepository)
@@ -326,14 +311,12 @@ describe('ActivityLoggingIntegration TODO機能統合', () => {
     test('destroy()で分割後のハンドラーもクリーンアップされる', async () => {
       await integration.initialize();
       
-      // MessageClassificationHandlerのdestroyメソッドをモック
-      const mockDestroy = jest.fn();
-      (integration as any).messageClassificationHandler = { destroy: mockDestroy };
       (integration as any).repository = { close: jest.fn() };
 
       await integration.destroy();
 
-      expect(mockDestroy).toHaveBeenCalled();
+      // リポジトリのクローズが呼ばれることを確認
+      expect((integration as any).repository.close).toHaveBeenCalled();
     });
 
     test('部分的な初期化状態でもクリーンアップが安全に実行される', async () => {

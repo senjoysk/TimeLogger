@@ -378,6 +378,95 @@ npm run test:integration   # 統合テスト実行（必須追加）
 npm run test:coverage      # カバレッジ確認（45.5%以上維持）
 ```
 
+## 🚨 Claude Code: 作業完了前の必須チェックリスト
+
+### Claude Codeは「完了しました」と報告する前に以下を必ず実行してください
+
+**タスクが本当に完了したことを確認するため、以下の品質チェックを順番に実行:**
+
+```bash
+# 1. TypeScriptビルドチェック
+npm run build
+
+# 2. テスト実行（並列実行問題の対処含む）
+npm run test:sequential  # 順次実行版（安定）
+# または
+npm test                 # 通常の並列実行版（高速）
+
+# 3. 統合テストの個別実行（問題がある場合）
+npm run test:integration
+
+# 4. コード品質チェック（Pre-commitフックの事前実行）
+./scripts/code-review/pre-commit-all-checks.sh
+
+# 5. すべて成功したら完了報告
+echo "✅ 全チェック成功: タスク完了"
+```
+
+### Claude Code専用チェックリスト
+
+タスク完了を宣言する前に、以下の項目をすべてチェック済みの状態にしてください：
+
+- [x] **ビルドチェック**: `npm run build` が成功
+- [x] **テスト実行**: `npm test` または `npm run test:sequential` が成功
+- [x] **統合テスト**: `npm run test:integration` が成功（必要な場合）
+- [x] **コード品質**: `./scripts/code-review/pre-commit-all-checks.sh` が成功
+- [x] **SRP違反**: 必要に応じて `@SRP-EXCEPTION` コメントを追加
+- [x] **型安全性**: any型の使用を避け、必要な場合は `// ALLOW_ANY` を追加
+- [x] **エラー処理**: AppError派生クラスを使用し、logger.errorでログ出力
+- [x] **TDDフェーズ**: テストコメントから🔴🟢♻️を削除し、機能説明に変更
+
+### ユーザーへのコミット推奨
+
+すべてのチェックが完了した後、ユーザーに対して：
+```bash
+# コミット推奨メッセージ
+git add .
+git commit -m "feat: 機能説明"
+```
+
+### 並列テスト実行の問題と対処法
+
+#### 問題の症状
+- テストがランダムに失敗する
+- データベース接続エラーが発生する
+- ファイルシステムの競合が起きる
+- タイミング依存のテストが不安定
+
+#### 解決策1: 順次実行モード（安定性優先）
+```bash
+# package.jsonに追加
+"test:sequential": "jest --runInBand",
+"test:integration:sequential": "jest --runInBand src/__tests__/integration"
+```
+
+#### 解決策2: ワーカー数制限（バランス重視）
+```bash
+# package.jsonに追加
+"test:balanced": "jest --maxWorkers=2",
+```
+
+#### 解決策3: テストファイルの分離実行
+```bash
+# 問題のあるテストを個別実行
+npm test -- src/__tests__/handlers/todoCrudHandler.test.ts
+npm test -- src/__tests__/integration/activityLoggingIntegration.test.ts
+```
+
+#### 解決策4: データベース分離（推奨）
+```typescript
+// テスト用のデータベース設定
+beforeEach(async () => {
+  // 各テストで独立したデータベースを使用
+  const testDbPath = `test-${process.pid}-${Date.now()}.db`;
+  // ...
+});
+```
+
+### Pre-commitフック事前チェックスクリプト
+
+新しいスクリプトを作成してすべてのチェックを事前実行:
+
 ## 🚨 Claude Code: タスク完了前の必須確認
 
 **Claude Codeは依頼されたタスクを完了したと判断する前に、以下を必ず実行してください:**
