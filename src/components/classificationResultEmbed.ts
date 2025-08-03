@@ -417,9 +417,11 @@ export function generateSessionId(userId: string, timestamp: Date = new Date()):
 }
 
 /**
- * TODO番号ボタンを生成（1-10の番号）
+ * TODO番号ボタンを生成（ページング対応）
+ * @param todoCount - 表示するTODOの数
+ * @param startIndex - 開始インデックス（0ベース）、省略時は0
  */
-export function createTodoNumberButtons(todoCount: number): ActionRowBuilder<ButtonBuilder>[] {
+export function createTodoNumberButtons(todoCount: number, startIndex = 0): ActionRowBuilder<ButtonBuilder>[] {
   const rows: ActionRowBuilder<ButtonBuilder>[] = [];
   
   if (todoCount === 0) {
@@ -429,13 +431,14 @@ export function createTodoNumberButtons(todoCount: number): ActionRowBuilder<But
   // 最大10個のボタンのみ作成
   const buttonCount = Math.min(todoCount, 10);
   
-  // 1行目（1-5）
+  // 1行目（最初の5個）
   const firstRow = new ActionRowBuilder<ButtonBuilder>();
-  for (let i = 1; i <= Math.min(buttonCount, 5); i++) {
+  for (let i = 0; i < Math.min(buttonCount, 5); i++) {
+    const buttonNumber = startIndex + i + 1;
     firstRow.addComponents(
       new ButtonBuilder()
-        .setCustomId(`todo_number_${i}`)
-        .setLabel(i.toString())
+        .setCustomId(`todo_number_${buttonNumber}`)
+        .setLabel(buttonNumber.toString())
         .setStyle(ButtonStyle.Secondary)
     );
   }
@@ -443,14 +446,15 @@ export function createTodoNumberButtons(todoCount: number): ActionRowBuilder<But
     rows.push(firstRow);
   }
   
-  // 2行目（6-10）
+  // 2行目（次の5個）
   if (buttonCount > 5) {
     const secondRow = new ActionRowBuilder<ButtonBuilder>();
-    for (let i = 6; i <= buttonCount; i++) {
+    for (let i = 5; i < buttonCount; i++) {
+      const buttonNumber = startIndex + i + 1;
       secondRow.addComponents(
         new ButtonBuilder()
-          .setCustomId(`todo_number_${i}`)
-          .setLabel(i.toString())
+          .setCustomId(`todo_number_${buttonNumber}`)
+          .setLabel(buttonNumber.toString())
           .setStyle(ButtonStyle.Secondary)
       );
     }

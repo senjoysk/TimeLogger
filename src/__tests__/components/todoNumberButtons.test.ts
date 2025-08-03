@@ -1,6 +1,6 @@
 /**
  * 🔴 Red Phase: TODO番号ボタンの表示テスト
- * TDD開発: 1-10の番号ボタンを表示する機能のテスト
+ * TDD開発: ページングに対応した番号ボタンを表示する機能のテスト
  */
 
 import { ActionRowBuilder, ButtonBuilder, ButtonStyle } from 'discord.js';
@@ -126,5 +126,70 @@ describe('🔴 Red Phase: TODO番号ボタンの表示テスト', () => {
     expect((button1.data as any).custom_id).toBe('todo_number_1');
     expect((button2.data as any).custom_id).toBe('todo_number_2');
     expect((button3.data as any).custom_id).toBe('todo_number_3');
+  });
+
+  // ページング対応のテストケース
+  test('ページ2では11-16の番号ボタンが表示される（startIndex=10）', () => {
+    // Arrange
+    const todoCount = 6;
+    const startIndex = 10; // ページ2のスタートインデックス
+    
+    // Act
+    const buttonRows = createTodoNumberButtons(todoCount, startIndex);
+    
+    // Assert
+    expect(buttonRows).toHaveLength(2); // 2行のActionRow
+    
+    // 1行目: 11-15
+    const firstRow = buttonRows[0];
+    expect(firstRow.components).toHaveLength(5);
+    const firstButton = firstRow.components[0] as ButtonBuilder;
+    expect((firstButton.data as any).label).toBe('11');
+    expect((firstButton.data as any).custom_id).toBe('todo_number_11');
+    const fifthButton = firstRow.components[4] as ButtonBuilder;
+    expect((fifthButton.data as any).label).toBe('15');
+    expect((fifthButton.data as any).custom_id).toBe('todo_number_15');
+    
+    // 2行目: 16
+    const secondRow = buttonRows[1];
+    expect(secondRow.components).toHaveLength(1);
+    const sixthButton = secondRow.components[0] as ButtonBuilder;
+    expect((sixthButton.data as any).label).toBe('16');
+    expect((sixthButton.data as any).custom_id).toBe('todo_number_16');
+  });
+
+  test('ページ3では21-25の番号ボタンが表示される（startIndex=20, todoCount=5）', () => {
+    // Arrange
+    const todoCount = 5;
+    const startIndex = 20; // ページ3のスタートインデックス
+    
+    // Act
+    const buttonRows = createTodoNumberButtons(todoCount, startIndex);
+    
+    // Assert
+    expect(buttonRows).toHaveLength(1); // 1行のActionRow
+    
+    const firstRow = buttonRows[0];
+    expect(firstRow.components).toHaveLength(5);
+    const firstButton = firstRow.components[0] as ButtonBuilder;
+    expect((firstButton.data as any).label).toBe('21');
+    expect((firstButton.data as any).custom_id).toBe('todo_number_21');
+    const lastButton = firstRow.components[4] as ButtonBuilder;
+    expect((lastButton.data as any).label).toBe('25');
+    expect((lastButton.data as any).custom_id).toBe('todo_number_25');
+  });
+
+  test('startIndexが省略された場合は従来通り1から始まる', () => {
+    // Arrange
+    const todoCount = 3;
+    
+    // Act
+    const buttonRows = createTodoNumberButtons(todoCount);
+    
+    // Assert
+    const firstRow = buttonRows[0];
+    const firstButton = firstRow.components[0] as ButtonBuilder;
+    expect((firstButton.data as any).label).toBe('1');
+    expect((firstButton.data as any).custom_id).toBe('todo_number_1');
   });
 });

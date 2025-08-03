@@ -142,8 +142,8 @@ export class TodoCrudHandler implements ITodoCrudHandler {
       components.push(this.createPaginationButtons(page, totalPages));
     }
     
-    // 番号ボタンを作成（1-10）
-    const numberButtons = createTodoNumberButtons(pageTodos.length);
+    // 番号ボタンを作成（ページに応じた番号）
+    const numberButtons = createTodoNumberButtons(pageTodos.length, startIndex);
     components.push(...numberButtons);
 
     await message.reply({

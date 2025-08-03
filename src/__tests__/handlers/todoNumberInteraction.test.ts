@@ -232,5 +232,81 @@ describe('🔴 Red Phase: TODO番号ボタンインタラクションテスト',
         ])
       }));
     });
+
+    test('ページ2で番号ボタン"11"をクリックすると、11番目のTODOの詳細が表示される', async () => {
+      // Arrange
+      const mockTodos: Todo[] = Array.from({ length: 20 }, (_, i) => ({
+        id: `todo-${String(i + 1).padStart(3, '0')}`,
+        userId: 'user123',
+        content: `TODO項目 ${i + 1}`,
+        status: (i + 1) % 2 === 0 ? 'in_progress' : 'pending',
+        priority: i % 3 === 0 ? 1 : i % 3 === 1 ? 0 : -1,
+        createdAt: new Date('2024-01-01').toISOString(),
+        updatedAt: new Date('2024-01-01').toISOString(),
+      } as Todo));
+
+      (mockTodoRepository.getTodosByStatusOptimized as jest.Mock).mockResolvedValue(mockTodos);
+      mockInteraction.customId = 'todo_number_11';
+
+      // Act
+      await handler.handleTodoNumberButton(mockInteraction, 'user123');
+
+      // Assert
+      expect(mockInteraction.reply).toHaveBeenCalledWith(expect.objectContaining({
+        embeds: expect.arrayContaining([
+          expect.objectContaining({
+            data: expect.objectContaining({
+              title: expect.stringContaining('#11'),
+              fields: expect.arrayContaining([
+                expect.objectContaining({
+                  name: expect.stringContaining('内容'),
+                  value: 'TODO項目 11' // 11番目のTODOの内容
+                }),
+                expect.objectContaining({
+                  name: expect.stringContaining('ステータス'),
+                  value: expect.stringContaining('⏳') // pending
+                })
+              ])
+            })
+          })
+        ])
+      }));
+    });
+
+    test('番号ボタン"25"をクリックすると、25番目のTODOの詳細が表示される', async () => {
+      // Arrange
+      const mockTodos: Todo[] = Array.from({ length: 30 }, (_, i) => ({
+        id: `todo-${String(i + 1).padStart(3, '0')}`,
+        userId: 'user123',
+        content: `タスク ${i + 1}`,
+        status: 'pending',
+        priority: 0,
+        createdAt: new Date('2024-01-01').toISOString(),
+        updatedAt: new Date('2024-01-01').toISOString(),
+      } as Todo));
+
+      (mockTodoRepository.getTodosByStatusOptimized as jest.Mock).mockResolvedValue(mockTodos);
+      mockInteraction.customId = 'todo_number_25';
+
+      // Act
+      await handler.handleTodoNumberButton(mockInteraction, 'user123');
+
+      // Assert
+      expect(mockInteraction.reply).toHaveBeenCalledWith(expect.objectContaining({
+        embeds: expect.arrayContaining([
+          expect.objectContaining({
+            data: expect.objectContaining({
+              title: expect.stringContaining('#25'),
+              fields: expect.arrayContaining([
+                expect.objectContaining({
+                  name: expect.stringContaining('内容'),
+                  value: 'タスク 25' // 25番目のTODOの内容
+                })
+              ])
+            })
+          })
+        ])
+      }));
+    });
   });
 });

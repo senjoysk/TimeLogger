@@ -142,9 +142,9 @@ export class TodoInteractionHandler implements ITodoInteractionHandler {
     // ページネーションボタン
     components.push(this.createPaginationButtons(newPage, totalPages));
     
-    // 番号ボタンを作成（1-10）
+    // 番号ボタンを作成（ページに応じた番号）
     const { createTodoNumberButtons } = await import('../components/classificationResultEmbed');
-    const numberButtons = createTodoNumberButtons(pageTodos.length);
+    const numberButtons = createTodoNumberButtons(pageTodos.length, startIndex);
     components.push(...numberButtons);
 
     // インタラクションを更新
