@@ -103,8 +103,8 @@ describe('🔴 Red Phase: Scheduler活動促し機能', () => {
     test('スケジュールが複数登録される', async () => {
       await scheduler.start();
 
-      // 日次サマリー、APIコスト、活動促しの3つのスケジュールが登録
-      expect(mockSchedulerService.schedule).toHaveBeenCalledTimes(3);
+      // 日次サマリー、活動促しの2つのスケジュールが登録
+      expect(mockSchedulerService.schedule).toHaveBeenCalledTimes(2);
     });
   });
 

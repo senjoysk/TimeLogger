@@ -160,22 +160,6 @@ SELECT
 FROM daily_analysis_cache
 ORDER BY business_date DESC, user_id;
 
--- API Cost monitoring テーブル
-CREATE TABLE IF NOT EXISTS api_costs (
-    id TEXT PRIMARY KEY,
-    operation TEXT NOT NULL,
-    input_tokens INTEGER DEFAULT 0,
-    output_tokens INTEGER DEFAULT 0,
-    estimated_cost REAL DEFAULT 0.0,
-    timestamp TEXT NOT NULL DEFAULT (datetime('now', 'utc')),
-    user_id TEXT,
-    business_date TEXT
-);
-
-CREATE INDEX IF NOT EXISTS idx_api_costs_timestamp ON api_costs(timestamp);
-CREATE INDEX IF NOT EXISTS idx_api_costs_business_date ON api_costs(business_date);
-CREATE INDEX IF NOT EXISTS idx_api_costs_operation ON api_costs(operation);
-
 -- ================================================================
 -- TODO管理機能用テーブル（TimeLoggerBot機能拡張）
 -- ================================================================
@@ -332,10 +316,6 @@ WHERE is_deleted = 0 AND due_date IS NOT NULL;
 -- メッセージ分類履歴最適化
 CREATE INDEX IF NOT EXISTS idx_message_classifications_user_date 
 ON message_classifications(user_id, classified_at DESC);
-
--- APIコスト監視最適化
-CREATE INDEX IF NOT EXISTS idx_api_costs_timestamp_operation 
-ON api_costs(timestamp DESC, operation);
 
 -- 分析キャッシュ最適化
 CREATE INDEX IF NOT EXISTS idx_daily_analysis_cache_user_date 

@@ -16,7 +16,6 @@ export interface ISecurityService {
 export class SecurityService implements ISecurityService {
   private readonly ALLOWED_TABLES = [
     'activity_logs',
-    'api_costs',
     'user_settings',
     'daily_analysis_cache',
     'todo_tasks',

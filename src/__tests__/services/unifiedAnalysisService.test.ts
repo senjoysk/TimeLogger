@@ -5,7 +5,6 @@
 
 import { UnifiedAnalysisService } from '../../services/unifiedAnalysisService';
 import { ActivityLog } from '../../types/activityLog';
-import { CostAlert } from '../../types/costAlert';
 
 // 最小限のモック実装
 class MockRepository {
@@ -36,23 +35,6 @@ class MockRepository {
   }
 }
 
-class MockCostRepository {
-  async recordApiCall(): Promise<void> {}
-  async getTodayStats(): Promise<any> {
-    return {
-      totalCalls: 0,
-      totalInputTokens: 0,
-      totalOutputTokens: 0,
-      estimatedCost: 0
-    };
-  }
-  async checkCostAlerts(): Promise<CostAlert | null> {
-    return null;
-  }
-  async generateDailyReport(): Promise<string> {
-    return 'Mock daily report';
-  }
-}
 
 // Gemini API のシンプルなモック
 const mockGenerateContent = jest.fn().mockImplementation(async () => ({
@@ -114,12 +96,10 @@ jest.mock('@google/generative-ai', () => ({
 describe('UnifiedAnalysisService', () => {
   let service: UnifiedAnalysisService;
   let mockRepository: MockRepository;
-  let mockCostRepository: MockCostRepository;
 
   beforeEach(() => {
     mockRepository = new MockRepository();
-    mockCostRepository = new MockCostRepository();
-    service = new UnifiedAnalysisService(mockRepository as any, mockCostRepository);
+    service = new UnifiedAnalysisService(mockRepository as any);
     
     mockGenerateContent.mockClear();
   });
@@ -128,7 +108,6 @@ describe('UnifiedAnalysisService', () => {
     test('環境設定が正しく行われている', () => {
       expect(service).toBeDefined();
       expect(mockRepository).toBeDefined();
-      expect(mockCostRepository).toBeDefined();
     });
   });
 

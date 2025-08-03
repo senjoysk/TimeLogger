@@ -6,7 +6,6 @@
  */
 
 import { IActivityLogRepository } from '../repositories/activityLogRepository';
-import { IApiCostRepository } from '../repositories/interfaces';
 import {
   ActivityLog,
   DailyAnalysisResult,
@@ -49,11 +48,10 @@ export class UnifiedAnalysisService implements IUnifiedAnalysisService {
   private orchestrator: IAnalysisOrchestrator;
 
   constructor(
-    repository: IActivityLogRepository,
-    costRepository: IApiCostRepository
+    repository: IActivityLogRepository
   ) {
     // 分析オーケストレーターに全責任を委譲
-    this.orchestrator = new AnalysisOrchestrator(repository, costRepository);
+    this.orchestrator = new AnalysisOrchestrator(repository);
   }
 
   /**

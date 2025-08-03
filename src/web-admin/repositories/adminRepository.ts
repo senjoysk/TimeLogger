@@ -37,7 +37,6 @@ export class AdminRepository implements IAdminRepository {
     // 固定のテーブル名リストを返す（セキュリティ上の理由）
     return [
       'activity_logs',
-      'api_costs',
       'user_settings',
       'daily_analysis_cache',
       'todo_tasks',

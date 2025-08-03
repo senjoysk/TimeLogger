@@ -79,7 +79,6 @@ export class Scheduler {
     
     this.startActivityPromptSchedule();
     this.startDailySummarySchedule();
-    this.startApiCostReportSchedule();
     
     this.logger.info('✅ 全てのスケジュールが開始されました');
     this.logScheduleInfo();
@@ -150,26 +149,6 @@ export class Scheduler {
     this.logger.info(`  ✅ 日次サマリースケジュール (${cronPattern}) を開始しました`);
   }
 
-  private startApiCostReportSchedule(): void {
-    // 毎時5分に実行し、全ユーザーに対してコストレポートを送信
-    const cronPattern = '5 * * * *';
-
-    const job = this.schedulerService.schedule(cronPattern, async () => {
-      try {
-        const now = this.timeProvider.now();
-        this.logger.info(`💰 APIコストレポートチェック (UTC: ${now.toISOString()})`);
-        
-        // 全ユーザーに対してコストレポートを送信
-        await this.bot.sendApiCostReportForAllUsers();
-        
-      } catch (error) {
-        this.logger.error('❌ APIコストレポートスケジュール実行エラー:', error as Error);
-      }
-    });
-
-    this.jobs.set('apiCostReport', job);
-    this.logger.info(`  ✅ APIコストレポートスケジュール (${cronPattern}) を開始しました`);
-  }
 
   /**
    * 活動促し通知チェックと送信

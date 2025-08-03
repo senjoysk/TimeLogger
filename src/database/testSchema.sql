@@ -43,18 +43,6 @@ CREATE TABLE IF NOT EXISTS daily_analysis_cache (
     UNIQUE(user_id, business_date)
 );
 
--- API コストテーブル
-CREATE TABLE IF NOT EXISTS api_costs (
-    id TEXT PRIMARY KEY,
-    operation TEXT NOT NULL,
-    input_tokens INTEGER DEFAULT 0,
-    output_tokens INTEGER DEFAULT 0,
-    estimated_cost REAL DEFAULT 0.0,
-    timestamp TEXT NOT NULL DEFAULT (datetime('now', 'utc')),
-    user_id TEXT,
-    business_date TEXT
-);
-
 -- TODOタスクテーブル
 CREATE TABLE IF NOT EXISTS todo_tasks (
     id TEXT PRIMARY KEY,

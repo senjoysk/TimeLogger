@@ -14,7 +14,6 @@ import {
   AnalysisInsight,
   ActivityLogError
 } from '../../types/activityLog';
-import { ApiCostMonitor } from '../apiCostMonitor';
 import { IGeminiPromptBuilder } from './geminiPromptBuilder';
 import { IGeminiResponseProcessor } from './geminiResponseProcessor';
 import { AnalysisResultConverter } from './analysisResultConverter';
@@ -43,7 +42,6 @@ export class AnalysisChunkManager implements IAnalysisChunkManager {
 
   constructor(
     private model: GenerativeModel,
-    private costMonitor: ApiCostMonitor,
     private promptBuilder: IGeminiPromptBuilder,
     private responseProcessor: IGeminiResponseProcessor
   ) {
@@ -162,12 +160,7 @@ export class AnalysisChunkManager implements IAnalysisChunkManager {
     const result = await this.model.generateContent(prompt);
     const response = result.response;
 
-    // トークン使用量を記録（非同期）
-    if (response.usageMetadata) {
-      const { promptTokenCount, candidatesTokenCount } = response.usageMetadata;
-      this.costMonitor.recordApiCall('generateDailySummary', promptTokenCount, candidatesTokenCount)
-        .catch(error => logger.warn('CHUNK_ANALYSIS', '⚠️ トークン使用量記録失敗:', { error }));
-    }
+    // トークン使用量記録は削除済み
 
     const responseText = response.text();
     

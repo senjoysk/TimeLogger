@@ -65,8 +65,6 @@
                                         <i class="fas fa-check-square text-green-600 text-2xl"></i>
                                     <% } else if (table.name === 'user_settings') { %>
                                         <i class="fas fa-users text-purple-600 text-2xl"></i>
-                                    <% } else if (table.name === 'api_costs') { %>
-                                        <i class="fas fa-coins text-yellow-600 text-2xl"></i>
                                     <% } else { %>
                                         <i class="fas fa-database text-gray-600 text-2xl"></i>
                                     <% } %>
@@ -178,10 +176,6 @@
                             <a href="<%= basePath %>/tables/user_settings" class="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
                                 <i class="fas fa-users mr-2"></i>
                                 ユーザー設定
-                            </a>
-                            <a href="<%= basePath %>/tables/api_costs" class="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
-                                <i class="fas fa-coins mr-2"></i>
-                                API費用確認
                             </a>
                             <a href="<%= basePath %>/health" class="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
                                 <i class="fas fa-heartbeat mr-2"></i>

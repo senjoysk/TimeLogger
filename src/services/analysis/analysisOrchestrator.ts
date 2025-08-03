@@ -4,7 +4,6 @@
  */
 
 import { IActivityLogRepository } from '../../repositories/activityLogRepository';
-import { IApiCostRepository } from '../../repositories/interfaces';
 import {
   ActivityLog,
   DailyAnalysisResult,
@@ -17,7 +16,6 @@ import { AnalysisChunkManager } from './analysisChunkManager';
 import { AnalysisResultConverter } from './analysisResultConverter';
 import { GoogleGenerativeAI, GenerativeModel } from '@google/generative-ai';
 import { config } from '../../config';
-import { ApiCostMonitor } from '../apiCostMonitor';
 import { logger } from '../../utils/logger';
 
 /**
@@ -47,15 +45,13 @@ export interface IAnalysisOrchestrator {
 export class AnalysisOrchestrator implements IAnalysisOrchestrator {
   private genAI: GoogleGenerativeAI;
   private model: GenerativeModel;
-  private costMonitor: ApiCostMonitor;
   private promptBuilder: GeminiPromptBuilder;
   private responseProcessor: GeminiResponseProcessor;
   private chunkManager: AnalysisChunkManager;
   private resultConverter: AnalysisResultConverter;
 
   constructor(
-    private repository: IActivityLogRepository,
-    costRepository: IApiCostRepository
+    private repository: IActivityLogRepository
   ) {
     // Gemini API の初期化
     this.genAI = new GoogleGenerativeAI(config.gemini.apiKey);
@@ -70,13 +66,10 @@ export class AnalysisOrchestrator implements IAnalysisOrchestrator {
       },
     });
     
-    // API使用量監視の初期化
-    this.costMonitor = new ApiCostMonitor(costRepository);
-    
     // 専門化されたサービスクラスを初期化
     this.promptBuilder = new GeminiPromptBuilder();
     this.responseProcessor = new GeminiResponseProcessor();
-    this.chunkManager = new AnalysisChunkManager(this.model, this.costMonitor, this.promptBuilder, this.responseProcessor);
+    this.chunkManager = new AnalysisChunkManager(this.model, this.promptBuilder, this.responseProcessor);
     this.resultConverter = new AnalysisResultConverter();
   }
 
@@ -185,11 +178,7 @@ export class AnalysisOrchestrator implements IAnalysisOrchestrator {
       const result = await this.model.generateContent(prompt);
       const response = result.response;
 
-      // トークン使用量を記録
-      if (response.usageMetadata) {
-        const { promptTokenCount, candidatesTokenCount } = response.usageMetadata;
-        await this.costMonitor.recordApiCall('generateDailySummary', promptTokenCount, candidatesTokenCount);
-      }
+      // トークン使用量記録は削除済み
 
       const responseText = response.text();
       

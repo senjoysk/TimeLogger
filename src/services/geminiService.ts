@@ -1,15 +1,11 @@
-import { IApiCostRepository } from '../repositories/interfaces';
-import { ApiCostMonitor } from './apiCostMonitor';
 import { ActivityAnalysisResult, ReminderContext } from '../types/activityAnalysis';
 import { PreviousActivities } from '../types/database';
-import { CostAlert } from '../types/costAlert';
 import { logger } from '../utils/logger';
 
 // 専用サービスのインポート
 import { GeminiApiClient, IGeminiApiClient } from './gemini/geminiApiClient';
 import { ReminderContextService, IReminderContextService } from './gemini/reminderContextService';
 import { ActivityAnalysisService, IActivityAnalysisService } from './gemini/activityAnalysisService';
-import { GeminiCostService, IGeminiCostService } from './gemini/geminiCostService';
 
 /**
  * Google Gemini API サービスクラス（リファクタリング版）
@@ -22,41 +18,16 @@ export class GeminiService {
   private apiClient: IGeminiApiClient;
   private reminderContext: IReminderContextService;
   private activityAnalysis: IActivityAnalysisService;
-  private costService: IGeminiCostService;
-  private costMonitor: ApiCostMonitor;
 
-  constructor(costRepository: IApiCostRepository) {
+  constructor() {
     // 基盤サービスの初期化
-    this.costMonitor = new ApiCostMonitor(costRepository);
     this.apiClient = new GeminiApiClient();
     
     // 専用サービスの初期化
-    this.reminderContext = new ReminderContextService(this.apiClient, this.costMonitor);
-    this.activityAnalysis = new ActivityAnalysisService(this.apiClient, this.costMonitor);
-    this.costService = new GeminiCostService(this.costMonitor);
+    this.reminderContext = new ReminderContextService(this.apiClient);
+    this.activityAnalysis = new ActivityAnalysisService(this.apiClient);
     
     logger.success('GEMINI', 'GeminiService（リファクタリング版）が初期化されました');
-  }
-
-  /**
-   * API使用量統計を取得
-   */
-  public async getCostStats() {
-    return await this.costService.getCostStats();
-  }
-
-  /**
-   * 日次コストレポートを取得
-   */
-  public async getDailyCostReport(userId: string, timezone: string): Promise<string> {
-    return await this.costService.getDailyCostReport(userId, timezone);
-  }
-
-  /**
-   * コスト警告をチェック
-   */
-  public async checkCostAlerts(userId: string, timezone: string): Promise<CostAlert | null> {
-    return await this.costService.checkCostAlerts(userId, timezone);
   }
 
 

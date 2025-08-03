@@ -71,7 +71,6 @@ describe('SecurityService', () => {
     test('許可されたテーブル名は有効', () => {
       const validTables = [
         'activity_logs',
-        'api_costs',
         'user_settings',
         'daily_analysis_cache',
         'todo_tasks',

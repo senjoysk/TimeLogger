@@ -5,47 +5,11 @@
 
 import { ActivityAnalysisResult, ReminderContext } from '../../types/activityAnalysis';
 import { PreviousActivities } from '../../types/database';
-import { CostAlert } from '../../types/costAlert';
-
-/**
- * API使用量統計
- */
-export interface ApiCostStats {
-  totalCalls: number;
-  analyzeActivityCalls: number;
-  generateSummaryCalls: number;
-  totalInputTokens: number;
-  totalOutputTokens: number;
-  estimatedCost: number;
-}
 
 /**
  * Gemini AIサービスインターフェース
  */
 export interface IGeminiService {
-  /**
-   * API使用量統計を取得
-   * @returns 今日のAPI使用量統計
-   */
-  getCostStats(): Promise<ApiCostStats>;
-
-  /**
-   * 日次コストレポートを取得
-   * @param userId ユーザーID
-   * @param timezone タイムゾーン
-   * @returns 日次コストレポート文字列
-   */
-  getDailyCostReport(userId: string, timezone: string): Promise<string>;
-
-  /**
-   * コストアラートをチェック
-   * @param userId ユーザーID
-   * @param timezone タイムゾーン
-   * @returns アラート情報（nullの場合はアラートなし）
-   */
-  checkCostAlerts(userId: string, timezone: string): Promise<CostAlert | null>;
-
-
   /**
    * リマインダーコンテキストプロンプトを構築
    * @param messageContent メッセージ内容

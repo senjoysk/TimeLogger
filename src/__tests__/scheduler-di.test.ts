@@ -106,8 +106,8 @@ describe('Scheduler DI対応テスト', () => {
       // startメソッドを呼ぶとschedulerServiceのscheduleが呼ばれることを確認
       await scheduler.start();
       
-      // 3回呼ばれる（dailySummary + apiCostReport + activityPrompt）
-      expect(mockSchedulerService.schedule).toHaveBeenCalledTimes(3);
+      // 2回呼ばれる（dailySummary + activityPrompt）
+      expect(mockSchedulerService.schedule).toHaveBeenCalledTimes(2);
     });
 
     test('DIによってLoggerが使用される', async () => {

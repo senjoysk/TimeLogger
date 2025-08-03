@@ -3,7 +3,6 @@
  * 全インターフェースを専用リポジトリに完全委譲
  * 
  * 完全分離戦略:
- * - IApiCostRepository -> SqliteApiCostRepository（分離済み）
  * - ITodoRepository -> SqliteTodoRepository（分離済み）
  * - IMessageClassificationRepository -> SqliteMessageClassificationRepository（分離済み）
  * - IUserRepository -> SqliteUserRepository（分離済み）
@@ -12,7 +11,6 @@
  */
 
 import { SqliteActivityLogRepository } from './specialized/SqliteActivityLogRepository';
-import { SqliteApiCostRepository } from './specialized/SqliteApiCostRepository';
 import { SqliteTodoRepository } from './specialized/SqliteTodoRepository';
 import { SqliteMessageClassificationRepository } from './specialized/SqliteMessageClassificationRepository';
 import { SqliteUserRepository } from './specialized/SqliteUserRepository';
@@ -22,7 +20,6 @@ import {
   CreateTodoRequest, UpdateTodoRequest, Todo, TodoPriority, TodoStatus, GetTodosOptions,
   MessageClassification, MessageClassificationHistory
 } from '../types/todo';
-import { CostAlert } from '../types/costAlert';
 import { UserInfo } from '../types/database';
 import {
   ActivityLog,
@@ -44,16 +41,14 @@ import {
  */
 export class PartialCompositeRepository implements IUnifiedRepository {
   private activityLogRepo: SqliteActivityLogRepository;
-  private apiCostRepo: SqliteApiCostRepository;
   private todoRepo: SqliteTodoRepository;
   private messageClassificationRepo: SqliteMessageClassificationRepository;
   private userRepo: SqliteUserRepository;
   private activityPromptRepo: SqliteActivityPromptRepository;
 
   constructor(databasePath: string) {
-    // 全インターフェースを専用リポジトリに委譲
+    // 全インターフェースを専用リポジトリに委議
     this.activityLogRepo = new SqliteActivityLogRepository(databasePath);
-    this.apiCostRepo = new SqliteApiCostRepository(databasePath);
     this.todoRepo = new SqliteTodoRepository(databasePath);
     this.messageClassificationRepo = new SqliteMessageClassificationRepository(databasePath);
     this.userRepo = new SqliteUserRepository(databasePath);
@@ -68,7 +63,6 @@ export class PartialCompositeRepository implements IUnifiedRepository {
     await this.activityLogRepo.ensureSchema();
     
     // 各専用リポジトリのスキーマを確実に初期化
-    await this.apiCostRepo.ensureSchema();
     await this.todoRepo.ensureSchema();
     await this.messageClassificationRepo.ensureSchema();
     await this.userRepo.ensureSchema();
@@ -217,32 +211,6 @@ export class PartialCompositeRepository implements IUnifiedRepository {
 
   async saveUserTimezone(userId: string, timezone: string): Promise<void> {
     return this.activityLogRepo.saveUserTimezone(userId, timezone);
-  }
-
-  // =============================================================================
-  // IApiCostRepository - 分離済みリポジトリに委譲
-  // =============================================================================
-  
-  async recordApiCall(operation: string, inputTokens: number, outputTokens: number): Promise<void> {
-    return this.apiCostRepo.recordApiCall(operation, inputTokens, outputTokens);
-  }
-
-  async getTodayStats(timezone?: string): Promise<{
-    totalCalls: number;
-    totalInputTokens: number;
-    totalOutputTokens: number;
-    estimatedCost: number;
-    operationBreakdown: Record<string, { calls: number; inputTokens: number; outputTokens: number; cost: number }>;
-  }> {
-    return this.apiCostRepo.getTodayStats(timezone);
-  }
-
-  async checkCostAlerts(timezone?: string): Promise<CostAlert | null> {
-    return this.apiCostRepo.checkCostAlerts(timezone);
-  }
-
-  async generateDailyReport(timezone: string): Promise<string> {
-    return this.apiCostRepo.generateDailyReport(timezone);
   }
 
   // =============================================================================
@@ -421,7 +389,6 @@ export class PartialCompositeRepository implements IUnifiedRepository {
   
   // 全てのインターフェースが専用リポジトリに完全委譲されました:
   // ✅ IActivityLogRepository -> SqliteActivityLogRepository
-  // ✅ IApiCostRepository -> SqliteApiCostRepository  
   // ✅ ITodoRepository -> SqliteTodoRepository
   // ✅ IMessageClassificationRepository -> SqliteMessageClassificationRepository
   // ✅ IUserRepository -> SqliteUserRepository

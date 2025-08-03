@@ -4,7 +4,6 @@
  */
 
 import { IGeminiApiClient } from './geminiApiClient';
-import { ApiCostMonitor } from '../apiCostMonitor';
 import { ActivityAnalysisResult, ReminderContext } from '../../types/activityAnalysis';
 import { ActivityAnalysisAIResponse } from '../../types/aiResponse';
 import { withApiErrorHandling } from '../../utils/errorHandler';
@@ -50,8 +49,7 @@ export interface IActivityAnalysisService {
  */
 export class ActivityAnalysisService implements IActivityAnalysisService {
   constructor(
-    private geminiClient: IGeminiApiClient,
-    private costMonitor: ApiCostMonitor
+    private geminiClient: IGeminiApiClient
   ) {}
 
   /**
@@ -87,11 +85,6 @@ export class ActivityAnalysisService implements IActivityAnalysisService {
         logger.debug('ACTIVITY_ANALYSIS', responseText);
         logger.debug('ACTIVITY_ANALYSIS', '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
         
-        // トークン使用量の記録
-        if (result.response.usageMetadata) {
-          const { promptTokenCount, candidatesTokenCount } = result.response.usageMetadata;
-          await this.costMonitor.recordApiCall('analyzeActivity', promptTokenCount, candidatesTokenCount);
-        }
         
         return this.parseActivityAnalysisResponse(responseText);
       },

@@ -160,7 +160,7 @@ export class ActivityLoggingIntegration {
       } else {
         // 通常の場合は新しいGeminiServiceを作成
         const { GeminiService } = await import('../services/geminiService');
-        this.geminiService = new GeminiService(this.repository);
+        this.geminiService = new GeminiService();
         logger.info('ACTIVITY_LOG', '✅ 新規GeminiServiceを作成');
       }
       
@@ -477,10 +477,6 @@ export class ActivityLoggingIntegration {
         await this.showSystemStatus(message, userId);
         break;
 
-      case 'cost':
-      case 'コスト':
-        await this.handleCostCommand(message, userId, timezone);
-        break;
 
       case 'timezone':
       case 'タイムゾーン':
@@ -681,7 +677,6 @@ export class ActivityLoggingIntegration {
 \`!edit\` - ログの編集・削除
 \`!logs\` - 生ログの表示・検索
 \`!gap\` - 未記録時間の検出・記録
-\`!cost\` - API使用コスト確認
 \`!timezone\` - タイムゾーン表示・検索・設定
 \`!prompt\` - 活動促し通知の設定・管理
 \`!status\` - システム状態確認
@@ -731,18 +726,6 @@ export class ActivityLoggingIntegration {
     }
   }
 
-  /**
-   * コストレポートを取得
-   */
-  async getCostReport(userId: string, timezone: string): Promise<string> {
-    try {
-      // GeminiService経由でコストレポートを取得
-      return await this.geminiService.getDailyCostReport(userId, timezone);
-    } catch (error) {
-      logger.error('ACTIVITY_LOG', '❌ コストレポート取得エラー:', error);
-      return '❌ コストレポートの取得に失敗しました。';
-    }
-  }
 
   /**
    * リポジトリインスタンスを取得
@@ -944,45 +927,6 @@ export class ActivityLoggingIntegration {
     }
   }
 
-  /**
-   * コストコマンドを処理
-   * @param message Discordメッセージ
-   * @param userId ユーザーID
-   * @param timezone タイムゾーン
-   */
-  private async handleCostCommand(message: Message, userId: string, timezone: string): Promise<void> {
-    try {
-      logger.info('ACTIVITY_LOG', `💰 コスト情報要求: ${userId}, timezone: ${timezone}`);
-      
-      // GeminiServiceが利用可能かチェック
-      if (!this.geminiService) {
-        logger.error('ACTIVITY_LOG', '❌ GeminiServiceが初期化されていません');
-        await message.reply('❌ コスト情報の取得機能が利用できません。');
-        return;
-      }
-
-      logger.info('ACTIVITY_LOG', '🔍 GeminiService利用可能、コストレポート生成中...');
-
-      // API使用コストレポートを生成
-      const costReport = await this.geminiService.getDailyCostReport(userId, timezone);
-      
-      logger.info('ACTIVITY_LOG', `📊 コストレポート生成完了: ${costReport.substring(0, 100)}...`);
-
-      // Discordに送信
-      await message.reply(costReport);
-      
-      logger.info('ACTIVITY_LOG', `✅ コストレポート送信完了: ${userId}`);
-      
-    } catch (error) {
-      logger.error('ACTIVITY_LOG', '❌ コストコマンドエラー:', error);
-      logger.error('ACTIVITY_LOG', '❌ エラー詳細:', {
-        name: (error as Error).name,
-        message: (error as Error).message,
-        stack: (error as Error).stack?.split('\n').slice(0, 3)
-      });
-      await message.reply('❌ コスト情報の取得中にエラーが発生しました。しばらく後でもう一度お試しください。');
-    }
-  }
 
 
   /**

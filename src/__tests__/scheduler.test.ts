@@ -175,12 +175,11 @@ describe('Scheduler', () => {
       expect(cron.schedule).toHaveBeenCalled();
     });
 
-    test('APIコストレポートスケジュールが設定される', async () => {
+    test('スケジュールが正しく設定される', async () => {
       await scheduler.start();
       
-      // startApiCostReportScheduleメソッドが内部で呼ばれることで
-      // cron.scheduleが複数回実行されることを確認
-      expect(cron.schedule).toHaveBeenCalledTimes(3); // 日次サマリー + APIコストレポート + 活動促し
+      // 日次サマリー + 活動促しの2つのスケジュールが設定される
+      expect(cron.schedule).toHaveBeenCalledTimes(2);
     });
   });
 

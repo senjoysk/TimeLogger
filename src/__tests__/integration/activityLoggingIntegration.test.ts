@@ -81,17 +81,6 @@ describe('活動記録システム統合テスト', () => {
   });
 
   describe('コマンド処理テスト', () => {
-    test('!cost コマンドが正しく処理される', async () => {
-      const mockMessage = new MockMessage('!cost');
-      
-      // プライベートメソッドをテストするためリフレクション使用
-      const handleMessage = (integration as any).handleMessage.bind(integration);
-      const result = await handleMessage(mockMessage as unknown as Message);
-      
-      expect(result).toBe(true); // 処理成功
-      expect(mockMessage.replies.length).toBeGreaterThan(0); // 何らかの返信がある
-      expect(mockMessage.replies[0]).toContain('API使用量レポート'); // コスト情報が含まれている
-    });
 
     test('!timezone コマンドが正しく処理される', async () => {
       const mockMessage = new MockMessage('!timezone');
@@ -143,7 +132,6 @@ describe('活動記録システム統合テスト', () => {
       expect(mockMessage.replies.length).toBeGreaterThan(0);
       
       const helpText = mockMessage.replies[0];
-      expect(helpText).toContain('!cost');
       expect(helpText).toContain('!timezone');
       expect(helpText).toContain('!summary');
       expect(helpText).toContain('!edit');
@@ -174,7 +162,7 @@ describe('活動記録システム統合テスト', () => {
 
   describe('エラーハンドリングテスト', () => {
     test('Botメッセージは無視される', async () => {
-      const mockMessage = new MockMessage('!cost');
+      const mockMessage = new MockMessage('!summary');
       mockMessage.author.bot = true;
       
       const handleMessage = (integration as any).handleMessage.bind(integration);
@@ -185,13 +173,13 @@ describe('活動記録システム統合テスト', () => {
     });
 
     test('マルチユーザー対応により全ユーザーが処理される', async () => {
-      const mockMessage = new MockMessage('!cost', 'different-user-id');
+      const mockMessage = new MockMessage('!summary', 'different-user-id');
       
       const handleMessage = (integration as any).handleMessage.bind(integration);
       const result = await handleMessage(mockMessage as unknown as Message);
       
       expect(result).toBe(true); // マルチユーザー対応により処理される
-      expect(mockMessage.replies.length).toBeGreaterThan(0); // コストレポートが返される
+      expect(mockMessage.replies.length).toBeGreaterThan(0); // サマリーが返される
     });
   });
 

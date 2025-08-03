@@ -4,7 +4,6 @@
  */
 
 import { IGeminiApiClient } from './geminiApiClient';
-import { ApiCostMonitor } from '../apiCostMonitor';
 import { ClassificationResult } from '../../types/todo';
 import { AppError, ErrorType } from '../../utils/errorHandler';
 import { logger } from '../../utils/logger';
@@ -63,8 +62,7 @@ export interface IReminderContextService {
  */
 export class ReminderContextService implements IReminderContextService {
   constructor(
-    private geminiClient: IGeminiApiClient,
-    private costMonitor: ApiCostMonitor
+    private geminiClient: IGeminiApiClient
   ) {}
 
   /**
@@ -94,10 +92,6 @@ export class ReminderContextService implements IReminderContextService {
       logger.debug('REMINDER_CONTEXT', responseText);
       logger.debug('REMINDER_CONTEXT', '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
       
-      // トークン使用量の記録
-      const inputTokens = this.geminiClient.estimateTokens(prompt);
-      const outputTokens = this.geminiClient.estimateTokens(responseText);
-      await this.costMonitor.recordApiCall('classifyMessage', inputTokens, outputTokens);
       
       // レスポンスをパース
       const analysis = this.parseClassificationResponse(responseText);
@@ -143,10 +137,6 @@ export class ReminderContextService implements IReminderContextService {
       logger.debug('REMINDER_CONTEXT', responseText);
       logger.debug('REMINDER_CONTEXT', '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
       
-      // トークン使用量の記録
-      const inputTokens = this.geminiClient.estimateTokens(prompt);
-      const outputTokens = this.geminiClient.estimateTokens(responseText);
-      await this.costMonitor.recordApiCall('classifyMessage', inputTokens, outputTokens);
       
       // レスポンスをパース
       const analysis = this.parseClassificationResponse(responseText);
@@ -259,7 +249,7 @@ JSON形式のみで回答してください。
       // JSONブロックを抽出
       const jsonMatch = response.match(/\{[\s\S]*\}/);
       if (!jsonMatch) {
-        throw new Error('JSONレスポンスが見つかりません');
+        throw new AppError('JSONレスポンスが見つかりません', ErrorType.API);
       }
 
       const jsonText = jsonMatch[0];

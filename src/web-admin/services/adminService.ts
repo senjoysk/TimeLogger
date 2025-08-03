@@ -12,7 +12,6 @@ export class AdminService implements IAdminService {
   // 許可されたテーブル一覧
   private readonly ALLOWED_TABLES: TableInfo[] = [
     { name: 'activity_logs', description: '活動ログテーブル' },
-    { name: 'api_costs', description: 'APIコスト監視テーブル' },
     { name: 'user_settings', description: 'ユーザー設定テーブル' },
     { name: 'daily_analysis_cache', description: '分析結果キャッシュテーブル' },
     { name: 'todo_tasks', description: 'TODOタスクテーブル' },

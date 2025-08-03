@@ -5,7 +5,6 @@ import {
   CreateActivityPromptSettingsRequest, 
   UpdateActivityPromptSettingsRequest 
 } from '../types/activityPrompt';
-import { CostAlert } from '../types/costAlert';
 import { IActivityLogRepository } from './activityLogRepository';
 
 /**
@@ -40,22 +39,6 @@ export interface UserStats {
   } | null;
 }
 
-
-/**
- * API使用量監視の抽象化インターフェース
- */
-export interface IApiCostRepository {
-  recordApiCall(operation: string, inputTokens: number, outputTokens: number): Promise<void>;
-  getTodayStats(timezone?: string): Promise<{
-    totalCalls: number;
-    totalInputTokens: number;
-    totalOutputTokens: number;
-    estimatedCost: number;
-    operationBreakdown: Record<string, { calls: number; inputTokens: number; outputTokens: number; cost: number }>;
-  }>;
-  checkCostAlerts(timezone?: string): Promise<CostAlert | null>;
-  generateDailyReport(timezone: string): Promise<string>;
-}
 
 
 /**
@@ -220,7 +203,6 @@ export interface TimezoneNotification {
  */
 export interface IUnifiedRepository extends 
   IActivityLogRepository, 
-  IApiCostRepository, 
   ITodoRepository, 
   IMessageClassificationRepository, 
   IUserRepository, 
