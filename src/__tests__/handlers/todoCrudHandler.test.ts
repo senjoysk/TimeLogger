@@ -187,12 +187,18 @@ describe('🔴 Red Phase: TodoCrudHandler分離テスト', () => {
       const replyCall = (message.reply as jest.Mock).mock.calls[0][0];
       expect(replyCall).toHaveProperty('components');
       
-      // ページネーションボタン（1行）+ 最大4つのTODOアクションボタン（4行）= 5行
-      expect(replyCall.components).toHaveLength(5);
+      // ページネーションボタン（1行）+ 番号ボタン（2行）= 3行
+      expect(replyCall.components).toHaveLength(3);
       
       // 最初のコンポーネントがページネーションボタンであることを確認
       const paginationRow = replyCall.components[0];
       expect(paginationRow.components).toHaveLength(3); // 前・現在・次のページボタン
+      
+      // 2行目と3行目が番号ボタンであることを確認
+      const numberRow1 = replyCall.components[1];
+      expect(numberRow1.components).toHaveLength(5); // 1-5の番号ボタン
+      const numberRow2 = replyCall.components[2];
+      expect(numberRow2.components).toHaveLength(5); // 6-10の番号ボタン
     });
 
     test('TODO編集が正しく動作する', async () => {

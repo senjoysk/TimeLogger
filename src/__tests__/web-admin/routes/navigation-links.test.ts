@@ -7,6 +7,7 @@ import request from 'supertest';
 import { IntegratedServer } from '../../../server';
 import { AdminServer } from '../../../web-admin/server';
 import { getTestDbPath, cleanupTestDatabase } from '../../../utils/testDatabasePath';
+import { SharedRepositoryManager } from '../../../repositories/SharedRepositoryManager';
 
 describe('ナビゲーションリンクのテスト', () => {
   const testDbPath = getTestDbPath(__filename);
@@ -51,6 +52,13 @@ describe('ナビゲーションリンクのテスト', () => {
       }
     }
     
+    // SharedRepositoryManagerをクリア
+    try {
+      await SharedRepositoryManager.getInstance().clear();
+    } catch (error) {
+      // クリアエラーは無視
+    }
+    
     await new Promise(resolve => setTimeout(resolve, 100));
     cleanupTestDatabase(testDbPath);
   });
@@ -67,6 +75,12 @@ describe('ナビゲーションリンクのテスト', () => {
         if (repo && typeof repo.close === 'function') {
           await repo.close();
         }
+      }
+      // SharedRepositoryManagerをクリア
+      try {
+        await SharedRepositoryManager.getInstance().clear();
+      } catch (error) {
+        // クリアエラーは無視
       }
     });
 
@@ -107,10 +121,23 @@ describe('ナビゲーションリンクのテスト', () => {
 
     test('TODO管理ページのナビゲーションリンクが正しく設定される', async () => {
       const app = adminServer.getExpressApp();
+      
+      // databasePathが正しく設定されているか確認
+      expect(app.get('databasePath')).toBe(testDbPath);
+      
       const response = await request(app)
         .get('/todos')
-        .auth('testuser', 'testpass')
-        .expect(200);
+        .auth('testuser', 'testpass');
+      
+      if (response.status !== 200) {
+        console.error('TODO page error status:', response.status);
+        console.error('TODO page error text:', response.text);
+        console.error('TODO page error body:', response.body);
+        console.error('Database path:', app.get('databasePath'));
+        console.error('Views path:', app.get('views'));
+        console.error('View engine:', app.get('view engine'));
+      }
+      expect(response.status).toBe(200);
       
       // ナビゲーションリンクが正しいことを確認
       expect(response.text).toContain('href="/"');  // Dashboard
@@ -124,8 +151,13 @@ describe('ナビゲーションリンクのテスト', () => {
   });
 
   describe('IntegratedServer（basePath = "/admin"）', () => {
+    let localTestDbPath: string;
+    
     beforeEach(async () => {
-      integratedServer = new IntegratedServer(testDbPath);
+      // 各テストで独立したDBパスを使用
+      localTestDbPath = getTestDbPath(`integrated-${Date.now()}`);
+      cleanupTestDatabase(localTestDbPath);
+      integratedServer = new IntegratedServer(localTestDbPath);
       await integratedServer.initialize();
     });
 
@@ -138,6 +170,17 @@ describe('ナビゲーションリンクのテスト', () => {
             await repo.close();
           }
         }
+      }
+      // SharedRepositoryManagerをクリア
+      try {
+        await SharedRepositoryManager.getInstance().clear();
+      } catch (error) {
+        // クリアエラーは無視
+      }
+      
+      // ローカルDBをクリーンアップ
+      if (localTestDbPath) {
+        cleanupTestDatabase(localTestDbPath);
       }
     });
 
@@ -180,8 +223,20 @@ describe('ナビゲーションリンクのテスト', () => {
       const app = (integratedServer as any).app;
       const response = await request(app)
         .get('/admin/todos')
-        .auth('testuser', 'testpass')
-        .expect(200);
+        .auth('testuser', 'testpass');
+      
+      if (response.status !== 200) {
+        console.error('IntegratedServer TODO page error status:', response.status);
+        console.error('IntegratedServer TODO page error text:', response.text.substring(0, 500));
+        console.error('IntegratedServer TODO page error body:', response.body);
+        
+        // エラーメッセージを抽出
+        const errorMatch = response.text.match(/Error: ([^<]+)/);
+        if (errorMatch) {
+          console.error('Extracted error message:', errorMatch[1]);
+        }
+      }
+      expect(response.status).toBe(200);
       
       // ナビゲーションリンクが正しいことを確認
       expect(response.text).toContain('href="/admin/"');  // Dashboard
@@ -217,7 +272,11 @@ describe('ナビゲーションリンクのテスト', () => {
   describe('リンクの重複パスバグ回帰テスト', () => {
     test('どのページでもナビゲーションリンクに重複パスが含まれない', async () => {
       // IntegratedServerでテスト（最も複雑なbasePathケース）
-      const integratedServer = new IntegratedServer(testDbPath);
+      // 新しいDBパスを使用して独立性を確保
+      const regressionTestDbPath = getTestDbPath('regression-test');
+      cleanupTestDatabase(regressionTestDbPath);
+      
+      const integratedServer = new IntegratedServer(regressionTestDbPath);
       await integratedServer.initialize();
       
       try {
@@ -259,6 +318,9 @@ describe('ナビゲーションリンクのテスト', () => {
             await repo.close();
           }
         }
+        // SharedRepositoryManagerをクリア
+        await SharedRepositoryManager.getInstance().clear();
+        cleanupTestDatabase(regressionTestDbPath);
       }
     });
   });

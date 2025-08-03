@@ -14,6 +14,7 @@ import { ITodoRepository } from '../../repositories/interfaces';
 import { SqliteTodoRepository } from '../../repositories/specialized/SqliteTodoRepository';
 import { MockGeminiService } from '../mocks/mockGeminiService';
 import { TestDatabaseInitializer } from '../../database/testDatabaseInitializer';
+import { SharedRepositoryManager } from '../../repositories/SharedRepositoryManager';
 
 // E2Eテスト用のモッククラス
 class MockDiscordMessage {
@@ -88,6 +89,9 @@ describe('TODO機能 End-to-End テスト', () => {
   let config: ActivityLoggingConfig;
 
   beforeEach(async () => {
+    // SharedRepositoryManagerをリセット
+    SharedRepositoryManager.resetInstance();
+    
     // 各テストで独立したデータベースを使用（固有のDB作成）
     const timestamp = Date.now();
     const randomId = Math.random().toString(36).substr(2, 9);
@@ -154,6 +158,9 @@ describe('TODO機能 End-to-End テスト', () => {
     } catch (error) {
       console.error('❌ E2Eテストクリーンアップエラー:', error);
     }
+    
+    // SharedRepositoryManagerをリセット
+    SharedRepositoryManager.resetInstance();
     
     // テストデータベースの完全クリーンアップ
     if (testDbInitializer) {

@@ -65,19 +65,37 @@ export function expressErrorHandler(
     logger.error('EXPRESS', `予期しないエラー: ${req.method} ${req.path}`, error, {
       url: req.url,
       method: req.method,
-      userAgent: req.get('User-Agent')
+      userAgent: req.get('User-Agent'),
+      error: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined
     });
   }
 
-  // JSON形式でエラーレスポンスを返す
-  res.status(statusCode).json({
-    error: {
+  // Content-Typeに応じて適切な形式でエラーレスポンスを返す
+  if (req.accepts('html') && !req.accepts('json')) {
+    // HTMLを期待している場合（ブラウザからのアクセス）
+    res.status(statusCode).render('error', {
+      title: 'エラー',
       message: userMessage,
-      timestamp: new Date().toISOString(),
-      path: req.path,
-      method: req.method
-    }
-  });
+      error: statusCode === 500 && process.env.NODE_ENV === 'development' ? String(error) : undefined,
+      code: error instanceof AppError ? error.type : undefined,
+      status: statusCode,
+      environment: { isReadOnly: false, isDevelopment: process.env.NODE_ENV === 'development' },
+      basePath: req.app.locals.basePath || '',
+      supportedTimezones: res.locals.supportedTimezones || [],
+      adminTimezone: res.locals.adminTimezone || 'Asia/Tokyo'
+    });
+  } else {
+    // JSON形式でエラーレスポンスを返す
+    res.status(statusCode).json({
+      error: {
+        message: userMessage,
+        timestamp: new Date().toISOString(),
+        path: req.path,
+        method: req.method
+      }
+    });
+  }
 }
 
 /**

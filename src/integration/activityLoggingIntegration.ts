@@ -8,7 +8,7 @@
 
 import { Client, Message, ButtonInteraction } from 'discord.js';
 // Removed better-sqlite3 import - using sqlite3 via repository
-import { PartialCompositeRepository } from '../repositories/PartialCompositeRepository';
+import { SharedRepositoryManager } from '../repositories/SharedRepositoryManager';
 import { IUnifiedRepository, IMemoRepository } from '../repositories/interfaces';
 import { SqliteMemoRepository } from '../repositories/sqliteMemoRepository';
 import { ActivityLogService, IActivityLogService } from '../services/activityLogService';
@@ -135,16 +135,14 @@ export class ActivityLoggingIntegration {
         this.repository = this.config.repository;
         logger.info('ACTIVITY_LOG', '✅ 外部リポジトリを使用（テスト用）');
       } else {
-        // 通常の場合は新しいリポジトリを作成
-        this.repository = new PartialCompositeRepository(this.config.databasePath);
-        
-        // リポジトリの初期化を明示的に実行
-        await this.repository.initializeDatabase();
+        // 共有リポジトリマネージャーを使用
+        const repoManager = SharedRepositoryManager.getInstance();
+        this.repository = await repoManager.getRepository(this.config.databasePath);
         
         // ConfigServiceとTimezoneServiceの初期化（リポジトリを注入）
         this.configService = new ConfigService();
         this.timezoneService = new TimezoneService(this.repository);
-        logger.info('ACTIVITY_LOG', '✅ データベース接続・初期化完了');
+        logger.info('ACTIVITY_LOG', '✅ 共有リポジトリ取得・初期化完了');
       }
 
       // メモリポジトリの初期化
@@ -613,6 +611,9 @@ export class ActivityLoggingIntegration {
       const pageAction = idParts[2]; // prev または next
       const currentPage = parseInt(idParts[3]);
       await this.todoInteractionHandler.handlePaginationInteraction(interaction, pageAction, currentPage, userId);
+    } else if (type === 'number') {
+      // 番号ボタンの処理
+      await this.todoInteractionHandler.handleTodoNumberButton(interaction, userId);
     } else {
       // TODOアクションの場合、todoIdは第3要素以降のすべて
       const todoId = idParts.slice(2).join('_');

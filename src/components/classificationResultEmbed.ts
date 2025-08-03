@@ -415,3 +415,49 @@ export function generateSessionId(userId: string, timestamp: Date = new Date()):
   const userHash = userId.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0).toString(36);
   return `${userHash}${timeStr}${randomStr}`;
 }
+
+/**
+ * TODO番号ボタンを生成（1-10の番号）
+ */
+export function createTodoNumberButtons(todoCount: number): ActionRowBuilder<ButtonBuilder>[] {
+  const rows: ActionRowBuilder<ButtonBuilder>[] = [];
+  
+  if (todoCount === 0) {
+    return rows;
+  }
+  
+  // 最大10個のボタンのみ作成
+  const buttonCount = Math.min(todoCount, 10);
+  
+  // 1行目（1-5）
+  const firstRow = new ActionRowBuilder<ButtonBuilder>();
+  for (let i = 1; i <= Math.min(buttonCount, 5); i++) {
+    firstRow.addComponents(
+      new ButtonBuilder()
+        .setCustomId(`todo_number_${i}`)
+        .setLabel(i.toString())
+        .setStyle(ButtonStyle.Secondary)
+    );
+  }
+  if (firstRow.components.length > 0) {
+    rows.push(firstRow);
+  }
+  
+  // 2行目（6-10）
+  if (buttonCount > 5) {
+    const secondRow = new ActionRowBuilder<ButtonBuilder>();
+    for (let i = 6; i <= buttonCount; i++) {
+      secondRow.addComponents(
+        new ButtonBuilder()
+          .setCustomId(`todo_number_${i}`)
+          .setLabel(i.toString())
+          .setStyle(ButtonStyle.Secondary)
+      );
+    }
+    if (secondRow.components.length > 0) {
+      rows.push(secondRow);
+    }
+  }
+  
+  return rows;
+}

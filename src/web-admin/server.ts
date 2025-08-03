@@ -12,6 +12,7 @@ import { SecurityService, ISecurityService } from './services/securityService';
 import { AdminRepository } from './repositories/adminRepository';
 import { PartialCompositeRepository } from '../repositories/PartialCompositeRepository';
 import { IUnifiedRepository } from '../repositories/interfaces';
+import { SharedRepositoryManager } from '../repositories/SharedRepositoryManager';
 import { createTimezoneMiddleware } from './middleware/timezoneMiddleware';
 import { createRoutes } from './routes';
 import { errorHandler } from './middleware/errorHandler';
@@ -21,26 +22,23 @@ import { logger } from '../utils/logger';
 
 export class AdminServer {
   private app: express.Application;
-  private adminService: IAdminService;
+  private adminService!: IAdminService;
   private securityService: ISecurityService;
   private port: number;
   private databasePath: string;
-  private sqliteRepo: IUnifiedRepository;
+  private sqliteRepo!: IUnifiedRepository;
+  private routesInitialized: boolean = false;
 
   constructor(databasePath: string, port: number = 3001, private bot?: IDiscordBot) {
     this.port = port;
     this.databasePath = databasePath;
     this.app = express();
     
-    // サービスの初期化
-    this.sqliteRepo = new PartialCompositeRepository(databasePath);
-    logger.info('WEB_ADMIN', `[AdminServer] Repository created for: ${databasePath}`);
-    const adminRepo = new AdminRepository(this.sqliteRepo);
-    this.adminService = new AdminService(adminRepo);
+    // SecurityServiceの初期化（リポジトリ非依存）
     this.securityService = new SecurityService();
     
+    // ミドルウェアのみ設定（ルーティングは初期化後）
     this.setupMiddleware();
-    this.setupRoutes();
   }
 
   /**
@@ -49,15 +47,25 @@ export class AdminServer {
    */
   async initializeDatabase(): Promise<void> {
     try {
-      // テスト環境では軽量なスキーマ初期化を使用
-      if (process.env.NODE_ENV === 'test') {
-        await this.sqliteRepo.ensureSchema();
-      } else {
-        await this.sqliteRepo.initializeDatabase();
+      // 共有リポジトリマネージャーを使用
+      const repoManager = SharedRepositoryManager.getInstance();
+      this.sqliteRepo = await repoManager.getRepository(this.databasePath);
+      logger.info('WEB_ADMIN', '✅ AdminServer: 共有リポジトリ取得完了');
+      
+      // サービスの初期化
+      const adminRepo = new AdminRepository(this.sqliteRepo);
+      this.adminService = new AdminService(adminRepo);
+      
+      // アプリケーション設定（ルーティング前に設定）
+      this.app.set('databasePath', this.databasePath);
+      
+      // ルーティング設定（リポジトリ初期化後）
+      if (!this.routesInitialized) {
+        await this.setupRoutes();
+        this.routesInitialized = true;
       }
-      logger.info('WEB_ADMIN', '✅ AdminServer: データベース初期化完了');
     } catch (error) {
-      logger.error('WEB_ADMIN', '❌ AdminServer: データベース初期化エラー:', error as Error);
+      logger.error('WEB_ADMIN', '❌ AdminServer: リポジトリ取得エラー:', error as Error);
       throw error;
     }
   }
@@ -81,7 +89,9 @@ export class AdminServer {
 
     // EJSテンプレートエンジン設定
     this.app.set('view engine', 'ejs');
-    this.app.set('views', path.join(__dirname, 'views'));
+    const viewsPath = path.join(__dirname, 'views');
+    this.app.set('views', viewsPath);
+    logger.info('WEB_ADMIN', `Views path set to: ${viewsPath}`);
 
     // 静的ファイル
     this.app.use('/static', express.static(path.join(__dirname, 'public')));
@@ -112,18 +122,16 @@ export class AdminServer {
     });
   }
 
-  private setupRoutes(): void {
+  private async setupRoutes(): Promise<void> {
     // 環境情報をテンプレートで使用可能にする
     this.app.locals.environment = this.securityService.getEnvironment();
     
     // basePathを設定（開発環境では空文字列、本番環境では/admin）
     this.app.locals.basePath = '';
     
-    // アプリケーション設定
-    this.app.set('databasePath', this.databasePath);
-    
     // ルーティング設定
-    this.app.use('/', createRoutes(this.adminService, this.securityService, this.databasePath, this.bot));
+    const routes = await createRoutes(this.adminService, this.securityService, this.databasePath, this.bot);
+    this.app.use('/', routes);
     
     // 404ハンドラー
     this.app.use(notFoundHandler);

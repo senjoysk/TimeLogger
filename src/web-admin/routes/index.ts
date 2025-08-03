@@ -14,7 +14,7 @@ import { createSummaryTestRouter } from './summaryTest';
 import { createTimezoneRouter } from './timezone';
 import { IDiscordBot } from '../../interfaces/dependencies';
 
-export function createRoutes(adminService: IAdminService, securityService: ISecurityService, databasePath: string, bot?: IDiscordBot): Router {
+export async function createRoutes(adminService: IAdminService, securityService: ISecurityService, databasePath: string, bot?: IDiscordBot): Promise<Router> {
   const router = Router();
 
   // すべてのレスポンスにbasePathを追加するミドルウェア
@@ -30,7 +30,7 @@ export function createRoutes(adminService: IAdminService, securityService: ISecu
   router.use('/tables', createTableRoutes(adminService, securityService));
   
   // TODO管理
-  router.use('/todos', createTodoRouter(databasePath));
+  router.use('/todos', await createTodoRouter(databasePath));
 
   // タイムゾーンAPI（Cookieベース）
   router.use('/', createTimezoneRouter());

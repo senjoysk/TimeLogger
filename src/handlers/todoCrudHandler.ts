@@ -8,7 +8,7 @@ import { Message, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } f
 import { ITodoRepository } from '../repositories/interfaces';
 import { CreateTodoRequest, Todo, TodoCommandType } from '../types/todo';
 import { logger } from '../utils/logger';
-import { createTodoListEmbed, createPaginatedEmbed, createTodoActionButtons } from '../components/classificationResultEmbed';
+import { createTodoListEmbed, createPaginatedEmbed, createTodoActionButtons, createTodoNumberButtons } from '../components/classificationResultEmbed';
 import { ActivityLogError } from '../types/activityLog';
 
 /**
@@ -142,16 +142,9 @@ export class TodoCrudHandler implements ITodoCrudHandler {
       components.push(this.createPaginationButtons(page, totalPages));
     }
     
-    // TODO操作ボタンを作成（Discord制限: 最大5行まで）
-    // ページネーションがある場合は4つまで、ない場合は5つまで
-    const hasPagination = activeTodos.length > 10;
-    const maxTodos = Math.min(pageTodos.length, hasPagination ? 4 : 5);
-    
-    for (let i = 0; i < maxTodos; i++) {
-      const todo = pageTodos[i];
-      const actionRow = createTodoActionButtons(todo.id, todo.status, startIndex + i);
-      components.push(actionRow);
-    }
+    // 番号ボタンを作成（1-10）
+    const numberButtons = createTodoNumberButtons(pageTodos.length);
+    components.push(...numberButtons);
 
     await message.reply({
       embeds: [embed],

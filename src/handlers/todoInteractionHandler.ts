@@ -38,6 +38,14 @@ export interface ITodoInteractionHandler {
    * ページネーション用のボタンを生成
    */
   createPaginationButtons(currentPage: number, totalPages: number): ActionRowBuilder<ButtonBuilder>;
+  
+  /**
+   * TODO番号ボタンを処理
+   */
+  handleTodoNumberButton(
+    interaction: ButtonInteraction,
+    userId: string
+  ): Promise<void>;
 }
 
 /**
@@ -134,14 +142,10 @@ export class TodoInteractionHandler implements ITodoInteractionHandler {
     // ページネーションボタン
     components.push(this.createPaginationButtons(newPage, totalPages));
     
-    // TODO操作ボタン（ページネーションがあるので最大4個）
-    const maxTodos = Math.min(pageTodos.length, 4);
-    
-    for (let i = 0; i < maxTodos; i++) {
-      const todo = pageTodos[i];
-      const actionRow = createTodoActionButtons(todo.id, todo.status, startIndex + i);
-      components.push(actionRow);
-    }
+    // 番号ボタンを作成（1-10）
+    const { createTodoNumberButtons } = await import('../components/classificationResultEmbed');
+    const numberButtons = createTodoNumberButtons(pageTodos.length);
+    components.push(...numberButtons);
 
     // インタラクションを更新
     await interaction.update({
@@ -186,6 +190,123 @@ export class TodoInteractionHandler implements ITodoInteractionHandler {
     return buttonRow;
   }
 
+
+  /**
+   * TODO番号ボタンを処理
+   */
+  async handleTodoNumberButton(
+    interaction: ButtonInteraction,
+    userId: string
+  ): Promise<void> {
+    // カスタムIDから番号を取得
+    const numberMatch = interaction.customId.match(/todo_number_(\d+)/);
+    if (!numberMatch) {
+      await interaction.reply({ 
+        content: '❌ 無効なボタン操作です。', 
+        ephemeral: true 
+      });
+      return;
+    }
+
+    const todoNumber = parseInt(numberMatch[1], 10);
+    
+    // アクティブなTODO一覧を取得
+    const activeTodos = await this.todoRepository.getTodosByStatusOptimized(userId, ['pending', 'in_progress']);
+    
+    // 指定番号のTODOが存在するか確認
+    if (todoNumber < 1 || todoNumber > activeTodos.length) {
+      await interaction.reply({ 
+        content: '❌ 指定されたTODOが見つかりません。', 
+        ephemeral: true 
+      });
+      return;
+    }
+
+    // 指定番号のTODOを取得（配列は0ベースなので-1）
+    const todo = activeTodos[todoNumber - 1];
+    
+    // TODO詳細のEmbedを作成
+    const embed = new EmbedBuilder()
+      .setTitle(`📋 TODO詳細 #${todoNumber}`)
+      .setColor(0x0099ff)
+      .setTimestamp()
+      .addFields(
+        { 
+          name: '📝 内容', 
+          value: todo.content, 
+          inline: false 
+        },
+        { 
+          name: '📊 ステータス', 
+          value: this.getStatusDisplay(todo.status), 
+          inline: true 
+        },
+        { 
+          name: '🎯 優先度', 
+          value: this.getPriorityDisplay(todo.priority), 
+          inline: true 
+        }
+      );
+
+    // 期日がある場合は追加
+    if (todo.dueDate) {
+      embed.addFields({ 
+        name: '📅 期日', 
+        value: todo.dueDate, 
+        inline: true 
+      });
+    }
+
+    // 作成日時を追加
+    embed.addFields({ 
+      name: '🕐 作成日時', 
+      value: new Date(todo.createdAt).toLocaleString('ja-JP'), 
+      inline: false 
+    });
+
+    // 操作ボタンを作成
+    const actionRow = createTodoActionButtons(todo.id, todo.status);
+
+    await interaction.reply({
+      embeds: [embed],
+      components: [actionRow],
+      ephemeral: true
+    });
+  }
+
+  /**
+   * ステータスの表示文字列を取得
+   */
+  private getStatusDisplay(status: string): string {
+    switch (status) {
+      case 'pending':
+        return '⏳ 待機中';
+      case 'in_progress':
+        return '🚀 進行中';
+      case 'completed':
+        return '✅ 完了';
+      case 'cancelled':
+        return '❌ キャンセル';
+      default:
+        return '❓ 不明';
+    }
+  }
+
+  /**
+   * 優先度の表示文字列を取得
+   */
+  private getPriorityDisplay(priority: number): string {
+    switch (priority) {
+      case 1:
+        return '🔴 高';
+      case 0:
+        return '🟡 普通';
+      case -1:
+        return '🟢 低';
+      default:
+        return '🟡 普通';
+    }
+  }
 
   /**
    * 完全IDまたは短縮IDでTODOを検索

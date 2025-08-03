@@ -235,6 +235,16 @@ describe('SummaryHandler', () => {
   });
 
   describe('活動ログ表示形式', () => {
+    beforeEach(() => {
+      // 現在時刻をモック（2025-06-30 15:30 JST = 06:30 UTC）
+      jest.useFakeTimers();
+      jest.setSystemTime(new Date('2025-06-30T06:30:00.000Z'));
+    });
+
+    afterEach(() => {
+      jest.useRealTimers();
+    });
+
     test('AI分析済みログが "starttime - endtime : 活動内容" 形式で表示される', async () => {
       const mockMessage = new MockMessage('!summary');
       

@@ -5,6 +5,7 @@ import { DynamicReportScheduler } from './services/dynamicReportScheduler';
 import { TimezoneChangeMonitor } from './services/timezoneChangeMonitor';
 import { IntegratedServer } from './server';
 import { logger } from './utils/logger';
+import { DATABASE_PATHS } from './database/simplePathConfig';
 
 /**
  * アプリケーションのメインエントリーポイント
@@ -46,7 +47,7 @@ class Application {
       // 統合HTTPサーバーの起動（Admin Web App + Health Check）
       if (process.env.ADMIN_USERNAME && process.env.ADMIN_PASSWORD) {
         logger.info('APP', '統合HTTPサーバーを起動中...');
-        const databasePath = process.env.DATABASE_PATH || './data/app.db';
+        const databasePath = process.env.DATABASE_PATH || DATABASE_PATHS.getMainDatabasePath();
         this.integratedServer = new IntegratedServer(databasePath, this.bot as unknown as import('./interfaces/dependencies').IDiscordBot);
         await this.integratedServer.start();
       } else {
@@ -60,10 +61,15 @@ class Application {
         logger.error('APP', 'リポジトリが取得できないため、スケジューラーの初期化をスキップします');
         return;
       }
-      // スケジューラーと動的コンポーネントを初期化
-      this.dynamicScheduler = new DynamicReportScheduler(repository);
-      this.timezoneMonitor = new TimezoneChangeMonitor(repository, this.dynamicScheduler);
-      this.scheduler = new EnhancedScheduler(this.bot, repository);
+      
+      // SharedRepositoryManagerから同じインスタンスを取得
+      const { SharedRepositoryManager } = await import('./repositories/SharedRepositoryManager');
+      const sharedRepo = await SharedRepositoryManager.getInstance().getRepository(DATABASE_PATHS.getMainDatabasePath());
+      
+      // スケジューラーと動的コンポーネントを初期化（SharedRepositoryManagerのインスタンスを使用）
+      this.dynamicScheduler = new DynamicReportScheduler(sharedRepo);
+      this.timezoneMonitor = new TimezoneChangeMonitor(sharedRepo, this.dynamicScheduler);
+      this.scheduler = new EnhancedScheduler(this.bot, sharedRepo);
       
       // EnhancedSchedulerに動的コンポーネントを統合
       if (this.scheduler) {

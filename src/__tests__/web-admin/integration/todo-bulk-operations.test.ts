@@ -57,8 +57,9 @@ describe('TODO一括操作の統合テスト', () => {
       }
     });
     
-    // TODOルーターをマウント
-    app.use('/todos', createTodoRouter(testDbPath));
+    // TODOルーターをマウント（非同期）
+    const todoRouter = await createTodoRouter(testDbPath);
+    app.use('/todos', todoRouter);
   });
 
   afterAll(async () => {

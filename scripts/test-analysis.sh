@@ -10,9 +10,12 @@ echo "🧪 テスト実行と失敗分析を開始..."
 # テスト結果保存用ディレクトリ作成
 mkdir -p test-reports
 
-# テスト実行して結果を保存
+# テスト実行して結果を保存（失敗してもスクリプトを継続）
 echo "📊 テスト実行中..."
+set +e  # テスト失敗時もスクリプトを継続
 npm test > test-reports/test-results.txt 2>&1
+TEST_EXIT_CODE=$?
+set -e  # エラーチェックを再開
 
 # 成功/失敗の統計を表示
 echo "=== テスト統計 ==="
@@ -44,10 +47,10 @@ if grep -q "FAIL " test-reports/test-results.txt; then
     echo "  - test-reports/test-failures.txt (失敗詳細)"
     echo "  - test-reports/test-summary.txt (失敗サマリー)"
     
-    exit 1
+    exit $TEST_EXIT_CODE
 else
     echo "✅ 全テスト成功！"
     # 成功時も統計を保存
     grep "Test Suites:" test-reports/test-results.txt > test-reports/test-success.txt
-    exit 0
+    exit $TEST_EXIT_CODE
 fi

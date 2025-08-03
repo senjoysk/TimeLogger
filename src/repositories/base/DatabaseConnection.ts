@@ -59,8 +59,26 @@ export class DatabaseConnection {
     this.db = new Database(this.databasePath);
     this.migrationManager = new MigrationManager(this.db, this.databasePath);
 
+    // SQLite最適化設定
+    // WALモードを有効化（同時アクセスのパフォーマンス向上）
+    await this.run('PRAGMA journal_mode = WAL');
+    
+    // 同期モードをNORMALに設定（パフォーマンスと安全性のバランス）
+    await this.run('PRAGMA synchronous = NORMAL');
+    
+    // キャッシュサイズを設定（20MB）
+    await this.run('PRAGMA cache_size = -20000');
+    
+    // ロックタイムアウトを設定（10秒）
+    await this.run('PRAGMA busy_timeout = 10000');
+    
     // 外部キー制約を有効化
     await this.run('PRAGMA foreign_keys = ON');
+    
+    logger.info('DATABASE', 'SQLite最適化設定を適用しました', {
+      databasePath: this.databasePath,
+      settings: ['WALモード', '同期モード: NORMAL', 'キャッシュ: 20MB', 'タイムアウト: 10秒']
+    });
 
     // スキーマ初期化とマイグレーション実行
     const initializer = new DatabaseInitializer(this.db, undefined, this.migrationManager);

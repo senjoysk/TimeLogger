@@ -9,12 +9,15 @@ import path from 'path';
 import { AdminServer } from './web-admin/server';
 import { IDiscordBot } from './interfaces/dependencies';
 import { logger } from './utils/logger';
+import { SharedRepositoryManager } from './repositories/SharedRepositoryManager';
+import { IUnifiedRepository } from './repositories/interfaces';
 
 export class IntegratedServer {
   private app: express.Application;
   private port: number;
   private adminServer: AdminServer;
   private databasePath: string;
+  private sharedRepository: IUnifiedRepository | null = null;
 
   constructor(databasePath: string, private bot?: IDiscordBot) {
     this.port = parseInt(process.env.PORT || '3000');
@@ -25,7 +28,6 @@ export class IntegratedServer {
     this.adminServer = new AdminServer(databasePath, 3001, bot);
     
     this.setupMiddleware();
-    this.setupRoutes();
   }
 
   private setupMiddleware(): void {
@@ -44,7 +46,10 @@ export class IntegratedServer {
     });
   }
 
-  private setupRoutes(): void {
+  private async setupRoutes(): Promise<void> {
+    // Adminサーバーの初期化を待機
+    await this.adminServer.initializeDatabase();
+    
     // ヘルスチェック（認証不要）
     this.app.get('/health', (req, res) => {
       res.json({
@@ -99,6 +104,10 @@ export class IntegratedServer {
     // basePathを設定してからマウント
     const adminApp = this.adminServer.getExpressApp();
     adminApp.locals.basePath = '/admin';
+    // databasePathも親アプリケーションに設定
+    this.app.set('databasePath', this.databasePath);
+    // 子アプリケーションにもdatabasePathを設定
+    adminApp.set('databasePath', this.databasePath);
     this.app.use('/admin', adminAuth, adminApp);
 
     // 404ハンドラー
@@ -108,8 +117,14 @@ export class IntegratedServer {
   }
 
   public async initialize(): Promise<void> {
-    // Admin serverのDB初期化
-    await this.adminServer.initializeDatabase();
+    // 共有リポジトリマネージャーを使用してDB初期化
+    const repoManager = SharedRepositoryManager.getInstance();
+    this.sharedRepository = await repoManager.getRepository(this.databasePath);
+    logger.info('INTEGRATED_SERVER', '✅ 共有リポジトリ初期化完了');
+    
+    // ルーティング設定（Adminサーバー初期化含む）
+    await this.setupRoutes();
+    logger.info('INTEGRATED_SERVER', '✅ ルーティング設定完了');
   }
 
   public async start(): Promise<void> {
