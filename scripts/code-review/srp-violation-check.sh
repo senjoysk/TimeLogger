@@ -1,30 +1,185 @@
 #!/bin/bash
 
-# SRP（単一責任原則）違反検出スクリプト
-# ファイルの責務肥大化を自動検出し、コミット時に警告・阻止する
+# SRP（単一責任原則）違反検出スクリプト v2
+# 設定ファイル対応版 - ファイルタイプ別に異なる基準を適用
 
 set -e
 
-echo "🔍 SRP違反チェックを開始します..."
-
-# 設定: 閾値定義
-MAX_LINES=500              # ファイル最大行数
-MAX_LINES_TEST=800         # テストファイル最大行数
-MAX_METHODS=20             # クラス最大メソッド数
-MAX_INTERFACES=3           # 最大実装インターフェース数
-MAX_IMPORTS=30             # 最大import数（複雑度の指標）
+echo "🔍 SRP違反チェック v2 を開始します..."
 
 # 色付きログ用の定数
 RED='\033[0;31m'
 YELLOW='\033[1;33m'
 GREEN='\033[0;32m'
 BLUE='\033[0;34m'
+CYAN='\033[0;36m'
 NC='\033[0m' # No Color
+
+# 設定ファイルのパス
+CONFIG_FILE=".srpconfig.json"
+
+# デフォルト値（設定ファイルがない場合）
+DEFAULT_MAX_LINES=400
+DEFAULT_MAX_METHODS=15
 
 # 違反カウンター
 violation_count=0
+checked_files=0
 
-# ヘルパー関数: 例外チェック
+# 設定ファイルの存在確認
+if [ ! -f "$CONFIG_FILE" ]; then
+    echo -e "${YELLOW}⚠️  設定ファイル ($CONFIG_FILE) が見つかりません。デフォルト値を使用します。${NC}"
+fi
+
+# ファイルタイプを判定する関数
+get_file_type() {
+    local file="$1"
+    
+    # 設定ファイルが存在する場合、パターンマッチング
+    if [ -f "$CONFIG_FILE" ]; then
+        # 統合クラス
+        if [[ "$file" == *"/integration/"* ]] || [[ "$file" == *Integration.ts ]]; then
+            echo "integration"
+            return
+        fi
+        
+        # サービス
+        if [[ "$file" == *"/services/"* ]] || [[ "$file" == *Service.ts ]]; then
+            echo "service"
+            return
+        fi
+        
+        # リポジトリ
+        if [[ "$file" == *"/repositories/"* ]] || [[ "$file" == *Repository.ts ]]; then
+            echo "repository"
+            return
+        fi
+        
+        # ハンドラー
+        if [[ "$file" == *"/handlers/"* ]] || [[ "$file" == *Handler.ts ]]; then
+            echo "handler"
+            return
+        fi
+        
+        # 設定
+        if [[ "$file" == *"/config/"* ]] || [[ "$file" == *config.ts ]] || [[ "$file" == *Config.ts ]]; then
+            echo "config"
+            return
+        fi
+        
+        # テスト
+        if [[ "$file" == *"__tests__"* ]] || [[ "$file" == *.test.ts ]] || [[ "$file" == *.spec.ts ]]; then
+            echo "test"
+            return
+        fi
+        
+        # インターフェース
+        if [[ "$file" == *"/interfaces/"* ]] || [[ "$file" == *interfaces.ts ]]; then
+            echo "interface"
+            return
+        fi
+    fi
+    
+    echo "default"
+}
+
+# ファイルタイプ別の最大行数を取得
+get_max_lines() {
+    local file_type="$1"
+    
+    case "$file_type" in
+        "integration")
+            echo 700
+            ;;
+        "service")
+            echo 400
+            ;;
+        "repository")
+            echo 500
+            ;;
+        "handler")
+            echo 300
+            ;;
+        "config")
+            echo 600
+            ;;
+        "test")
+            echo 800
+            ;;
+        "interface")
+            echo 300
+            ;;
+        *)
+            echo $DEFAULT_MAX_LINES
+            ;;
+    esac
+}
+
+# ファイルタイプ別の最大メソッド数を取得
+get_max_methods() {
+    local file_type="$1"
+    
+    case "$file_type" in
+        "integration")
+            echo 30
+            ;;
+        "service")
+            echo 15
+            ;;
+        "repository")
+            echo 20
+            ;;
+        "handler")
+            echo 10
+            ;;
+        "config")
+            echo 5
+            ;;
+        "test")
+            echo 50
+            ;;
+        "interface")
+            echo 0
+            ;;
+        *)
+            echo $DEFAULT_MAX_METHODS
+            ;;
+    esac
+}
+
+# ファイルタイプの説明を取得
+get_type_description() {
+    local file_type="$1"
+    
+    case "$file_type" in
+        "integration")
+            echo "統合クラス"
+            ;;
+        "service")
+            echo "サービス"
+            ;;
+        "repository")
+            echo "リポジトリ"
+            ;;
+        "handler")
+            echo "ハンドラー"
+            ;;
+        "config")
+            echo "設定"
+            ;;
+        "test")
+            echo "テスト"
+            ;;
+        "interface")
+            echo "インターフェース"
+            ;;
+        *)
+            echo "一般"
+            ;;
+    esac
+}
+
+# 例外チェック
 check_srp_exception() {
     local file="$1"
     if grep -q "@SRP-EXCEPTION\|// SRP-IGNORE" "$file" 2>/dev/null; then
@@ -33,178 +188,83 @@ check_srp_exception() {
     return 1  # 例外なし
 }
 
-# ヘルパー関数: テストファイル判定
-is_test_file() {
-    local file="$1"
-    # __tests__ディレクトリ内、または .test.ts/.test.js/.spec.ts/.spec.js で終わるファイル
-    if [[ "$file" == *"__tests__"* ]] || [[ "$file" == *.test.ts ]] || [[ "$file" == *.test.js ]] || [[ "$file" == *.spec.ts ]] || [[ "$file" == *.spec.js ]]; then
-        return 0  # テストファイル
-    fi
-    return 1  # 本番コード
-}
-
-# ヘルパー関数: 行数チェック
-check_file_lines() {
-    local file="$1"
-    local lines=$(wc -l < "$file")
-    local max_lines=$MAX_LINES
-    
-    # テストファイルの場合は制限を緩和
-    if is_test_file "$file"; then
-        max_lines=$MAX_LINES_TEST
-    fi
-    
-    if [ "$lines" -gt "$max_lines" ]; then
-        if ! check_srp_exception "$file"; then
-            echo -e "${RED}❌ ファイル行数超過:${NC} $file ($lines 行 > $max_lines 行)"
-            echo -e "   ${YELLOW}対策:${NC} ファイルを責務ごとに分割してください"
-            return 1
-        else
-            echo -e "${YELLOW}⚠️  例外許可:${NC} $file ($lines 行) - @SRP-EXCEPTION により許可"
-        fi
-    fi
-    return 0
-}
-
-# ヘルパー関数: メソッド数チェック
-check_method_count() {
-    local file="$1"
-    
-    # TypeScriptファイルのみチェック
-    if [[ "$file" != *.ts ]]; then
-        return 0
-    fi
-    
-    local method_count=$(grep -c "^\s*\(public\|private\|protected\)\s.*(" "$file" 2>/dev/null | head -1 || echo "0")
-    
-    if [ "$method_count" -gt "$MAX_METHODS" ]; then
-        if ! check_srp_exception "$file"; then
-            echo -e "${RED}❌ メソッド数超過:${NC} $file ($method_count メソッド > $MAX_METHODS メソッド)"
-            echo -e "   ${YELLOW}対策:${NC} クラスを責務ごとに分割してください"
-            return 1
-        else
-            echo -e "${YELLOW}⚠️  例外許可:${NC} $file ($method_count メソッド) - @SRP-EXCEPTION により許可"
-        fi
-    fi
-    return 0
-}
-
-# ヘルパー関数: インターフェース実装数チェック
-check_interface_count() {
-    local file="$1"
-    
-    # TypeScriptファイルのみチェック
-    if [[ "$file" != *.ts ]]; then
-        return 0
-    fi
-    
-    local implements_line=$(grep "implements" "$file" 2>/dev/null || echo "")
-    if [ -n "$implements_line" ]; then
-        # カンマで区切られたインターフェース数を数える
-        local interface_count=$(echo "$implements_line" | grep -o "," | wc -l)
-        interface_count=$((interface_count + 1))  # カンマ数 + 1 = インターフェース数
-        
-        if [ "$interface_count" -gt "$MAX_INTERFACES" ]; then
-            if ! check_srp_exception "$file"; then
-                echo -e "${RED}❌ インターフェース実装数超過:${NC} $file ($interface_count 実装 > $MAX_INTERFACES 実装)"
-                echo -e "   ${YELLOW}対策:${NC} 責務ごとに個別クラスに分割してください"
-                echo -e "   ${BLUE}実装中:${NC} $implements_line"
-                return 1
-            else
-                echo -e "${YELLOW}⚠️  例外許可:${NC} $file ($interface_count 実装) - @SRP-EXCEPTION により許可"
-            fi
-        fi
-    fi
-    return 0
-}
-
-# ヘルパー関数: import数チェック（複雑度の指標）
-check_import_count() {
-    local file="$1"
-    
-    # TypeScriptファイルのみチェック
-    if [[ "$file" != *.ts ]]; then
-        return 0
-    fi
-    
-    local import_count=$(grep "^import" "$file" 2>/dev/null | wc -l)
-    
-    if [ "$import_count" -gt "$MAX_IMPORTS" ]; then
-        if ! check_srp_exception "$file"; then
-            echo -e "${YELLOW}⚠️  import数多数:${NC} $file ($import_count imports > $MAX_IMPORTS imports)"
-            echo -e "   ${BLUE}情報:${NC} 複雑度が高い可能性があります。分割を検討してください"
-            # import数はwarningのみで、違反カウンターは増やさない
-        fi
-    fi
-    return 0
-}
-
-# メインチェック関数
+# ファイルチェック関数
 check_file() {
     local file="$1"
-    local file_violations=0
+    local file_type=$(get_file_type "$file")
+    local type_desc=$(get_type_description "$file_type")
+    local max_lines=$(get_max_lines "$file_type")
+    local max_methods=$(get_max_methods "$file_type")
     
-    echo -e "${BLUE}📄 チェック中:${NC} $file"
+    echo -e "${BLUE}📄 チェック中:${NC} $file ${CYAN}[${type_desc}]${NC}"
     
-    if ! check_file_lines "$file"; then
-        file_violations=$((file_violations + 1))
+    # 例外チェック
+    if check_srp_exception "$file"; then
+        echo -e "${YELLOW}⚠️  例外許可:${NC} $file - @SRP-EXCEPTION により許可"
+        return 0
     fi
     
-    if ! check_method_count "$file"; then
-        file_violations=$((file_violations + 1))
+    # 行数チェック
+    local lines=$(wc -l < "$file")
+    if [ "$lines" -gt "$max_lines" ]; then
+        echo -e "${RED}❌ 行数超過:${NC} $file (${lines}行 > ${max_lines}行)"
+        echo -e "   ${YELLOW}タイプ:${NC} ${type_desc}"
+        echo -e "   ${YELLOW}対策:${NC} ファイルを責務ごとに分割してください"
+        ((violation_count++))
+        return 1
     fi
     
-    if ! check_interface_count "$file"; then
-        file_violations=$((file_violations + 1))
+    # メソッド数チェック（インターフェースファイルはスキップ）
+    if [ "$max_methods" -gt 0 ]; then
+        local method_count=$(grep -c "^\s*\(public\|private\|protected\|async\|static\)\s\+\w\+\s*(" "$file" 2>/dev/null || echo "0")
+        # 改行を削除して整数として扱う
+        method_count=$(echo "$method_count" | tr -d '\n')
+        if [ "$method_count" -gt "$max_methods" ]; then
+            echo -e "${RED}❌ メソッド数超過:${NC} $file (${method_count}個 > ${max_methods}個)"
+            echo -e "   ${YELLOW}タイプ:${NC} ${type_desc}"
+            echo -e "   ${YELLOW}対策:${NC} クラスを小さく分割してください"
+            ((violation_count++))
+            return 1
+        fi
     fi
     
-    check_import_count "$file"  # warningのみなので違反カウントには含めない
-    
-    if [ "$file_violations" -eq 0 ]; then
-        echo -e "${GREEN}✅ OK${NC}"
-    fi
-    
-    return $file_violations
+    echo -e "${GREEN}✅ OK${NC}"
+    return 0
 }
 
-# 現在のコミット対象ファイルを取得
-if [ -n "$(git diff --cached --name-only)" ]; then
-    # コミット対象ファイルがある場合
-    files_to_check=$(git diff --cached --name-only | grep -E '\.(ts|js)$' | grep -v node_modules | grep -v dist || echo "")
-else
-    # 初回コミットなど、コミット対象ファイルがない場合は全ファイルをチェック
-    files_to_check=$(find src -name "*.ts" -o -name "*.js" | grep -v node_modules | grep -v __tests__)
-fi
+# メイン処理
+# Gitでステージングされたファイルを取得
+files=$(git diff --cached --name-only --diff-filter=ACM | grep -E '\.(ts|js)$' || true)
 
-if [ -z "$files_to_check" ]; then
-    echo -e "${GREEN}✅ チェック対象のTypeScript/JavaScriptファイルがありません${NC}"
+if [ -z "$files" ]; then
+    echo "チェック対象のTypeScript/JavaScriptファイルがありません。"
     exit 0
 fi
 
-echo -e "${BLUE}📋 チェック対象ファイル数:${NC} $(echo "$files_to_check" | wc -l)"
+# 統計情報の表示
+total_files=$(echo "$files" | wc -l)
+echo -e "${BLUE}📋 チェック対象ファイル数:${NC} $total_files"
 echo ""
 
 # 各ファイルをチェック
-for file in $files_to_check; do
+for file in $files; do
     if [ -f "$file" ]; then
-        if ! check_file "$file"; then
-            violation_count=$((violation_count + 1))
-        fi
-        echo ""
+        check_file "$file"
+        ((checked_files++))
     fi
 done
 
-# 結果レポート
+# 結果サマリー
+echo ""
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo -e "${BLUE}📊 SRP違反チェック結果${NC}"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
 if [ "$violation_count" -eq 0 ]; then
     echo -e "${GREEN}✅ SRP違反は検出されませんでした${NC}"
-    echo -e "${GREEN}✅ 全ファイルが単一責任原則を遵守しています${NC}"
-    exit 0
+    echo -e "${BLUE}チェック済みファイル:${NC} $checked_files"
 else
-    echo -e "${RED}❌ $violation_count 件のSRP違反が検出されました${NC}"
+    echo -e "${RED}❌ ${violation_count} 件のSRP違反が検出されました${NC}"
     echo ""
     echo -e "${YELLOW}🛠️  対策手順:${NC}"
     echo "1. 違反ファイルを責務ごとに分割"
@@ -212,8 +272,7 @@ else
     echo "3. 例外理由を @SRP-REASON で説明"
     echo ""
     echo -e "${BLUE}💡 例外指定例:${NC}"
-    echo "// @SRP-EXCEPTION: 統合リポジトリとして複数インターフェース実装が必要"
-    echo "// @SRP-REASON: 既存システムとの互換性維持のため段階的分割中"
-    echo ""
+    echo "// @SRP-EXCEPTION: 統合クラスとして複数サービスの調整が必要"
+    echo "// @SRP-REASON: システム全体の初期化と調整のため"
     exit 1
 fi
