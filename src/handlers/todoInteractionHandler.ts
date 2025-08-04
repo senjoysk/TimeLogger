@@ -121,6 +121,12 @@ export class TodoInteractionHandler implements ITodoInteractionHandler {
     // 新しいページのTODO一覧を取得
     const activeTodos = await this.todoRepository.getTodosByStatusOptimized(userId, ['pending', 'in_progress']);
     
+    // 優先度でソート（高優先度→普通→低の順）
+    activeTodos.sort((a, b) => {
+      // 優先度が高い（1）ものを先に、低い（-1）ものを後に
+      return b.priority - a.priority;
+    });
+    
     const pageSize = 10;
     const totalPages = Math.ceil(activeTodos.length / pageSize);
     const startIndex = (newPage - 1) * pageSize;
@@ -212,6 +218,12 @@ export class TodoInteractionHandler implements ITodoInteractionHandler {
     
     // アクティブなTODO一覧を取得
     const activeTodos = await this.todoRepository.getTodosByStatusOptimized(userId, ['pending', 'in_progress']);
+    
+    // 優先度でソート（高優先度→普通→低の順）
+    activeTodos.sort((a, b) => {
+      // 優先度が高い（1）ものを先に、低い（-1）ものを後に
+      return b.priority - a.priority;
+    });
     
     // 指定番号のTODOが存在するか確認
     if (todoNumber < 1 || todoNumber > activeTodos.length) {
