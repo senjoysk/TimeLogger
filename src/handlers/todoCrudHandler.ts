@@ -117,11 +117,17 @@ export class TodoCrudHandler implements ITodoCrudHandler {
     // パフォーマンス最適化: メモリ内フィルタリングをDB直接クエリに変更
     const activeTodos = await this.todoRepository.getTodosByStatusOptimized(userId, ['pending', 'in_progress']);
 
+    // デバッグ: ソート前の優先度を出力
+    logger.debug('HANDLER', `📋 TODO一覧（ソート前）: ${activeTodos.map(t => `[${t.priority}]`).join(', ')}`);
+
     // 優先度でソート（高優先度→普通→低の順）
     activeTodos.sort((a, b) => {
       // 優先度が高い（1）ものを先に、低い（-1）ものを後に
       return b.priority - a.priority;
     });
+
+    // デバッグ: ソート後の優先度を出力
+    logger.debug('HANDLER', `📋 TODO一覧（ソート後）: ${activeTodos.map(t => `[${t.priority}]`).join(', ')}`);
 
     const pageSize = 10;
     const totalPages = Math.ceil(activeTodos.length / pageSize);
