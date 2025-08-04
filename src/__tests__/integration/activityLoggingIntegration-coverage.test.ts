@@ -39,11 +39,12 @@ class ExtendedMockMessage {
 
 describe('ActivityLoggingIntegration Coverage Tests', () => {
   let integration: ActivityLoggingIntegration;
+  // プロセスIDとタイムスタンプでユニークなDBパスを生成
   let testDbPath: string;
 
   beforeAll(async () => {
-    // テスト用データベース設定
-    testDbPath = getTestDbPath(__filename);
+    // テスト用データベース設定（ユニークなパス）
+    testDbPath = getTestDbPath(`${__filename}-${process.pid}-${Date.now()}`);
     cleanupTestDatabase(testDbPath);
 
     const config = createDefaultConfig(testDbPath, 'test-api-key');

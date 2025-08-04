@@ -13,7 +13,7 @@ mkdir -p test-reports
 # テスト実行して結果を保存（失敗してもスクリプトを継続）
 echo "📊 テスト実行中..."
 set +e  # テスト失敗時もスクリプトを継続
-npm test > test-reports/test-results.txt 2>&1
+npm run test:stable > test-reports/test-results.txt 2>&1
 TEST_EXIT_CODE=$?
 set -e  # エラーチェックを再開
 

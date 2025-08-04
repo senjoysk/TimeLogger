@@ -117,7 +117,7 @@ if [ "$SKIP_TESTS" = false ]; then
     
     # テスト実行
     log_info "テスト実行中..."
-    if ! npm test; then
+    if ! npm run test:stable; then
         log_error "テストに失敗しました"
         exit 1
     fi

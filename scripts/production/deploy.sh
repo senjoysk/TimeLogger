@@ -139,9 +139,9 @@ if [ "$SKIP_TESTS" = false ] && [ "$DRY_RUN" = false ]; then
         exit 1
     fi
     
-    # テスト実行
+    # テスト実行（安定版を使用）
     log_info "テスト実行中..."
-    if ! npm test; then
+    if ! npm run test:stable; then
         log_error "テストに失敗しました"
         exit 1
     fi

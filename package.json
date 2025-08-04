@@ -13,7 +13,7 @@
     "dev:prod": "NODE_ENV=production ts-node src/index.ts",
     "watch": "NODE_ENV=development ts-node --watch src/index.ts",
     "test": "jest",
-    "test:stable": "jest --runInBand --forceExit",
+    "test:stable": "jest --runInBand --forceExit --silent",
     "test:fast": "TEST_PARALLEL=true jest --maxWorkers=4",
     "test:debug": "DEBUG=true jest --runInBand --detectOpenHandles",
     "test:analyze": "./scripts/test-analysis.sh",

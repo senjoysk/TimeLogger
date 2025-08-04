@@ -35,7 +35,8 @@ class MockMessage {
 
 describe('活動記録システム統合テスト', () => {
   let integration: ActivityLoggingIntegration;
-  const testDbPath = getTestDbPath(__filename);
+  // プロセスIDとタイムスタンプでユニークなDBパスを生成
+  const testDbPath = getTestDbPath(`${__filename}-${process.pid}-${Date.now()}`);
 
   beforeAll(async () => {
     // 環境変数を明示的に設定
