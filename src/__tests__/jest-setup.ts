@@ -1,10 +1,10 @@
 // Jest グローバルセットアップファイル
 // テスト実行前に必要な設定を行う
 
-import { initializeTestDatabase, closeAllPooledConnections } from './test-helper';
+import * as path from 'path';
+import * as fs from 'fs';
 
 // グローバルなconsoleモック設定（Test Suite失敗表示を防ぐため）
-// console.error/warnの実際の出力を防ぎ、代わりにjest.fnで記録
 const originalConsole = { ...console };
 global.console = {
   ...console,
@@ -29,20 +29,13 @@ process.env.DISCORD_TOKEN = 'test-discord-token';
 process.env.GEMINI_API_KEY = 'test-gemini-key';
 process.env.TARGET_USER_ID = 'test-user-123';
 
-// グローバルなデータベース初期化（1回だけ実行）
-let isDbInitialized = false;
-
-beforeAll(async () => {
-  if (!isDbInitialized) {
-    try {
-      await initializeTestDatabase();
-      isDbInitialized = true;
-      originalConsole.log('✅ 共有テストデータベースを初期化しました');
-    } catch (error) {
-      originalConsole.error('❌ データベース初期化エラー:', error);
-    }
-  }
-});
+// テストファイルごとの独立したデータベースパスを生成
+export function getTestDatabasePath(testName: string): string {
+  const timestamp = Date.now();
+  const random = Math.random().toString(36).substring(7);
+  const safeName = testName.replace(/[^a-zA-Z0-9]/g, '-').toLowerCase();
+  return path.join(__dirname, '../../test-data', `test-${safeName}-${timestamp}-${random}.db`);
+}
 
 // beforeEach/afterEachでモックをクリア
 beforeEach(() => {
@@ -50,25 +43,36 @@ beforeEach(() => {
   jest.clearAllMocks();
 });
 
-afterEach(() => {
+afterEach(async () => {
   // 各テスト後にもモックの呼び出し履歴をクリア
   jest.clearAllMocks();
-  // 全てのタイマーをクリア（リアルタイマーの場合も安全）
-  jest.clearAllTimers();
+  
+  // テストデータディレクトリのクリーンアップ
+  const testDataDir = path.join(__dirname, '../../test-data');
+  if (fs.existsSync(testDataDir)) {
+    try {
+      const files = fs.readdirSync(testDataDir);
+      for (const file of files) {
+        if (file.startsWith('test-') && file.includes(process.pid.toString())) {
+          const filePath = path.join(testDataDir, file);
+          try {
+            fs.unlinkSync(filePath);
+          } catch (error) {
+            // ファイル削除エラーは無視
+          }
+        }
+      }
+    } catch (error) {
+      // ディレクトリ読み取りエラーは無視
+    }
+  }
 });
 
 afterAll(async () => {
-  // プール接続をすべてクローズ
-  try {
-    await closeAllPooledConnections();
-  } catch (error) {
-    // エラーは無視
-  }
-  
-  // 少し待機（非同期処理の完了を待つ）
+  // 非同期処理のクリーンアップ
   await new Promise(resolve => setTimeout(resolve, 100));
   
-  // 全てのタイマーをクリア
+  // プロセス内のタイマーをクリア
   jest.clearAllTimers();
   
   // テスト完了後にSQLite WALファイルを削除
@@ -77,10 +81,6 @@ afterAll(async () => {
 
 // SQLite WALファイルのクリーンアップ関数
 async function cleanupTestDatabaseFiles(): Promise<void> {
-  const fs = require('fs').promises;
-  const path = require('path');
-  
-  // クリーンアップ対象ディレクトリ
   const cleanupDirs = [
     path.join(__dirname, '../../test-data'),
     path.join(__dirname, 'web-admin/integration')
@@ -90,18 +90,26 @@ async function cleanupTestDatabaseFiles(): Promise<void> {
   
   for (const targetDir of cleanupDirs) {
     try {
-      const files = await fs.readdir(targetDir);
+      const files = await fs.promises.readdir(targetDir);
       
-      // .db-shm と .db-wal ファイルを削除
+      // .db, .db-shm, .db-wal ファイルを削除
       const filesToDelete = files.filter((file: string) => 
-        file.endsWith('.db-shm') || file.endsWith('.db-wal')
+        file.startsWith('test-') && (
+          file.endsWith('.db') ||
+          file.endsWith('.db-shm') || 
+          file.endsWith('.db-wal')
+        )
       );
       
       for (const file of filesToDelete) {
         const filePath = path.join(targetDir, file);
-        await fs.unlink(filePath);
-        originalConsole.log(`✅ クリーンアップ: ${path.relative(__dirname, filePath)} を削除しました`);
-        totalDeletedFiles++;
+        try {
+          await fs.promises.unlink(filePath);
+          originalConsole.log(`✅ クリーンアップ: ${path.relative(__dirname, filePath)} を削除しました`);
+          totalDeletedFiles++;
+        } catch (error) {
+          // ファイル削除エラーは無視
+        }
       }
     } catch (error) {
       // ディレクトリが存在しない場合は無視
@@ -115,7 +123,7 @@ async function cleanupTestDatabaseFiles(): Promise<void> {
   if (totalDeletedFiles === 0) {
     originalConsole.log('✅ クリーンアップ: 削除対象のWALファイルはありませんでした');
   } else {
-    originalConsole.log(`✅ クリーンアップ完了: ${totalDeletedFiles}個のWALファイルを削除しました`);
+    originalConsole.log(`✅ クリーンアップ完了: ${totalDeletedFiles}個のファイルを削除しました`);
   }
 }
 
