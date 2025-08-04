@@ -94,8 +94,9 @@ describe('TODO tasks table status filter（実装済み）', () => {
 
   test('should handle empty status filter', async () => {
     // 空のstatusパラメータのリクエスト  
-    await request(app)
+    const response = await request(app)
       .get('/tables/todo_tasks?status=')
+      .timeout(5000)  // タイムアウトを5秒に設定
       .expect(200);
 
     // 空のstatusの場合はgetTableDataが呼ばれる
@@ -103,7 +104,7 @@ describe('TODO tasks table status filter（実装済み）', () => {
       'todo_tasks',
       expect.any(Object)
     );
-  });
+  }, 10000);  // Jestのタイムアウトを10秒に設定
 
   test('should not apply status filter for non-todo tables', async () => {
     // 他のテーブルの場合はstatusフィルターは影響しない

@@ -13,7 +13,7 @@ describe('AdminServer Integration Tests', () => {
   const testDbPath = getTestDbPath(__filename);
 
   beforeAll(async () => {
-    // テスト用の環境変数を設定
+    // テスト用の環境変数を設定（AdminServer初期化前に設定する必要がある）
     process.env.ADMIN_USERNAME = 'testuser';
     process.env.ADMIN_PASSWORD = 'testpass';
     process.env.NODE_ENV = 'test';
@@ -22,7 +22,7 @@ describe('AdminServer Integration Tests', () => {
     // テスト用データベースが存在する場合は削除
     cleanupTestDatabase(testDbPath);
     
-    // AdminServerを初期化
+    // AdminServerを初期化（環境変数設定後）
     adminServer = new AdminServer(testDbPath, 3002);
     
     // 【重要】データベースを明示的に初期化
