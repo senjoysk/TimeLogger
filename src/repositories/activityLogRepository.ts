@@ -12,7 +12,7 @@ import {
   DailyAnalysisResult,
   BusinessDateInfo
 } from '../types/activityLog';
-import { TimezoneChange, TimezoneNotification } from './interfaces';
+import { TimezoneChange } from './interfaces';
 
 /**
  * 活動ログ管理用Repositoryインターフェース
@@ -227,17 +227,6 @@ export interface IActivityLogRepository {
     timezone: string;
   }>>;
 
-  /**
-   * 未処理の通知を取得
-   * @returns 未処理通知配列
-   */
-  getUnprocessedNotifications(): Promise<TimezoneNotification[]>;
-
-  /**
-   * 通知を処理済みとしてマーク
-   * @param notificationId 通知ID
-   */
-  markNotificationAsProcessed(notificationId: string): Promise<void>;
 }
 
 /**

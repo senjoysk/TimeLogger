@@ -46,8 +46,6 @@ describe('TimezoneChangeMonitor', () => {
     // リポジトリのモック
     mockRepository = {
       getUserTimezoneChanges: jest.fn(),
-      getUnprocessedNotifications: jest.fn(),
-      markNotificationAsProcessed: jest.fn(),
       getUserTimezone: jest.fn(),
       saveUserTimezone: jest.fn(),
     };
@@ -177,96 +175,6 @@ describe('TimezoneChangeMonitor', () => {
     });
   });
 
-  describe('通知テーブル監視テスト', () => {
-    test('should process unprocessed notifications', async () => {
-      // 通知テーブル処理テスト
-
-      mockRepository.getUnprocessedNotifications.mockResolvedValue([
-        {
-          id: 'notif1',
-          user_id: 'user1',
-          old_timezone: 'Asia/Tokyo',
-          new_timezone: 'America/New_York',
-          changed_at: '2024-01-01T10:00:00.000Z',
-          processed: false
-        }
-      ]);
-
-      await monitor.startNotificationProcessor();
-      await new Promise(resolve => setTimeout(resolve, 100));
-
-      // スケジューラーに通知
-      expect(mockScheduler.onTimezoneChanged).toHaveBeenCalledWith(
-        'user1', 'Asia/Tokyo', 'America/New_York'
-      );
-
-      // 処理済みマーク
-      expect(mockRepository.markNotificationAsProcessed).toHaveBeenCalledWith('notif1');
-    });
-
-    test('should handle notification processing errors', async () => {
-      // 通知処理エラーハンドリングテスト
-
-      mockRepository.getUnprocessedNotifications.mockResolvedValue([
-        {
-          id: 'notif1',
-          user_id: 'user1',
-          old_timezone: 'Asia/Tokyo',
-          new_timezone: 'America/New_York',
-          changed_at: '2024-01-01T10:00:00.000Z',
-          processed: false
-        }
-      ]);
-
-      // スケジューラーでエラー発生
-      mockScheduler.onTimezoneChanged.mockRejectedValue(
-        new Error('Scheduler failed')
-      );
-
-      await monitor.startNotificationProcessor();
-      await new Promise(resolve => setTimeout(resolve, 100));
-
-      // エラーが発生しても処理済みマークはされない
-      expect(mockRepository.markNotificationAsProcessed).not.toHaveBeenCalled();
-
-      // エラーログが出力されることを確認
-      const { logger } = require('../../utils/logger');
-      expect(logger.error).toHaveBeenCalledWith(
-        'TIMEZONE_MONITOR',
-        '❌ Failed to process notification notif1:',
-        expect.any(Error)
-      );
-    });
-
-    test('should batch process multiple notifications', async () => {
-      // バッチ処理テスト
-
-      mockRepository.getUnprocessedNotifications.mockResolvedValue([
-        {
-          id: 'notif1',
-          user_id: 'user1',
-          old_timezone: 'Asia/Tokyo',
-          new_timezone: 'Europe/London',
-          changed_at: '2024-01-01T10:00:00.000Z',
-          processed: false
-        },
-        {
-          id: 'notif2', 
-          user_id: 'user2',
-          old_timezone: 'America/New_York',
-          new_timezone: 'Asia/Tokyo',
-          changed_at: '2024-01-01T10:01:00.000Z',
-          processed: false
-        }
-      ]);
-
-      await monitor.startNotificationProcessor();
-      await new Promise(resolve => setTimeout(resolve, 100));
-
-      expect(mockScheduler.onTimezoneChanged).toHaveBeenCalledTimes(2);
-      expect(mockRepository.markNotificationAsProcessed).toHaveBeenCalledTimes(2);
-    });
-  });
 
   describe('TimezoneCommandHandler統合テスト', () => {
     test('should handle timezone command integration', async () => {
@@ -335,17 +243,6 @@ describe('TimezoneChangeMonitor', () => {
       expect(monitor.isRunning()).toBe(false);
     });
 
-    test('should start and stop notification processor', async () => {
-      // 通知プロセッサー制御テスト
-
-      expect(monitor.isProcessorActive()).toBe(false);
-
-      await monitor.startNotificationProcessor();
-      expect(monitor.isProcessorActive()).toBe(true);
-
-      monitor.stopProcessor();
-      expect(monitor.isProcessorActive()).toBe(false);
-    });
 
     test('should configure polling interval', async () => {
       // ポーリング間隔設定テスト
@@ -370,7 +267,6 @@ describe('TimezoneChangeMonitor', () => {
       const status = monitor.getStatus();
       
       expect(status).toHaveProperty('isPollingRunning');
-      expect(status).toHaveProperty('isProcessorRunning');
       expect(status).toHaveProperty('lastCheckTime');
       expect(status).toHaveProperty('processedNotifications');
       expect(status).toHaveProperty('pollingInterval');
@@ -379,23 +275,8 @@ describe('TimezoneChangeMonitor', () => {
     test('should provide statistics', async () => {
       // 統計情報取得テスト
 
-      // いくつかの処理を実行
-      mockRepository.getUnprocessedNotifications.mockResolvedValue([
-        {
-          id: 'notif1',
-          user_id: 'user1',
-          old_timezone: 'Asia/Tokyo',
-          new_timezone: 'Europe/London',
-          changed_at: '2024-01-01T10:00:00.000Z',
-          processed: false
-        }
-      ]);
-
-      await monitor.startNotificationProcessor();
-      await new Promise(resolve => setTimeout(resolve, 100));
-
       const stats = monitor.getStatistics();
-      expect(stats.totalProcessedNotifications).toBe(1);
+      expect(stats.totalProcessedNotifications).toBe(0);
       expect(stats.totalErrors).toBe(0);
       expect(stats).toHaveProperty('uptime');
       expect(stats).toHaveProperty('lastActivity');
@@ -500,38 +381,6 @@ describe('TimezoneChangeMonitor', () => {
       expect(mockScheduler.onTimezoneChanged).not.toHaveBeenCalled();
     });
 
-    test('should handle missing repository methods gracefully', async () => {
-      // リポジトリのメソッドが不完全な場合のテスト
-      
-      // 一部のメソッドが存在しないリポジトリ
-      const incompleteRepository = {
-        getUserTimezoneChanges: jest.fn().mockResolvedValue([]),
-        // getUnprocessedNotifications: jest.fn(), // このメソッドを削除
-        // markNotificationAsProcessed: jest.fn(), // このメソッドを削除
-        getUserTimezone: jest.fn().mockResolvedValue('Asia/Tokyo'),
-        saveUserTimezone: jest.fn().mockResolvedValue(undefined)
-      } as any;
-      
-      monitor.setRepository(incompleteRepository);
-      
-      // startNotificationProcessorで getUnprocessedNotifications is not a function エラーが発生
-      await expect(async () => {
-        await monitor.startNotificationProcessor();
-      }).not.toThrow();
-      
-      // 短い間隔で処理を実行
-      await new Promise(resolve => setTimeout(resolve, 100));
-      
-      // エラーログが出力されることを確認
-      const { logger } = require('../../utils/logger');
-      expect(logger.error).toHaveBeenCalledWith(
-        'TIMEZONE_MONITOR',
-        '❌ getUnprocessedNotifications is not a function'
-      );
-      
-      // スケジューラーは呼ばれない
-      expect(mockScheduler.onTimezoneChanged).not.toHaveBeenCalled();
-    });
 
     test('should handle repository methods returning non-arrays', async () => {
       // リポジトリメソッドが配列以外を返す場合のテスト
@@ -550,9 +399,6 @@ describe('TimezoneChangeMonitor', () => {
       await expect(async () => {
         await monitor.startPollingMonitor();
       }).not.toThrow();
-      await expect(async () => {
-        await monitor.startNotificationProcessor();
-      }).not.toThrow();
       
       // 短い間隔で処理を実行
       await new Promise(resolve => setTimeout(resolve, 100));
@@ -562,10 +408,6 @@ describe('TimezoneChangeMonitor', () => {
       expect(logger.warn).toHaveBeenCalledWith(
         'TIMEZONE_MONITOR',
         '⚠️ getUserTimezoneChanges returned invalid data, skipping'
-      );
-      expect(logger.warn).toHaveBeenCalledWith(
-        'TIMEZONE_MONITOR',
-        '⚠️ getUnprocessedNotifications returned invalid data, skipping'
       );
     });
   });

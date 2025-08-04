@@ -15,7 +15,7 @@ import { SqliteTodoRepository } from './specialized/SqliteTodoRepository';
 import { SqliteMessageClassificationRepository } from './specialized/SqliteMessageClassificationRepository';
 import { SqliteUserRepository } from './specialized/SqliteUserRepository';
 import { SqliteActivityPromptRepository } from './specialized/SqliteActivityPromptRepository';
-import { IUnifiedRepository, UserStats, UserTimezone, TimezoneChange, TimezoneNotification } from './interfaces';
+import { IUnifiedRepository, UserStats, UserTimezone, TimezoneChange } from './interfaces';
 import { 
   CreateTodoRequest, UpdateTodoRequest, Todo, TodoPriority, TodoStatus, GetTodosOptions,
   MessageClassification, MessageClassificationHistory
@@ -181,13 +181,6 @@ export class PartialCompositeRepository implements IUnifiedRepository {
     return this.activityLogRepo.getAllUserTimezonesForScheduler();
   }
 
-  async getUnprocessedNotifications(): Promise<TimezoneNotification[]> {
-    return this.activityLogRepo.getUnprocessedNotifications();
-  }
-
-  async markNotificationAsProcessed(notificationId: string): Promise<void> {
-    return this.activityLogRepo.markNotificationAsProcessed(notificationId);
-  }
 
   async getBusinessDateInfo(userId: string, timezone: string): Promise<BusinessDateInfo> {
     return this.activityLogRepo.getBusinessDateInfo(userId, timezone);

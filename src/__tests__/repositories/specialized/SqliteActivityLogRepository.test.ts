@@ -282,11 +282,7 @@ describe('SqliteActivityLogRepository専用テスト', () => {
       expect(testUser!.timezone).toBe('America/New_York');
     });
 
-    test('未処理通知と処理済みマークが正しく動作する', async () => {
-      // 未処理通知の取得をテスト
-      const notifications = await repository.getUnprocessedNotifications();
-      expect(Array.isArray(notifications)).toBe(true);
-
+    test('タイムゾーン変更履歴が正しく取得できる', async () => {
       // タイムゾーン変更履歴の取得をテスト
       const changes = await repository.getUserTimezoneChanges();
       expect(Array.isArray(changes)).toBe(true);

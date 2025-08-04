@@ -40,8 +40,7 @@ export class AdminRepository implements IAdminRepository {
       'user_settings',
       'daily_analysis_cache',
       'todo_tasks',
-      'message_classifications',
-      'timezone_change_notifications'
+      'message_classifications'
     ];
   }
 

@@ -32,7 +32,6 @@ interface ComprehensiveStatus {
   };
   timezoneMonitoring: {
     isRunning: boolean;
-    isProcessorRunning: boolean;
   };
 }
 
@@ -280,8 +279,7 @@ export class EnhancedScheduler extends Scheduler {
         isRunning: this.componentHealth.dynamicScheduler === 'healthy'
       },
       timezoneMonitoring: {
-        isRunning: this.timezoneMonitor?.isRunning() || false,
-        isProcessorRunning: this.timezoneMonitor?.isProcessorActive() || false
+        isRunning: this.timezoneMonitor?.isRunning() || false
       }
     };
   }
