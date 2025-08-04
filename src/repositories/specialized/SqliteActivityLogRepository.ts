@@ -432,64 +432,7 @@ export class SqliteActivityLogRepository implements IActivityLogRepository {
   // 不足しているIActivityLogRepositoryメソッド
   // =============================================================================
 
-  /**
-   * 指定ログを物理削除（管理者用）
-   */
-  async permanentDeleteLog(logId: string): Promise<boolean> {
-    return new Promise((resolve, reject) => {
-      const db = this.db.getDatabase();
-      
-      const sql = 'DELETE FROM activity_logs WHERE id = ?';
 
-      db.run(sql, [logId], function(err) {
-        if (err) {
-          reject(new AppError(`ログ物理削除エラー: ${err.message}`, ErrorType.DATABASE, { error: err }));
-          return;
-        }
-
-        resolve((this as any).changes > 0); // ALLOW_ANY: sqlite3のRunResultのchangesプロパティアクセスのため
-      });
-    });
-  }
-
-  /**
-   * 削除済みログを復元
-   */
-  async restoreLog(logId: string): Promise<ActivityLog> {
-    return new Promise((resolve, reject) => {
-      const db = this.db.getDatabase();
-      
-      // まず削除済みログを取得
-      const selectSql = 'SELECT * FROM activity_logs WHERE id = ? AND is_deleted = TRUE';
-      db.get(selectSql, [logId], (selectErr: Error | null, row: Record<string, unknown>) => {
-        if (selectErr) {
-          reject(new AppError(`復元前ログ取得エラー: ${selectErr.message}`, ErrorType.DATABASE, { error: selectErr }));
-          return;
-        }
-
-        if (!row) {
-          reject(new AppError(`復元対象ログが見つかりません: ${logId}`, ErrorType.DATABASE, { logId }));
-          return;
-        }
-
-        const now = new Date().toISOString();
-        const sql = 'UPDATE activity_logs SET is_deleted = FALSE, updated_at = ? WHERE id = ?';
-
-        db.run(sql, [now, logId], (err: Error | null) => {
-          if (err) {
-            reject(new AppError(`ログ復元エラー: ${err.message}`, ErrorType.DATABASE, { error: err }));
-            return;
-          }
-
-          // 復元されたログを返す
-          const restoredLog = this.mapRowToActivityLog(row);
-          restoredLog.isDeleted = false;
-          restoredLog.updatedAt = now;
-          resolve(restoredLog);
-        });
-      });
-    });
-  }
 
   /**
    * 分析結果キャッシュを更新

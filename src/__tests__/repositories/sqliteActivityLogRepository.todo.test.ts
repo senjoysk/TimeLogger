@@ -47,7 +47,7 @@ describe('PartialCompositeRepository TODO機能', () => {
           '2100-12-31'
         );
         for (const log of logs) {
-          await repository.permanentDeleteLog(log.id);
+          await repository.deleteLog(log.id);
         }
         
         // 全TODOを削除

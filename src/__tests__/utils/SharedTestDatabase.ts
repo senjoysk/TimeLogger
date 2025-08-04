@@ -103,7 +103,7 @@ export class SharedTestDatabase {
           '2100-12-31'
         );
         for (const log of logs) {
-          await this.repository.permanentDeleteLog(log.id);
+          await this.repository.deleteLog(log.id);
         }
       }
       

@@ -128,13 +128,6 @@ export class PartialCompositeRepository implements IUnifiedRepository {
   }
 
   // 不足しているIActivityLogRepositoryメソッド
-  async permanentDeleteLog(logId: string): Promise<boolean> {
-    return this.activityLogRepo.permanentDeleteLog(logId);
-  }
-
-  async restoreLog(logId: string): Promise<ActivityLog> {
-    return this.activityLogRepo.restoreLog(logId);
-  }
 
   async updateAnalysisCache(userId: string, businessDate: string, analysisResult: DailyAnalysisResult, logCount: number): Promise<AnalysisCache> {
     return this.activityLogRepo.updateAnalysisCache(userId, businessDate, analysisResult, logCount);

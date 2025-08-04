@@ -89,6 +89,9 @@ Desktop.ini
 # Claude設定（ユーザー固有）
 .claude/
 
+# Serenaキャッシュ
+.serena/cache/
+
 # 環境固有の設定
 .env.staging
 
