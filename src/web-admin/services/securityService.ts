@@ -1,6 +1,6 @@
 /**
  * SecurityService実装
- * TDD Green Phase: テストを通す最小実装
+ * セキュリティ管理サービス
  */
 
 import { AdminEnvironment, AdminSecurityError } from '../types/admin';

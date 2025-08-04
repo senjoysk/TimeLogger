@@ -203,7 +203,7 @@ export class ActivityLoggingIntegration {
       
       this.messageSelectionHandler = new MessageSelectionHandler();
       
-      // 🟢 Green Phase: MessageSelectionHandlerに依存性注入
+      // MessageSelectionHandlerに依存性注入
       this.messageSelectionHandler.setTodoRepository(this.repository);
       this.messageSelectionHandler.setActivityLogService(this.activityLogService);
       this.messageSelectionHandler.setMemoRepository(this.memoRepository);
@@ -414,7 +414,7 @@ export class ActivityLoggingIntegration {
       if (content.length > 0 && content.length <= 2000) {
         logger.info('ACTIVITY_LOG', `🤖 メッセージ分類処理開始: ${userId}`);
         
-        // 🟢 Green Phase: AI分類をMessageSelectionHandlerに置き換え
+        // AI分類をMessageSelectionHandlerに置き換え
         await this.messageSelectionHandler.processNonCommandMessage(message, userId, timezone);
         
         logger.info('ACTIVITY_LOG', `✅ メッセージ分類処理完了: ${userId}`);
@@ -536,7 +536,7 @@ export class ActivityLoggingIntegration {
       
       logger.info('ACTIVITY_LOG', `🔘 ボタンインタラクション処理: ${userId} - ${interaction.customId}`);
       
-      // 🟢 Green Phase: MessageSelectionのボタンかTODOボタンかを判定
+      // MessageSelectionのボタンかTODOボタンかを判定
       if (interaction.customId.startsWith('select_')) {
         // MessageSelectionHandlerに委譲
         await this.messageSelectionHandler.handleButtonInteraction(interaction, userId, timezone);

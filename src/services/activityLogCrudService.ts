@@ -1,6 +1,6 @@
 /**
- * 🟢 Green Phase: ActivityLogCrudService
- * 基本CRUD操作専門サービス - 最小限の実装でテストを通す
+ * ActivityLogCrudService
+ * 基本CRUD操作専門サービス
  */
 
 import { v4 as uuidv4 } from 'uuid';

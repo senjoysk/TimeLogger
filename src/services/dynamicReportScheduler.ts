@@ -1,8 +1,6 @@
 /**
  * DynamicReportScheduler - 動的cronスケジューラーサービス
  * 
- * 🟢 Green Phase: テストを通すための最小限実装
- * 
  * 機能:
  * - ユーザーのタイムゾーン変更時の動的cron作成/削除
  * - UTC時刻ベースでの効率的なジョブ管理

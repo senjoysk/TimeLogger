@@ -39,7 +39,7 @@ export class MessageSelectionHandler {
   }
 
   async showSelectionUI(message: Message, userId: string, content: string) {
-    // 🟢 Green Phase: メッセージ内容を保存
+    // メッセージ内容を保存
     this.storedMessages.set(userId, content);
     
     // テストを通すための最小限の実装：Embedとボタンを作成
@@ -79,7 +79,7 @@ export class MessageSelectionHandler {
 
   async handleButtonInteraction(interaction: ButtonInteraction, userId: string, timezone: string) {
     try {
-      // 🟢 Green Phase: 実際の処理統合（エラーハンドリング強化）
+      // 実際の処理統合
       const messageContent = this.storedMessages.get(userId);
       logger.debug('MESSAGE_SELECT', `🔘 MessageSelection処理開始: ${userId}, customId: ${interaction.customId}, messageContent: "${messageContent}"`);
       
@@ -254,12 +254,12 @@ export class MessageSelectionHandler {
   }
 
   getStoredMessage(userId: string): string | undefined {
-    // 🟢 Green Phase: 保存されたメッセージ内容を取得
+    // 保存されたメッセージ内容を取得
     return this.storedMessages.get(userId);
   }
 
   async processNonCommandMessage(message: Message, userId: string, timezone: string): Promise<boolean> {
-    // 🟢 Green Phase: ActivityLoggingIntegration統合メソッド
+    // ActivityLoggingIntegration統合メソッド
     // AI分類の代わりにユーザー選択UIを表示
     try {
       await this.showSelectionUI(message, userId, message.content);

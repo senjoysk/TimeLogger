@@ -1,6 +1,6 @@
 /**
  * AdminService実装
- * TDD Green Phase: テストを通す最小実装
+ * 管理機能サービス
  */
 
 import { IAdminService, IAdminRepository } from '../interfaces/adminInterfaces';

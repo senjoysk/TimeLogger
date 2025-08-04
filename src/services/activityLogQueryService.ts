@@ -1,6 +1,6 @@
 /**
- * 🟢 Green Phase: ActivityLogQueryService
- * データ取得・検索専門サービス - 最小限の実装でテストを通す
+ * ActivityLogQueryService
+ * データ取得・検索専門サービス
  */
 
 import { format } from 'date-fns-tz';
