@@ -4,6 +4,7 @@
  */
 
 import { TimeProviderService } from '../services/timeProviderService';
+import { TimeProviderFactory } from '../services/timeProviderFactory';
 import { TimeSimulationService } from '../web-admin/services/timeSimulationService';
 import { TimezoneHandler } from '../handlers/timezoneHandler';
 import { MockTimeProvider, RealTimeProvider } from '../factories';
@@ -14,9 +15,9 @@ describe('Time Simulation Integration Tests', () => {
   let timeSimulationService: TimeSimulationService;
 
   beforeEach(() => {
-    // 各テストでシングルトンをリセット
-    (TimeProviderService as any).resetForTesting();
-    timeProviderService = TimeProviderService.getInstance();
+    // 各テストでグローバルインスタンスをリセット
+    TimeProviderFactory.resetGlobalInstance();
+    timeProviderService = TimeProviderFactory.getGlobalInstance();
     // TimeSimulationServiceのコンストラクタは後で必要な時に呼ぶ
   });
 
@@ -25,10 +26,10 @@ describe('Time Simulation Integration Tests', () => {
     timeProviderService.disableSimulationMode();
   });
 
-  describe('TimeProviderService Singleton', () => {
-    test('シングルトンインスタンスが正しく動作する', () => {
-      const instance1 = TimeProviderService.getInstance();
-      const instance2 = TimeProviderService.getInstance();
+  describe('TimeProviderService Global Instance', () => {
+    test('グローバルインスタンスが正しく動作する', () => {
+      const instance1 = TimeProviderFactory.getGlobalInstance();
+      const instance2 = TimeProviderFactory.getGlobalInstance();
       
       expect(instance1).toBe(instance2);
       expect(instance1.isInSimulationMode()).toBe(false);

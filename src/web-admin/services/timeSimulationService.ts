@@ -6,6 +6,7 @@
 
 import { MockTimeProvider } from '../../factories';
 import { TimeProviderService } from '../../services/timeProviderService';
+import { TimeProviderFactory } from '../../services/timeProviderFactory';
 import { ITimeProvider } from '../../interfaces/dependencies';
 import { 
   TimeSetRequest, 
@@ -24,11 +25,11 @@ export class TimeSimulationService {
     'Asia/Kolkata',
     'UTC'
   ];
-  private readonly timeProviderService: TimeProviderService; // シングルトンパターンでは具象クラス依存が必要 (dependency-injection-check除外対象)
+  private readonly timeProviderService: TimeProviderService;
 
-  constructor(timeProvider?: MockTimeProvider) {
-    // TimeProviderServiceシングルトンを使用
-    this.timeProviderService = TimeProviderService.getInstance();
+  constructor(timeProviderService?: TimeProviderService) {
+    // 注入されたサービスを使用、またはグローバルインスタンスを取得
+    this.timeProviderService = timeProviderService || TimeProviderFactory.getGlobalInstance();
     
     // シミュレーションモードを有効化
     if (!this.timeProviderService.isInSimulationMode()) {

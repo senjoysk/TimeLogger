@@ -33,7 +33,7 @@ import { ConfigService } from '../services/configService';
 import { IConfigService } from '../interfaces/dependencies';
 import { TaskLoggerBot } from '../bot';
 import { ITimeProvider, IDiscordBot } from '../interfaces/dependencies';
-import { TimeProviderService } from '../services/timeProviderService';
+import { TimeProviderFactory } from '../services/timeProviderFactory';
 import { ReminderReplyService, IReminderReplyService } from '../services/reminderReplyService';
 import { HealthStatus } from '../types/health';
 import { logger } from '../utils/logger';
@@ -108,7 +108,7 @@ export class ActivityLoggingIntegration {
   constructor(config: ActivityLoggingConfig) {
     this.config = config;
     // TimeProviderの設定（注入された場合はそれを使用、そうでなければシングルトンから取得）
-    this.timeProvider = config.timeProvider || TimeProviderService.getInstance().getTimeProvider();
+    this.timeProvider = config.timeProvider || TimeProviderFactory.getGlobalInstance().getTimeProvider();
   }
 
   /**
