@@ -46,7 +46,7 @@ describe('AdminRepository TODO管理機能拡張', () => {
           '2100-12-31'
         );
         for (const log of logs) {
-          await sqliteRepo.permanentDeleteLog(log.id);
+          await sqliteRepo.deleteLog(log.id);
         }
         
         // 全TODOを削除

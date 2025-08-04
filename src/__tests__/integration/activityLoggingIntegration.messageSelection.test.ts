@@ -4,7 +4,9 @@
  * MessageSelectionHandlerが正しく統合されることを確認
  */
 
-import { ActivityLoggingIntegration, createDefaultConfig } from '../../integration';
+import { ActivityLoggingIntegration } from '../../integration/activityLoggingIntegration';
+import { createDefaultConfig } from '../../integration/config';
+import { PartialCompositeRepository } from '../../repositories/PartialCompositeRepository';
 import { getTestDbPath, cleanupTestDatabase } from '../../utils/testDatabasePath';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -63,7 +65,9 @@ describe('ActivityLoggingIntegration MessageSelection統合テスト', () => {
       'test-gemini-key'
     );
     
-    integration = new ActivityLoggingIntegration(config);
+    const repository = new PartialCompositeRepository(testDbPath);
+    await repository.initializeDatabase();
+    integration = new ActivityLoggingIntegration(repository, config);
     await integration.initialize();
   });
 

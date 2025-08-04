@@ -12,7 +12,7 @@ import {
   DailyAnalysisResult,
   BusinessDateInfo
 } from '../types/activityLog';
-import { TimezoneChange, TimezoneNotification } from './interfaces';
+import { TimezoneChange } from './interfaces';
 
 /**
  * 活動ログ管理用Repositoryインターフェース
@@ -68,19 +68,7 @@ export interface IActivityLogRepository {
    */
   deleteLog(logId: string): Promise<ActivityLog>;
 
-  /**
-   * 指定ログを物理削除（管理者用）
-   * @param logId ログID
-   * @returns 削除されたかどうか
-   */
-  permanentDeleteLog(logId: string): Promise<boolean>;
 
-  /**
-   * 削除済みログを復元
-   * @param logId ログID
-   * @returns 復元されたActivityLog
-   */
-  restoreLog(logId: string): Promise<ActivityLog>;
 
   // === 分析キャッシュ管理 ===
 
@@ -239,17 +227,6 @@ export interface IActivityLogRepository {
     timezone: string;
   }>>;
 
-  /**
-   * 未処理の通知を取得
-   * @returns 未処理通知配列
-   */
-  getUnprocessedNotifications(): Promise<TimezoneNotification[]>;
-
-  /**
-   * 通知を処理済みとしてマーク
-   * @param notificationId 通知ID
-   */
-  markNotificationAsProcessed(notificationId: string): Promise<void>;
 }
 
 /**
@@ -271,54 +248,3 @@ export interface IActivityLogRepositoryFactory {
   createFromConnection(connection: Database): IActivityLogRepository;
 }
 
-/**
- * 検索・フィルタリング用の条件インターフェース
- */
-export interface LogSearchCriteria {
-  userId: string;
-  startDate?: string;        // YYYY-MM-DD形式
-  endDate?: string;          // YYYY-MM-DD形式
-  contentFilter?: string;    // 内容での部分一致検索
-  includeDeleted?: boolean;
-  sortBy?: 'input_timestamp' | 'created_at' | 'updated_at';
-  sortOrder?: 'asc' | 'desc';
-  limit?: number;
-  offset?: number;
-}
-
-/**
- * 高度な検索機能用インターフェース（将来拡張）
- */
-export interface IAdvancedActivityLogRepository extends IActivityLogRepository {
-  /**
-   * 条件に基づいてログを検索
-   * @param criteria 検索条件
-   * @returns 検索結果
-   */
-  searchLogs(criteria: LogSearchCriteria): Promise<{
-    logs: ActivityLog[];
-    totalCount: number;
-    hasMore: boolean;
-  }>;
-
-  /**
-   * 内容の全文検索
-   * @param userId ユーザーID
-   * @param query 検索クエリ
-   * @param limit 取得件数上限
-   * @returns 検索結果
-   */
-  fullTextSearch(userId: string, query: string, limit?: number): Promise<ActivityLog[]>;
-
-  /**
-   * ログの重複を検出
-   * @param userId ユーザーID
-   * @param businessDate 業務日
-   * @returns 重複している可能性のあるログペア
-   */
-  detectDuplicateLogs(userId: string, businessDate: string): Promise<Array<{
-    log1: ActivityLog;
-    log2: ActivityLog;
-    similarity: number;
-  }>>;
-}

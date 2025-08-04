@@ -1,6 +1,6 @@
 /**
- * 🟢 Green Phase: ActivityLogFormattingService
- * フォーマット処理専門サービス - 最小限の実装でテストを通す
+ * ActivityLogFormattingService
+ * フォーマット処理専門サービス
  */
 
 import { toZonedTime, format } from 'date-fns-tz';

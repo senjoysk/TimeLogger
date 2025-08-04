@@ -50,7 +50,6 @@ Password: ${ADMIN_PASSWORD}
   - `daily_analysis_cache`: 分析結果キャッシュテーブル
   - `todo_tasks`: TODOタスクテーブル
   - `message_classifications`: メッセージ分類履歴テーブル
-  - `timezone_change_notifications`: タイムゾーン変更通知テーブル
 
 #### テーブル詳細 (`/tables/{tableName}`)
 - **データ表示**: ページネーション付きデータ一覧

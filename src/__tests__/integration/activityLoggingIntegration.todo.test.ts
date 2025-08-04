@@ -3,7 +3,9 @@
  * TDD開発: Red Phase - まず失敗するテストを書く
  */
 
-import { ActivityLoggingIntegration, ActivityLoggingConfig } from '../../integration/activityLoggingIntegration';
+import { ActivityLoggingIntegration } from '../../integration/activityLoggingIntegration';
+import { ActivityLoggingConfig } from '../../integration/config';
+import { PartialCompositeRepository } from '../../repositories/PartialCompositeRepository';
 import { TodoCrudHandler } from '../../handlers/todoCrudHandler';
 
 // モックDependencies
@@ -52,7 +54,8 @@ describe('ActivityLoggingIntegration TODO機能統合', () => {
       targetUserId: 'test-user'
     };
 
-    integration = new ActivityLoggingIntegration(config);
+    const repository = new PartialCompositeRepository(config.databasePath);
+    integration = new ActivityLoggingIntegration(repository, config);
   });
 
   afterEach(async () => {
@@ -332,7 +335,7 @@ describe('ActivityLoggingIntegration TODO機能統合', () => {
 
   describe('設定とファクトリー', () => {
     test('デフォルト設定が正しく生成される', () => {
-      const { createDefaultConfig } = require('../../integration/activityLoggingIntegration');
+      const { createDefaultConfig } = require('../../integration/config');
       
       const config = createDefaultConfig('/test/db/path', 'test-api-key');
       
@@ -348,7 +351,7 @@ describe('ActivityLoggingIntegration TODO機能統合', () => {
     });
 
     test('ファクトリー関数が正しく動作する', async () => {
-      const { createActivityLoggingIntegration } = require('../../integration/activityLoggingIntegration');
+      const { PartialCompositeRepository } = require('../../repositories/PartialCompositeRepository');
       
       const testConfig = {
         databasePath: ':memory:',
@@ -360,7 +363,10 @@ describe('ActivityLoggingIntegration TODO機能統合', () => {
         targetUserId: 'factory-test-user'
       };
 
-      const instance = await createActivityLoggingIntegration(testConfig);
+      const repository = new PartialCompositeRepository(testConfig.databasePath);
+      await repository.initializeDatabase();
+      const instance = new ActivityLoggingIntegration(repository, testConfig);
+      await instance.initialize();
       
       expect(instance).toBeInstanceOf(ActivityLoggingIntegration);
       

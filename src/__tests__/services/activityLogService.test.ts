@@ -35,8 +35,6 @@ const mockRepository = {
   isCacheValid: jest.fn(),
   cleanupOldCaches: jest.fn(),
   // その他
-  permanentDeleteLog: jest.fn(),
-  restoreLog: jest.fn(),
   close: jest.fn(),
   initialize: jest.fn(),
   searchLogs: jest.fn(),

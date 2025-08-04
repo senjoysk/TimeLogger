@@ -1,6 +1,8 @@
 // Jest グローバルセットアップファイル
 // テスト実行前に必要な設定を行う
 
+import { initializeTestDatabase, closeAllPooledConnections } from './test-helper';
+
 // グローバルなconsoleモック設定（Test Suite失敗表示を防ぐため）
 // console.error/warnの実際の出力を防ぎ、代わりにjest.fnで記録
 const originalConsole = { ...console };
@@ -27,6 +29,21 @@ process.env.DISCORD_TOKEN = 'test-discord-token';
 process.env.GEMINI_API_KEY = 'test-gemini-key';
 process.env.TARGET_USER_ID = 'test-user-123';
 
+// グローバルなデータベース初期化（1回だけ実行）
+let isDbInitialized = false;
+
+beforeAll(async () => {
+  if (!isDbInitialized) {
+    try {
+      await initializeTestDatabase();
+      isDbInitialized = true;
+      originalConsole.log('✅ 共有テストデータベースを初期化しました');
+    } catch (error) {
+      originalConsole.error('❌ データベース初期化エラー:', error);
+    }
+  }
+});
+
 // beforeEach/afterEachでモックをクリア
 beforeEach(() => {
   // 各テスト前にモックの呼び出し履歴をクリア
@@ -36,13 +53,22 @@ beforeEach(() => {
 afterEach(() => {
   // 各テスト後にもモックの呼び出し履歴をクリア
   jest.clearAllMocks();
+  // 全てのタイマーをクリア（リアルタイマーの場合も安全）
+  jest.clearAllTimers();
 });
 
 afterAll(async () => {
-  // 非同期処理のクリーンアップ
+  // プール接続をすべてクローズ
+  try {
+    await closeAllPooledConnections();
+  } catch (error) {
+    // エラーは無視
+  }
+  
+  // 少し待機（非同期処理の完了を待つ）
   await new Promise(resolve => setTimeout(resolve, 100));
   
-  // プロセス内のタイマーをクリア
+  // 全てのタイマーをクリア
   jest.clearAllTimers();
   
   // テスト完了後にSQLite WALファイルを削除

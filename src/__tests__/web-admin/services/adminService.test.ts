@@ -40,8 +40,7 @@ describe('AdminService', () => {
         { name: 'user_settings', description: 'ユーザー設定テーブル' },
         { name: 'daily_analysis_cache', description: '分析結果キャッシュテーブル' },
         { name: 'todo_tasks', description: 'TODOタスクテーブル' },
-        { name: 'message_classifications', description: 'メッセージ分類履歴テーブル' },
-        { name: 'timezone_change_notifications', description: 'タイムゾーン変更通知テーブル' }
+        { name: 'message_classifications', description: 'メッセージ分類履歴テーブル' }
       ];
 
       const result = await adminService.getTableList();

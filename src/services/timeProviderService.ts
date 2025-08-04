@@ -1,6 +1,6 @@
 /**
- * 時刻プロバイダーサービス（シングルトン）
- * Web管理アプリとDiscord Bot間で時刻プロバイダーを共有
+ * 時刻プロバイダーサービス
+ * 時刻プロバイダーの管理とシミュレーション機能を提供
  */
 
 import { ITimeProvider } from '../interfaces/dependencies';
@@ -20,27 +20,18 @@ export interface ITimeProviderService {
 }
 
 /**
- * TimeProviderServiceのシングルトンインスタンス
- * アプリケーション全体で共有される時刻プロバイダーを管理
+ * TimeProviderService
+ * 依存性注入パターンで時刻プロバイダーを管理
  */
 export class TimeProviderService implements ITimeProviderService {
-  private static instance: TimeProviderService; // シングルトンパターンでは具象クラス依存が必要 (dependency-injection-check除外対象)
   private timeProvider: ITimeProvider;
   private isSimulationMode: boolean = false;
 
-  private constructor() {
-    // デフォルトは実時刻プロバイダー
-    this.timeProvider = new RealTimeProvider();
-  }
-
-  /**
-   * シングルトンインスタンスを取得
-   */
-  static getInstance(): TimeProviderService {
-    if (!TimeProviderService.instance) {
-      TimeProviderService.instance = new TimeProviderService();
-    }
-    return TimeProviderService.instance;
+  constructor(timeProvider?: ITimeProvider) {
+    // デフォルトは実時刻プロバイダー、または注入されたプロバイダーを使用
+    this.timeProvider = timeProvider || new RealTimeProvider();
+    // 注入されたプロバイダーがMockの場合はシミュレーションモードとして扱う
+    this.isSimulationMode = this.timeProvider instanceof MockTimeProvider;
   }
 
   /**
@@ -133,9 +124,9 @@ export class TimeProviderService implements ITimeProviderService {
   }
 
   /**
-   * テスト用：インスタンスをリセット
+   * デフォルトインスタンスを作成（後方互換性のため）
    */
-  static resetForTesting(): void {
-    TimeProviderService.instance = null as any; // ALLOW_ANY: インスタンスのリセットのため
+  static createDefault(): TimeProviderService {
+    return new TimeProviderService();
   }
 }

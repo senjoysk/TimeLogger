@@ -1,6 +1,6 @@
 /**
  * SecurityService実装
- * TDD Green Phase: テストを通す最小実装
+ * セキュリティ管理サービス
  */
 
 import { AdminEnvironment, AdminSecurityError } from '../types/admin';
@@ -19,8 +19,7 @@ export class SecurityService implements ISecurityService {
     'user_settings',
     'daily_analysis_cache',
     'todo_tasks',
-    'message_classifications',
-    'timezone_change_notifications'
+    'message_classifications'
   ];
 
   /**

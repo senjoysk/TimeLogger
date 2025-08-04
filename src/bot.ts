@@ -381,8 +381,12 @@ export class TaskLoggerBot {
       integrationConfig.debugMode = true;
       integrationConfig.enableAutoAnalysis = true;
       
+      // リポジトリを作成
+      const { PartialCompositeRepository } = await import('./repositories/PartialCompositeRepository');
+      const repository = new PartialCompositeRepository(integrationConfig.databasePath);
+      
       // 活動記録システムを初期化
-      this.activityLoggingIntegration = new ActivityLoggingIntegration(integrationConfig);
+      this.activityLoggingIntegration = new ActivityLoggingIntegration(repository, integrationConfig);
       await this.activityLoggingIntegration.initialize();
       
       // Discord Clientに統合（自身のBotインスタンスを渡す）
@@ -677,18 +681,26 @@ export class TaskLoggerBot {
       }
 
       // SqliteActivityLogRepositoryから登録ユーザーを取得
-      const users = await this.activityLoggingIntegration.getAllUserTimezones();
+      const timezoneMap = await this.activityLoggingIntegration.getAllUserTimezones();
       const now = new Date().toISOString();
-      return users.map(user => ({
-        userId: user.user_id,
-        username: undefined,
-        timezone: user.timezone,
-        registrationDate: now,
-        lastSeenAt: now,
-        isActive: true,
-        createdAt: now,
-        updatedAt: now
-      }));
+      const users: UserInfo[] = [];
+      
+      // Map<timezone, userId[]>をUserInfo[]に変換
+      for (const [timezone, userIds] of timezoneMap) {
+        for (const userId of userIds) {
+          users.push({
+            userId,
+            username: undefined,
+            timezone,
+            registrationDate: now,
+            lastSeenAt: now,
+            isActive: true,
+            createdAt: now,
+            updatedAt: now
+          });
+        }
+      }
+      return users;
     } catch (error) {
       const fetchError = new DatabaseError('登録ユーザー取得エラー', {
         operation: 'getRegisteredUsers',
@@ -778,9 +790,14 @@ export class TaskLoggerBot {
         return this.getSystemDefaultTimezone();
       }
       
-      const users = await this.activityLoggingIntegration.getAllUserTimezones();
-      const user = users.find(u => u.user_id === userId);
-      return user?.timezone || this.getSystemDefaultTimezone();
+      const timezoneMap = await this.activityLoggingIntegration.getAllUserTimezones();
+      // Map<timezone, userId[]>から該当ユーザーを探す
+      for (const [timezone, userIds] of timezoneMap) {
+        if (userIds.includes(userId)) {
+          return timezone;
+        }
+      }
+      return this.getSystemDefaultTimezone();
     } catch (error) {
       logger.error('TIMEZONE', `${userId} のタイムゾーン取得エラー`, error, { userId });
       // デフォルト値を返すのでエラーは再スローしない
@@ -832,7 +849,11 @@ export class TaskLoggerBot {
    */
   public setTimezoneChangeCallback(callback: (userId: string, oldTimezone: string | null, newTimezone: string) => Promise<void>): void {
     if (this.activityLoggingIntegration) {
-      this.activityLoggingIntegration.setTimezoneChangeCallback(callback);
+      // コールバックの引数が異なるので、ラッパーを作成
+      this.activityLoggingIntegration.setTimezoneChangeCallback((userId: string, timezone: string) => {
+        // oldTimezoneは渡されないので、nullとする
+        callback(userId, null, timezone);
+      });
     } else {
       logger.warn('BOT', 'ActivityLoggingIntegrationが初期化されていません');
     }

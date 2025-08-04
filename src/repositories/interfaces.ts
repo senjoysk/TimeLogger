@@ -185,17 +185,6 @@ export interface TimezoneChange {
   updated_at: string;
 }
 
-/**
- * タイムゾーン変更通知
- */
-export interface TimezoneNotification {
-  id: string;
-  user_id: string;
-  old_timezone: string | null;
-  new_timezone: string;
-  changed_at: string;
-  processed: boolean;
-}
 
 /**
  * 統合リポジトリインターフェース
@@ -216,8 +205,6 @@ export interface IUnifiedRepository extends
   // スケジューラー関連メソッド
   getAllUserTimezonesForScheduler(): Promise<UserTimezone[]>;
   getUserTimezoneChanges(since?: Date): Promise<TimezoneChange[]>;
-  getUnprocessedNotifications(): Promise<TimezoneNotification[]>;
-  markNotificationAsProcessed(notificationId: string): Promise<void>;
   getUserTimezone(userId: string): Promise<string | null>;
   saveUserTimezone(userId: string, timezone: string): Promise<void>;
 }

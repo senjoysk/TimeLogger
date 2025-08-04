@@ -1,7 +1,7 @@
 import { config } from '../config';
 import { toZonedTime, fromZonedTime } from 'date-fns-tz';
 import { addMinutes, setMinutes, setHours, setSeconds, getHours, getMinutes, getDay, subMinutes, subDays, format } from 'date-fns';
-import { TimeProviderService } from '../services/timeProviderService';
+import { TimeProviderFactory } from '../services/timeProviderFactory';
 
 /**
  * 時間枠の定義
@@ -18,7 +18,7 @@ export interface TimeSlot {
  * @returns 現在のタイムスロット
  */
 export function getCurrentTimeSlot(timezone: string): TimeSlot {
-  const now = TimeProviderService.getInstance().now();
+  const now = TimeProviderFactory.getGlobalInstance().now();
   const zonedNow = toZonedTime(now, timezone);
 
   // ユーザー体験としては「前の枠」に記録したいので、30分前の時刻を計算
@@ -48,7 +48,7 @@ export function getCurrentTimeSlot(timezone: string): TimeSlot {
  * @returns 勤務時間内であればtrue
  */
 export function isWorkingHours(timezone: string): boolean {
-  const zonedNow = toZonedTime(TimeProviderService.getInstance().now(), timezone);
+  const zonedNow = toZonedTime(TimeProviderFactory.getGlobalInstance().now(), timezone);
   const hour = getHours(zonedNow);
   const day = getDay(zonedNow); // 0: Sunday, 1: Monday, ..., 6: Saturday
 
@@ -65,7 +65,7 @@ export function isWorkingHours(timezone: string): boolean {
  * @returns 業務日 (YYYY-MM-DD)
  */
 export function getCurrentBusinessDate(timezone: string): string {
-  return getBusinessDateForDate(TimeProviderService.getInstance().now(), timezone);
+  return getBusinessDateForDate(TimeProviderFactory.getGlobalInstance().now(), timezone);
 }
 
 /**
@@ -120,7 +120,7 @@ export function formatDateTime(date: Date, timezone: string): string {
  * @returns 次の問いかけ時刻 (UTC)
  */
 export function getNextPromptTime(timezone: string): Date {
-  const now = TimeProviderService.getInstance().now();
+  const now = TimeProviderFactory.getGlobalInstance().now();
   let zonedNow = toZonedTime(now, timezone);
   let next = new Date(zonedNow);
 
@@ -142,7 +142,7 @@ export function getNextPromptTime(timezone: string): Date {
  * @returns サマリー生成時刻 (UTC)
  */
 export function getTodaySummaryTime(timezone: string): Date {
-  const now = TimeProviderService.getInstance().now();
+  const now = TimeProviderFactory.getGlobalInstance().now();
   let zonedNow = toZonedTime(now, timezone);
   
   let summaryTime = setHours(zonedNow, config.app.summaryTime.hour);

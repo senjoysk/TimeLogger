@@ -1,8 +1,6 @@
 /**
  * TimezoneChangeMonitor - タイムゾーン変更監視サービス
  * 
- * 🟢 Green Phase: テストを通すための最小限実装
- * 
  * 機能:
  * - データベースポーリングによるタイムゾーン変更検出
  * - 通知テーブルによるタイムゾーン変更検出
@@ -11,8 +9,9 @@
  */
 
 import { DynamicReportScheduler } from './dynamicReportScheduler';
-import { TimezoneChange, TimezoneNotification } from '../repositories/interfaces';
+import { TimezoneChange } from '../repositories/interfaces';
 import { logger } from '../utils/logger';
+import { SystemError } from '../errors';
 
 interface UserSettings {
   user_id: string;
@@ -21,15 +20,12 @@ interface UserSettings {
 
 interface ITimezoneRepository {
   getUserTimezoneChanges(since?: Date): Promise<TimezoneChange[]>;
-  getUnprocessedNotifications(): Promise<TimezoneNotification[]>;
-  markNotificationAsProcessed(notificationId: string): Promise<void>;
   getUserTimezone(userId: string): Promise<string | null>;
   saveUserTimezone(userId: string, timezone: string): Promise<void>;
 }
 
 interface MonitorStatus {
   isPollingRunning: boolean;
-  isProcessorRunning: boolean;
   lastCheckTime: Date | null;
   processedNotifications: number;
   pollingInterval: number;
@@ -47,10 +43,8 @@ export class TimezoneChangeMonitor {
   private repository?: ITimezoneRepository;
   private pollingInterval: number = 10000; // 10秒
   private pollingTimer?: NodeJS.Timeout;
-  private processorTimer?: NodeJS.Timeout;
   private lastCheckTime: Date | null = null;
   private isPollingRunning: boolean = false;
-  private isProcessorRunning: boolean = false;
   private startTime: Date = new Date();
   
   // 統計情報
@@ -90,10 +84,10 @@ export class TimezoneChangeMonitor {
    */
   async startPollingMonitor(): Promise<void> {
     if (!this.scheduler) {
-      throw new Error('Scheduler not set');
+      throw new SystemError('Scheduler not set');
     }
     if (!this.repository) {
-      throw new Error('Repository not set');
+      throw new SystemError('Repository not set');
     }
 
     if (this.isPollingRunning) {
@@ -114,35 +108,6 @@ export class TimezoneChangeMonitor {
     logger.info('TIMEZONE_MONITOR', `✅ Timezone polling monitor started (interval: ${this.pollingInterval}ms)`);
   }
 
-  /**
-   * 通知プロセッサーを開始
-   */
-  async startNotificationProcessor(): Promise<void> {
-    if (!this.scheduler) {
-      throw new Error('Scheduler not set');
-    }
-    if (!this.repository) {
-      throw new Error('Repository not set');
-    }
-
-    if (this.isProcessorRunning) {
-      return;
-    }
-
-    this.isProcessorRunning = true;
-
-    // 即座に1回実行
-    await this.processNotifications();
-
-    // 定期実行を開始
-    this.processorTimer = setInterval(async () => {
-      if (this.repository && this.scheduler) {
-        await this.processNotifications();
-      }
-    }, this.pollingInterval);
-
-    logger.info('TIMEZONE_MONITOR', `✅ Timezone notification processor started`);
-  }
 
   /**
    * タイムゾーン変更をポーリングで検出
@@ -192,57 +157,6 @@ export class TimezoneChangeMonitor {
     }
   }
 
-  /**
-   * 通知テーブルから未処理通知を処理
-   */
-  private async processNotifications(): Promise<void> {
-    try {
-      if (!this.repository || !this.scheduler) {
-        // テスト環境などでrepositoryが設定されていない場合は静かに終了
-        return;
-      }
-
-      // getUnprocessedNotifications メソッドの存在確認
-      if (typeof this.repository.getUnprocessedNotifications !== 'function') {
-        logger.error('TIMEZONE_MONITOR', '❌ getUnprocessedNotifications is not a function');
-        this.stats.totalErrors++;
-        return;
-      }
-
-      const notifications = await this.repository.getUnprocessedNotifications();
-
-      // notificationsがnull、undefined、または配列でない場合の処理
-      if (!notifications || !Array.isArray(notifications)) {
-        logger.warn('TIMEZONE_MONITOR', '⚠️ getUnprocessedNotifications returned invalid data, skipping');
-        return;
-      }
-
-      for (const notification of notifications) {
-        try {
-          await this.scheduler.onTimezoneChanged(
-            notification.user_id,
-            notification.old_timezone,
-            notification.new_timezone
-          );
-
-          // 処理済みマーク
-          if (typeof this.repository.markNotificationAsProcessed === 'function') {
-            await this.repository.markNotificationAsProcessed(notification.id);
-          }
-          
-          this.stats.totalProcessedNotifications++;
-          this.stats.lastActivity = new Date();
-        } catch (error) {
-          logger.error('TIMEZONE_MONITOR', `❌ Failed to process notification ${notification.id}:`, error as Error);
-          this.stats.totalErrors++;
-          // エラー時は処理済みマークしない（再試行可能）
-        }
-      }
-    } catch (error) {
-      logger.error('TIMEZONE_MONITOR', '❌ Processing notifications failed:', error as Error);
-      this.stats.totalErrors++;
-    }
-  }
 
   /**
    * TimezoneCommandから呼び出される統合メソッド
@@ -250,7 +164,7 @@ export class TimezoneChangeMonitor {
   async onTimezoneCommandUpdate(userId: string, newTimezone: string): Promise<void> {
     try {
       if (!this.repository || !this.scheduler) {
-        throw new Error('Repository or Scheduler not set');
+        throw new SystemError('Repository or Scheduler not set');
       }
 
       // 現在のタイムゾーンを取得
@@ -291,24 +205,13 @@ export class TimezoneChangeMonitor {
     logger.info('TIMEZONE_MONITOR', '🛑 Timezone polling monitor stopped');
   }
 
-  /**
-   * 通知プロセッサーを停止
-   */
-  stopProcessor(): void {
-    if (this.processorTimer) {
-      clearInterval(this.processorTimer);
-      this.processorTimer = undefined;
-    }
-    this.isProcessorRunning = false;
-    logger.info('TIMEZONE_MONITOR', '🛑 Timezone notification processor stopped');
-  }
 
   /**
    * ポーリング間隔を設定
    */
   setPollingInterval(intervalMs: number): void {
     if (intervalMs <= 0) {
-      throw new Error('Polling interval must be positive');
+      throw new SystemError('Polling interval must be positive');
     }
     
     this.pollingInterval = intervalMs;
@@ -317,10 +220,6 @@ export class TimezoneChangeMonitor {
     if (this.isPollingRunning) {
       this.stop();
       this.startPollingMonitor();
-    }
-    if (this.isProcessorRunning) {
-      this.stopProcessor();
-      this.startNotificationProcessor();
     }
   }
 
@@ -341,9 +240,6 @@ export class TimezoneChangeMonitor {
   /**
    * 通知プロセッサーの実行状態を取得
    */
-  isProcessorActive(): boolean {
-    return this.isProcessorRunning;
-  }
 
   /**
    * 監視状態を取得
@@ -351,7 +247,6 @@ export class TimezoneChangeMonitor {
   getStatus(): MonitorStatus {
     return {
       isPollingRunning: this.isPollingRunning,
-      isProcessorRunning: this.isProcessorRunning,
       lastCheckTime: this.lastCheckTime,
       processedNotifications: this.stats.totalProcessedNotifications,
       pollingInterval: this.pollingInterval

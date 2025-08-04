@@ -12,15 +12,18 @@
 
 import { TimeSimulationService } from '../../../web-admin/services/timeSimulationService';
 import { MockTimeProvider } from '../../../factories';
+import { TimeProviderService } from '../../../services/timeProviderService';
 import { TimeSetRequest, TimezoneDisplay } from '../../../web-admin/types/testing';
 
 describe('TimeSimulationService', () => {
   let service: TimeSimulationService;
   let mockTimeProvider: MockTimeProvider;
+  let timeProviderService: TimeProviderService;
 
   beforeEach(() => {
     mockTimeProvider = new MockTimeProvider();
-    service = new TimeSimulationService(mockTimeProvider);
+    timeProviderService = new TimeProviderService(mockTimeProvider);
+    service = new TimeSimulationService(timeProviderService);
   });
 
   describe('時刻設定機能テスト', () => {

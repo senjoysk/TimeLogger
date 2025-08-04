@@ -1,8 +1,6 @@
 /**
  * EnhancedScheduler - 既存Schedulerを拡張した統合スケジューラー
  * 
- * 🟢 Green Phase: 統合テストを通すための実装
- * 
  * 機能:
  * - 既存の静的スケジュール（APIコストレポート等）の継続
  * - 動的スケジューラー（18:30レポート）の統合
@@ -32,7 +30,6 @@ interface ComprehensiveStatus {
   };
   timezoneMonitoring: {
     isRunning: boolean;
-    isProcessorRunning: boolean;
   };
 }
 
@@ -280,8 +277,7 @@ export class EnhancedScheduler extends Scheduler {
         isRunning: this.componentHealth.dynamicScheduler === 'healthy'
       },
       timezoneMonitoring: {
-        isRunning: this.timezoneMonitor?.isRunning() || false,
-        isProcessorRunning: this.timezoneMonitor?.isProcessorActive() || false
+        isRunning: this.timezoneMonitor?.isRunning() || false
       }
     };
   }

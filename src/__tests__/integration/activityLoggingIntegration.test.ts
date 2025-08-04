@@ -55,7 +55,11 @@ describe('活動記録システム統合テスト', () => {
     config.debugMode = true;
     config.enableAutoAnalysis = false; // テスト環境では自動分析を無効化
     
-    integration = new ActivityLoggingIntegration(config);
+    // 新しいコンストラクタ形式に対応
+    const { PartialCompositeRepository } = await import('../../repositories/PartialCompositeRepository');
+    const repository = new PartialCompositeRepository(testDbPath);
+    await repository.initializeDatabase(); // データベース初期化を追加
+    integration = new ActivityLoggingIntegration(repository, config);
     await integration.initialize();
   });
 
@@ -424,7 +428,10 @@ describe('活動記録システム統合テスト', () => {
     test('Bot停止時にActivityLoggingIntegrationのシャットダウンが実行される', async () => {
       // 新しいintegrationインスタンスでシャットダウンをテスト
       const testConfig = createDefaultConfig('./test-data/shutdown-test.db', 'test-api-key');
-      const testIntegration = new ActivityLoggingIntegration(testConfig);
+      const { PartialCompositeRepository } = await import('../../repositories/PartialCompositeRepository');
+      const testRepository = new PartialCompositeRepository(testConfig.databasePath);
+      await testRepository.initializeDatabase(); // データベース初期化を追加
+      const testIntegration = new ActivityLoggingIntegration(testRepository, testConfig);
       await testIntegration.initialize();
       
       // シャットダウン前の状態確認

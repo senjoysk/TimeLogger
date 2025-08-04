@@ -23,7 +23,7 @@ import {
   BusinessDateInfo,
   DailyAnalysisResult
 } from '../../types/activityLog';
-import { TimezoneChange, TimezoneNotification, UserTimezone } from '../interfaces';
+import { TimezoneChange, UserTimezone } from '../interfaces';
 import { AppError, ErrorType, createPromiseErrorHandler } from '../../utils/errorHandler';
 
 /**
@@ -432,64 +432,7 @@ export class SqliteActivityLogRepository implements IActivityLogRepository {
   // 不足しているIActivityLogRepositoryメソッド
   // =============================================================================
 
-  /**
-   * 指定ログを物理削除（管理者用）
-   */
-  async permanentDeleteLog(logId: string): Promise<boolean> {
-    return new Promise((resolve, reject) => {
-      const db = this.db.getDatabase();
-      
-      const sql = 'DELETE FROM activity_logs WHERE id = ?';
 
-      db.run(sql, [logId], function(err) {
-        if (err) {
-          reject(new AppError(`ログ物理削除エラー: ${err.message}`, ErrorType.DATABASE, { error: err }));
-          return;
-        }
-
-        resolve((this as any).changes > 0); // ALLOW_ANY: sqlite3のRunResultのchangesプロパティアクセスのため
-      });
-    });
-  }
-
-  /**
-   * 削除済みログを復元
-   */
-  async restoreLog(logId: string): Promise<ActivityLog> {
-    return new Promise((resolve, reject) => {
-      const db = this.db.getDatabase();
-      
-      // まず削除済みログを取得
-      const selectSql = 'SELECT * FROM activity_logs WHERE id = ? AND is_deleted = TRUE';
-      db.get(selectSql, [logId], (selectErr: Error | null, row: Record<string, unknown>) => {
-        if (selectErr) {
-          reject(new AppError(`復元前ログ取得エラー: ${selectErr.message}`, ErrorType.DATABASE, { error: selectErr }));
-          return;
-        }
-
-        if (!row) {
-          reject(new AppError(`復元対象ログが見つかりません: ${logId}`, ErrorType.DATABASE, { logId }));
-          return;
-        }
-
-        const now = new Date().toISOString();
-        const sql = 'UPDATE activity_logs SET is_deleted = FALSE, updated_at = ? WHERE id = ?';
-
-        db.run(sql, [now, logId], (err: Error | null) => {
-          if (err) {
-            reject(new AppError(`ログ復元エラー: ${err.message}`, ErrorType.DATABASE, { error: err }));
-            return;
-          }
-
-          // 復元されたログを返す
-          const restoredLog = this.mapRowToActivityLog(row);
-          restoredLog.isDeleted = false;
-          restoredLog.updatedAt = now;
-          resolve(restoredLog);
-        });
-      });
-    });
-  }
 
   /**
    * 分析結果キャッシュを更新
@@ -696,21 +639,22 @@ export class SqliteActivityLogRepository implements IActivityLogRepository {
   }
 
   /**
-   * タイムゾーン変更履歴を取得
+   * タイムゾーン変更履歴を取得（user_settingsテーブルから取得）
    */
   async getUserTimezoneChanges(since?: Date): Promise<TimezoneChange[]> {
     return new Promise((resolve, reject) => {
       const db = this.db.getDatabase();
       
-      let sql = 'SELECT * FROM timezone_change_notifications';
+      // user_settingsテーブルから変更を検出
+      let sql = 'SELECT user_id, timezone, updated_at FROM user_settings';
       const params: unknown[] = [];
       
       if (since) {
-        sql += ' WHERE changed_at > ?';
+        sql += ' WHERE updated_at > ?';
         params.push(since.toISOString());
       }
       
-      sql += ' ORDER BY changed_at DESC';
+      sql += ' ORDER BY updated_at DESC';
 
       db.all(sql, params, (err: Error | null, rows: Record<string, unknown>[]) => {
         if (err) {
@@ -718,11 +662,12 @@ export class SqliteActivityLogRepository implements IActivityLogRepository {
           return;
         }
 
+        // user_settingsテーブルでは履歴が保持されないため、現在のタイムゾーンのみを返す
         const changes: TimezoneChange[] = rows.map(row => ({
           user_id: String(row.user_id),
-          old_timezone: String(row.old_timezone),
-          new_timezone: String(row.new_timezone),
-          updated_at: String(row.changed_at)
+          old_timezone: null, // 履歴がないためnull
+          new_timezone: String(row.timezone),
+          updated_at: String(row.updated_at)
         }));
 
         resolve(changes);
@@ -730,58 +675,6 @@ export class SqliteActivityLogRepository implements IActivityLogRepository {
     });
   }
 
-  /**
-   * 未処理のタイムゾーン変更通知を取得
-   */
-  async getUnprocessedNotifications(): Promise<TimezoneNotification[]> {
-    return new Promise((resolve, reject) => {
-      const db = this.db.getDatabase();
-      
-      const sql = `
-        SELECT * FROM timezone_change_notifications 
-        WHERE processed = FALSE 
-        ORDER BY changed_at ASC
-      `;
-
-      db.all(sql, [], (err: Error | null, rows: Record<string, unknown>[]) => {
-        if (err) {
-          reject(new AppError(`未処理通知取得エラー: ${err.message}`, ErrorType.DATABASE, { error: err }));
-          return;
-        }
-
-        const notifications: TimezoneNotification[] = rows.map(row => ({
-          id: String(row.id),
-          user_id: String(row.user_id),
-          old_timezone: String(row.old_timezone),
-          new_timezone: String(row.new_timezone),
-          changed_at: String(row.changed_at),
-          processed: Boolean(row.processed)
-        }));
-
-        resolve(notifications);
-      });
-    });
-  }
-
-  /**
-   * 通知を処理済みにマーク
-   */
-  async markNotificationAsProcessed(notificationId: string): Promise<void> {
-    return new Promise((resolve, reject) => {
-      const db = this.db.getDatabase();
-      
-      const sql = 'UPDATE timezone_change_notifications SET processed = TRUE WHERE id = ?';
-
-      db.run(sql, [notificationId], function(err) {
-        if (err) {
-          reject(new AppError(`通知処理済みマークエラー: ${err.message}`, ErrorType.DATABASE, { error: err }));
-          return;
-        }
-
-        resolve();
-      });
-    });
-  }
 
   // =============================================================================
   // 追加の不足メソッド

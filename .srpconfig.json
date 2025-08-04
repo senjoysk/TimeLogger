@@ -1,0 +1,63 @@
+{
+  "fileTypes": {
+    "integration": {
+      "pattern": ["**/integration/**/*.ts", "*Integration.ts"],
+      "maxLines": 700,
+      "maxMethods": 30,
+      "description": "統合クラス・ファサードパターン"
+    },
+    "service": {
+      "pattern": ["**/services/**/*.ts", "*Service.ts"],
+      "maxLines": 400,
+      "maxMethods": 15,
+      "description": "ビジネスロジックサービス"
+    },
+    "repository": {
+      "pattern": ["**/repositories/**/*.ts", "*Repository.ts"],
+      "maxLines": 500,
+      "maxMethods": 20,
+      "description": "データアクセス層"
+    },
+    "handler": {
+      "pattern": ["**/handlers/**/*.ts", "*Handler.ts"],
+      "maxLines": 300,
+      "maxMethods": 10,
+      "description": "コマンド・イベントハンドラー"
+    },
+    "config": {
+      "pattern": ["**/config/**/*.ts", "config.ts", "*Config.ts"],
+      "maxLines": 600,
+      "maxMethods": 5,
+      "description": "設定・初期化ファイル"
+    },
+    "test": {
+      "pattern": ["**/__tests__/**/*.ts", "*.test.ts", "*.spec.ts"],
+      "maxLines": 800,
+      "maxMethods": 50,
+      "description": "テストファイル"
+    },
+    "interface": {
+      "pattern": ["**/interfaces/**/*.ts", "interfaces.ts"],
+      "maxLines": 300,
+      "maxMethods": 0,
+      "description": "インターフェース定義"
+    },
+    "default": {
+      "pattern": ["**/*.ts", "**/*.js"],
+      "maxLines": 400,
+      "maxMethods": 15,
+      "description": "デフォルト設定"
+    }
+  },
+  "exceptions": {
+    "allowExceptionComment": true,
+    "exceptionPatterns": ["@SRP-EXCEPTION", "// SRP-IGNORE"],
+    "requireReason": true,
+    "reasonPattern": "@SRP-REASON"
+  },
+  "reporting": {
+    "verbose": true,
+    "showSuggestions": true,
+    "outputFormat": "colored"
+  }
+}

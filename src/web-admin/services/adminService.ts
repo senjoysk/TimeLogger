@@ -1,6 +1,6 @@
 /**
  * AdminService実装
- * TDD Green Phase: テストを通す最小実装
+ * 管理機能サービス
  */
 
 import { IAdminService, IAdminRepository } from '../interfaces/adminInterfaces';
@@ -15,8 +15,7 @@ export class AdminService implements IAdminService {
     { name: 'user_settings', description: 'ユーザー設定テーブル' },
     { name: 'daily_analysis_cache', description: '分析結果キャッシュテーブル' },
     { name: 'todo_tasks', description: 'TODOタスクテーブル' },
-    { name: 'message_classifications', description: 'メッセージ分類履歴テーブル' },
-    { name: 'timezone_change_notifications', description: 'タイムゾーン変更通知テーブル' }
+    { name: 'message_classifications', description: 'メッセージ分類履歴テーブル' }
   ];
 
   constructor(repository: IAdminRepository) {

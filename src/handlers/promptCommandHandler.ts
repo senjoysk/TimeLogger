@@ -1,6 +1,6 @@
 /**
- * 🟢 Green Phase: PromptCommandHandler 実装
- * TDDアプローチ: テストを通す最小限の実装
+ * PromptCommandHandler
+ * 活動促し通知コマンドハンドラー
  */
 
 import { Message, EmbedBuilder } from 'discord.js';

@@ -10,6 +10,7 @@ import { ITimezoneService } from '../services/interfaces/ITimezoneService';
 import { ITimeProvider } from '../interfaces/dependencies';
 import { logger } from '../utils/logger';
 import { TimeProviderService } from '../services/timeProviderService';
+import { TimeProviderFactory } from '../services/timeProviderFactory';
 
 /**
  * タイムゾーンコマンドの種類
@@ -65,8 +66,8 @@ export class TimezoneHandler implements ITimezoneHandler {
     private timezoneService?: ITimezoneService,
     timeProvider?: ITimeProvider
   ) {
-    // TimeProviderが注入されない場合は、シングルトンから取得
-    this.timeProvider = timeProvider || TimeProviderService.getInstance().getTimeProvider();
+    // TimeProviderが注入されない場合は、グローバルインスタンスから取得
+    this.timeProvider = timeProvider || TimeProviderFactory.getGlobalInstance().getTimeProvider();
   }
 
   /**
@@ -139,7 +140,7 @@ export class TimezoneHandler implements ITimezoneHandler {
         currentTimezone = dbTimezone || this.getSystemDefaultTimezone();
       }
       
-      const now = TimeProviderService.getInstance().now();
+      const now = TimeProviderFactory.getGlobalInstance().now();
       const localTime = now.toLocaleString('ja-JP', { 
         timeZone: currentTimezone,
         year: 'numeric',
@@ -233,7 +234,7 @@ export class TimezoneHandler implements ITimezoneHandler {
       }
       
       // 現在時刻を新しいタイムゾーンで表示
-      const now = TimeProviderService.getInstance().now();
+      const now = TimeProviderFactory.getGlobalInstance().now();
       const localTime = now.toLocaleString('ja-JP', { 
         timeZone: timezone,
         year: 'numeric',
@@ -440,7 +441,7 @@ Botの再起動は不要で、即座に全機能に反映されます。
     
     // フォールバック: 直接検証
     try {
-      TimeProviderService.getInstance().now().toLocaleString('en-US', { timeZone: timezone });
+      TimeProviderFactory.getGlobalInstance().now().toLocaleString('en-US', { timeZone: timezone });
       return true;
     } catch (error) {
       return false;
