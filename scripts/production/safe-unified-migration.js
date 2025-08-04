@@ -276,7 +276,7 @@ async function validateDatabase() {
         tables.forEach(table => console.log(`   - ${table}`));
         
         // 必須テーブルの確認
-        const requiredTables = ['activity_logs', 'user_settings', 'api_costs', 'todo_tasks'];
+        const requiredTables = ['activity_logs', 'user_settings', 'todo_tasks'];
         const missingTables = requiredTables.filter(table => !tables.includes(table));
         
         if (missingTables.length > 0) {
