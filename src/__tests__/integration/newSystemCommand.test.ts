@@ -3,7 +3,9 @@
  * gapコマンドでdetectGapsFromAnalysisが呼ばれることを確認
  */
 
-import { ActivityLoggingIntegration, createDefaultConfig } from '../../integration/activityLoggingIntegration';
+import { ActivityLoggingIntegration } from '../../integration/activityLoggingIntegration';
+import { createDefaultConfig } from '../../integration/config';
+import { PartialCompositeRepository } from '../../repositories/PartialCompositeRepository';
 import { getTestDbPath, cleanupTestDatabase } from '../../utils/testDatabasePath';
 
 describe('新システム統合コマンド', () => {
@@ -20,7 +22,9 @@ describe('新システム統合コマンド', () => {
       'test-api-key'
     );
     
-    integration = new ActivityLoggingIntegration(config);
+    const repository = new PartialCompositeRepository(testDbPath);
+    await repository.initializeDatabase();
+    integration = new ActivityLoggingIntegration(repository, config);
     await integration.initialize();
   });
 

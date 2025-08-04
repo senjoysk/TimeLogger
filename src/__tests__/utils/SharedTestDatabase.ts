@@ -4,7 +4,8 @@
  */
 
 import { PartialCompositeRepository } from '../../repositories/PartialCompositeRepository';
-import { ActivityLoggingIntegration, ActivityLoggingConfig } from '../../integration/activityLoggingIntegration';
+import { ActivityLoggingIntegration } from '../../integration/activityLoggingIntegration';
+import { ActivityLoggingConfig } from '../../integration/config';
 import * as path from 'path';
 import * as fs from 'fs';
 
@@ -56,11 +57,10 @@ export class SharedTestDatabase {
         defaultTimezone: 'Asia/Tokyo',
         enableAutoAnalysis: false, // テスト時は自動分析無効
         cacheValidityMinutes: 1, // テスト用に短時間設定
-        targetUserId: '', // マルチユーザー対応により削除
-        repository: this.repository // 共有リポジトリを注入
+        targetUserId: '' // マルチユーザー対応により削除
       };
 
-      this.integration = new ActivityLoggingIntegration(config);
+      this.integration = new ActivityLoggingIntegration(this.repository, config);
       await this.integration.initialize();
 
       this.isInitialized = true;

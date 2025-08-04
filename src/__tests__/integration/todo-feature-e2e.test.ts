@@ -6,7 +6,9 @@
  * TODO機能の統合テスト
  */
 
-import { ActivityLoggingIntegration, ActivityLoggingConfig } from '../../integration/activityLoggingIntegration';
+import { ActivityLoggingIntegration } from '../../integration/activityLoggingIntegration';
+import { ActivityLoggingConfig } from '../../integration/config';
+import { PartialCompositeRepository } from '../../repositories/PartialCompositeRepository';
 import { Message, ButtonInteraction, User, TextChannel } from 'discord.js';
 import { ActivityLog } from '../../types/activityLog';
 import { Todo } from '../../types/todo';
@@ -108,7 +110,9 @@ describe('TODO機能 End-to-End テスト', () => {
       targetUserId: 'test-user-123'
     };
     
-    integration = new ActivityLoggingIntegration(config);
+    const repository = new PartialCompositeRepository(config.databasePath);
+    await repository.initializeDatabase();
+    integration = new ActivityLoggingIntegration(repository, config);
     try {
       await integration.initialize();
       

@@ -3,12 +3,18 @@
  * 既存Botに活動記録システムを簡単に統合するためのファサード
  */
 
+// 活動記録システム統合クラス
 export { 
-  ActivityLoggingIntegration, 
+  ActivityLoggingIntegration,
+  IActivityLoggingIntegration
+} from './activityLoggingIntegration';
+
+// 設定関連
+export {
   ActivityLoggingConfig,
   createDefaultConfig,
   createActivityLoggingIntegration 
-} from './activityLoggingIntegration';
+} from './config';
 
 export { 
   SystemMigrator, 
@@ -19,11 +25,11 @@ export {
 } from './systemMigrator';
 
 import { Client } from 'discord.js';
+import { ActivityLoggingIntegration } from './activityLoggingIntegration';
 import { 
-  ActivityLoggingIntegration, 
   ActivityLoggingConfig, 
   createDefaultConfig 
-} from './activityLoggingIntegration';
+} from './config';
 import { config } from '../config';
 import { DATABASE_PATHS } from '../database/simplePathConfig';
 import { logger } from '../utils/logger';
@@ -59,8 +65,12 @@ export async function integrateActivityLogging(
       throw new Error('データベースパスが設定されていません');
     }
 
-    // 活動記録システムを初期化
-    const integration = new ActivityLoggingIntegration(finalConfig);
+    // リポジトリを作成
+    const { PartialCompositeRepository } = await import('../repositories/PartialCompositeRepository');
+    const repository = new PartialCompositeRepository(finalConfig.databasePath);
+    
+    // V2版の活動記録システムを初期化
+    const integration = new ActivityLoggingIntegration(repository, finalConfig);
     await integration.initialize();
 
     // Discord Botに統合
@@ -98,7 +108,12 @@ export async function createTestIntegration(
   testConfig.debugMode = true;
   testConfig.enableAutoAnalysis = false; // テスト中は自動分析を無効
 
-  const integration = new ActivityLoggingIntegration(testConfig);
+  // リポジトリを作成
+  const { PartialCompositeRepository } = await import('../repositories/PartialCompositeRepository');
+  const repository = new PartialCompositeRepository(testConfig.databasePath);
+  
+  // V2版の活動記録システムを初期化
+  const integration = new ActivityLoggingIntegration(repository, testConfig);
   await integration.initialize();
   
   return integration;

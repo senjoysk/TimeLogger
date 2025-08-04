@@ -4,7 +4,7 @@
  * DynamicReportSchedulerと連携して実際の日次レポートを送信
  */
 
-import { ActivityLoggingIntegration } from '../integration/activityLoggingIntegration';
+import { ActivityLoggingIntegration } from '../integration';
 import { TaskLoggerBot } from '../bot';
 import { ActivityLogError } from '../types/activityLog';
 import { logger } from '../utils/logger';
