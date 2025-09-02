@@ -79,17 +79,52 @@ export class TodoInteractionHandler implements ITodoInteractionHandler {
       return;
     }
 
+    // 優先度変更（選択肢提示）
+    if (action === 'priority') {
+      const buttons = new ActionRowBuilder<ButtonBuilder>()
+        .addComponents(
+          new ButtonBuilder()
+            .setCustomId(`todo_priority1_${todo.id}`)
+            .setLabel('🔴 高')
+            .setStyle(ButtonStyle.Danger),
+          new ButtonBuilder()
+            .setCustomId(`todo_priority0_${todo.id}`)
+            .setLabel('🟡 普通')
+            .setStyle(ButtonStyle.Primary),
+          new ButtonBuilder()
+            .setCustomId(`todo_priority-1_${todo.id}`)
+            .setLabel('🟢 低')
+            .setStyle(ButtonStyle.Secondary)
+        );
+
+      await interaction.reply({
+        content: '🎯 優先度を選択してください',
+        components: [buttons],
+        ephemeral: true,
+      });
+      return;
+    }
+
+    // 優先度更新（priority1 / priority0 / priority-1）
+    if (action.startsWith('priority') && action !== 'priority') {
+      const valueStr = action.replace('priority', '');
+      const newPriority = Number(valueStr);
+      if (Number.isNaN(newPriority) || ![-1, 0, 1].includes(newPriority)) {
+        await interaction.reply({ content: '❌ 無効な優先度です。', ephemeral: true });
+        return;
+      }
+      await this.todoRepository.updateTodo(todo.id, { priority: newPriority });
+      const label = this.getPriorityDisplay(newPriority);
+      await interaction.reply({ content: `🎯 優先度を ${label} に更新しました。`, ephemeral: true });
+      return;
+    }
+
     switch (action) {
       case 'complete':
         await this.todoRepository.updateTodoStatus(todo.id, 'completed');
         await interaction.reply({ content: `🎉 TODO「${todo.content}」を完了しました！`, ephemeral: true });
         break;
-        
-      case 'start':
-        await this.todoRepository.updateTodoStatus(todo.id, 'in_progress');
-        await interaction.reply({ content: `🚀 TODO「${todo.content}」を開始しました！`, ephemeral: true });
-        break;
-        
+
       case 'edit':
         await interaction.reply({ 
           content: `✏️ TODO編集は \`!todo edit ${todo.id} <新しい内容>\` コマンドを使用してください。`, 

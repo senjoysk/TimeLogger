@@ -213,14 +213,13 @@ export function createTodoActionButtons(
     );
   }
 
-  if (status === 'pending') {
-    buttons.addComponents(
-      new ButtonBuilder()
-        .setCustomId(`todo_start_${todoId}`)
-        .setLabel(`${numberPrefix}🚀 開始`)
-        .setStyle(ButtonStyle.Primary)
-    );
-  }
+  // ステータスに関係なく、常に優先度変更ボタンを表示
+  buttons.addComponents(
+    new ButtonBuilder()
+      .setCustomId(`todo_priority_${todoId}`)
+      .setLabel(`${numberPrefix}🎯 優先度変更`)
+      .setStyle(ButtonStyle.Primary)
+  );
 
   buttons.addComponents(
     new ButtonBuilder()
