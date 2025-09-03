@@ -231,20 +231,22 @@ describe('ClassificationResultEmbed', () => {
     test('in_progress状態のTODOアクションボタン', () => {
       const buttons = createTodoActionButtons('todo-456', 'in_progress');
 
-      expect(buttons.components).toHaveLength(3); // 完了、編集、削除（開始なし）
+      expect(buttons.components).toHaveLength(4); // 完了、優先度変更、編集、削除
       
       expect(buttons.components[0]).toBeDefined();
       expect(buttons.components[1]).toBeDefined();
       expect(buttons.components[2]).toBeDefined();
+      expect(buttons.components[3]).toBeDefined();
     });
 
     test('completed状態のTODOアクションボタン', () => {
       const buttons = createTodoActionButtons('todo-789', 'completed');
 
-      expect(buttons.components).toHaveLength(2); // 編集、削除のみ（完了・開始なし）
+      expect(buttons.components).toHaveLength(3); // 優先度変更、編集、削除（完了なし）
       
       expect(buttons.components[0]).toBeDefined();
       expect(buttons.components[1]).toBeDefined();
+      expect(buttons.components[2]).toBeDefined();
     });
 
     test('すべてのボタンに適切なIDが設定される', () => {

@@ -126,24 +126,37 @@ describe('🔴 Red Phase: TodoInteractionHandler分離テスト', () => {
       expect(updatedTodo?.status).toBe('completed');
     });
 
-    test('TODO開始ボタンが正しく動作する', async () => {
+    test('優先度変更の選択肢が提示される', async () => {
       // 事前にTODOを作成
       const todo = await mockTodoRepo.createTodo({
         userId: 'test-user',
         content: 'テスト用TODO'
       });
 
-      const interaction = createMockButtonInteraction(`todo_start_${todo.id}`, 'test-user') as ButtonInteraction;
+      const interaction = createMockButtonInteraction(`todo_priority_${todo.id}`, 'test-user') as ButtonInteraction;
       
-      await handler.handleTodoActionButton(interaction, 'start', todo.id, 'test-user', 'Asia/Tokyo');
+      await handler.handleTodoActionButton(interaction, 'priority', todo.id, 'test-user', 'Asia/Tokyo');
       
       expect(interaction.reply).toHaveBeenCalled();
       const replyCall = (interaction.reply as jest.Mock).mock.calls[0][0];
-      expect(replyCall.content).toContain('🚀');
-      expect(replyCall.content).toContain('開始しました');
+      expect(replyCall.content).toContain('優先度を選択');
+      expect(replyCall.ephemeral).toBe(true);
+    });
+
+    test('優先度が更新される', async () => {
+      const todo = await mockTodoRepo.createTodo({
+        userId: 'test-user',
+        content: 'テスト用TODO',
+        priority: 0,
+      });
+
+      const interaction = createMockButtonInteraction(`todo_priority1_${todo.id}`, 'test-user') as ButtonInteraction;
       
-      const updatedTodo = await mockTodoRepo.getTodoById(todo.id);
-      expect(updatedTodo?.status).toBe('in_progress');
+      await handler.handleTodoActionButton(interaction, 'priority1', todo.id, 'test-user', 'Asia/Tokyo');
+      
+      expect(interaction.reply).toHaveBeenCalled();
+      const updated = await mockTodoRepo.getTodoById(todo.id);
+      expect(updated?.priority).toBe(1);
     });
 
     test('TODO削除ボタンが正しく動作する', async () => {
